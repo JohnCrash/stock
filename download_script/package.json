@@ -1,0 +1,17 @@
+{
+  "name": "download_script",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^2.6.1",
+    "big-integer": "^1.6.40",
+    "crawler": "^1.2.0",
+    "mysql": "^2.16.0"
+  }
+}
