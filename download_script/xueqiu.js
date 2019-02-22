@@ -17,7 +17,8 @@ var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; __
 //var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; _ga=GA1.2.564054628.1547831580; Hm_lvt_fe218c11eab60b6ab1b6f84fb38bcc4a=1548040243; _gid=GA1.2.2077977505.1548294644; xq_a_token=8dd2cc84915c45983930bb32e788dc93e0fcfddd; xq_a_token.sig=rjG2G1sq6nNdwvwGHxpwqDYbk3s; xq_r_token=5bb4c968b369150a382906ceba61eb8763282a13; xq_r_token.sig=eoelFajTh7zpqBNrEdBVD9rYjbw; Hm_lvt_1db88642e346389874251b5a1eded6e3=1548294644,1548299106,1548375753,1548463656; _gat_gtag_UA_16079156_4=1; u=721548463656672; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1548463660';
 //var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; _ga=GA1.2.564054628.1547831580; Hm_lvt_fe218c11eab60b6ab1b6f84fb38bcc4a=1548040243; _gid=GA1.2.209931511.1550060636; xq_a_token=340cd8594a60098b3a9101bfed3c937ef2a41ae3; xq_a_token.sig=X5wPD5esioe_4cV4REojaNVJuMg; xq_r_token=9b4eeb50e2b16a45217033dcc55df006837cff00; xq_r_token.sig=Y3KOMJ2JkHB5ccV0Re2uvclcddY; Hm_lvt_1db88642e346389874251b5a1eded6e3=1550060636,1550127249,1550203847,1550237793; u=441550237793218; _gat_gtag_UA_16079156_4=1; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1550237806';
 //var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; _ga=GA1.2.564054628.1547831580; Hm_lvt_fe218c11eab60b6ab1b6f84fb38bcc4a=1548040243; _gid=GA1.2.209931511.1550060636; xq_a_token=340cd8594a60098b3a9101bfed3c937ef2a41ae3; xq_a_token.sig=X5wPD5esioe_4cV4REojaNVJuMg; xq_r_token=9b4eeb50e2b16a45217033dcc55df006837cff00; xq_r_token.sig=Y3KOMJ2JkHB5ccV0Re2uvclcddY; u=741550318108222; Hm_lvt_1db88642e346389874251b5a1eded6e3=1550203847,1550237793,1550285970,1550318108; _gat_gtag_UA_16079156_4=1; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1550321763';
-var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; _ga=GA1.2.564054628.1547831580; Hm_lvt_fe218c11eab60b6ab1b6f84fb38bcc4a=1548040243; _gid=GA1.2.209931511.1550060636; xq_a_token=340cd8594a60098b3a9101bfed3c937ef2a41ae3; xq_a_token.sig=X5wPD5esioe_4cV4REojaNVJuMg; xq_r_token=9b4eeb50e2b16a45217033dcc55df006837cff00; xq_r_token.sig=Y3KOMJ2JkHB5ccV0Re2uvclcddY; Hm_lvt_1db88642e346389874251b5a1eded6e3=1550237793,1550285970,1550318108,1550399051; u=561550399050848; _gat_gtag_UA_16079156_4=1; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1550399365';
+//var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; _ga=GA1.2.564054628.1547831580; Hm_lvt_fe218c11eab60b6ab1b6f84fb38bcc4a=1548040243; _gid=GA1.2.209931511.1550060636; xq_a_token=340cd8594a60098b3a9101bfed3c937ef2a41ae3; xq_a_token.sig=X5wPD5esioe_4cV4REojaNVJuMg; xq_r_token=9b4eeb50e2b16a45217033dcc55df006837cff00; xq_r_token.sig=Y3KOMJ2JkHB5ccV0Re2uvclcddY; Hm_lvt_1db88642e346389874251b5a1eded6e3=1550237793,1550285970,1550318108,1550399051; u=561550399050848; _gat_gtag_UA_16079156_4=1; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1550399365';
+var xuequeCookie = 'xq_a_token=0d73a36f00a0e985d381412742c39d12fb3ca56a; xq_a_token.sig=knknlVAPG2nkQ9enLy6gnEylv5w; xq_r_token=18d38484159ce73ae3451797d6517a41efa531b1; xq_r_token.sig=_SVEXsDz6FhNpFjXlGS8TPj_T7Q; _ga=GA1.2.1181448870.1550643624; _gid=GA1.2.230571212.1550643624; _gat=1; Hm_lvt_1db88642e346389874251b5a1eded6e3=1550643624; u=291550643626655; s=ds11jo7273; device_id=c23e116dd6bed04938f77815772ad027; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1550643643';
 
 /**
  * 从雪球玩获得行业分类表(主要下面代码没有排重)
@@ -466,55 +467,42 @@ function kd_companys(p){
     }else{
         doit();
     }
-    let N = 5;
     function doit(){
         connection.query('select * from company where category_base!=9 and done=0 order by id',(error, results, field)=>{
             if(error){
                 console.error(error);
             }else{
-                let aas = [];
-                let segment = Math.ceil(results.length/N);
-                console.info('Total number of companies ',results.length);
-                for(let s=0;s<results.length;s+=segment){
-                    let a = [];
-                    let n = s+segment<results.length?segment:results.length-s;
-                    for(let i=s;i<s+n;i++){
-                        let it = results[i];
-                        a.push(function(cb){
-                            kd_company(it.id,it.code,(error)=>{
-                                if(error){
-                                    connection.query(`delete from kd_xueqiu where id=${it.id}`,(error, results, field)=>{
-                                        if(error)console.error(error);
-                                    });
-                                    cb(error);
-                                }else{
-                                    connection.query(`update company set done=1 where id=${it.id}`,(error, results, field)=>{
-                                        if(error){
-                                            console.error(error);
-                                            cb(error);
-                                        }else{
-                                            kd_company_update_range(it.id,it.code,it.name,(err)=>{
-                                                console.log(it.code,it.name,'PASS');
-                                                cb(err);
-                                            });
-                                        }
-                                    });    
-                                }
-                            });
-                        });
-                    }
-                    aas.push((cb)=>{
-                        async.series(a,(err,results)=>{
-                            cb(err,results);
+                let a = [];
+                for(let i=0;i<results.length;i++){
+                    let it = results[i];
+                    a.push(function(cb){
+                        kd_company(it.id,it.code,(error)=>{
+                            if(error){
+                                connection.query(`delete from kd_xueqiu where id=${it.id}`,(error, results, field)=>{
+                                    if(error)console.error(error);
+                                });
+                                cb(error);
+                            }else{
+                                connection.query(`update company set done=1 where id=${it.id}`,(error, results, field)=>{
+                                    if(error){
+                                        console.error(error);
+                                        cb(error);
+                                    }else{
+                                        kd_company_update_range(it.id,it.code,it.name,(err)=>{
+                                            console.log(it.code,it.name,'PASS');
+                                            cb(err);
+                                        });
+                                    }
+                                });    
+                            }
                         });
                     });
                 }
                 //
-                let total = 0;
+                let total = results.length;
                 let t = Date.now();
-                aas.forEach((it)=>{total+=it.length});
-                console.info('Task group = ',N,'Segment = ',segment,'total = ',total);
-                async.parallel(aas,(err, results)=>{
+                console.log('Number of pending',total);
+                async.parallelLimit(a,10,(err, results)=>{
                     connection.query('select count(*) as count from company where category_base!=9 and done=0 order by id',(error, results, field)=>{
                         if(error){
                             console.error(error);
