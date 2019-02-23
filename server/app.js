@@ -34,14 +34,17 @@ app.post('/api/k', function(req, res){
     connection.query(`select * from company where code='${req.body.code}'`,(error, results, field)=>{
         if(error){
             res.json({error});
-        }else{
-            connection.query(`select * from kd_xueqiu where id=${results[0].id} order by date desc limit 1000`,(error, results, field)=>{  
+        }else if(results.length===1){
+            let name  = results[0].name;
+            connection.query(`select * from kd_xueqiu where id=${results[0].id} order by date desc limit 360`,(error, results, field)=>{  
                 if(error){
                     res.json({error});
                 }else{
-                    res.json({results,field});
+                    res.json({results,field,name});
                 }
             });        
+        }else{
+            res.json({error:`Not found '${req.body.code}'`});
         }
     });
 });

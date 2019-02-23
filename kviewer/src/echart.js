@@ -5,7 +5,10 @@ class EChart extends Component{
         super(props);  
     }
     componentDidMount(){
-        echarts.init(this.node).setOption(this.props.options);
+        this.chart = echarts.init(this.node);
+    }
+    componentDidUpdate(prevProps, prevState, snapshot){
+        this.chart.setOption(this.props.options);
     }
     render(){
         let {width,height} = this.props;

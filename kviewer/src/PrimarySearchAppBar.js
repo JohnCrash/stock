@@ -177,11 +177,12 @@ class PrimarySearchAppBar extends React.Component {
                 <SearchIcon />
               </div>
               <InputBase
-                placeholder="Search…"
+                placeholder="SH000001"
                 classes={{
                   root: classes.inputRoot,
                   input: classes.inputInput,
                 }}
+                onChange={(event)=>{this.props.onSearchChange(event.target.value)}}
               />
             </div>
           </Toolbar>

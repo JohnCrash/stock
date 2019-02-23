@@ -4,12 +4,26 @@ import './App.css';
 import PrimarySearchAppBar from './PrimarySearchAppBar';
 import KView from './kview';
 
+function isStockCode(code){
+  if(code && code.length===8){
+    return code.match(/[sh|sz]\d{6}/i);
+  }else{
+    return false;
+  }
+}
+
 class App extends Component {
+  constructor(props){
+    super(props);
+    this.state={code:'SH000001'};
+  }
   render() {
     return (
       <div>
-        <PrimarySearchAppBar/>
-        <KView width={1600} height={1024} />
+        <PrimarySearchAppBar onSearchChange={(text)=>{
+            if(isStockCode(text))this.setState({code:text.toUpperCase()})
+          }}/>
+        <KView width={'100%'} height={640} code={this.state.code}/>
       </div>
     );
   }
