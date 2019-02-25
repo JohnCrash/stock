@@ -7,8 +7,10 @@ class EChart extends Component{
     componentDidMount(){
         this.chart = echarts.init(this.node);
     }
-    componentDidUpdate(prevProps, prevState, snapshot){
-        this.chart.setOption(this.props.options);
+    componentDidUpdate(nextProps, nextState, snapshot){
+        if(nextProps.options!==this.props.options){
+            this.chart.setOption(this.props.options); 
+        }
     }
     render(){
         let {width,height} = this.props;

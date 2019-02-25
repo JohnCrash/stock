@@ -13,17 +13,18 @@ const downBorderColor = '#008F28';
 
 class KView extends Component{
     constructor(props){
-        super(props);
+        super(props);  
         this.state = {options:{}};
     }
-    componentWillUpdate(){
-        this.initComponent();
+    componentWillUpdate(nextProps, nextState, snapshot){
+        if(nextProps.code!==this.props.code)
+            this.initComponent(nextProps.code);
     }
     componentDidMount(){
-        this.initComponent();
+        this.initComponent(this.props.code);
     }
-    initComponent(){
-        postJson('/api/k',{code:this.props.code},(json)=>{
+    initComponent(code){
+        postJson('/api/k',{code},(json)=>{
             if(json.results){
                 this.setState({options:this.initData(json.name,json.results)});
                 /*
@@ -53,6 +54,7 @@ class KView extends Component{
         let ma10 = [];
         let ma20 = [];
         let ma30 = [];
+        let macd = [];
         results.reverse().forEach(element => {
             let d = new Date(element.date);
             let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
@@ -62,6 +64,7 @@ class KView extends Component{
             ma10.push(element.ma10);
             ma20.push(element.ma20);
             ma30.push(element.ma30);
+            macd.push(element.macd);
         });
         return {
             title: {
@@ -77,36 +80,74 @@ class KView extends Component{
             legend: {
                 data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30']
             },
-            grid: {
-                left: '10%',
-                right: '10%',
-                bottom: '15%'
-            },
-            xAxis: {
-                type: 'category',
-                data: dates,
-                scale: true,
-                boundaryGap : false,
-                axisLine: {onZero: false},
-                splitLine: {show: false},
-                splitNumber: 20,
-                min: 'dataMin',
-                max: 'dataMax'
-            },
-            yAxis: {
-                scale: true,
-                splitArea: {
-                    show: true
+          
+            grid: [
+                {
+                    left: '1%',
+                    right: '1%',
+                    height: '50%'
+                },
+                {
+                    left: '1%',
+                    right: '1%',
+                    top: '63%',
+                    height: '16%'
                 }
-            },
+            ],
+            xAxis: [
+                {
+                    type: 'category',
+                    data: dates,
+                    scale: true,
+                    boundaryGap : false,
+                    axisLine: {onZero: false},
+                    splitLine: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax'
+                },
+                {
+                    type: 'category',
+                    gridIndex: 1,
+                    data: dates,
+                    scale: true,
+                    boundaryGap : false,
+                    axisLine: {onZero: false},
+                    axisTick: {show: false},
+                    splitLine: {show: false},
+                    axisLabel: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax'
+                }
+            ],
+            yAxis: [
+                {
+                    scale: true,
+                    splitArea: {
+                        show: true
+                    }
+                },
+                {
+                    scale: true,
+                    gridIndex: 1,
+                    splitNumber: 2,
+                    axisLabel: {show: false},
+                    axisLine: {show: false},
+                    axisTick: {show: false},
+                    splitLine: {show: false}
+                }
+            ],
             dataZoom: [
                 {
                     type: 'inside',
-                    start: 90,
+                    xAxisIndex: [0, 1],
+                    start: 80,
                     end: 100
                 },
                 {
                     show: true,
+                    xAxisIndex: [0, 1],
                     type: 'slider',
                     y: '90%',
                     start: 50,
@@ -135,14 +176,7 @@ class KView extends Component{
                             }
                         },
                         data: [
-                            {
-                                name: 'XX标点',
-                                coord: ['2013/5/31', 2300],
-                                value: 2300,
-                                itemStyle: {
-                                    normal: {color: 'rgb(41,60,85)'}
-                                }
-                            },
+
                             {
                                 name: 'highest value',
                                 type: 'max',
@@ -243,7 +277,14 @@ class KView extends Component{
                     lineStyle: {
                         normal: {color:'#ef6c00'}
                     }
-                }                 
+                },
+                {
+                    name: 'MACD',
+                    type: 'bar',
+                    xAxisIndex: 1,
+                    yAxisIndex: 1,
+                    data: macd
+                }             
             ]            
         };
     }
@@ -276,7 +317,8 @@ class KView extends Component{
         return result;
     }
     render(){
-        return <EChart options={this.state.options} {...this.props}/>;
+        let {width,height} = this.props
+        return <EChart options={this.state.options} width={width} height={height}/>;
     }
 };
 

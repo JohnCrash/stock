@@ -21,7 +21,7 @@ class App extends Component {
     return (
       <div>
         <PrimarySearchAppBar onSearchChange={(text)=>{
-            if(isStockCode(text))this.setState({code:text.toUpperCase()})
+            if(isStockCode(text.trim()))this.setState({code:text.trim().toUpperCase()})
           }}/>
         <KView width={'100%'} height={640} code={this.state.code}/>
       </div>
