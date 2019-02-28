@@ -8,8 +8,10 @@ const downBorderColor = '#008F28';
 
 function KMacdChart(props){
     let {} = props;
-    return <FetchChart api='/api/kmacd' args={{code:props.code}} init={
-        ({name,results})=>{
+    return <FetchChart api={['/api/k','/api/macd']} args={{code:props.code,range:40}} init={
+        (a)=>{
+            let name = a[0].name;
+            let results = a[0].results;
             let dates = [];
             let values = [];
             let ma5 = [];
@@ -42,7 +44,37 @@ function KMacdChart(props){
                 legend: {
                     data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30']
                 },
-              
+                visualMap: {
+                    show: false,
+                    seriesIndex: 5,
+                    dimension: 1,
+                    pieces: [{
+                        max: 0,
+                        color: downColor
+                    }, {
+                        min: 0,
+                        color: upColor
+                    }]
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    },
+                    backgroundColor: 'rgba(245, 245, 245, 0.5)',
+                    borderWidth: 1,
+                    borderColor: '#ccc',
+                    padding: 10,
+                    textStyle: {
+                        color: '#000'
+                    }                    
+                },    
+                axisPointer: {
+                    link: {xAxisIndex: 'all'},
+                    label: {
+                        backgroundColor: '#777'
+                    }
+                },                      
                 grid: [
                     {
                         left: '6%',
@@ -104,7 +136,7 @@ function KMacdChart(props){
                     {
                         type: 'inside',
                         xAxisIndex: [0, 1],
-                        start: 80,
+                        start: 98,
                         end: 100
                     },
                     {
@@ -112,7 +144,7 @@ function KMacdChart(props){
                         xAxisIndex: [0, 1],
                         type: 'slider',
                         y: '90%',
-                        start: 50,
+                        start: 90,
                         end: 100
                     }
                 ],
@@ -246,7 +278,7 @@ function KMacdChart(props){
                         xAxisIndex: 1,
                         yAxisIndex: 1,
                         data: macd
-                    }             
+                    }                             
                 ]            
             };          
         }
