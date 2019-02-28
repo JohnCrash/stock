@@ -340,11 +340,11 @@ function kd_company(id,code,callback){
     /**
      * 第一步找到数据库中最近的一条记录
      */
-    connection.query(`SELECT MAX(uuid) as r FROM kd_xueqiu where id=${id};`,(error, results, field)=>{
+    connection.query(`SELECT MAX(date) as r FROM kd_xueqiu where id=${id};`,(error, results, field)=>{
         /**
          * 第二步覆盖最开头的数据
          */
-        let head_uuid = error?null:results[0].r;
+        let head_date = error?null:results[0].r;
         let nextdate;
         let c = new Crawler({
             maxConnections : 1,
@@ -364,18 +364,18 @@ function kd_company(id,code,callback){
                                 let date = new Date(it[0]);
                                 let dateString = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
                                 let sqlStr;
-                                if(head_uuid && uuid===head_uuid){
+                                if(head_date && date===head_date){
                                     //接头部分需要覆盖
                                     console.log(code,'update : ',dateString);
                                     let cols = columns.map((v,i)=>`${v}=${it[i]}`);
-                                    sqlStr = `update kd_xueqiu set ${cols.slice(1,18).join()},${cols.slice(19).join()} where uuid=${uuid}`;
+                                    sqlStr = `update kd_xueqiu set ${cols.slice(1,18).join()},${cols.slice(19).join()} where id=${id} and date='${dateString}'`;
                                     needContinue = false;
                                 }else{
                                     //如果存在指定的id和date就不插入，否则就插入
                                     console.log(code,'insert : ',dateString);
                                     //ma20重复了index在18
                                     let cols = it.map((v)=>`${v}`); //避免join出,,,
-                                    sqlStr =`insert ignore into kd_xueqiu values (${uuid},${id},'${dateString}',${cols.slice(1,18).join()},${cols.slice(19).join()})`;
+                                    sqlStr =`insert ignore into kd_xueqiu values (${id},'${dateString}',${cols.slice(1,18).join()},${cols.slice(19).join()})`;
                                 }
                                 connection.query(sqlStr,(error, results, field)=>{
                                     if(error){

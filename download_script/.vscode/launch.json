@@ -7,6 +7,12 @@
     {
         "type": "node",
         "request": "launch",
+        "name": "MACD策略分析",
+        "program": "${workspaceFolder}/macd.js"
+    },
+    {
+        "type": "node",
+        "request": "launch",
         "name": "雪球取得行业分类",
         "program": "${workspaceFolder}/xueqiu.js"
     },

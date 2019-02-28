@@ -17,31 +17,16 @@ class KView extends Component{
         this.state = {options:{}};
     }
     componentWillUpdate(nextProps, nextState, snapshot){
-        if(nextProps.code!==this.props.code)
-            this.initComponent(nextProps.code);
+        if(nextProps.code!==this.props.code||nextProps.range!==this.props.range)
+            this.initComponent(nextProps);
     }
     componentDidMount(){
-        this.initComponent(this.props.code);
+        this.initComponent(this.props);
     }
-    initComponent(code){
-        postJson('/api/k',{code},(json)=>{
+    initComponent({code,range}){
+        postJson('/api/k',{code,range},(json)=>{
             if(json.results){
                 this.setState({options:this.initData(json.name,json.results)});
-                /*
-                let options = {
-                    xAxis: {
-                        type: 'category',
-                        data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                    },
-                    yAxis: {
-                        type: 'value'
-                    },
-                    series: [{
-                        data: [820, 932, 901, 934, 1290, 1330, 1320],
-                        type: 'line'
-                    }]
-                };
-                this.setState({options});*/
             }else{
                 console.error(json.error);
             }
@@ -80,16 +65,27 @@ class KView extends Component{
             legend: {
                 data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30']
             },
-          
+            visualMap: {
+                show: false,
+                seriesIndex: 5,
+                dimension: 1,
+                pieces: [{
+                    max: 0,
+                    color: downColor
+                }, {
+                    min: 0,
+                    color: upColor
+                }]
+            }, 
             grid: [
                 {
-                    left: '1%',
-                    right: '1%',
+                    left: '6%',
+                    right: '6%',
                     height: '50%'
                 },
                 {
-                    left: '1%',
-                    right: '1%',
+                    left: '6%',
+                    right: '6%',
                     top: '63%',
                     height: '16%'
                 }

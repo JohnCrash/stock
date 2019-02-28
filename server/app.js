@@ -30,13 +30,86 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(serveStatic('public'));
 
+function isStockCode(code){
+    if(code && code.length===8){
+      return code.match(/[sh|sz]\d{6}/i);
+    }else{
+      return false;
+    }
+}
+/**
+ * k线图查询
+ */
 app.post('/api/k', function(req, res){
-    connection.query(`select * from company where code='${req.body.code}'`,(error, results, field)=>{
+    let queryStr;
+    if(isStockCode(req.body.code)){
+        queryStr = `code='${req.body.code}'`;
+    }else{
+        queryStr = `name='${req.body.code}'`;
+    }
+    connection.query(`select * from company where ${queryStr}`,(error, results, field)=>{
         if(error){
             res.json({error});
         }else if(results.length===1){
             let name  = results[0].name;
-            connection.query(`select * from kd_xueqiu where id=${results[0].id} order by date desc limit 360`,(error, results, field)=>{  
+            let ry = req.body.range?req.body.range:1;
+            connection.query(`select * from kd_xueqiu where id=${results[0].id} order by date desc limit ${ry*243}`,(error, results, field)=>{  
+                if(error){
+                    res.json({error});
+                }else{
+                    res.json({results,field,name});
+                }
+            });        
+        }else{
+            res.json({error:`Not found '${req.body.code}'`});
+        }
+    });
+});
+
+/**
+ * macd交易查询
+ */
+app.post('/api/macd', function(req, res){
+    let queryStr;
+    if(isStockCode(req.body.code)){
+        queryStr = `code='${req.body.code}'`;
+    }else{
+        queryStr = `name='${req.body.code}'`;
+    }
+    connection.query(`select * from company where ${queryStr}`,(error, results, field)=>{
+        if(error){
+            res.json({error});
+        }else if(results.length===1){
+            let name  = results[0].name;
+            connection.query(`select * from tech_macd where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
+                if(error){
+                    res.json({error});
+                }else{
+                    res.json({results,field,name});
+                }
+            });        
+        }else{
+            res.json({error:`Not found '${req.body.code}'`});
+        }
+    });
+});
+
+/**
+ * macd交易查询和k一起发出
+ */
+app.post('/api/kmacd', function(req, res){
+    let queryStr;
+    if(isStockCode(req.body.code)){
+        queryStr = `code='${req.body.code}'`;
+    }else{
+        queryStr = `name='${req.body.code}'`;
+    }
+    connection.query(`select * from company where ${queryStr}`,(error, results, field)=>{
+        if(error){
+            res.json({error});
+        }else if(results.length===1){
+            let name  = results[0].name;
+            connection.query(`select * from tech_macd where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
                 if(error){
                     res.json({error});
                 }else{
