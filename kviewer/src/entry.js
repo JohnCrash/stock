@@ -17,7 +17,8 @@ const Entry = [
     {
         title:'MACD',
         icon:<TrendingUp />,
-        view:<MACDView />
+        view:<MACDView />,
+        default:true
     }
 ];
 

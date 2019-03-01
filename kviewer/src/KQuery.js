@@ -36,7 +36,7 @@ class KQuery extends React.Component{
         this.setState({code:this.inputRef.value});
     }
     handeChangeRange(event,value){
-        this.setState({range:Number(value)});
+        this.setState({range:value});
     }
     render(){
         const {classes} = this.props;
@@ -47,10 +47,10 @@ class KQuery extends React.Component{
                     <Button variant="contained" color="primary" className={classes.button} onClick={this.handleQuery.bind(this)}>查询</Button>
                     <FormControl component="fieldset">
                         <RadioGroup row name="range"  value={range} onChange={this.handeChangeRange.bind(this)}>
-                            <FormControlLabel value={1} control={<Radio />} label="1年" />
-                            <FormControlLabel value={5} control={<Radio />} label="5年" />
-                            <FormControlLabel value={10} control={<Radio />} label="10年" />                    
-                            <FormControlLabel value={40} control={<Radio />} label="全部" />                    
+                            <FormControlLabel value={"1"} control={<Radio />} label="1年" />
+                            <FormControlLabel value={"5"} control={<Radio />} label="5年" />
+                            <FormControlLabel value={"10"} control={<Radio />} label="10年" />                    
+                            <FormControlLabel value={"40"} control={<Radio />} label="全部" />                    
                         </RadioGroup>                    
                     </FormControl>
                 </Paper>

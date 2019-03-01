@@ -31,10 +31,10 @@ function KMacdChart(props){
                 macd.push(element.macd);
             });
             return {
-                title: {
-                    text: name?name:'上证指数',
-                    left: 0
-                },
+            //    title: {
+            //        text: name?name:'上证指数',
+            //        left: 0
+            //    },
                 tooltip: {
                     trigger: 'axis',
                     axisPointer: {

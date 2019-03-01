@@ -19,9 +19,9 @@ function MacdChart(props){
                 values.push(e.rate);
             });        
             return {
-                title: {
-                    text: name
-                },
+            //    title: {
+            //        text: name
+            //    },
                 legend: {
                     data: [name],
                     align: 'left'

@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import EChart from './echart';
 import {postJson} from './fetch';
 import async from 'async';
+import {Eq} from './kits';
 
 class FetchChart extends Component{
     constructor(props){
@@ -9,8 +10,9 @@ class FetchChart extends Component{
         this.state = {options:{}};
     }
     componentWillUpdate(nextProps, nextState, snapshot){
-        if(nextProps.api!==this.props.api||nextProps.args!==this.props.args||nextProps.init!=this.props.init)
+        if(!Eq(nextProps.api,this.props.api)||!Eq(nextProps.args,this.props.args)){
             this.initComponent(nextProps);
+        }
     }
     componentDidMount(){
         this.initComponent(this.props);

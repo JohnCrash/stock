@@ -55,7 +55,7 @@ app.post('/api/k', function(req, res){
             let ry = req.body.range?req.body.range:1;
             connection.query(`select * from kd_xueqiu where id=${results[0].id} order by date desc limit ${ry*243}`,(error, results, field)=>{  
                 if(error){
-                    res.json({error});
+                    res.json({error:error.sqlMessage});
                 }else{
                     res.json({results,field,name});
                 }
@@ -83,7 +83,7 @@ app.post('/api/macd', function(req, res){
             let name  = results[0].name;
             connection.query(`select * from tech_macd where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
                 if(error){
-                    res.json({error});
+                    res.json({error:error.sqlMessage});
                 }else{
                     res.json({results,field,name});
                 }
@@ -95,31 +95,37 @@ app.post('/api/macd', function(req, res){
 });
 
 /**
- * macd交易查询和k一起发出
+ * 股票选择
  */
-app.post('/api/kmacd', function(req, res){
+app.post('/api/select', function(req, res){
     let queryStr;
-    if(isStockCode(req.body.code)){
-        queryStr = `code='${req.body.code}'`;
+    let cmd = req.body.cmd;
+    if(cmd &&cmd[0]==='#'){
+        connection.query(`select * from company_detail where ${cmd.slice(1)}`,(error, results, field)=>{
+            if(error){
+                res.json({error:error.sqlMessage});
+            }else if(results.length===0){
+                res.json({error:`Not found '${cmd}'`});
+            }else{
+                res.json({results});
+            }
+        });
     }else{
-        queryStr = `name='${req.body.code}'`;
-    }
-    connection.query(`select * from company where ${queryStr}`,(error, results, field)=>{
-        if(error){
-            res.json({error});
-        }else if(results.length===1){
-            let name  = results[0].name;
-            connection.query(`select * from tech_macd where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
-                if(error){
-                    res.json({error});
-                }else{
-                    res.json({results,field,name});
-                }
-            });        
+        if(isStockCode(cmd)){
+            queryStr = `code='${cmd}'`;
         }else{
-            res.json({error:`Not found '${req.body.code}'`});
+            queryStr = `name='${cmd}'`;
         }
-    });
+        connection.query(`select * from company_detail where ${queryStr}`,(error, results, field)=>{
+            if(error){
+                res.json({error:error.sqlMessage});
+            }else if(results.length===0){
+                res.json({error:`Not found '${cmd}'`});
+            }else{
+                res.json({results});
+            }
+        });
+    }
 });
 
 // catch 404 and forward to error handler
