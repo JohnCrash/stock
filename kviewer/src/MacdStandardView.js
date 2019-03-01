@@ -61,17 +61,4 @@ class MacdStandardView extends Component{
     }
 }
 
-/*
-            <Paper className={classes.paper}>
-                <Typography>
-                    严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。
-                </Typography>
-            </Paper>
-            <Paper className={classes.paper}>
-                <TextField id="id-name" placeholder="股票名称或者代码" className={classes.textField} margin="normal" inputRef={(ref)=>this.inputRef=ref}/>
-                <Button variant="contained" color="primary" className={classes.button} onClick={this.handleQuery.bind(this)}>查询</Button>
-            </Paper>
-            <MacdChart width={'100%'} height={640} code={this.state.code} />
-            <KMacdChart width={'100%'} height={640} code={this.state.code} />
-*/
 export default withStyles(styles)(MacdStandardView);

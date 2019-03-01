@@ -55,6 +55,9 @@ const styles = theme => ({
     handleCloseSnackbar=(event)=>{
         this.setState({ openbar: false });
     };
+    handleCloseDialog=(result,args)=>()=>{
+        this.props.onClose(result,args);
+    };
     render(){
         const { classes,onClose } = this.props;
         const { companys,openbar,err} = this.state;
@@ -63,7 +66,7 @@ const styles = theme => ({
                 fullWidth={true}
                 maxWidth={'xl'}
                 open={this.props.open}
-                onClose={onClose}
+                onClose={this.handleCloseDialog('cancel')}
                 aria-labelledby="form-dialog-title"
               >
                 <DialogTitle id="form-dialog-title">股票选择</DialogTitle>
@@ -80,31 +83,11 @@ const styles = theme => ({
                   />
                   <CompanySelectTable data={companys}/>
                 </DialogContent>
-                <DialogActions>
-                <TextField
-                        id="date"
-                        label="起始日期"
-                        type="date"
-                        defaultValue="2017-05-24"
-                        className={classes.textField}
-                        InputLabelProps={{
-                        shrink: true,
-                        }}
-                    />
-                    <TextField
-                        id="date"
-                        label="结束日期"
-                        type="date"
-                        defaultValue="2017-05-24"
-                        className={classes.textField}
-                        InputLabelProps={{
-                        shrink: true,
-                        }}
-                    />                     
-                  <Button onClick={onClose} color="primary">
+                <DialogActions>                   
+                  <Button onClick={this.handleCloseDialog('cancel')} color="primary">
                     取消
                   </Button>
-                  <Button onClick={onClose} color="primary">
+                  <Button onClick={this.handleCloseDialog('ok',companys)} color="primary">
                     确定
                   </Button>
                 </DialogActions>

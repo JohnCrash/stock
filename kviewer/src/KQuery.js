@@ -8,6 +8,7 @@ import RadioGroup from '@material-ui/core/RadioGroup';
 import Radio from '@material-ui/core/Radio';
 import FormControl from '@material-ui/core/FormControl';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
+import {CompanyContext} from './CompanyContext';
 
 /**
  * 测试查看K日数据库是否正确
@@ -30,21 +31,17 @@ const styles = theme => ({
 class KQuery extends React.Component{
     constructor(props){
         super(props);
-        this.state = {code:'SH000001',range:1};
-    }
-    handleQuery = (event)=>{
-        this.setState({code:this.inputRef.value});
+        this.state = {range:1};
     }
     handeChangeRange(event,value){
         this.setState({range:value});
     }
     render(){
         const {classes} = this.props;
-        let {code,range} = this.state;
+        let {range} = this.state;
+
         return <div>
                 <Paper className={classes.paper}>
-                    <TextField id="id-name" placeholder="股票名称或者代码" className={classes.textField} margin="normal" inputRef={(ref)=>this.inputRef=ref}/>
-                    <Button variant="contained" color="primary" className={classes.button} onClick={this.handleQuery.bind(this)}>查询</Button>
                     <FormControl component="fieldset">
                         <RadioGroup row name="range"  value={range} onChange={this.handeChangeRange.bind(this)}>
                             <FormControlLabel value={"1"} control={<Radio />} label="1年" />
@@ -54,9 +51,11 @@ class KQuery extends React.Component{
                         </RadioGroup>                    
                     </FormControl>
                 </Paper>
-                <KView width={'100%'} height={640} code={code} range={range}/>
+                <KView width={'100%'} height={640} code={this.context.code} range={range}/>
             </div>;
     }
 }
 
-export default withStyles(styles)(KQuery);
+KQuery.contextType  = CompanyContext;
+
+export default withStyles(styles)(KQuery)

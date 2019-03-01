@@ -18,6 +18,8 @@ import Badge from '@material-ui/core/Badge';
 import AccountBalance from '@material-ui/icons/AccountBalance';
 import CompanySelect from './CompanySelect';
 import Entry from './entry';
+import {CompanyContext} from './CompanyContext';
+
 
 const drawerWidth = 240;
 
@@ -63,8 +65,28 @@ class App extends Component {
         break;
       }
     }
-    this.state={selectIdx:idx,open:false};
+    this.state={
+      selectIdx:idx,
+      open:false,
+      selector:[]
+    };
   }
+
+  handleCloseDialog(result,args){
+    if(result==='ok' && args){
+      let selects = [];
+      let code;
+      for(let v of args){
+        if(v.isSelected)
+          selects.push(v);
+      }
+      if(selects.length>0){
+        code = selects[0].code;
+        this.setState({ selector:{code,selects,companys:args}});  
+      }
+    }
+    this.setState({ open:false })
+  };
 
   render() {
     const { classes } = this.props;
@@ -72,7 +94,9 @@ class App extends Component {
     let title = Entry[selectIdx].title;
     let children = Entry[selectIdx].view;
 
-    return (<div className={classes.root}>
+    return (
+    <CompanyContext.Provider value={this.state.selector}>
+    <div className={classes.root}>
       <AppBar position="fixed" className={classes.appBar}>
         <CssBaseline />
         <Toolbar>
@@ -108,8 +132,9 @@ class App extends Component {
         <div className={classes.toolbar} />
         {children}
       </main>
-      <CompanySelect open={open} onClose={()=>this.setState({ open:false })}/>
-    </div>);
+      <CompanySelect open={open} onClose={this.handleCloseDialog.bind(this)}/>
+    </div>
+    </CompanyContext.Provider>);
   }
 }
 

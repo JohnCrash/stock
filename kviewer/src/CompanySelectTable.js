@@ -214,6 +214,7 @@ EnhancedTableHead.propTypes = {
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map(n => {
                     const isSelected = this.isSelected(n.id);
+                    n.isSelected = isSelected;
                     return (
                       <TableRow
                         hover

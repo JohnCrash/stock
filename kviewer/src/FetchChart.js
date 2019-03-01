@@ -3,6 +3,7 @@ import EChart from './echart';
 import {postJson} from './fetch';
 import async from 'async';
 import {Eq} from './kits';
+import {CompanyContext} from './CompanyContext';
 
 class FetchChart extends Component{
     constructor(props){
@@ -10,14 +11,17 @@ class FetchChart extends Component{
         this.state = {options:{}};
     }
     componentWillUpdate(nextProps, nextState, snapshot){
-        if(!Eq(nextProps.api,this.props.api)||!Eq(nextProps.args,this.props.args)){
+    //    if(!Eq(nextProps.api,this.props.api)||!Eq(nextProps.args,this.props.args)||
+    //        this.props.args.code !== this.context.code||nextProps.args.code !== this.context.code){
             this.initComponent(nextProps);
-        }
+    //    }
     }
     componentDidMount(){
         this.initComponent(this.props);
     }
     initComponent(props){
+        props.args.code = this.context.code;
+        props.args.selects = this.context.selects;
         if(props.api instanceof Array){
             let tasks = [];
             props.api.forEach(api => {
@@ -49,4 +53,5 @@ class FetchChart extends Component{
     }
 }
 
+FetchChart.contextType = CompanyContext;
 export default FetchChart;
