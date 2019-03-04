@@ -29,29 +29,11 @@ const styles = theme => ({
   });
 
 class KQuery extends React.Component{
-    constructor(props){
-        super(props);
-        this.state = {range:1};
-    }
-    handeChangeRange(event,value){
-        this.setState({range:value});
-    }
     render(){
         const {classes} = this.props;
-        let {range} = this.state;
 
         return <div>
-                <Paper className={classes.paper}>
-                    <FormControl component="fieldset">
-                        <RadioGroup row name="range"  value={range} onChange={this.handeChangeRange.bind(this)}>
-                            <FormControlLabel value={"1"} control={<Radio />} label="1年" />
-                            <FormControlLabel value={"5"} control={<Radio />} label="5年" />
-                            <FormControlLabel value={"10"} control={<Radio />} label="10年" />                    
-                            <FormControlLabel value={"40"} control={<Radio />} label="全部" />                    
-                        </RadioGroup>                    
-                    </FormControl>
-                </Paper>
-                <KView width={'100%'} height={640} code={this.context.code} range={range}/>
+                <KView width={'100%'} height={640} code={this.context.code} range={this.context.range}/>
             </div>;
     }
 }

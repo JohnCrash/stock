@@ -4,6 +4,7 @@
 import React, { Component } from 'react';
 import EChart from './echart';
 import {postJson} from './fetch';
+import {getDayLength} from './kits';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
@@ -51,6 +52,7 @@ class KView extends Component{
             ma30.push(element.ma30);
             macd.push(element.macd);
         });
+        let dl = Math.abs(Math.floor(16000/getDayLength(results[0].date,results[results.length-1].date)));
         return {
             title: {
                 text: name?name:'上证指数',
@@ -100,12 +102,12 @@ class KView extends Component{
                 {
                     left: '6%',
                     right: '6%',
-                    height: '50%'
+                    height: '65%'
                 },
                 {
                     left: '6%',
                     right: '6%',
-                    top: '63%',
+                    top: '78%',
                     height: '16%'
                 }
             ],
@@ -127,7 +129,7 @@ class KView extends Component{
                     data: dates,
                     scale: true,
                     boundaryGap : false,
-                    axisLine: {onZero: false},
+                    axisLine: {onZero: true},
                     axisTick: {show: false},
                     splitLine: {show: false},
                     axisLabel: {show: false},
@@ -157,7 +159,7 @@ class KView extends Component{
                 {
                     type: 'inside',
                     xAxisIndex: [0, 1],
-                    start: 80,
+                    start: 100-dl,
                     end: 100
                 },
                 {

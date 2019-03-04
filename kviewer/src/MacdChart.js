@@ -1,14 +1,22 @@
 import React, { Component } from 'react';
+import { withStyles } from '@material-ui/core/styles';
 import FetchChart from './FetchChart';
+import Typography from '@material-ui/core/Typography';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
 const downColor = '#00da3c';
 const downBorderColor = '#008F28';
 
+const styles = theme => ({
+    root: {
+        width:'100%'
+      }
+  });
+
 function MacdChart(props){
-    let {} = props;
-    return <FetchChart api='/api/macd' args={{code:props.code}} init={
+    let {classes} = props;
+    return <div className={classes.root}><FetchChart api='/api/macd' init={
         ({name,results})=>{
             let dates = [];
             let values = [];
@@ -19,9 +27,6 @@ function MacdChart(props){
                 values.push(e.rate);
             });        
             return {
-            //    title: {
-            //        text: name
-            //    },
                 legend: {
                     data: [name],
                     align: 'left'
@@ -37,18 +42,6 @@ function MacdChart(props){
                         min: 0,
                         color: upColor
                     }]
-                },            
-                toolbox: {
-                    // y: 'bottom',
-                    feature: {
-                        magicType: {
-                            type: ['stack', 'tiled']
-                        },
-                        dataView: {},
-                        saveAsImage: {
-                            pixelRatio: 2
-                        }
-                    }
                 },
                 tooltip: {},
                 xAxis: {
@@ -67,7 +60,11 @@ function MacdChart(props){
                 }]
             };            
         }
-    } {...props}/>;
+    } {...props}/>
+    <Typography>
+        每一条代表一次买入卖出的完整交易，红色表示获利，绿色表示亏损。
+    </Typography>    
+    </div>;
 }
 
-export default MacdChart;
+export default withStyles(styles)(MacdChart);

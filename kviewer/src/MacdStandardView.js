@@ -48,6 +48,21 @@ const switchs=[
         title:'交易趋势表',
         desc:'将交易表放入在趋势图下',
         view:<KMacdChart width={'100%'} height={640} />
+    },
+    {
+        title:'年收益率',
+        desc:'将指定年的收益率叠加',
+        view:<KMacdChart width={'100%'} height={640} /> 
+    },
+    {
+        title:'收益率分布',
+        desc:'看看每种收益率下有多少只股票',
+        view:<KMacdChart width={'100%'} height={640} /> 
+    },
+    {
+        title:'统计',
+        desc:'全部股票的综合统计数据',
+        view:<KMacdChart width={'100%'} height={640} /> 
     }
 ];
 

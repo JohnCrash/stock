@@ -1,14 +1,23 @@
 import React, { Component } from 'react';
+import { withStyles } from '@material-ui/core/styles';
 import FetchChart from './FetchChart';
+import {getDayLength,days} from './kits';
+import Typography from '@material-ui/core/Typography';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
 const downColor = '#00da3c';
 const downBorderColor = '#008F28';
 
+const styles = theme => ({
+    root: {
+        width:'100%'
+      }
+  });
+
 function KMacdChart(props){
-    let {} = props;
-    return <FetchChart api={['/api/k','/api/macd']} args={{code:props.code,range:40}} init={
+    let {classes} = props;
+    return <div className={classes.root}><FetchChart api={['/api/k','/api/macd']} init={
         (a)=>{
             let name = a[0].name;
             let results = a[0].results;
@@ -19,6 +28,22 @@ function KMacdChart(props){
             let ma20 = [];
             let ma30 = [];
             let macd = [];
+            let merchsData = a[1].results;
+            let merchs = [];
+            // 将macd交易数据的时间整合到k的时间线上
+            let merchsMaps = {};
+            for(let v of merchsData){
+                //merchsMaps[v.buy_date] = v;
+                //merchsMaps[v.sell_date] = v;
+                //将中间填满
+                for(let d of days(v.buy_date,v.sell_date)){
+                    merchsMaps[d] = v;
+                }
+            }
+            function getMerchsRate(date){
+                let v = merchsMaps[date];
+                return v?v.rate:0;
+            }
             results.reverse().forEach(element => {
                 let d = new Date(element.date);
                 let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
@@ -29,12 +54,10 @@ function KMacdChart(props){
                 ma20.push(element.ma20);
                 ma30.push(element.ma30);
                 macd.push(element.macd);
+                merchs.push(getMerchsRate(element.date)); //将改天的交易数据放入，没有就是0
             });
+            let dl = Math.abs(Math.floor(32000/getDayLength(results[0].date,results[results.length-1].date)));
             return {
-            //    title: {
-            //        text: name?name:'上证指数',
-            //        left: 0
-            //    },
                 tooltip: {
                     trigger: 'axis',
                     axisPointer: {
@@ -46,7 +69,7 @@ function KMacdChart(props){
                 },
                 visualMap: {
                     show: false,
-                    seriesIndex: 5,
+                    seriesIndex: [5,6],
                     dimension: 1,
                     pieces: [{
                         max: 0,
@@ -85,6 +108,12 @@ function KMacdChart(props){
                         left: '6%',
                         right: '6%',
                         top: '63%',
+                        height: '8%'
+                    },
+                    {
+                        left: '6%',
+                        right: '6%',
+                        top: '72%',
                         height: '16%'
                     }
                 ],
@@ -106,7 +135,21 @@ function KMacdChart(props){
                         data: dates,
                         scale: true,
                         boundaryGap : false,
-                        axisLine: {onZero: false},
+                        axisLine: {onZero: true},
+                        axisTick: {show: false},
+                        splitLine: {show: false},
+                        axisLabel: {show: false},
+                        splitNumber: 20,
+                        min: 'dataMin',
+                        max: 'dataMax'
+                    },
+                    {
+                        type: 'category',
+                        gridIndex: 2,
+                        data: dates,
+                        scale: false,
+                        boundaryGap : false,
+                        axisLine: {onZero: true},
                         axisTick: {show: false},
                         splitLine: {show: false},
                         axisLabel: {show: false},
@@ -126,27 +169,36 @@ function KMacdChart(props){
                         scale: true,
                         gridIndex: 1,
                         splitNumber: 2,
-                        axisLabel: {show: false},
-                        axisLine: {show: false},
+                        axisLabel: {show: true},
+                        axisLine: {show: true},
                         axisTick: {show: false},
                         splitLine: {show: false}
-                    }
+                    },
+                    {
+                        scale: true,
+                        gridIndex: 2,
+                        splitNumber: 2,
+                        axisLabel: {show: true},
+                        axisLine: {show: true},
+                        axisTick: {show: false},
+                        splitLine: {show: false}
+                    }                    
                 ],
                 dataZoom: [
                     {
                         type: 'inside',
                         xAxisIndex: [0, 1],
-                        start: 98,
+                        start: 100-dl,
                         end: 100
                     },
                     {
                         show: true,
-                        xAxisIndex: [0, 1],
+                        xAxisIndex: [0,1,2],
                         type: 'slider',
                         y: '90%',
-                        start: 90,
+                        start: 100-dl,
                         end: 100
-                    }
+                    }                   
                 ],
                 series: [
                     {
@@ -278,11 +330,22 @@ function KMacdChart(props){
                         xAxisIndex: 1,
                         yAxisIndex: 1,
                         data: macd
-                    }                             
+                    },
+                    {
+                        name: '交易',
+                        type: 'bar',
+                        xAxisIndex: 2,
+                        yAxisIndex: 2,
+                        data: merchs
+                    }                       
                 ]            
             };          
         }
-    } {...props}/>;
+    } {...props}/>
+    <Typography>
+        图像的上部是标准的k线图，中间是macd，下部是交易情况，一个方块代表一次交易，红色代表盈利，绿色代表亏损。高度是盈利率。
+    </Typography>
+    </div>;
 }
 
-export default KMacdChart;
+export default withStyles(styles)(KMacdChart);

@@ -12,6 +12,7 @@ const ViewArray = [
     <MacdStandardView />,
     <MacdCycleView />,
     <MacdWideView />,
+    <MacdComplexView />,
     <MacdComplexView />
 ];
 
@@ -40,6 +41,7 @@ class MacdView extends Component{
                 <Tab label="周期优化" />
                 <Tab label="大盘优化" />
                 <Tab label="综合优化" />
+                <Tab label="选股分析" />
           </Tabs>
           {ViewArray[value]}
         </div>;

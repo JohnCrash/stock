@@ -9,24 +9,30 @@ class FetchChart extends Component{
     constructor(props){
         super(props);  
         this.state = {options:{}};
+        this.args = {};
     }
-    componentWillUpdate(nextProps, nextState, snapshot){
-    //    if(!Eq(nextProps.api,this.props.api)||!Eq(nextProps.args,this.props.args)||
-    //        this.props.args.code !== this.context.code||nextProps.args.code !== this.context.code){
-            this.initComponent(nextProps);
-    //    }
+    componentDidUpdate(prevProps, prevState, snapshot){
+        this.initComponent(this.props);
     }
     componentDidMount(){
         this.initComponent(this.props);
     }
     initComponent(props){
-        props.args.code = this.context.code;
-        props.args.selects = this.context.selects;
-        if(props.api instanceof Array){
+        if(!this.context.code || 
+            (this.args.range===this.context.range && this.args.code===this.context.code && Eq(this.args.selects,this.context.selects) && Eq(this.api,props.api))){
+            return;
+        }
+            
+        this.args.code = this.context.code;
+        this.args.selects = this.context.selects;
+        this.args.range = this.context.range;
+        this.api = props.api;
+
+        if(this.api instanceof Array){
             let tasks = [];
-            props.api.forEach(api => {
+            this.api.forEach(api => {
                 tasks.push((cb)=>{
-                    postJson(api,props.args,(json)=>{
+                    postJson(api,this.args,(json)=>{
                         cb(json.error,json);
                     });
                 })
@@ -38,7 +44,7 @@ class FetchChart extends Component{
                     this.setState({options:props.init(a)});
             });
         }else{
-            postJson(props.api,props.args,(json)=>{
+            postJson(this.api,this.args,(json)=>{
                 if(json.results){
                     this.setState({options:props.init(json)});
                 }else{
