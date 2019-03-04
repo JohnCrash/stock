@@ -7,6 +7,8 @@ import TextField from '@material-ui/core/TextField';
 import Paper from '@material-ui/core/Paper';
 import KMacdChart from './KMacdChart';
 import SwitchView from './SwitchView';
+import MacdYearRateChart from './MacdYearRateChart';
+import MacdDistributedChart from './MacdDistributedChart';
 
 const styles = theme => ({
     button: {
@@ -33,13 +35,6 @@ const styles = theme => ({
 
 const switchs=[
     {
-        title:'理论',
-        desc:'严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。',
-        view:<Typography>
-            严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。
-        </Typography>
-    },
-    {
         title:'交易表',
         desc:'查看个股在此理论的支持下的交易情况',
         view:<MacdChart width={'100%'} height={640} />
@@ -52,18 +47,20 @@ const switchs=[
     {
         title:'年收益率',
         desc:'将指定年的收益率叠加',
-        view:<KMacdChart width={'100%'} height={640} /> 
+        view:<MacdYearRateChart width={'100%'} height={640} /> 
     },
     {
         title:'收益率分布',
         desc:'看看每种收益率下有多少只股票',
-        view:<KMacdChart width={'100%'} height={640} /> 
+        view:<MacdDistributedChart width={'100%'} height={640} /> 
     },
     {
-        title:'统计',
-        desc:'全部股票的综合统计数据',
-        view:<KMacdChart width={'100%'} height={640} /> 
-    }
+        title:'理论',
+        desc:'严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。',
+        view:<Typography>
+            严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。
+        </Typography>
+    }    
 ];
 
 class MacdStandardView extends Component{

@@ -216,5 +216,67 @@ function macd_all(p){
     }
 }
 
-macd_all();
+/**
+ * 将每一年的一只股票的数据统计到表sta_macd_year中去。
+ * 基于tech_macd表中的数据
+ */
+function macd_year_company(id,cb){
+    connection.query(`select * from tech_macd where company_id=${id}`,(error, results, field)=>{
+        if(error){
+            console.error(error);
+            cb(error);
+            return;
+        }
+        let m = [];
+        for(let i in results){
+            let it = results[i];
+            let y = it.sell_date.getFullYear();
+            if(!m[y]){
+                m[y] = {income:0,positive_income:0,negative_income:0,static_income:0,
+                    opertor_num:0,positive_num:0,negative_num:0,usage_rate:0,hold_day:0};
+            }
+            m[y].income += it.rate;
+            if(it.rate>0){
+                m[y].positive_income += it.rate;
+                m[y].positive_num++;
+            }else{
+                m[y].negative_income += it.rate;
+                m[y].negative_num++;
+            }
+            m[y].opertor_num++;
+            m[y].hold_day+=it.rate_dd;
+            m[y].id = it.company_id;
+        }
+        for(let i in m){
+            let c = m[i];
+            connection.query(`insert ignore into sta_macd_year values (${c.id},${i},${c.income},${c.positive_income},${c.negative_income},${c.static_income},${c.opertor_num},${c.positive_num},${c.negative_num},${c.usage_rate},${c.hold_day})`,(error)=>{
+                if(error)console.error(error);
+            });
+        }
+        cb(error);
+    });
+}
+function macd_year(){
+    connection.query('select id from company where category_base!=9',(error, results, field)=>{
+        if(error){
+            console.error(error);
+        }else{
+            let a = [];
+            for(let i=0;i<results.length;i++){
+                let it = results[i];
+                a.push(function(cb){
+                    console.log(it.id);
+                    macd_year_company(it.id,(error)=>{
+                        cb(error);
+                    });
+                });
+            }  
+            async.series(a,(err, results)=>{
+                console.log(err,'DONE!');
+            });
+        }
+    });
+}
+//macd_all();
 //macd_company(134,'SH601318',(err)=>{console.log(err)});
+macd_year();

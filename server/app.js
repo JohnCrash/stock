@@ -78,7 +78,7 @@ app.post('/api/macd', function(req, res){
     }
     connection.query(`select * from company where ${queryStr}`,(error, results, field)=>{
         if(error){
-            res.json({error});
+            res.json({error:error.sqlMessage});
         }else if(results.length===1){
             let name  = results[0].name;
             connection.query(`select * from tech_macd where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
@@ -88,6 +88,29 @@ app.post('/api/macd', function(req, res){
                     res.json({results,field,name});
                 }
             });        
+        }else{
+            res.json({error:`Not found '${req.body.code}'`});
+        }
+    });
+});
+
+/**
+ * macd年收益分布
+ */
+app.post('/api/macd_distributed', function(req, res){
+    connection.query(`select * from sta_macd_year where year=${req.body.year}`,(error, results, field)=>{
+        if(error){
+            res.json({error:error.sqlMessage});
+        }else if(results.length>0){
+            let min = results[0].income;
+            let max = results[results.length-1].income;
+            let a = {};
+            for(let v of results){
+                let k = Math.floor(v.income/0.02);
+                if(!a[k])a[k] = 0;
+                a[k]++;
+            }
+            res.json({results:a,step:0.02});
         }else{
             res.json({error:`Not found '${req.body.code}'`});
         }

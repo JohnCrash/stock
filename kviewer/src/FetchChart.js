@@ -2,14 +2,16 @@ import React, { Component } from 'react';
 import EChart from './echart';
 import {postJson} from './fetch';
 import async from 'async';
-import {Eq} from './kits';
 import {CompanyContext} from './CompanyContext';
+import {assign,isEqual} from 'lodash';
 
 class FetchChart extends Component{
     constructor(props){
         super(props);  
         this.state = {options:{}};
         this.args = {};
+        this.oldContext = {};
+        this.oldArgs = {};
     }
     componentDidUpdate(prevProps, prevState, snapshot){
         this.initComponent(this.props);
@@ -19,20 +21,22 @@ class FetchChart extends Component{
     }
     initComponent(props){
         if(!this.context.code || 
-            (this.args.range===this.context.range && this.args.code===this.context.code && Eq(this.args.selects,this.context.selects) && Eq(this.api,props.api))){
+            (isEqual(this.oldContext,this.context) && isEqual(this.api,props.api) && isEqual(this.oldArgs,props.args?props.args:{}))){
             return;
         }
-            
-        this.args.code = this.context.code;
-        this.args.selects = this.context.selects;
-        this.args.range = this.context.range;
+        let args = {};
+        assign(this.oldContext,this.context);
+        assign(this.oldArgs,props.args);
         this.api = props.api;
+        //将props.args追加到args传送给fetch
+        assign(args,this.context);
+        assign(args,props.args);
 
         if(this.api instanceof Array){
             let tasks = [];
             this.api.forEach(api => {
                 tasks.push((cb)=>{
-                    postJson(api,this.args,(json)=>{
+                    postJson(api,args,(json)=>{
                         cb(json.error,json);
                     });
                 })
@@ -44,7 +48,7 @@ class FetchChart extends Component{
                     this.setState({options:props.init(a)});
             });
         }else{
-            postJson(this.api,this.args,(json)=>{
+            postJson(this.api,args,(json)=>{
                 if(json.results){
                     this.setState({options:props.init(json)});
                 }else{
