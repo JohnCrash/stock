@@ -28,7 +28,7 @@ var connection = mysql.createPool({
         PRIMARY KEY (`id`),
         UNIQUE INDEX `id_UNIQUE` (`id` ASC));
    */
-function macd_company(id,code,callback){
+function macd_company(id,code,kend,callback){
     let errmsg = 'repeat purchase';
     let t0 = Date.now();
     let total_income = 0; //总收益
@@ -60,13 +60,14 @@ function macd_company(id,code,callback){
             hold_day += dd;
             total_num++;
             let sqlstr = `insert ignore into tech_macd values (${id},'${dateString(buy.date)}','${dateString(cur.date)}',${buy_value},${sell_value},${rate},${dd})`;
-            //console.log(sqlstr);
+            //console.log(`insert ${code} ${rate}`);
             connection.query(sqlstr,(error, results, field)=>{
                 if(error)console.error(code,error);
             });
         }
     }
-    connection.query(`select date,open,close,macd from kd_xueqiu where id=${id}`,(error, results, field)=>{
+    let endDate = dateString(new Date(kend));
+    connection.query(`select date,open,close,macd from kd_xueqiu where id=${id} and date>'${endDate}'`,(error, results, field)=>{
         if(error){
             console.error(code,error);
             callback(error);
@@ -76,41 +77,31 @@ function macd_company(id,code,callback){
             let t1 = Date.now();
             for(let i=0;i<results.length;i++){
                 let it = results[i];
-                if(it.macd>0){
+                if(it.macd>=0){
                     if(flag===-1){
                         if(!buy)
                             buy = it;
-                        else
-                            console.error(code,errmsg);
                     }
                     flag = 1;
                 }else if(it.macd<0){
                     if(flag===1){
-                        sell(buy,it);
+                        if(buy)
+                            sell(buy,it);
                         buy = null;
                     }
                     flag = -1;
-                }else{
-                    if(flag===1){
-                        sell(buy,it);
-                        buy = null;
-                    }else if(flag===-1){
-                        if(!buy)
-                            buy = it;
-                        else
-                            console.error(code,errmsg);
-                    }
                 }
             }
             if(end_p && begin_p && end_p.date && begin_p.date){
                 let d = (end_p.date-begin_p.date)/(3600*24*1000);
                 let usage_rate = hold_day/d;
                 static_income = (end_p.close-begin_p.close)/begin_p.close;
+                /* 这里不再更新sta_macd
                 let sqlstr = `insert ignore into sta_macd values (${id},${total_income},${positive_income},${negative_income},${static_income},${total_num},${positive_num},${negative_num},${usage_rate},${hold_day})`;
-                //console.log(sqlstr);
                 connection.query(sqlstr,(error, results, field)=>{
                     if(error)console.error(code,error);
                 });
+                */
                 let c = Date.now();
                 console.log(code,c-t1,t1-t0,total_num,total_income,results.length);
             }
@@ -118,110 +109,68 @@ function macd_company(id,code,callback){
         }   
     });
 }
-
-//防止插入到tech_macd的数据出现重复
-function macd_company2(id,code,callback){
-    let t0 = Date.now();
-    connection.query(`select company_id from sta_macd where company_id=${id}`,(error, results, field)=>{
-        if(error){
-            console.error(code,error);
-            callback(error);
-        }else{
-            if(results.length===0){
-                //先清理一下tech_macd
-                let t1 = Date.now();
-                connection.query(`delete from tech_macd where company_id=${id}`,(error, results, field)=>{
-                    if(error){
-                        console.error(code,error);
-                        callback(error);
-                    }else{
-                        let c = Date.now();
-                        console.log(code,'pending',c-t1,t1-t0);
-                        macd_company(id,code,callback);
-                    }
-                });
-            }else{
-                callback();
-            }
-        }
-    });
-}
 /**
- * 处理全部公司的macd策略
- * p = null,false,0(完全更新)
- * p = 1继续上次更新(如果失败)
+ * 处理全部公司的macd交易数据，将数据存储到teach_macd表中
+ * 重复可重复调用进行差异化更新
  */
-function macd_all(p){
-    if(!p){
-        connection.query('update company set done=0',(error, results, field)=>{
-            if(error){
-                console.error(error);
-            }else{
-                connection.query('delete from tech_macd',(error, results, field)=>{
+function macd_all(){
+    let t0 = Date.now();
+    console.log('handle macd_all...');
+    connection.query('select * from company where category_base!=9',(error, results, field)=>{
+        if(error){    
+            console.error(error);
+        }else{
+            let a = [];
+            let t1 = Date.now();
+            for(let i=0;i<results.length;i++){
+                let it = results[i];
+                a.push(function(cb){
+                    connection.query(`select max(sell_date) as b from tech_macd where company_id=${it.id}`,(error1, results1, field1)=>{
+                        if(error1){
+                            console.error(error1);
+                            cb(error1);
+                        }else if(results1.length>0){
+                            console.log(it.code);
+                            macd_company(it.id,it.code,(results1[0].b?results1[0].b:it.kbegin),(error)=>{
+                                cb(error);
+                            });        
+                        }else{
+                            let err = `select max(sell_date) as b from tech_macd where company_id .. return results1.length<=0 (${it.id})`;
+                            console.error(err);
+                            cb(err);
+                        }
+                    });    
+                });
+            }
+            //
+            let total = results.length;
+            let t = Date.now();
+            
+            console.log('Number of pending',total,t-t1,t1-t0);
+            async.series(a,(err, results)=>{
+                connection.query('select count(*) as count from company where category_base!=9 and done=0',(error, results, field)=>{
                     if(error){
                         console.error(error);
                     }else{
-                        doit();
+                        console.log('Last time',total,'Current',results[0].count,'Processing completed',total-results[0].count);
+                        console.log('Time cost',(Date.now()-t)/1000,'seconds');
+
+                        macd_year();
                     }
                 });
-            }
-        });
-    }else{
-        doit();
-    }
-    function doit(){
-        let t0 = Date.now();
-        connection.query('select * from company where category_base!=9 and done=0',(error, results, field)=>{
-            if(error){
-                console.error(error);
-            }else{
-                let a = [];
-                let t1 = Date.now();
-                for(let i=0;i<results.length;i++){
-                    let it = results[i];
-                    a.push(function(cb){
-                        macd_company2(it.id,it.code,(error)=>{
-                            if(error){
-                                connection.query(`delete from tech_macd where company_id=${it.id}`,(error, results, field)=>{
-                                    if(error)console.error(error);
-                                });
-                                cb(error);
-                            }else{
-                                connection.query(`update company set done=1 where id=${it.id}`,(error, results, field)=>{
-                                    if(error){
-                                        console.error(error);
-                                    }
-                                    cb(error);
-                                });    
-                            }
-                        });
-                    });
-                }
-                //
-                let total = results.length;
-                let t = Date.now();
-                console.log('Number of pending',total,t-t1,t1-t0);
-                async.series(a,(err, results)=>{
-                    connection.query('select count(*) as count from company where category_base!=9 and done=0',(error, results, field)=>{
-                        if(error){
-                            console.error(error);
-                        }else{
-                            console.log('Last time',total,'Current',results[0].count,'Processing completed',total-results[0].count);
-                            console.log('Time cost',(Date.now()-t)/1000,'seconds');
-                        }
-                    });
-                });
-            } 
-        });
-    }
+            });
+        } 
+    });
 }
 
 /**
  * 将每一年的一只股票的数据统计到表sta_macd_year中去。
  * 基于tech_macd表中的数据
  */
-function macd_year_company(id,cb){
-    connection.query(`select * from tech_macd where company_id=${id}`,(error, results, field)=>{
+const sta_macd_names = ['company_id','year','category','income','positive_income',
+    'negative_income','static_income','opertor_num','positive_num','negative_num','usage_rate','hold_day'];
+function macd_year_company(id,category,year,cb){
+    connection.query(`select * from tech_macd where company_id=${id}`+(year?` and sell_date>='${year}-1-1'`:''),(error, results, field)=>{
         if(error){
             console.error(error);
             cb(error);
@@ -249,34 +198,119 @@ function macd_year_company(id,cb){
         }
         for(let i in m){
             let c = m[i];
-            connection.query(`insert ignore into sta_macd_year values (${c.id},${i},${c.income},${c.positive_income},${c.negative_income},${c.static_income},${c.opertor_num},${c.positive_num},${c.negative_num},${c.usage_rate},${c.hold_day})`,(error)=>{
-                if(error)console.error(error);
-            });
+            if(i==year){
+                let args = [c.id,i,category,c.income,c.positive_income,c.negative_income,c.static_income,c.opertor_num,c.positive_num,c.negative_num,c.usage_rate,c.hold_day];
+                let argument_list = [];
+                for(let i in sta_macd_names){
+                    argument_list.push(`${sta_macd_names[i]}=${args[i]}`);
+                }
+                connection.query(`update sta_macd_year set ${argument_list.join(',')} where company_id=${id} and year=${year}`,(error)=>{
+                    if(error)
+                        console.error(error);
+                });    
+            }else{
+                connection.query(`insert ignore into sta_macd_year values (${c.id},${i},${category},${c.income},${c.positive_income},${c.negative_income},${c.static_income},${c.opertor_num},${c.positive_num},${c.negative_num},${c.usage_rate},${c.hold_day})`,(error)=>{
+                    if(error)
+                        console.error(error);
+                });    
+            }
         }
         cb(error);
     });
 }
+/**
+ * 计算sta_macd_year，用于年收益率分布与年收益率
+ */
 function macd_year(){
-    connection.query('select id from company where category_base!=9',(error, results, field)=>{
+    console.log('handle macd_year...');
+    connection.query('select max(year) as year from sta_macd_year',(error, results, field)=>{
         if(error){
             console.error(error);
         }else{
-            let a = [];
-            for(let i=0;i<results.length;i++){
-                let it = results[i];
-                a.push(function(cb){
-                    console.log(it.id);
-                    macd_year_company(it.id,(error)=>{
-                        cb(error);
-                    });
+            if(results.length>0){
+                let year = results[0].year;
+                connection.query('select id,category from company where category_base!=9',(error, results, field)=>{
+                    if(error){
+                        console.error(error);
+                    }else{
+                        let a = [];
+                        for(let i=0;i<results.length;i++){
+                            let it = results[i];
+                            a.push(function(cb){
+                                console.log(it.id);
+                                macd_year_company(it.id,it.category,year,(error)=>{
+                                    cb(error);
+                                });
+                            });
+                        }  
+                        async.series(a,(err, results)=>{
+                            if(!err){
+                                macd_wave()
+                            }else console.error(err);
+                        });
+                    }
                 });
-            }  
-            async.series(a,(err, results)=>{
-                console.log(err,'DONE!');
-            });
+            }else{
+                console.error(`select max(year) as year from sta_macd_year return results.length = ${results}`);
+            }
         }
     });
 }
-//macd_all();
-//macd_company(134,'SH601318',(err)=>{console.log(err)});
-macd_year();
+
+function macd_wave(){
+    console.log('handle macd_wave...')
+    connection.query('select max(date) as d from sta_macd_wave',(error, results, field)=>{
+        if(error){
+            console.error(error);
+        }else{
+            if(results.length>0){
+                let d = results[0].d;
+                let b = new Date(dateString(new Date(d?d:'1990-1-1')));
+                let e = new Date(dateString(new Date()));
+                //这里使用日SH000001的k的日期，因为星期天和节日没有成交数据
+                connection.query('select date from kd_xueqiu where id=8828 order by date',(error, results, field)=>{
+                    if(error){
+                        console.error(error);
+                        return;
+                    }
+                    let tasks = [];
+                    for(let dd of results){
+                        let cc = new Date(dd.date);
+                        if(cc>=b && cc<=e){
+                            let date = dateString(cc);
+                            tasks.push((cb)=>{
+                                async.parallel([(cb)=>connection.query(`select count(company_id) as sell from tech_macd where sell_date='${date}'`,(error, results, field)=>{
+                                    cb(error,results);
+                                }),
+                                (cb)=>connection.query(`select count(company_id) as buy from tech_macd where buy_date='${date}'`,(error, results, field)=>{
+                                    cb(error,results);
+                                })],(error,result)=>{
+                                    if(error){
+                                        console.error(error); //如果出错需要删除sta_macd_wave重新执行
+                                    }else{
+                                        let sell = result[0][0].sell;
+                                        let buy = result[1][0].buy;
+                                        connection.query(`insert ignore into sta_macd_wave values ('${date}',${buy},${sell})`,(error, results, field)=>{
+                                            if(error)console.error(error); //如果出错需要删除sta_macd_wave重新执行
+                                            console.log(date,buy,sell);
+                                            cb(error);
+                                        });
+                                    }
+                                });    
+                            });
+                        }
+                    }
+                    async.series(tasks,(err,result)=>{
+                        console.log(err,'DONE!');     
+                    });
+                });
+            }else{
+                console.error(`select max(date) as d from sta_macd_wave return results.length<=0`);
+            }
+        }
+    });
+}
+
+macd_all();
+//macd_year();
+//macd_wave();

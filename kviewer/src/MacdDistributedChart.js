@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { withStyles } from '@material-ui/core/styles';
 import FetchChart from './FetchChart';
+import {postJson} from './fetch';
 import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 import {CompanyContext} from './CompanyContext';
@@ -28,26 +29,43 @@ function buildYears(range){
     return y;
 }
 
+let category = null;
+
+function precision(a,N){
+    return Math.floor(a*N)/N;
+}
+
 class MacdDistributedChart extends Component{
     state = {
-        current:String(new Date().getFullYear())
+        current:String(new Date().getFullYear()),
+        isall:true,
+        currentCategory:null
     };
-    
+    componentDidMount(){
+        if(!category)
+            postJson('/api/category',{},(json)=>{
+                if(json.error){
+                    console.error(json.error);
+                }else{
+                    category = json.results;
+                }
+            });
+    }
     handleChangeYear=(year)=>(event)=>{
         this.setState({current:year});
     };
     render(){
         const {classes} = this.props;
-        const {current} = this.state;
+        const {current,isall,currentCategory} = this.state;
         const years = buildYears(this.context.range);
         let _this = this;
         return (<div className={classes.root}>
         {years.map((item)=>{
-            return <Button  variant="contained" color={item===current?"secondary":"primary"} className={classes.button} onClick={_this.handleChangeYear(item)}>
+            return <Button  variant="contained" key={item} color={item===current?"secondary":"primary"} className={classes.button} onClick={_this.handleChangeYear(item)}>
                 {item}
             </Button>
         })}
-        <FetchChart api='/api/macd_distributed' args={{year:current}} init={
+        <FetchChart api='/api/macd_distributed' args={{year:current,category:currentCategory}} init={
             ({step,results})=>{
                 let dates = [];
                 let values = [];
@@ -61,12 +79,11 @@ class MacdDistributedChart extends Component{
                 });
                 let k=0;
                 for(let v of rows){
-                    dates.push(v.value*step);
+                    dates.push(precision(v.value*step,100));
                     values.push([k,v.number,v.value]);
                     k++;
                 }
                 return {
-
                     visualMap: {
                         show: false,
                         seriesIndex: 0,
@@ -97,6 +114,16 @@ class MacdDistributedChart extends Component{
                 };            
             }
         } {...this.props}/>
+        <Button variant="contained" color={isall?"secondary":"primary"} key={"main"} onClick={()=>this.setState({isall:true,currentCategory:null})}>
+            全部
+        </Button>
+        {isall?<Button variant="contained" color={isall?"primary":"secondary"} key={"category"} onClick={()=>this.setState({isall:false})}>
+            分类
+        </Button>:category?category.map((item)=>{
+            return <Button variant="contained" color={currentCategory===item.id?"secondary":"primary"} key={item.id} onClick={()=>this.setState({currentCategory:item.id})}>
+                {item.name}
+            </Button>
+        }):undefined}
         <Typography>
             每条线代表年收益率
         </Typography>

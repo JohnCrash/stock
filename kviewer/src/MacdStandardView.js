@@ -9,6 +9,7 @@ import KMacdChart from './KMacdChart';
 import SwitchView from './SwitchView';
 import MacdYearRateChart from './MacdYearRateChart';
 import MacdDistributedChart from './MacdDistributedChart';
+import MacdBuyShellChart from './MacdBuyShellChart';
 
 const styles = theme => ({
     button: {
@@ -55,7 +56,17 @@ const switchs=[
         view:<MacdDistributedChart width={'100%'} height={640} /> 
     },
     {
-        title:'理论',
+        title:'信号分布',
+        desc:'将每天进入macd买入点和卖出点的股票数量作为y，日期作为x',
+        view:<MacdBuyShellChart width={'100%'} height={640} /> 
+    },
+    {
+        title:'周期分布',
+        desc:'将macd的周期天数作为y，日期作为x',
+        view:<MacdDistributedChart width={'100%'} height={640} /> 
+    },
+    {
+        title:'理论与分析',
         desc:'严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。',
         view:<Typography>
             严格在MACD为正时买入为负时卖出，买入和卖出使用当日平均价。

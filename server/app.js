@@ -15,6 +15,10 @@ var connection = mysql.createPool({
 
 var app = express();
 
+function dateString(date){
+    return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
+}
+
 function shouldCompress (req, res) {
     if (req.headers['x-no-compression']) {
       // don't compress responses with this request header
@@ -98,7 +102,10 @@ app.post('/api/macd', function(req, res){
  * macd年收益分布
  */
 app.post('/api/macd_distributed', function(req, res){
-    connection.query(`select * from sta_macd_year where year=${req.body.year}`,(error, results, field)=>{
+    let str1 = req.body.category?`category=${req.body.category}`:"";
+    let str2 = req.body.year?`year=${req.body.year}`:"";
+    let str = (str1 && str2)?`${str1} and ${str2}`:(str1+str2);
+    connection.query(`select * from sta_macd_year where ${str}`,(error, results, field)=>{
         if(error){
             res.json({error:error.sqlMessage});
         }else if(results.length>0){
@@ -113,6 +120,38 @@ app.post('/api/macd_distributed', function(req, res){
             res.json({results:a,step:0.02});
         }else{
             res.json({error:`Not found '${req.body.code}'`});
+        }
+    });
+});
+
+/**
+ * category返回股票分类表
+ */
+app.post('/api/category', function(req, res){
+    connection.query(`select * from category`,(error, results, field)=>{
+        if(error){
+            res.json({error:error.sqlMessage});
+        }else if(results.length>0){
+            res.json({results});
+        }else{
+            res.json({error:`Not found`});
+        }
+    });
+});
+
+/**
+ * macd买卖想信号
+ */
+app.post('/api/buysell', function(req, res){
+    let ry = Number(req.body.range?req.body.range:1);
+    let c = new Date(Date.now() - ry*365*24*3600*1000);
+    connection.query(`select * from sta_macd_wave where date>'${dateString(c)}'`,(error, results, field)=>{
+        if(error){
+            res.json({error:error.sqlMessage});
+        }else if(results.length>0){
+            res.json({results});
+        }else{
+            res.json({error:`Not found`});
         }
     });
 });
