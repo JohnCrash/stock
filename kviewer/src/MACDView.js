@@ -6,14 +6,13 @@ import Typography from '@material-ui/core/Typography';
 import MacdStandardView from './MacdStandardView';
 import MacdCycleView from './MacdCycleView';
 import MacdWideView from './MacdWideView';
+import MacdSelectView from './MacdSelectView';
 import MacdComplexView from './MacdComplexView';
 
 const ViewArray = [
     <MacdStandardView />,
-    <MacdCycleView />,
-    <MacdWideView />,
     <MacdComplexView />,
-    <MacdComplexView />
+    <MacdSelectView />
 ];
 
 class MacdView extends Component{
@@ -37,11 +36,9 @@ class MacdView extends Component{
                 textColor="primary"
                 variant="fullWidth"
             >
-                <Tab label="严格" />
-                <Tab label="周期优化" />
-                <Tab label="大盘优化" />
-                <Tab label="综合优化" />
+                <Tab label="标准模型" />
                 <Tab label="选股分析" />
+                <Tab label="抛盘分析" />
           </Tabs>
           {ViewArray[value]}
         </div>;

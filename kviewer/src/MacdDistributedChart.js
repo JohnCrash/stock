@@ -5,7 +5,6 @@ import {postJson} from './fetch';
 import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 import {CompanyContext} from './CompanyContext';
-import EChart from './echart';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
@@ -66,85 +65,13 @@ class MacdDistributedChart extends Component{
                 {item}
             </Button>
         })}
-        <EChart options={{
-            grid: {
-                left: '3%',
-                right: '3%',
-                bottom: '3%',
-                containLabel: true
-            },
-            visualMap: {
-                show: false,
-                seriesIndex: 0,
-                dimension: 0,
-                pieces: [{
-                    max: 0,
-                    color: downColor
-                }, {
-                    min: 0,
-                    color: upColor
-                }]
-            },            
-            xAxis : [
-                {
-                    type : 'value'
-                }
-            ],
-            yAxis : [
-                {
-                    type : 'category',
-                    axisTick : {show: false},
-                    data : ['统计']
-                }
-            ],
-            series : [
-                {
-                    name:'利润',
-                    type:'bar',
-                    label: {
-                        normal: {
-                            show: true,
-                            position: 'inside'
-                        }
-                    },
-                    data:[200]
-                },                
-                {
-                    name:'收入',
-                    type:'bar',
-                    stack: '总量',
-                    label: {
-                        normal: {
-                            show: true
-                        }
-                    },
-                    itemStyle:{
-                        color:upColor
-                    },
-                    data:[320]
-                },
-                {
-                    name:'支出',
-                    type:'bar',
-                    stack: '总量',
-                    label: {
-                        normal: {
-                            show: true,
-                            position: 'left'
-                        }
-                    },
-                    itemStyle:{
-                        color:downColor
-                    },
-                    data:[-120]
-                }
-            ]            
-        }} width={'100%'} height={140}/>
         <FetchChart api='/api/macd_distributed' args={{year:current,category:currentCategory}} init={
-            ({step,results})=>{
+            ({step,results,positive,negative,income})=>{
                 let dates = [];
                 let values = [];
                 let rows = [];
+                positive = precision(positive,1000);
+                negative = precision(negative,1000);
                 for(let i in results){
                     let n = results[i];
                     rows.push({value:i,number:n});
@@ -159,11 +86,19 @@ class MacdDistributedChart extends Component{
                     k++;
                 }
                 return {
-                    grid: {
-                        left: '6%',
-                        right: '3%'
-                    },
-                    visualMap: {
+                    grid: [{
+                            left: '6%',
+                            right: '3%',
+                            height: '70%'
+                        },
+                        {
+                            left: '6%',
+                            right: '3%',
+                            top: '83%',
+                            height: '6%'
+                        }
+                    ],
+                    visualMap: [{
                         show: false,
                         seriesIndex: 0,
                         dimension: 2,
@@ -175,21 +110,94 @@ class MacdDistributedChart extends Component{
                             color: upColor
                         }]
                     },
+                    {
+                        show: false,
+                        seriesIndex: [1,2,3],
+                        dimension: 0,
+                        pieces: [{
+                            max: 0,
+                            color: downColor
+                        }, {
+                            min: 0,
+                            color: upColor
+                        }]
+                    }],
                     tooltip: {},
-                    xAxis: {
+                    xAxis: [
+                        {
                         data: dates,
                         silent: false,
                         splitLine: {
                             show: false
+                            }
+                        },
+                        {
+                            type : 'value',
+                            gridIndex: 1,
+                        }                        
+                    ],
+                    yAxis: [
+                        {
+                        },
+                        {
+                            type : 'category',
+                            gridIndex: 1,
+                            axisTick : {show: false},
+                            data : ['统计']
                         }
-                    },
-                    yAxis: {
-                    },
+                    ],
                     series: [{
                         name: current,
                         type: 'bar',
                         data: values
-                    }]
+                    },
+                    {
+                        name:'利润',
+                        type:'bar',
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,                        
+                        label: {
+                            normal: {
+                                show: true,
+                                position: 'inside'
+                            }
+                        },
+                        data:[precision(income,1000)]
+                    },                
+                    {
+                        name:'收入',
+                        type:'bar',
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,                        
+                        stack: '总量',
+                        label: {
+                            normal: {
+                                show: true
+                            }
+                        },
+                        itemStyle:{
+                            color:upColor
+                        },
+                        data:[positive]
+                    },
+                    {
+                        name:'支出',
+                        type:'bar',
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        stack: '总量',
+                        label: {
+                            normal: {
+                                show: true,
+                                position: 'left'
+                            }
+                        },
+                        itemStyle:{
+                            color:downColor
+                        },
+                        data:[negative]
+                    }
+                ]
                 };            
             }
         } {...this.props}/>
@@ -203,9 +211,6 @@ class MacdDistributedChart extends Component{
                 {item.name}
             </Button>
         }):undefined}
-        <Typography>
-            每条线代表年收益率
-        </Typography>
         </div>);
     }
 }

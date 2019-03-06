@@ -7,20 +7,8 @@
     {
         "type": "node",
         "request": "launch",
-        "name": "计算MACD数据",
-        "program": "${workspaceFolder}/macd.js"
-    },
-    {
-        "type": "node",
-        "request": "launch",
         "name": "雪球取得K线数据",
         "program": "${workspaceFolder}/xueqiu.js"
-    },
-    {
-        "type": "node",
-        "request": "launch",
-        "name": "公司合并只能执行一次的临时脚本",
-        "program": "${workspaceFolder}/marge.js"
-    }    
+    }   
     ]
 }

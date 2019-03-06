@@ -28,28 +28,7 @@ const styles = theme => ({
     };
     handleInput=(event)=>{
         if(event.key==='Enter'){
-            postJson('/api/select',{cmd:event.target.value},(json)=>{
-                if(json.error){
-                    this.setState({openbar:true,err:json.error});
-                }else{
-                    let companys = [];
-                    let counter = 0;
-                    for(let v of json.results){
-                        counter++;
-                        let date = dateString(new Date(v.kbegin));
-                        companys.push({id:counter,
-                            name:v.name,
-                            code:v.code,
-                            category:v.category?v.category:'',
-                            date:date?date:'',
-                            income:v.income,
-                            static:v.static_income,
-                            positive:v.positive_num,
-                            negative:v.negative_num});
-                    }
-                    this.setState({companys});
-                }
-            });
+          this.requestSelect(event.target.value);
         }
     };
     handleCloseSnackbar=(event)=>{
@@ -58,6 +37,33 @@ const styles = theme => ({
     handleCloseDialog=(result,args)=>()=>{
         this.props.onClose(result,args);
     };
+    requestSelect(cmd){
+      postJson('/api/select',{cmd},json=>{
+        if(json.error){
+            this.setState({openbar:true,err:json.error});
+        }else{
+            let companys = [];
+            let counter = 0;
+            for(let v of json.results){
+                counter++;
+                let date = dateString(new Date(v.kbegin));
+                companys.push({id:counter,
+                    name:v.name,
+                    code:v.code,
+                    category:v.category?v.category:'',
+                    date:date?date:'',
+                    income:v.income,
+                    static:v.static_income,
+                    positive:v.positive_num,
+                    negative:v.negative_num});
+            }
+            this.setState({companys});
+        }
+     });
+    }
+    componentDidMount(){
+      setTimeout(()=>this.requestSelect('#cart=1'),1);
+    }
     render(){
         const { classes,onClose } = this.props;
         const { companys,openbar,err} = this.state;

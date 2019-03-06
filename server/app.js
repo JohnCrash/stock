@@ -112,12 +112,29 @@ app.post('/api/macd_distributed', function(req, res){
             let min = results[0].income;
             let max = results[results.length-1].income;
             let a = {};
+            let positive = 0;
+            let positiveNum = 0;
+            let negative = 0;
+            let negativeNum = 0;
             for(let v of results){
                 let k = Math.floor(v.income/0.02);
+                if(v.income>0){
+                    positive+=v.income;
+                    positiveNum++;
+                }else{
+                    negative+=v.income;
+                    negativeNum++;
+                }
                 if(!a[k])a[k] = 0;
                 a[k]++;
             }
-            res.json({results:a,step:0.02});
+            res.json({
+                results:a,
+                step:0.02,
+                positive:positiveNum!=0?positive/positiveNum:0,
+                negative:negativeNum!=0?negative/negativeNum:0,
+                income:(positive+negative)/(positiveNum+negativeNum)
+            });
         }else{
             res.json({error:`Not found '${req.body.code}'`});
         }

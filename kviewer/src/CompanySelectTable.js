@@ -132,13 +132,15 @@ EnhancedTableHead.propTypes = {
     },
   });
   
+  let _page = 0;
+
   class EnhancedTable extends React.Component {
     state = {
-      order: 'asc',
-      orderBy: 'calories',
+      order: 'desc',
+      orderBy: 'income',
       selected: [],
       data: [],
-      page: 0,
+      page: _page,
       rowsPerPage: 5,
     };
   
@@ -183,6 +185,7 @@ EnhancedTableHead.propTypes = {
     };
   
     handleChangePage = (event, page) => {
+      _page = page;
       this.setState({ page });
     };
   
