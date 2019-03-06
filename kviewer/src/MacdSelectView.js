@@ -1,10 +1,18 @@
 import React, { Component } from 'react';
 import { withStyles } from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
+import SwitchView from './SwitchView';
+import MacdChart from './MacdChart';
 
 const styles = theme => ({
 });
-
+const switchs=[
+    {
+        title:'MACD',
+        desc:'MACD搞好要变成正的股票列表',
+        view:<MacdChart width={'100%'} height={640} />
+    } 
+];
 class MacdSelectView extends Component{
     constructor(props){
         super(props);
@@ -12,9 +20,7 @@ class MacdSelectView extends Component{
 
     render(){
         const { classes } = this.props;
-        return <Typography>
-            综合考虑使用周期和大盘优化。
-        </Typography>
+        return <SwitchView switchs={switchs}/>
     }
 }
 

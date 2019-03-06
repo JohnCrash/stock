@@ -11,8 +11,8 @@ import MacdComplexView from './MacdComplexView';
 
 const ViewArray = [
     <MacdStandardView />,
-    <MacdComplexView />,
-    <MacdSelectView />
+    <MacdSelectView />,
+    <MacdComplexView />
 ];
 
 class MacdView extends Component{
