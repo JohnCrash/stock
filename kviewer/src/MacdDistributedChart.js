@@ -5,6 +5,7 @@ import {postJson} from './fetch';
 import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 import {CompanyContext} from './CompanyContext';
+import EChart from './echart';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
@@ -65,6 +66,80 @@ class MacdDistributedChart extends Component{
                 {item}
             </Button>
         })}
+        <EChart options={{
+            grid: {
+                left: '3%',
+                right: '3%',
+                bottom: '3%',
+                containLabel: true
+            },
+            visualMap: {
+                show: false,
+                seriesIndex: 0,
+                dimension: 0,
+                pieces: [{
+                    max: 0,
+                    color: downColor
+                }, {
+                    min: 0,
+                    color: upColor
+                }]
+            },            
+            xAxis : [
+                {
+                    type : 'value'
+                }
+            ],
+            yAxis : [
+                {
+                    type : 'category',
+                    axisTick : {show: false},
+                    data : ['统计']
+                }
+            ],
+            series : [
+                {
+                    name:'利润',
+                    type:'bar',
+                    label: {
+                        normal: {
+                            show: true,
+                            position: 'inside'
+                        }
+                    },
+                    data:[200]
+                },                
+                {
+                    name:'收入',
+                    type:'bar',
+                    stack: '总量',
+                    label: {
+                        normal: {
+                            show: true
+                        }
+                    },
+                    itemStyle:{
+                        color:upColor
+                    },
+                    data:[320]
+                },
+                {
+                    name:'支出',
+                    type:'bar',
+                    stack: '总量',
+                    label: {
+                        normal: {
+                            show: true,
+                            position: 'left'
+                        }
+                    },
+                    itemStyle:{
+                        color:downColor
+                    },
+                    data:[-120]
+                }
+            ]            
+        }} width={'100%'} height={140}/>
         <FetchChart api='/api/macd_distributed' args={{year:current,category:currentCategory}} init={
             ({step,results})=>{
                 let dates = [];
@@ -84,6 +159,10 @@ class MacdDistributedChart extends Component{
                     k++;
                 }
                 return {
+                    grid: {
+                        left: '6%',
+                        right: '3%'
+                    },
                     visualMap: {
                         show: false,
                         seriesIndex: 0,
