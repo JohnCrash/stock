@@ -513,7 +513,9 @@ function kd_companys(p){
                         let today = new Date();
                         let week = today.getDay();
                         let hours = today.getHours();
-                        if( !(week>=1 && week<=5 && hours>9 && hours<=15) ){
+                        if( week>=1 && week<=5 && hours>9 && hours<15 ){
+                            console.log(`Trading ${week} ${hours}!`);
+                        }else{
                             macd_all();
                         }
                     }
@@ -920,7 +922,8 @@ function macd_select(){
 }
 
 //kd_companys();
-macd_select();
+macd_all();
+//macd_select();
 //kd_company(253,'SZ002627',function(error){
 //    console.log('kd_company error : ',error);
 //});

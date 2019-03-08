@@ -14,6 +14,27 @@ const styles = theme => ({
       }
   });
 
+const moo = [['2005/6/30','2007/10/30'],['2013/1/30','2015/5/29']];
+
+function nearDate(d,dates,dir){
+    let dd = new Date(d);
+    if(dir){
+        for(let i=0;i<dates.length;i++){
+            if(dd<(new Date(dates[i]))){
+                return dates[i];
+            }
+        }
+        return dates[dates.length-1];
+    }else{
+        for(let i=dates.length-1;i>=0;i--){
+            if(dd>(new Date(dates[i]))){
+                return dates[i];
+            }
+        }
+        return dates[0];
+    }
+}
+
 function MacdChart(props){
     let {classes} = props;
     return <div className={classes.root}><FetchChart api='/api/macd' init={
@@ -21,11 +42,16 @@ function MacdChart(props){
             let dates = [];
             let values = [];
             results.reverse().forEach(e => {
-                let d = new Date(e.sell_date);
+                let d = new Date(e.buy_date);
                 let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
                 dates.push(dateString);
                 values.push(e.rate);
-            });        
+            });
+            let marka = moo.map(it=>{
+                return [
+                    {xAxis: nearDate(it[0],dates,false)},
+                    {xAxis: nearDate(it[1],dates,true)}
+                ]});
             return {
                 legend: {
                     data: [name],
@@ -56,6 +82,9 @@ function MacdChart(props){
                 series: [{
                     name: name,
                     type: 'bar',
+                    markArea:  {
+                        data: marka
+                    },                    
                     data: values
                 }]
             };            

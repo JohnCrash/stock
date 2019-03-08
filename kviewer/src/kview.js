@@ -261,7 +261,7 @@ class KView extends Component{
                     symbol: 'none',
                     data: ma5,
                     smooth: true,
-                    lineStyle: {
+                    itemStyle: {
                         normal: {color:'#fdd835'}
                     }
                 },
@@ -271,7 +271,7 @@ class KView extends Component{
                     symbol: 'none',
                     data: ma10,
                     smooth: true,
-                    lineStyle: {
+                    itemStyle: {
                         normal: {color:'#0277bd'}
                     }
                 },
@@ -281,7 +281,7 @@ class KView extends Component{
                     symbol: 'none',
                     data: ma20,
                     smooth: true,
-                    lineStyle: {
+                    itemStyle: {
                         normal: {color:'#ab47bc'}
                     }
                 },
@@ -291,7 +291,7 @@ class KView extends Component{
                     symbol: 'none',
                     data: ma30,
                     smooth: true,
-                    lineStyle: {
+                    itemStyle: {
                         normal: {color:'#ef6c00'}
                     }
                 },

@@ -212,76 +212,6 @@ function KMacdChart(props){
                                 borderColor: upBorderColor,
                                 borderColor0: downBorderColor
                             }
-                        },
-                        markPoint: {
-                            label: {
-                                normal: {
-                                    formatter: function (param) {
-                                        return param != null ? Math.round(param.value) : '';
-                                    }
-                                }
-                            },
-                            data: [
-    
-                                {
-                                    name: 'highest value',
-                                    type: 'max',
-                                    valueDim: 'highest'
-                                },
-                                {
-                                    name: 'lowest value',
-                                    type: 'min',
-                                    valueDim: 'lowest'
-                                },
-                                {
-                                    name: 'average value on close',
-                                    type: 'average',
-                                    valueDim: 'close'
-                                }
-                            ],
-                            tooltip: {
-                                formatter: function (param) {
-                                    return param.name + '<br>' + (param.data.coord || '');
-                                }
-                            }
-                        },
-                        markLine: {
-                            symbol: ['none', 'none'],
-                            data: [
-                                [
-                                    {
-                                        name: 'from lowest to highest',
-                                        type: 'min',
-                                        valueDim: 'lowest',
-                                        symbol: 'circle',
-                                        symbolSize: 10,
-                                        label: {
-                                            normal: {show: false},
-                                            emphasis: {show: false}
-                                        }
-                                    },
-                                    {
-                                        type: 'max',
-                                        valueDim: 'highest',
-                                        symbol: 'circle',
-                                        symbolSize: 10,
-                                        label: {
-                                            normal: {show: false},
-                                            emphasis: {show: false}
-                                        }
-                                    }
-                                ],
-                                {
-                                    name: 'min line on close',
-                                    type: 'min',
-                                    valueDim: 'close'
-                                },
-                                {
-                                    name: 'max line on close',
-                                    type: 'max',
-                                    valueDim: 'close'
-                                }                           
-                            ]
                         }
                     },
                     {
@@ -290,7 +220,7 @@ function KMacdChart(props){
                         symbol: 'none',
                         data: ma5,
                         smooth: true,
-                        lineStyle: {
+                        itemStyle: {
                             normal: {color:'#fdd835'}
                         }
                     },
@@ -300,7 +230,7 @@ function KMacdChart(props){
                         symbol: 'none',
                         data: ma10,
                         smooth: true,
-                        lineStyle: {
+                        itemStyle: {
                             normal: {color:'#0277bd'}
                         }
                     },
@@ -310,7 +240,7 @@ function KMacdChart(props){
                         symbol: 'none',
                         data: ma20,
                         smooth: true,
-                        lineStyle: {
+                        itemStyle: {
                             normal: {color:'#ab47bc'}
                         }
                     },
@@ -320,7 +250,7 @@ function KMacdChart(props){
                         symbol: 'none',
                         data: ma30,
                         smooth: true,
-                        lineStyle: {
+                        itemStyle: {
                             normal: {color:'#ef6c00'}
                         }
                     },

@@ -22,7 +22,7 @@ function MacdYearRateChart(props){
             let values = [];
             let years = {};
             results.reverse().forEach(e => {
-                let d = new Date(e.sell_date);
+                let d = new Date(e.buy_date);
                 let y = d.getFullYear();
                 years[y] = years[y]?years[y]+e.rate:e.rate;
             });
