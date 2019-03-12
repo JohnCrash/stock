@@ -37,62 +37,63 @@ function nearDate(d,dates,dir){
 
 function MacdChart(props){
     let {classes} = props;
-    return <div className={classes.root}><FetchChart api='/api/macd' init={
-        ({name,results})=>{
-            let dates = [];
-            let values = [];
-            results.reverse().forEach(e => {
-                let d = new Date(e.buy_date);
-                let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-                dates.push(dateString);
-                values.push(e.rate);
-            });
-            let marka = moo.map(it=>{
-                return [
-                    {xAxis: nearDate(it[0],dates,false)},
-                    {xAxis: nearDate(it[1],dates,true)}
-                ]});
-            return {
-                legend: {
-                    data: [name],
-                    align: 'left'
-                },
-                visualMap: {
-                    show: false,
-                    seriesIndex: 0,
-                    dimension: 1,
-                    pieces: [{
-                        max: 0,
-                        color: downColor
-                    }, {
-                        min: 0,
-                        color: upColor
-                    }]
-                },
-                tooltip: {},
-                xAxis: {
-                    data: dates,
-                    silent: false,
-                    splitLine: {
-                        show: false
-                    }
-                },
-                yAxis: {
-                },
-                series: [{
-                    name: name,
-                    type: 'bar',
-                    markArea:  {
-                        data: marka
-                    },                    
-                    data: values
+    function init({name,results}){
+        let dates = [];
+        let values = [];
+        results.reverse().forEach(e => {
+            let d = new Date(e.buy_date);
+            let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+            dates.push(dateString);
+            values.push(e.rate);
+        });
+        let marka = moo.map(it=>{
+            return [
+                {xAxis: nearDate(it[0],dates,false)},
+                {xAxis: nearDate(it[1],dates,true)}
+            ]});
+        return {
+            legend: {
+                data: [name],
+                align: 'left'
+            },
+            visualMap: {
+                show: false,
+                seriesIndex: 0,
+                dimension: 1,
+                pieces: [{
+                    max: 0,
+                    color: downColor
+                }, {
+                    min: 0,
+                    color: upColor
                 }]
-            };            
-        }
-    } {...props}/>
-    <Typography>
-        每一条代表一次买入卖出的完整交易，红色表示获利，绿色表示亏损。
-    </Typography>    
+            },
+            tooltip: {},
+            xAxis: {
+                data: dates,
+                silent: false,
+                splitLine: {
+                    show: false
+                }
+            },
+            yAxis: {
+            },
+            series: [{
+                name: name,
+                type: 'bar',
+                markArea:  {
+                    data: marka
+                },                    
+                data: values
+            }]
+        };            
+    }
+    return <div className={classes.root}>
+        <FetchChart api='/api/macd' init={init} {...props}/>
+        <FetchChart api='/api/macd' init={init} args={{db:'tech_macd2'}} {...props}/>
+        <Typography>
+            每一条代表一次买入卖出的完整交易，红色表示获利，绿色表示亏损。
+        </Typography>    
     </div>;
 }
 

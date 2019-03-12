@@ -75,6 +75,7 @@ app.post('/api/k', function(req, res){
  */
 app.post('/api/macd', function(req, res){
     let queryStr;
+    let queryDB = req.body.db?req.body.db:'tech_macd';
     if(isStockCode(req.body.code)){
         queryStr = `code='${req.body.code}'`;
     }else{
@@ -85,7 +86,7 @@ app.post('/api/macd', function(req, res){
             res.json({error:error.sqlMessage});
         }else if(results.length===1){
             let name  = results[0].name;
-            connection.query(`select * from tech_macd where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
+            connection.query(`select * from ${queryDB} where company_id=${results[0].id} order by sell_date desc`,(error, results, field)=>{  
                 if(error){
                     res.json({error:error.sqlMessage});
                 }else{

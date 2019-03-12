@@ -20,6 +20,8 @@ import Radio from '@material-ui/core/Radio';
 import FormControl from '@material-ui/core/FormControl';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import AccountBalance from '@material-ui/icons/AccountBalance';
+import ShoppingCart from '@material-ui/icons/ShoppingCart';
+import Bookmark from '@material-ui/icons/Bookmark';
 import CompanySelect from './CompanySelect';
 import Entry from './entry';
 import {CompanyContext} from './CompanyContext';
@@ -139,6 +141,12 @@ class App extends Component {
                 <FormControlLabel value={"40"} control={<Radio />} label="全部" />
             </RadioGroup>                    
           </FormControl>
+          <IconButton color="inherit" onClick={()=>this.setState({ open:true })}>
+            <Bookmark />
+          </IconButton>
+          <IconButton color="inherit" onClick={()=>this.setState({ open:true })}>
+           <ShoppingCart />
+          </IconButton>
           <IconButton color="inherit" onClick={()=>this.setState({ open:true })}>
             <AccountBalance />
           </IconButton>
