@@ -4,7 +4,7 @@ var async = require("async");
 var bigint = require("big-integer");
 
 var connection = mysql.createPool({
-    connectionLimit : 10,
+    connectionLimit : 30,
     host     : 'localhost',
     user     : 'root',
     password : 'nv30ati2',
@@ -108,6 +108,33 @@ function companys_task(itemStr,task){
     });
 }
 
+function query(querys){
+    let queryArray = (typeof(query)==='object' && query.length) ? query : arguments;
+    return new Promise((resolve,reject)=>{
+        let tasks = [];
+        for(let str of queryArray){
+            tasks.push((cb)=>{
+                connection.query(str,(error,results,field)=>{
+                    if(error){
+                        cb(error);
+                    }else{
+                        cb(null,results);
+                    }
+                });        
+            });    
+        }
+        async.series(tasks,(err,result)=>{
+            if(err)
+                reject(err);
+            else{
+                if(result.length==1)
+                    resolve(result[0]);
+                else
+                    resolve(result);
+            }
+        })
+    });
+}
 /**
  * 将每一年的一只股票的数据统计到表sta_macd_year中去。
  * 基于tech_macd表中的数据
@@ -260,4 +287,4 @@ function macd_wave(){
 //macd_year();
 //macd_wave();
 
-module.exports = {k_company,companys_task,dateString};
+module.exports = {k_company,companys_task,dateString,query,connection};

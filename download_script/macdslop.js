@@ -1,3 +1,3 @@
-let {calc_tech_macd} = require('./macd');
+let {calc_tech_macd,calc_macd_wave} = require('./macd');
 
-calc_tech_macd();
+calc_macd_wave();
