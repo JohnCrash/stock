@@ -4,6 +4,7 @@ var compression = require('compression');
 var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var mysql   = require('mysql');
+var async = require('async');
 
 var connection = mysql.createPool({
     connectionLimit : 100,
@@ -15,8 +16,42 @@ var connection = mysql.createPool({
 
 var app = express();
 
+function query(querys){
+    let queryArray = (typeof(query)==='object' && query.length) ? query : arguments;
+    return new Promise((resolve,reject)=>{
+        let tasks = [];
+        for(let str of queryArray){
+            tasks.push((cb)=>{
+                connection.query(str,(error,results,field)=>{
+                    if(error){
+                        cb(error);
+                    }else{
+                        cb(null,results);
+                    }
+                });        
+            });    
+        }
+        async.series(tasks,(err,result)=>{
+            if(err)
+                reject(err);
+            else{
+                if(result.length==1)
+                    resolve(result[0]);
+                else
+                    resolve(result);
+            }
+        })
+    });
+}
+
 function dateString(date){
-    return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
+    if(typeof(date)==='object')
+        return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
+    else if(typeof(date)==='string'){
+        let d = new Date(date);
+        return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+    }else
+        return 'null';    
 }
 
 function shouldCompress (req, res) {
@@ -158,7 +193,7 @@ app.post('/api/category', function(req, res){
 });
 
 /**
- * macd买卖想信号
+ * macd买卖信号
  */
 app.post('/api/buysell', function(req, res){
     let ry = Number(req.body.range?req.body.range:1);
@@ -171,6 +206,21 @@ app.post('/api/buysell', function(req, res){
         }else{
             res.json({error:`Not found`});
         }
+    });
+});
+
+/**
+ * 最近macd变化接口
+ */
+const days = ['ready','today','yesterday','threeday'];
+app.post('/api/macdselect', function(req, res){
+    let day = days[req.body.day?req.body.day:0];
+    let buy = req.body.buy?1:2;
+    query(`select * from company_detail where ${day}=${buy}`)
+    .then(results=>{
+        res.json({results});
+    }).catch(err=>{
+        res.json({error:err.sqlMessage});
     });
 });
 

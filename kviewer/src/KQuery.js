@@ -33,7 +33,7 @@ class KQuery extends React.Component{
         const {classes} = this.props;
 
         return <div>
-                <KView width={'100%'} height={640} code={this.context.code} range={this.context.range}/>
+                <KView width={'100%'} height={840} code={this.context.code} range={this.context.range}/>
             </div>;
     }
 }

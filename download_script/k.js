@@ -36,17 +36,19 @@ var connection = mysql.createPool({
 function k_company(id,kstart,db,trader_callback){
     return new Promise((resolve,reject)=>{
         let t0 = Date.now();
-        function sell(buy,cur,max){
-            if(buy && cur){
+        let lastSellDate;
+        function sell(buy,sell,max){
+            if(buy && sell){
                 let buy_value = buy.close;
-                let sell_value = cur.close;
+                let sell_value = sell.close;
                 let max_value = max.close;
-                let dd = Math.floor((cur.date-buy.date)/(3600*24*1000));
+                let dd = Math.floor((sell.date-buy.date)/(3600*24*1000));
                 let max_dd = Math.floor((max.date-buy.date)/(3600*24*1000));
                 //每年股市开盘时间为243天
                 let rate = ((sell_value-buy_value))/(buy_value);
                 let max_rate = ((max_value-buy_value))/(buy_value);
-                let sqlstr = `insert ignore into ${db} values (${id},'${dateString(buy.date)}','${dateString(cur.date)}',${buy_value},${sell_value},${rate},${dd},'${dateString(max.date)}',${max_rate},${max_dd},${max_value})`;
+                lastSellDate = sell.date;
+                let sqlstr = `insert ignore into ${db} values (${id},'${dateString(buy.date)}','${dateString(sell.date)}',${buy_value},${sell_value},${rate},${dd},'${dateString(max.date)}',${max_rate},${max_dd},${max_value})`;
     
                 connection.query(sqlstr,(error, results, field)=>{
                     if(error)console.error(id,error);
@@ -54,7 +56,7 @@ function k_company(id,kstart,db,trader_callback){
             }
         }
         let startDate = dateString(new Date(kstart));
-        connection.query(`select date,open,close,macd from kd_xueqiu where id=${id} and date>'${startDate}'`,(error, results, field)=>{
+        connection.query(`select date,open,close,macd from kd_xueqiu where id=${id} and date>='${startDate}'`,(error, results, field)=>{
             if(error){
                 console.error(id,error);
                 reject(error);
@@ -66,6 +68,7 @@ function k_company(id,kstart,db,trader_callback){
                     resolve({
                         beginDate:results[0].date,
                         endDate:results[results.length-1].date,
+                        lastSellDate,
                         usetime:Date.now()-t0
                     });
                 }else{

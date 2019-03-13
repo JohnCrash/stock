@@ -40,8 +40,9 @@ class KView extends Component{
         let ma10 = [];
         let ma20 = [];
         let ma30 = [];
+        let volume = [];
         let macd = [];
-        results.reverse().forEach(element => {
+        results.reverse().forEach((element,i)=> {
             let d = new Date(element.date);
             let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
             dates.push(dateString);
@@ -50,6 +51,7 @@ class KView extends Component{
             ma10.push(element.ma10);
             ma20.push(element.ma20);
             ma30.push(element.ma30);
+            volume.push([i,element.volume,element.close-element.open]);
             macd.push(element.macd);
         });
         let dl = Math.abs(Math.floor(16000/getDayLength(results[0].date,results[results.length-1].date)));
@@ -86,29 +88,49 @@ class KView extends Component{
                     backgroundColor: '#777'
                 }
             },            
-            visualMap: {
-                show: false,
-                seriesIndex: 5,
-                dimension: 1,
-                pieces: [{
-                    max: 0,
-                    color: downColor
-                }, {
-                    min: 0,
-                    color: upColor
-                }]
-            }, 
+            visualMap: [
+                {
+                    show: false,
+                    seriesIndex: 5,
+                    dimension: 2,
+                    pieces: [{
+                        max: 0,
+                        color: downColor
+                    }, {
+                        min: 0,
+                        color: upColor
+                    }]
+                },
+                {
+                    show: false,
+                    seriesIndex: 6,
+                    dimension: 1,
+                    pieces: [{
+                        max: 0,
+                        color: downColor
+                    }, {
+                        min: 0,
+                        color: upColor
+                    }]
+                }
+            ],
             grid: [
                 {
                     left: '6%',
                     right: '6%',
-                    height: '65%'
+                    height: '69%'
                 },
                 {
                     left: '6%',
                     right: '6%',
                     top: '78%',
-                    height: '16%'
+                    height: '5%'
+                },
+                {
+                    left: '6%',
+                    right: '6%',
+                    top: '84%',
+                    height: '8%'
                 }
             ],
             xAxis: [
@@ -136,6 +158,20 @@ class KView extends Component{
                     splitNumber: 20,
                     min: 'dataMin',
                     max: 'dataMax'
+                },                
+                {
+                    type: 'category',
+                    gridIndex: 2,
+                    data: dates,
+                    scale: true,
+                    boundaryGap : false,
+                    axisLine: {onZero: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false},
+                    axisLabel: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax'
                 }
             ],
             yAxis: [
@@ -153,18 +189,27 @@ class KView extends Component{
                     axisLine: {show: false},
                     axisTick: {show: false},
                     splitLine: {show: false}
+                },
+                {
+                    scale: true,
+                    gridIndex: 2,
+                    splitNumber: 2,
+                    axisLabel: {show: false},
+                    axisLine: {show: false},
+                    axisTick: {show: false},
+                    splitLine: {show: false}
                 }
             ],
             dataZoom: [
                 {
                     type: 'inside',
-                    xAxisIndex: [0, 1],
+                    xAxisIndex: [0, 1,2],
                     start: 100-dl,
                     end: 100
                 },
                 {
                     show: true,
-                    xAxisIndex: [0, 1],
+                    xAxisIndex: [0, 1,2],
                     type: 'slider',
                     y: '90%',
                     start: 50,
@@ -296,10 +341,17 @@ class KView extends Component{
                     }
                 },
                 {
-                    name: 'MACD',
+                    name: 'VOLUME',
                     type: 'bar',
                     xAxisIndex: 1,
                     yAxisIndex: 1,
+                    data: volume
+                },
+                {
+                    name: 'MACD',
+                    type: 'bar',
+                    xAxisIndex: 2,
+                    yAxisIndex: 2,
                     data: macd
                 }             
             ]            

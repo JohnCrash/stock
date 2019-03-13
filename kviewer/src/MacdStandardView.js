@@ -43,7 +43,7 @@ const switchs=[
     {
         title:'交易趋势表',
         desc:'将交易表放入在趋势图下',
-        view:<KMacdChart width={'100%'} height={640} />
+        view:<KMacdChart width={'100%'} height={820} />
     },
     {
         title:'年收益率',

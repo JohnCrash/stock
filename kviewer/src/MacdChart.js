@@ -37,14 +37,21 @@ function nearDate(d,dates,dir){
 
 function MacdChart(props){
     let {classes} = props;
-    function init({name,results}){
+    let init = S =>({name,results})=>{
         let dates = [];
         let values = [];
         results.reverse().forEach(e => {
             let d = new Date(e.buy_date);
             let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
             dates.push(dateString);
-            values.push(e.rate);
+            if(S===0)
+                values.push(e.rate);
+            else{
+                if(e.max_dd==0){
+                    values.push(e.rate);
+                }else
+                    values.push(e.max_rate);
+            }
         });
         let marka = moo.map(it=>{
             return [
@@ -89,8 +96,8 @@ function MacdChart(props){
         };            
     }
     return <div className={classes.root}>
-        <FetchChart api='/api/macd' init={init} {...props}/>
-        <FetchChart api='/api/macd' init={init} args={{db:'tech_macd2'}} {...props}/>
+        <FetchChart api='/api/macd' init={init(0)} {...props}/>
+        <FetchChart api='/api/macd' init={init(1)} args={{db:'tech_macd2'}} {...props}/>
         <Typography>
             每一条代表一次买入卖出的完整交易，红色表示获利，绿色表示亏损。
         </Typography>    

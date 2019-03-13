@@ -18,6 +18,7 @@ import Tooltip from '@material-ui/core/Tooltip';
 import DeleteIcon from '@material-ui/icons/Delete';
 import FilterListIcon from '@material-ui/icons/FilterList';
 import { lighten } from '@material-ui/core/styles/colorManipulator';
+import Button from '@material-ui/core/Button';
 
   let counter = 0;
   function createData(name, calories, fat, carbs, protein) {
@@ -51,13 +52,15 @@ import { lighten } from '@material-ui/core/styles/colorManipulator';
   
   const rows = [
     { id: 'name', numeric: false, disablePadding: false, label: '名称' },
-    { id: 'code', numeric: false, disablePadding: false, label: '代码' },
+//    { id: 'code', numeric: false, disablePadding: false, label: '代码' },
     { id: 'category', numeric: true, disablePadding: false, label: '分类' },
-    { id: 'date', numeric: true, disablePadding: false, label: '上市日期' },
-    { id: 'income', numeric: true, disablePadding: false, label: 'MACD累计收益' },
+//    { id: 'date', numeric: true, disablePadding: false, label: '上市日期' },
+    { id: 'income', numeric: true, disablePadding: false, label: 'MACD累计' },
     { id: 'static', numeric: true, disablePadding: false, label: '静态收益' },
-    { id: 'positive', numeric: true, disablePadding: false, label: '收益次数' },
-    { id: 'negative', numeric: true, disablePadding: false, label: '亏损次数' }
+//    { id: 'positive', numeric: true, disablePadding: false, label: '收益次数' },
+//    { id: 'negative', numeric: true, disablePadding: false, label: '亏损次数' }
+    { id: 'xueqiu', numeric: true, disablePadding: false, label: '雪球网' },
+    { id: 'collection', numeric: true, disablePadding: false, label: '收藏' },
   ];
   
   class EnhancedTableHead extends React.Component {
@@ -141,7 +144,7 @@ EnhancedTableHead.propTypes = {
       selected: [],
       data: [],
       page: _page,
-      rowsPerPage: 5,
+      rowsPerPage: 10,
     };
   
     handleRequestSort = (event, property) => {
@@ -234,13 +237,19 @@ EnhancedTableHead.propTypes = {
                         <TableCell component="th" scope="row" padding="none">
                           {n.name}
                         </TableCell>
-                        <TableCell align="right">{n.code}</TableCell>
                         <TableCell align="right">{n.category}</TableCell>
-                        <TableCell align="right">{n.date}</TableCell>
                         <TableCell align="right">{n.income}</TableCell>
                         <TableCell align="right">{n.static}</TableCell>
-                        <TableCell align="right">{n.positive}</TableCell>
-                        <TableCell align="right">{n.negative}</TableCell>
+                        <TableCell align="right">
+                          <Button  variant="contained" color={"primary"} onClick={()=>{window.open(`https://xueqiu.com/S/${n.code}`)}}>
+                            雪球
+                          </Button>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button  variant="contained" color={"primary"}>
+                            收藏
+                          </Button>
+                        </TableCell>                        
                       </TableRow>
                     );
                   })}
