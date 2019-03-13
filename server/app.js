@@ -210,6 +210,18 @@ app.post('/api/buysell', function(req, res){
 });
 
 /**
+ * 股票的描述信息
+ */
+app.post('/api/desc', function(req, res){
+    query(`select * from descript where code='${req.body.code}'`)
+    .then(results=>{
+        res.json({results});
+    }).catch(err=>{
+        res.json({error:err.sqlMessage});
+    });
+});
+
+/**
  * 最近macd变化接口
  */
 const days = ['ready','today','yesterday','threeday'];
@@ -257,6 +269,10 @@ app.post('/api/select', function(req, res){
         });
     }
 });
+
+/**
+ * 股票的基本信息
+ */
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

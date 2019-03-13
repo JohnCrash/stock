@@ -14,18 +14,23 @@ import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
-import Badge from '@material-ui/core/Badge';
 import RadioGroup from '@material-ui/core/RadioGroup';
 import Radio from '@material-ui/core/Radio';
 import FormControl from '@material-ui/core/FormControl';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
-import AccountBalance from '@material-ui/icons/AccountBalance';
-import ShoppingCart from '@material-ui/icons/ShoppingCart';
+import AccountBalanceIcon from '@material-ui/icons/AccountBalance';
+import ShoppingCartIcon from '@material-ui/icons/ShoppingCart';
+import NavigateBeforeIcon from '@material-ui/icons/NavigateBefore';
+import NavigateNextIcon from '@material-ui/icons/NavigateNext';
+import CheckIcon from '@material-ui/icons/Check';
 import Bookmark from '@material-ui/icons/Bookmark';
 import CompanySelect from './CompanySelect';
 import Entry from './entry';
 import {CompanyContext} from './CompanyContext';
 import {clone} from 'lodash';
+import CompanyInfo from './CompanyInfo';
+import Menu from '@material-ui/core/Menu';
+import MenuItem from '@material-ui/core/MenuItem';
 
 const drawerWidth = 240;
 
@@ -61,6 +66,14 @@ const styles = theme => ({
   }  
 });
 
+const menus = [
+  {label:'收藏夹'},
+  {label:'即将为正'},
+  {label:'当前为正'},
+  {label:'昨天为正'},
+  {label:'三天前为正'}
+];
+
 class App extends Component {
   constructor(props){
     super(props);
@@ -81,7 +94,9 @@ class App extends Component {
       open:false,
       selector:clone(this.selector),
       title:`${localStorage.name} (${localStorage.code})`,
-      range:this.selector.range
+      range:this.selector.range,
+      anchorEl:null,
+      menuSel:0
     };
   }
 
@@ -115,10 +130,21 @@ class App extends Component {
     this.selector.range = value;
     this.setState({range:value,selector:clone(this.selector)});
   }
+  handleClose = ()=>{
+    this.setState({ anchorEl: null });
+  }
+  handleMenuSelect = (i)=>()=>{
+    this.setState({menuSel:i,anchorEl:null});
+  }
+  handlePrev = ()=>{
 
+  }
+  handleNext = ()=>{
+
+  }
   render() {
     const { classes } = this.props;
-    const {selector,title,selectIdx,open,range} = this.state;
+    const {selector,title,selectIdx,open,range,anchorEl,menuSel} = this.state;
     //let title = Entry[selectIdx].title;
     let children = Entry[selectIdx].view;
 
@@ -141,15 +167,25 @@ class App extends Component {
                 <FormControlLabel value={"40"} control={<Radio />} label="全部" />
             </RadioGroup>                    
           </FormControl>
-          <IconButton color="inherit" onClick={()=>this.setState({ open:true })}>
-            <Bookmark />
+          <IconButton color="inherit" onClick={this.handlePrev}>
+            <NavigateBeforeIcon />
           </IconButton>
-          <IconButton color="inherit" onClick={()=>this.setState({ open:true })}>
-           <ShoppingCart />
+          <IconButton color="inherit" onClick={this.handleNext}>
+           <NavigateNextIcon />
           </IconButton>
-          <IconButton color="inherit" onClick={()=>this.setState({ open:true })}>
-            <AccountBalance />
+          <IconButton color="inherit" onClick={(event)=>this.setState({ anchorEl: event.currentTarget })}>
+            <AccountBalanceIcon />
           </IconButton>
+          <Menu
+            id="simple-menu"
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={this.handleClose}
+          >
+            {menus.map((item,i)=>{
+              return <MenuItem selected={menuSel===i} onClick={this.handleMenuSelect(i)}>{item.label}</MenuItem>  
+            })}
+          </Menu>          
         </Toolbar>
       </AppBar>        
       <Drawer
@@ -170,6 +206,7 @@ class App extends Component {
             </ListItem>
           ))}
         </List>
+        <CompanyInfo />
       </Drawer>
       <main className={classes.content}>
         <div className={classes.toolbar} />
