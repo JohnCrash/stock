@@ -36,7 +36,7 @@ class MacdBuyShellChart extends Component{
                     let v = results[i];
                     dates.push(dateString(v.date));
                     buys.push(v.buy);
-                    sells.push(v.sell);
+                    sells.push(-v.sell);
                 }
                 return {
                     tooltip: {},
@@ -47,6 +47,7 @@ class MacdBuyShellChart extends Component{
                         type: 'category',
                         data: dates,
                         scale: true,
+                        silent: false,
                         boundaryGap : false,
                         axisLine: {onZero: false},
                         splitLine: {show: false},
@@ -67,6 +68,7 @@ class MacdBuyShellChart extends Component{
                     series: [{
                         name: '买',
                         type: 'bar',
+                        stack:'one',
                         data: buys,
                         itemStyle:{
                             color : upColor
@@ -74,6 +76,7 @@ class MacdBuyShellChart extends Component{
                     },{
                         name: '卖',
                         type: 'bar',
+                        stack:'one',
                         data : sells,
                         itemStyle:{
                             color : downColor

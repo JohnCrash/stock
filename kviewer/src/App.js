@@ -246,7 +246,7 @@ class App extends Component {
 
   }
   handleBookmark = ()=>{
-    
+
   }
   render() {
     const { classes } = this.props;
@@ -266,8 +266,8 @@ class App extends Component {
             </Link>
           </Typography>
           <div className={classes.grow} />
-          <FormControl component="fieldset">
-            <RadioGroup row name="range"  value={range} onChange={this.handeChangeRange.bind(this)}>
+          <FormControl component="fieldset" >
+            <RadioGroup row name="range"  value={range} onChange={this.handeChangeRange.bind(this)} >
                 <FormControlLabel value={"1"} control={<Radio />} label="1年" />
                 <FormControlLabel value={"5"} control={<Radio />} label="5年" />
                 <FormControlLabel value={"10"} control={<Radio />} label="10年" />
