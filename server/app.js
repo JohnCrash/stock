@@ -235,6 +235,17 @@ app.post('/api/macdselect', function(req, res){
         res.json({error:err.sqlMessage});
     });
 });
+/**
+ * 将最近买入的都返回让客户端处理
+ */
+app.post('/api/selects', function(req, res){
+    query(`select * from company_detail where ready=1 or today=1 or yesterday=1 or threeday=1 or cart=1 or bookmark=1`)
+    .then(results=>{
+        res.json({results});
+    }).catch(err=>{
+        res.json({error:err.sqlMessage});
+    });
+});
 
 /**
  * 股票选择

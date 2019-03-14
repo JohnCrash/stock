@@ -61,6 +61,11 @@ const switchs=[
         view:<MacdBuyShellChart width={'100%'} height={640} /> 
     },
     {
+        title:'股价、市值、市盈率收益分布',
+        desc:'将股价、市值、市盈率作为横坐标，将收益率作为纵坐标',
+        view:<MacdDistributedChart width={'100%'} height={640} /> 
+    },    
+    {
         title:'周期分布',
         desc:'将macd的周期天数作为y，日期作为x',
         view:<MacdDistributedChart width={'100%'} height={640} /> 

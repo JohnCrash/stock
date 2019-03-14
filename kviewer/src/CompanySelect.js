@@ -18,8 +18,10 @@ const styles = theme => ({
 
 /**
  * 用于选择股票和时间范围以及其他参数
+ * prop.title标题
+ * prop.lists选择列表
+ * prop.search是否打开搜索栏
  */
-
  class CompanySelect extends Component{
     state = {
         companys : [],
@@ -61,11 +63,8 @@ const styles = theme => ({
         }
      });
     }
-    componentDidMount(){
-      setTimeout(()=>this.requestSelect('#cart=1'),1);
-    }
     render(){
-        const { classes,onClose } = this.props;
+        const { classes,onClose,title,lists,search } = this.props;
         const { companys,openbar,err} = this.state;
         return (
               <Dialog
@@ -75,19 +74,18 @@ const styles = theme => ({
                 onClose={this.handleCloseDialog('cancel')}
                 aria-labelledby="form-dialog-title"
               >
-                <DialogTitle id="form-dialog-title">股票选择</DialogTitle>
+                <DialogTitle id="form-dialog-title">{title?title:'股票选择'}</DialogTitle>
                 <DialogContent>
-                  <DialogContentText>
+                  {search?[<DialogContentText>
                       输入股票名称或者代码，也可以以#开头输入一个数据库查询条件。
-                  </DialogContentText>
-                  <TextField
-                    autoFocus
-                    margin="dense"
-                    id="name"
-                    fullWidth
-                    onKeyPress={this.handleInput}
-                  />
-                  <CompanySelectTable data={companys}/>
+                    </DialogContentText>,
+                    <TextField
+                      autoFocus
+                      margin="dense"
+                      id="name"
+                      fullWidth
+                      onKeyPress={this.handleInput}/>]:undefined}
+                  <CompanySelectTable data={lists?lists:companys}/>
                 </DialogContent>
                 <DialogActions>                   
                   <Button onClick={this.handleCloseDialog('cancel')} color="primary">

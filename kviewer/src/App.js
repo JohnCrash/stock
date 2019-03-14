@@ -23,7 +23,15 @@ import ShoppingCartIcon from '@material-ui/icons/ShoppingCart';
 import NavigateBeforeIcon from '@material-ui/icons/NavigateBefore';
 import NavigateNextIcon from '@material-ui/icons/NavigateNext';
 import CheckIcon from '@material-ui/icons/Check';
-import Bookmark from '@material-ui/icons/Bookmark';
+import Badge from '@material-ui/core/Badge';
+import ExposurePlus1Icon from '@material-ui/icons/ExposurePlus1';
+import ExposureZeroIcon from '@material-ui/icons/ExposureZero';
+import ExposureNeg1Icon from '@material-ui/icons/ExposureNeg1';
+import ExposureNeg2Icon from '@material-ui/icons/ExposureNeg2';
+import BookmarkIcon from '@material-ui/icons/Bookmark';
+import AddShoppingCartIcon from '@material-ui/icons/AddShoppingCart';
+import SearchIcon from '@material-ui/icons/Search';
+import {postJson} from './fetch';
 import CompanySelect from './CompanySelect';
 import Entry from './entry';
 import {CompanyContext} from './CompanyContext';
@@ -31,6 +39,7 @@ import {clone} from 'lodash';
 import CompanyInfo from './CompanyInfo';
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
+import Link from '@material-ui/core/Link';
 
 const drawerWidth = 240;
 
@@ -63,15 +72,23 @@ const styles = theme => ({
     [theme.breakpoints.up('md')]: {
       display: 'flex',
     },
+  },
+  primary: {},
+  icon: {},
+  link: {
+    margin: theme.spacing.unit,
   }  
 });
 
-const menus = [
-  {label:'收藏夹'},
-  {label:'即将为正'},
-  {label:'当前为正'},
-  {label:'昨天为正'},
-  {label:'三天前为正'}
+const searchIndex = 6;
+let menus = [
+  {label:'买入的股票',icon:<ShoppingCartIcon/>,key:'cart',tables:[]},
+  {label:'收藏夹',icon:<BookmarkIcon/>,key:'bookmark',tables:[]},
+  {label:'即将为正',icon:<ExposurePlus1Icon/>,key:'ready',tables:[]},
+  {label:'当前为正',icon:<ExposureZeroIcon/>,key:'today',tables:[]},
+  {label:'昨天为正',icon:<ExposureNeg1Icon/>,key:'yesterday',tables:[]},
+  {label:'三天前为正',icon:<ExposureNeg2Icon/>,key:'threeday',tables:[]},
+  {label:'条件筛选',icon:<SearchIcon/>,key:'search',tables:[]}
 ];
 
 class App extends Component {
@@ -96,35 +113,98 @@ class App extends Component {
       title:`${localStorage.name} (${localStorage.code})`,
       range:this.selector.range,
       anchorEl:null,
-      menuSel:0
+      menuSel:0,
+      currentNum:0,
+      currentSel:0
     };
   }
-
+  componentDidMount(){
+    this.requstSelectList();
+  }
+  errorMessage(str){
+    console.error(str);
+  }
+  /**
+   * 将股票列表加载进来
+   */
+  requstSelectList(){
+    //FIXBUG postJson在componentDidMount可能不响应
+    //放在setTimeout中正常相应？
+    setTimeout(()=>postJson('/api/selects',{},(json)=>{
+      if(json && json.results){
+        for(let it of menus){
+          it.tables = [];
+          for(let com of json.results){
+            com.id = com.company_id;
+            if(com[it.key]===1)
+              it.tables.push(com);
+          }
+        }
+        this.setState({currentNum:menus[this.state.menuSel].tables.length,currentSel:1});
+        this.selectCompanyByIndex(this.state.menuSel,1);
+      }else{
+        this.errorMessage('not found new stock');
+      }
+    }),0);
+  }
   handleCloseDialog(result,args){
+    let menu = menus[this.state.menuSel];
+    let idx = 0;
     if(result==='ok' && args){
       let selects = [];
       let code,name;
-      for(let v of args){
-        if(v.isSelected)
-          selects.push(v);
+
+      if(this.state.menuSel===searchIndex){
+        args.sort((a,b)=>b.income-a.income);
+        menus[searchIndex].tables = args;
+        for(let v of args){
+          if(v.isSelected)
+            selects.push(v);
+        }  
+      }else{
+        menu.tables.sort((a,b)=>b.income-a.income);
+        for(let i in menu.tables){
+          let v = menu.tables[i];
+          if(v.isSelected){
+            idx = Number(i);
+            selects.push(v);
+          }
+        }  
       }
+
       if(selects.length>0){
         code = selects[0].code;
         name = selects[0].name;
-        this.selector.code = code;
-        this.selector.selects = selects;
-        this.selector.companys = args;
-        this.setState({title:`${name} (${code})`,selector:clone(this.selector)});  
-        //将最近的一次选择放入到本地存储中
-        localStorage.code = code;
-        localStorage.name = name;
-
-        localStorage.selects = selects;
+      }else if(menu.tables.length>0){
+        code = menu.tables[0].code;
+        name = menu.tables[0].name;
       }
-    }
-    this.setState({ open:false })
-  }
+      this.selector.code = code;
+      this.selector.selects = selects;
+      this.selector.companys = args;
+      this.setState({title:`${name} (${code})`,selector:clone(this.selector)});  
+      //将最近的一次选择放入到本地存储中
+      localStorage.code = code;
+      localStorage.name = name;
 
+      localStorage.selects = selects;
+    }
+    let count =menus[this.state.menuSel].tables.length;
+    this.setState({ open:false,anchorEl:null,currentNum:count,currentSel:count>0?idx+1:0 });
+    this.selectCompanyByIndex(this.state.menuSel,idx+1)
+  }
+  selectCompanyByIndex(menuSel,i){
+    let t = menus[menuSel].tables;
+    if(t && i-1>=0 && i-1<t.length){
+      let com = menus[menuSel].tables[i-1];
+      let code = com.code;
+      let name = com.name;
+      this.selector.code = code;
+      this.setState({title:`${name} (${code})`,selector:clone(this.selector)});  
+      localStorage.code = code;
+      localStorage.name = name;
+    }
+  }
   handeChangeRange(event,value){
     localStorage.range = value;
     this.selector.range = value;
@@ -134,20 +214,45 @@ class App extends Component {
     this.setState({ anchorEl: null });
   }
   handleMenuSelect = (i)=>()=>{
-    this.setState({menuSel:i,anchorEl:null});
+    let count = menus[i].tables.length;
+    if(menus[i].key==='search'){
+      this.setState({ open:true,menuSel:i,anchorEl:null,currentNum:0,currentSel:0 });
+    }else{
+      this.setState({open:true,menuSel:i,anchorEl:null,currentNum:count,currentSel:count>0?1:0});
+    }
+    this.selectCompanyByIndex(i,1);
   }
   handlePrev = ()=>{
-
+    const {menuSel,currentNum,currentSel} = this.state;
+    if(currentNum>0){
+      let sel = currentSel-1<1?1:currentSel-1
+      this.setState({currentSel:sel});
+      this.selectCompanyByIndex(menuSel,sel);
+    }else{
+      this.setState({currentSel:0});
+    }
   }
   handleNext = ()=>{
+    const {menuSel,currentNum,currentSel} = this.state;
+    if(currentNum>0){
+      let sel = currentSel>=currentNum?currentNum:currentSel+1;
+      this.setState({currentSel:sel});
+      this.selectCompanyByIndex(menuSel,sel);
+    }else{
+      this.setState({currentSel:0});
+    }
+  }
+  handleAddShopping = ()=>{
 
+  }
+  handleBookmark = ()=>{
+    
   }
   render() {
     const { classes } = this.props;
-    const {selector,title,selectIdx,open,range,anchorEl,menuSel} = this.state;
-    //let title = Entry[selectIdx].title;
+    const {selector,title,selectIdx,open,range,anchorEl,menuSel,currentNum,currentSel} = this.state;
     let children = Entry[selectIdx].view;
-
+    let currentMenu = menus[menuSel];
     return (
     <CompanyContext.Provider value={selector}>
     <div className={classes.root}>
@@ -155,7 +260,10 @@ class App extends Component {
         <CssBaseline />
         <Toolbar>
           <Typography variant="h6" color="inherit" noWrap>
-            {title}
+            <Link variant="h6" component="button" className={classes.link} color={'inherit'}
+              onClick={()=>{window.open(`https://xueqiu.com/S/${this.selector.code}`)}}>
+              {title}
+            </Link>
           </Typography>
           <div className={classes.grow} />
           <FormControl component="fieldset">
@@ -167,15 +275,27 @@ class App extends Component {
                 <FormControlLabel value={"40"} control={<Radio />} label="全部" />
             </RadioGroup>                    
           </FormControl>
-          <IconButton color="inherit" onClick={this.handlePrev}>
-            <NavigateBeforeIcon />
+          <IconButton color="inherit" onClick={this.handleAddShopping}>
+            <AddShoppingCartIcon/>
           </IconButton>
-          <IconButton color="inherit" onClick={this.handleNext}>
-           <NavigateNextIcon />
+          <IconButton color="inherit" onClick={this.handleBookmark}>
+            <BookmarkIcon/>
+          </IconButton>
+          <IconButton color="inherit" onClick={this.handlePrev}>
+            <Badge className={classes.margin} badgeContent={currentSel} color="secondary">
+              <NavigateBeforeIcon />
+            </Badge>
           </IconButton>
           <IconButton color="inherit" onClick={(event)=>this.setState({ anchorEl: event.currentTarget })}>
-            <AccountBalanceIcon />
+            <Badge className={classes.margin} badgeContent={currentNum} color="secondary">
+              {menus[menuSel].icon}
+            </Badge>
           </IconButton>
+          <IconButton color="inherit" onClick={this.handleNext}>
+            <Badge className={classes.margin} badgeContent={currentNum-currentSel} color="secondary">
+              <NavigateNextIcon />
+            </Badge>
+          </IconButton>          
           <Menu
             id="simple-menu"
             anchorEl={anchorEl}
@@ -183,7 +303,14 @@ class App extends Component {
             onClose={this.handleClose}
           >
             {menus.map((item,i)=>{
-              return <MenuItem selected={menuSel===i} onClick={this.handleMenuSelect(i)}>{item.label}</MenuItem>  
+              return <MenuItem selected={menuSel===i} key={item.key} onClick={this.handleMenuSelect(i)}>
+                  <Badge className={classes.margin} badgeContent={item.tables?item.tables.length:0} color="secondary">
+                  <ListItemIcon className={classes.icon}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText classes={{ primary: classes.primary }} inset primary={item.label} />
+                  </Badge>
+                </MenuItem>  
             })}
           </Menu>          
         </Toolbar>
@@ -212,7 +339,7 @@ class App extends Component {
         <div className={classes.toolbar} />
         {children}
       </main>
-      <CompanySelect open={open} onClose={this.handleCloseDialog.bind(this)}/>
+      <CompanySelect open={open} title={currentMenu.label} search={currentMenu.key==='search'} lists={currentMenu.key==='search'?undefined:currentMenu.tables} onClose={this.handleCloseDialog.bind(this)}/>
     </div>
     </CompanyContext.Provider>);
   }

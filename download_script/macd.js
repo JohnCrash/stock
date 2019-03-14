@@ -269,7 +269,6 @@ function calc_macd_select(done){
 
 /**
  * 如果连续计算tech_macd,macd_wave,macd_select
- * 
  */
 function macd(done){
     calc_macd_select((err)=>{
@@ -321,7 +320,7 @@ function macd(done){
                 if(err){
                     if(done)done(err);
                 }else{
-                    if(ids){
+                    if(!ids){
                         if(done)done();
                     }else
                         calc_tech_macd(done,ids);
