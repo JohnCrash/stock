@@ -56,11 +56,9 @@ import Button from '@material-ui/core/Button';
     { id: 'category', numeric: true, disablePadding: false, label: '分类' },
 //    { id: 'date', numeric: true, disablePadding: false, label: '上市日期' },
     { id: 'income', numeric: true, disablePadding: false, label: 'MACD累计' },
-    { id: 'static', numeric: true, disablePadding: false, label: '静态收益' },
+    { id: 'static', numeric: true, disablePadding: false, label: '静态收益' }
 //    { id: 'positive', numeric: true, disablePadding: false, label: '收益次数' },
 //    { id: 'negative', numeric: true, disablePadding: false, label: '亏损次数' }
-    { id: 'xueqiu', numeric: true, disablePadding: false, label: '雪球网' },
-    { id: 'collection', numeric: true, disablePadding: false, label: '收藏' },
   ];
   
   class EnhancedTableHead extends React.Component {
@@ -240,16 +238,6 @@ EnhancedTableHead.propTypes = {
                         <TableCell align="right">{n.category}</TableCell>
                         <TableCell align="right">{n.income}</TableCell>
                         <TableCell align="right">{n.static}</TableCell>
-                        <TableCell align="right">
-                          <Button  variant="contained" color={"primary"} onClick={()=>{window.open(`https://xueqiu.com/S/${n.code}`)}}>
-                            雪球
-                          </Button>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Button  variant="contained" color={"primary"}>
-                            收藏
-                          </Button>
-                        </TableCell>                        
                       </TableRow>
                     );
                   })}

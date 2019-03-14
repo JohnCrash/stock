@@ -28,7 +28,6 @@ class MacdBuyShellChart extends Component{
         <FetchChart api='/api/buysell' init={
             ({results})=>{
                 let dates = [];
-                let values = [];
                 let buys = [];
                 let sells = [];
                 let dl = Math.abs(Math.floor(16000/getDayLength(results[0].date,results[results.length-1].date)));

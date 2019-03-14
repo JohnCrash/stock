@@ -40,6 +40,8 @@ import CompanyInfo from './CompanyInfo';
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Link from '@material-ui/core/Link';
+import Input from '@material-ui/core/Input';
+import InputAdornment from '@material-ui/core/InputAdornment';
 
 const drawerWidth = 240;
 
@@ -77,10 +79,18 @@ const styles = theme => ({
   icon: {},
   link: {
     margin: theme.spacing.unit,
-  }  
+  },
+  iconbutton:{
+    colorSecondary : '#ffea00'
+  },
+  input: {
+    margin: theme.spacing.unit,
+  }
 });
 
 const searchIndex = 6;
+const cartIndex = 0;
+const bookmarkIndex = 1;
 let menus = [
   {label:'买入的股票',icon:<ShoppingCartIcon/>,key:'cart',tables:[]},
   {label:'收藏夹',icon:<BookmarkIcon/>,key:'bookmark',tables:[]},
@@ -107,6 +117,8 @@ class App extends Component {
       range:localStorage.range?localStorage.range:"1"
     }
     this.state={
+      name:'',
+      code:'',
       selectIdx:idx,
       open:false,
       selector:clone(this.selector),
@@ -115,7 +127,9 @@ class App extends Component {
       anchorEl:null,
       menuSel:0,
       currentNum:0,
-      currentSel:0
+      currentSel:0,
+      incart:false,
+      inbookmark:false
     };
   }
   componentDidMount(){
@@ -150,10 +164,9 @@ class App extends Component {
   handleCloseDialog(result,args){
     let menu = menus[this.state.menuSel];
     let idx = 0;
+    let selects = [];
+    let code,name;
     if(result==='ok' && args){
-      let selects = [];
-      let code,name;
-
       if(this.state.menuSel===searchIndex){
         args.sort((a,b)=>b.income-a.income);
         menus[searchIndex].tables = args;
@@ -200,9 +213,27 @@ class App extends Component {
       let code = com.code;
       let name = com.name;
       this.selector.code = code;
-      this.setState({title:`${name} (${code})`,selector:clone(this.selector)});  
+      this.setState({title:`${name} (${code})`,selector:clone(this.selector),code,name});  
       localStorage.code = code;
       localStorage.name = name;
+      /**
+       * 如果该股票在购物车或者收藏加重
+       */
+      let incart = false;
+      let inbookmark = false;
+      for(let it of menus[cartIndex].tables){
+        if(it.code===code){
+          incart = true;
+          break;
+        }
+      }
+      for(let it of menus[bookmarkIndex].tables){
+        if(it.code===code){
+          inbookmark = true;
+          break;
+        }
+      }
+      this.setState({inbookmark,incart});
     }
   }
   handeChangeRange(event,value){
@@ -243,14 +274,74 @@ class App extends Component {
     }
   }
   handleAddShopping = ()=>{
-
+    let {code,incart,currentNum} = this.state;
+    postJson('/api/addsub',{code,variable:'cart',value:incart?0:1},(json)=>{
+      if(json && json.results==='ok'){
+        let t = menus[cartIndex].tables;
+        if(incart){ //删除
+          for(let i in t){
+            let it = t[i];
+            if(it.code === code){
+              t.splice(i,1);
+              currentNum--;
+              this.setState({incart:false,currentNum});
+              break;
+            }
+          }  
+        }else if(json.company &&json.company.length===1){ //增加
+          t.splice(0,0,json.company[0]);
+          currentNum++;
+          this.setState({incart:true,currentNum});
+        }
+      }
+    });
   }
   handleBookmark = ()=>{
-
+    let {code,inbookmark,currentNum} = this.state;
+    postJson('/api/addsub',{code,variable:'bookmark',value:inbookmark?0:1},(json)=>{
+      if(json && json.results==='ok'){
+        let t = menus[bookmarkIndex].tables;
+        if(inbookmark){
+          for(let i in t){
+            let it = t[i];
+            if(it.code === code){
+              t.splice(i,1);
+              currentNum--;
+              this.setState({inbookmark:false});
+              break;
+            }
+          }
+        }else if(json.company &&json.company.length===1){
+          t.splice(0,0,json.company[0]);
+          currentNum++;
+          this.setState({inbookmark:true,currentNum});
+        }
+      }
+    });
+  }
+  handleEnter=(event)=>{
+    if(event.key==='Enter'){
+        postJson('/api/select',{cmd:event.target.value},json=>{
+          if(json.error){
+              this.setState({openbar:true,err:json.error});
+          }else if(json.results &&json.results.length>0){
+            //切换到条件搜索模式
+            let search = [];
+            
+            for(let com of json.results){
+              com.id = com.company_id;
+              search.push(com);
+            }
+            menus[searchIndex].tables = search;
+            this.setState({currentNum:search.length,currentSel:1});
+            this.selectCompanyByIndex(searchIndex,1);
+          }
+      });
+    }
   }
   render() {
     const { classes } = this.props;
-    const {selector,title,selectIdx,open,range,anchorEl,menuSel,currentNum,currentSel} = this.state;
+    const {incart,inbookmark,selector,title,selectIdx,open,range,anchorEl,menuSel,currentNum,currentSel} = this.state;
     let children = Entry[selectIdx].view;
     let currentMenu = menus[menuSel];
     return (
@@ -266,6 +357,18 @@ class App extends Component {
             </Link>
           </Typography>
           <div className={classes.grow} />
+          <Input
+            defaultValue=""
+            className={classes.input}
+            startAdornment={
+              <InputAdornment position="start">
+                <AccountBalanceIcon />
+              </InputAdornment>
+            }
+            onKeyPress={this.handleEnter}     
+            inputProps={{
+              'aria-label': 'Description',
+            }}/>
           <FormControl component="fieldset" >
             <RadioGroup row name="range"  value={range} onChange={this.handeChangeRange.bind(this)} >
                 <FormControlLabel value={"1"} control={<Radio />} label="1年" />
@@ -275,10 +378,10 @@ class App extends Component {
                 <FormControlLabel value={"40"} control={<Radio />} label="全部" />
             </RadioGroup>                    
           </FormControl>
-          <IconButton color="inherit" onClick={this.handleAddShopping}>
+          <IconButton className={classes.iconbutton} color={incart?"secondary":"inherit"} onClick={this.handleAddShopping}>
             <AddShoppingCartIcon/>
           </IconButton>
-          <IconButton color="inherit" onClick={this.handleBookmark}>
+          <IconButton className={classes.iconbutton} color={inbookmark?"secondary":"inherit"} onClick={this.handleBookmark}>
             <BookmarkIcon/>
           </IconButton>
           <IconButton color="inherit" onClick={this.handlePrev}>

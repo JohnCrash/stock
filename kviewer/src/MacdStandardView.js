@@ -42,7 +42,7 @@ const switchs=[
     },
     {
         title:'交易趋势表',
-        desc:'将交易表放入在趋势图下',
+        desc:'将交易表放入在趋势图下，图表从上到下依次是K线、成交量、MACD、交易盈亏、金叉死叉分布',
         view:<KMacdChart width={'100%'} height={820} />
     },
     {

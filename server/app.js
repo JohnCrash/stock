@@ -67,6 +67,7 @@ app.use(compression({filter: shouldCompress}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(serveStatic('release'));
 app.use(serveStatic('public'));
 
 function isStockCode(code){
@@ -280,7 +281,31 @@ app.post('/api/select', function(req, res){
         });
     }
 });
-
+/**
+ * 处理标记
+ */
+app.post('/api/addsub', function(req, res){
+    let code = req.body.code;
+    let variable = req.body.variable;
+    let value = req.body.value;
+    if(code && variable){
+        query(`update company_detail set ${variable}=${value} where code='${code}'`)
+        .then(results=>{
+            if(value===1){
+                query(`select * from company_detail where code='${code}'`)
+                .then((results)=>{
+                    res.json({results:'ok',company:results});    
+                });
+            }else{
+                res.json({results:'ok'});
+            }
+        }).catch(err=>{
+            res.json({error:err.sqlMessage});
+        });
+    }else{
+        res.json({error:`Not found '${code}' feild ${variable}`});
+    }
+});
 /**
  * 股票的基本信息
  */
@@ -294,6 +319,6 @@ app.use(function(req, res, next) {
 
 /* istanbul ignore next */
 if (!module.parent) {
-  app.listen(4000);
-  console.log('Express started on port 4000');
+  app.listen(80);
+  console.log('Express started on port 80');
 }

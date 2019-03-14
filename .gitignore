@@ -1,3 +1,5 @@
 viewer/node_modules/
 download_script/node_modules/
 server/node_modules/
+server/app.js
+server/release

@@ -1,13 +1,14 @@
 import React, { Component } from 'react';
 import { withStyles } from '@material-ui/core/styles';
+import {dateString,getDayLength,days} from './kits';
 import FetchChart from './FetchChart';
-import {getDayLength,days} from './kits';
-import Typography from '@material-ui/core/Typography';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
 const downColor = '#00da3c';
 const downBorderColor = '#008F28';
+const goldColor = '#ffd54f';
+const buyColor = '#7c4dff';
 
 const styles = theme => ({
     root: {
@@ -30,6 +31,7 @@ function KMacdChart(props){
         let macd = [];
         let merchsData = a[1].results;
         let merchs = [];
+
         // 将macd交易数据的时间整合到k的时间线上
         let merchsMaps = {};
         for(let v of merchsData){
@@ -40,14 +42,14 @@ function KMacdChart(props){
                 merchsMaps[d] = v;
             }
         }
-        function getMerchsRate(date){
+
+        function getMerchsRate(date,i){
             let v = merchsMaps[date];
-            return v?v.rate:0;
+            return [i,v?v.rate:0,date&&v&&v.max_date&&date==v.max_date?-1:1];
         }
         results.reverse().forEach((element,i) => {
-            let d = new Date(element.date);
-            let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-            dates.push(dateString);
+            let dateStr = dateString(element.date);
+            dates.push(dateStr);
             values.push([element.open,element.close,element.low,element.high]);
             ma5.push(element.ma5);
             ma10.push(element.ma10);
@@ -55,8 +57,29 @@ function KMacdChart(props){
             ma30.push(element.ma30);
             volume.push([i,element.volume,element.close-element.open]);
             macd.push(element.macd);
-            merchs.push(getMerchsRate(element.date)); //将改天的交易数据放入，没有就是0
+            merchs.push(getMerchsRate(element.date,i)); //将改天的交易数据放入，没有就是0
         });
+        //金叉死叉分布，将时间走同步的kd线一致
+        //=================================
+        let buysells = a[2].results;
+        let dateBuySell = {};
+        let buys = [];
+        let sells = [];
+        for(let i=0;i<buysells.length;i++){
+            let v = buysells[i];
+            dateBuySell[dateString(v.date)] = {buy:v.buy,sell:v.sell};
+        }
+        for(let d of dates){
+            let v = dateBuySell[d];
+            if(v){
+                buys.push(v.buy);
+                sells.push(-v.sell);        
+            }else{
+                buys.push(0);
+                sells.push(0);
+            }
+        }
+        //=================================
         let dl = Math.abs(Math.floor(32000/getDayLength(results[0].date,results[results.length-1].date)));
         return {
             tooltip: {
@@ -66,7 +89,7 @@ function KMacdChart(props){
                 }
             },
             legend: {
-                data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30']
+                data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30','成交量','MACD','交易','金叉','死叉']
             },
             visualMap: [{
                 show: false,
@@ -90,6 +113,18 @@ function KMacdChart(props){
                     }, {
                         min: 0,
                         color: upColor
+                    }]
+                },
+                {
+                    show: false,
+                    seriesIndex: [7],
+                    dimension: 2,
+                    pieces: [{
+                        max: 0,
+                        color: goldColor
+                    }, {
+                        min: 0,
+                        color: buyColor
                     }]
                 }
             ],
@@ -121,21 +156,27 @@ function KMacdChart(props){
                 {
                     left: '6%',
                     right: '6%',
-                    top: '69%',
+                    top: '60.3%',
                     height: '5%'
                 },
                 {
                     left: '6%',
                     right: '6%',
-                    top: '74%',
+                    top: '68%',
+                    height: '6%'
+                },
+                {
+                    left: '6%',
+                    right: '6%',
+                    top: '72%',
                     height: '8%'
                 },
                 {
                     left: '6%',
                     right: '6%',
-                    top: '82%',
-                    height: '8%'
-                }
+                    top: '78%',
+                    height: '20%'
+                }                
             ],
             xAxis: [
                 {
@@ -190,6 +231,20 @@ function KMacdChart(props){
                     splitNumber: 20,
                     min: 'dataMin',
                     max: 'dataMax'
+                },                
+                {
+                    type: 'category',
+                    gridIndex: 4,
+                    data: dates,
+                    scale: true,
+                    boundaryGap : false,
+                    axisLine: {onZero: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false},
+                    axisLabel: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax'
                 }
             ],
             yAxis: [
@@ -225,7 +280,16 @@ function KMacdChart(props){
                     axisLine: {show: true},
                     axisTick: {show: false},
                     splitLine: {show: false}
-                }                 
+                },
+                {
+                    scale: true,
+                    gridIndex: 4,
+                    splitNumber: 2,
+                    axisLabel: {show: true},
+                    axisLine: {show: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false}
+                }                                 
             ],
             dataZoom: [
                 {
@@ -236,7 +300,7 @@ function KMacdChart(props){
                 },
                 {
                     show: true,
-                    xAxisIndex: [0,1,2,3],
+                    xAxisIndex: [0,1,2,3,4],
                     type: 'slider',
                     y: '90%',
                     start: 100-dl,
@@ -298,7 +362,7 @@ function KMacdChart(props){
                     }
                 },
                 {
-                    name: 'Volume',
+                    name: '成交量',
                     type: 'bar',
                     xAxisIndex: 1,
                     yAxisIndex: 1,
@@ -317,13 +381,35 @@ function KMacdChart(props){
                     xAxisIndex: 3,
                     yAxisIndex: 3,
                     data: merchs
-                }                       
+                },
+                {
+                    name: '金叉',
+                    type: 'bar',
+                    stack:'one',
+                    data: buys,
+                    xAxisIndex: 4,
+                    yAxisIndex: 4,                    
+                    itemStyle:{
+                        color : upColor
+                    }
+                },
+                {
+                    name: '死叉',
+                    type: 'bar',
+                    stack:'one',
+                    data : sells,
+                    xAxisIndex: 4,
+                    yAxisIndex: 4,                    
+                    itemStyle:{
+                        color : downColor
+                    }
+                }
             ]            
         };        
     }
     //<FetchChart api={['/api/k','/api/macd']} args={{db:'tech_macdrate'}} init={init} {...props}/>
     return <div className={classes.root}>
-        <FetchChart api={['/api/k','/api/macd']} init={init} {...props}/>
+        <FetchChart api={['/api/k','/api/macd','/api/buysell']} init={init} {...props}/>
     </div>;
 }
 
