@@ -1,39 +1,26 @@
-/**
- * k图表使用echarts库显示
- */
 import React, { Component } from 'react';
-import EChart from './echart';
-import {postJson} from './fetch';
-import {getDayLength} from './kits';
+import { withStyles } from '@material-ui/core/styles';
+import {dateString,getDayLength,days} from './kits';
+import FetchChart from './FetchChart';
 
 const upColor = '#ec0000';
 const upBorderColor = '#ec0000';
 const downColor = '#00da3c';
 const downBorderColor = '#008F28';
+const goldColor = '#ffd54f';
+const buyColor = '#7c4dff';
 
+const styles = theme => ({
+    root: {
+        width:'100%'
+      }
+  });
 
-class KView extends Component{
-    constructor(props){
-        super(props);  
-        this.state = {options:{}};
-    }
-    componentWillUpdate(nextProps, nextState, snapshot){
-        if(nextProps.code!==this.props.code||nextProps.range!==this.props.range)
-            this.initComponent(nextProps);
-    }
-    componentDidMount(){
-        this.initComponent(this.props);
-    }
-    initComponent({code,range}){
-        postJson('/api/k',{code,range},(json)=>{
-            if(json.results){
-                this.setState({options:this.initData(json.name,json.results)});
-            }else{
-                console.error(json.error);
-            }
-        });
-    }
-    initData(name,results){
+function KView(props){
+    let {classes} = props;
+    function init(a){
+        let name = a[0].name;
+        let results = a[0].results;
         let dates = [];
         let values = [];
         let ma5 = [];
@@ -42,10 +29,27 @@ class KView extends Component{
         let ma30 = [];
         let volume = [];
         let macd = [];
-        results.reverse().forEach((element,i)=> {
-            let d = new Date(element.date);
-            let dateString = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-            dates.push(dateString);
+        let merchsData = a[1].results;
+        let merchs = [];
+
+        // 将macd交易数据的时间整合到k的时间线上
+        let merchsMaps = {};
+        for(let v of merchsData){
+            //merchsMaps[v.buy_date] = v;
+            //merchsMaps[v.sell_date] = v;
+            //将中间填满
+            for(let d of days(v.buy_date,v.sell_date)){
+                merchsMaps[d] = v;
+            }
+        }
+
+        function getMerchsRate(date,i){
+            let v = merchsMaps[date];
+            return [i,v?v.rate:0,date&&v&&v.max_date&&date==v.max_date?-1:1];
+        }
+        results.reverse().forEach((element,i) => {
+            let dateStr = dateString(element.date);
+            dates.push(dateStr);
             values.push([element.open,element.close,element.low,element.high]);
             ma5.push(element.ma5);
             ma10.push(element.ma10);
@@ -53,13 +57,37 @@ class KView extends Component{
             ma30.push(element.ma30);
             volume.push([i,element.volume,element.close-element.open]);
             macd.push(element.macd);
+            merchs.push(getMerchsRate(element.date,i)); //将改天的交易数据放入，没有就是0
         });
-        let dl = Math.abs(Math.floor(16000/getDayLength(results[0].date,results[results.length-1].date)));
+        //金叉死叉分布，将时间走同步的kd线一致
+        //=================================
+        let buysells = a[2].results;
+        let dateBuySell = {};
+        let buys = [];
+        let sells = [];
+        let positives = [];
+        let negatives = [];
+        for(let i=0;i<buysells.length;i++){
+            let v = buysells[i];
+            dateBuySell[dateString(v.date)] = {buy:v.buy,sell:v.sell,positive:v.positive,negative:v.negative};
+        }
+        for(let d of dates){
+            let v = dateBuySell[dateString(d)];
+            if(v){
+                buys.push(v.buy);
+                sells.push(-v.sell);
+                positives.push(v.positive);
+                negatives.push(-v.negative);       
+            }else{
+                buys.push(0);
+                sells.push(0);
+                positives.push(0);
+                negatives.push(0);                   
+            }
+        }
+        //=================================
+        let dl = Math.abs(Math.floor(32000/getDayLength(results[0].date,results[results.length-1].date)));
         return {
-            title: {
-                text: name?name:'上证指数',
-                left: 0
-            },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: {
@@ -67,8 +95,45 @@ class KView extends Component{
                 }
             },
             legend: {
-                data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30']
+                data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30','成交量','MACD','交易','金叉','死叉','macd正','macd负']
             },
+            visualMap: [{
+                show: false,
+                seriesIndex: [5],
+                dimension: 2,
+                pieces: [{
+                    max: 0,
+                    color: downColor
+                }, {
+                    min: 0,
+                    color: upColor
+                }]
+                },
+                {
+                    show: false,
+                    seriesIndex: [6,7],
+                    dimension: 1,
+                    pieces: [{
+                        max: 0,
+                        color: downColor
+                    }, {
+                        min: 0,
+                        color: upColor
+                    }]
+                },
+                {
+                    show: false,
+                    seriesIndex: [7],
+                    dimension: 2,
+                    pieces: [{
+                        max: 0,
+                        color: goldColor
+                    }, {
+                        min: 0,
+                        color: buyColor
+                    }]
+                }
+            ],
             tooltip: {
                 trigger: 'axis',
                 axisPointer: {
@@ -83,55 +148,44 @@ class KView extends Component{
                 }                    
             },    
             axisPointer: {
-                link: {xAxisIndex: 'all'},
-                label: {
-                    backgroundColor: '#777'
-                }
-            },            
-            visualMap: [
-                {
-                    show: false,
-                    seriesIndex: 5,
-                    dimension: 2,
-                    pieces: [{
-                        max: 0,
-                        color: downColor
-                    }, {
-                        min: 0,
-                        color: upColor
-                    }]
-                },
-                {
-                    show: false,
-                    seriesIndex: 6,
-                    dimension: 1,
-                    pieces: [{
-                        max: 0,
-                        color: downColor
-                    }, {
-                        min: 0,
-                        color: upColor
-                    }]
-                }
-            ],
+                link: {xAxisIndex: 'all'}
+            },
             grid: [
-                {
-                    left: '6%',
-                    right: '6%',
-                    height: '69%'
+                { //k
+                    left: '3%',
+                    right: '3%',
+                    height: '58%'
                 },
-                {
-                    left: '6%',
-                    right: '6%',
-                    top: '78%',
+                {//volume
+                    left: '3%',
+                    right: '3%',
+                    top: '60.3%',
                     height: '5%'
                 },
-                {
-                    left: '6%',
-                    right: '6%',
-                    top: '84%',
-                    height: '8%'
-                }
+                {//macd
+                    left: '3%',
+                    right: '3%',
+                    top: '68%',
+                    height: '6%'
+                },
+                {//tr
+                    left: '3%',
+                    right: '3%',
+                    top: '72%',
+                    height: '3%'
+                },
+                {//sign
+                    left: '3%',
+                    right: '3%',
+                    top: '73%',
+                    height: '16%'
+                },
+                {//金叉死叉存量
+                    left: '3%',
+                    right: '3%',
+                    top: '83%',
+                    height: '10%'
+                }            
             ],
             xAxis: [
                 {
@@ -143,7 +197,12 @@ class KView extends Component{
                     splitLine: {show: false},
                     splitNumber: 20,
                     min: 'dataMin',
-                    max: 'dataMax'
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
                 },
                 {
                     type: 'category',
@@ -157,11 +216,73 @@ class KView extends Component{
                     axisLabel: {show: false},
                     splitNumber: 20,
                     min: 'dataMin',
-                    max: 'dataMax'
-                },                
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
+                },
                 {
                     type: 'category',
                     gridIndex: 2,
+                    data: dates,
+                    scale: false,
+                    boundaryGap : false,
+                    axisLine: {onZero: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false},
+                    axisLabel: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
+                },                
+                {
+                    type: 'category',
+                    gridIndex: 3,
+                    data: dates,
+                    scale: true,
+                    boundaryGap : false,
+                    axisLine: {onZero: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false},
+                    axisLabel: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
+                },                
+                {
+                    type: 'category',
+                    gridIndex: 4,
+                    data: dates,
+                    scale: true,
+                    boundaryGap : false,
+                    axisLine: {onZero: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false},
+                    axisLabel: {show: false},
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
+                },                
+                {
+                    type: 'category',
+                    gridIndex: 5,
                     data: dates,
                     scale: true,
                     boundaryGap : false,
@@ -185,8 +306,8 @@ class KView extends Component{
                     scale: true,
                     gridIndex: 1,
                     splitNumber: 2,
-                    axisLabel: {show: false},
-                    axisLine: {show: false},
+                    axisLabel: {show: true},
+                    axisLine: {show: true},
                     axisTick: {show: false},
                     splitLine: {show: false}
                 },
@@ -194,27 +315,54 @@ class KView extends Component{
                     scale: true,
                     gridIndex: 2,
                     splitNumber: 2,
-                    axisLabel: {show: false},
-                    axisLine: {show: false},
+                    axisLabel: {show: true},
+                    axisLine: {show: true},
                     axisTick: {show: false},
                     splitLine: {show: false}
-                }
+                },
+                {
+                    scale: true,
+                    gridIndex: 3,
+                    splitNumber: 2,
+                    axisLabel: {show: true},
+                    axisLine: {show: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false}
+                },
+                {
+                    scale: true,
+                    gridIndex: 4,
+                    splitNumber: 2,
+                    axisLabel: {show: true},
+                    axisLine: {show: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false}
+                },
+                {
+                    scale: true,
+                    gridIndex: 5,
+                    splitNumber: 2,
+                    axisLabel: {show: true},
+                    axisLine: {show: true},
+                    axisTick: {show: false},
+                    splitLine: {show: false}
+                }                               
             ],
             dataZoom: [
                 {
                     type: 'inside',
-                    xAxisIndex: [0, 1,2],
+                    xAxisIndex: [0, 1],
                     start: 100-dl,
                     end: 100
                 },
                 {
                     show: true,
-                    xAxisIndex: [0, 1,2],
+                    xAxisIndex: [0,1,2,3,4,5],
                     type: 'slider',
                     y: '90%',
-                    start: 50,
+                    start: 100-dl,
                     end: 100
-                }
+                }                   
             ],
             series: [
                 {
@@ -228,76 +376,6 @@ class KView extends Component{
                             borderColor: upBorderColor,
                             borderColor0: downBorderColor
                         }
-                    },
-                    markPoint: {
-                        label: {
-                            normal: {
-                                formatter: function (param) {
-                                    return param != null ? Math.round(param.value) : '';
-                                }
-                            }
-                        },
-                        data: [
-
-                            {
-                                name: 'highest value',
-                                type: 'max',
-                                valueDim: 'highest'
-                            },
-                            {
-                                name: 'lowest value',
-                                type: 'min',
-                                valueDim: 'lowest'
-                            },
-                            {
-                                name: 'average value on close',
-                                type: 'average',
-                                valueDim: 'close'
-                            }
-                        ],
-                        tooltip: {
-                            formatter: function (param) {
-                                return param.name + '<br>' + (param.data.coord || '');
-                            }
-                        }
-                    },
-                    markLine: {
-                        symbol: ['none', 'none'],
-                        data: [
-                            [
-                                {
-                                    name: 'from lowest to highest',
-                                    type: 'min',
-                                    valueDim: 'lowest',
-                                    symbol: 'circle',
-                                    symbolSize: 10,
-                                    label: {
-                                        normal: {show: false},
-                                        emphasis: {show: false}
-                                    }
-                                },
-                                {
-                                    type: 'max',
-                                    valueDim: 'highest',
-                                    symbol: 'circle',
-                                    symbolSize: 10,
-                                    label: {
-                                        normal: {show: false},
-                                        emphasis: {show: false}
-                                    }
-                                }
-                            ],
-                            {
-                                name: 'min line on close',
-                                type: 'min',
-                                valueDim: 'close'
-                            },
-                            {
-                                name: 'max line on close',
-                                type: 'max',
-                                valueDim: 'close'
-                            }                           
-                        ]
                     }
                 },
                 {
@@ -341,54 +419,77 @@ class KView extends Component{
                     }
                 },
                 {
-                    name: 'VOLUME',
+                    name: '成交量',
                     type: 'bar',
                     xAxisIndex: 1,
                     yAxisIndex: 1,
                     data: volume
-                },
+                },                
                 {
                     name: 'MACD',
                     type: 'bar',
                     xAxisIndex: 2,
                     yAxisIndex: 2,
                     data: macd
-                }             
+                },               
+                {
+                    name: '交易',
+                    type: 'bar',
+                    xAxisIndex: 3,
+                    yAxisIndex: 3,
+                    data: merchs
+                },
+                {
+                    name: '金叉',
+                    type: 'bar',
+                    stack:'one',
+                    data: buys,
+                    xAxisIndex: 4,
+                    yAxisIndex: 4,                    
+                    itemStyle:{
+                        color : upColor
+                    }
+                },
+                {
+                    name: '死叉',
+                    type: 'bar',
+                    stack:'one',
+                    data : sells,
+                    xAxisIndex: 4,
+                    yAxisIndex: 4,                    
+                    itemStyle:{
+                        color : downColor
+                    }
+                },
+                {
+                    name: 'macd正',
+                    type: 'bar',
+                    stack:'two',
+                    data: positives,
+                    xAxisIndex: 5,
+                    yAxisIndex: 5,                    
+                    itemStyle:{
+                        color : upColor
+                    }
+                },
+                {
+                    name: 'macd负',
+                    type: 'bar',
+                    stack:'two',
+                    data : negatives,
+                    xAxisIndex: 5,
+                    yAxisIndex: 5,                    
+                    itemStyle:{
+                        color : downColor
+                    }
+                }
             ]            
-        };
+        };        
     }
-    splitData(rawData) {
-        var categoryData = [];
-        var values = []
-        for (var i = 0; i < rawData.length; i++) {
-            categoryData.push(rawData[i].splice(0, 1)[0]);
-            values.push(rawData[i])
-        }
-        return {
-            categoryData: categoryData,
-            values: values
-        };
-    }
-    
-    calculateMA(data0,dayCount) {
-        var result = [];
-        for (var i = 0, len = data0.values.length; i < len; i++) {
-            if (i < dayCount) {
-                result.push('-');
-                continue;
-            }
-            var sum = 0;
-            for (var j = 0; j < dayCount; j++) {
-                sum += data0.values[i - j][1];
-            }
-            result.push(sum / dayCount);
-        }
-        return result;
-    }
-    render(){
-        let {width,height} = this.props
-        return <EChart options={this.state.options} width={width} height={height}/>;
-    }
-};
+    //<FetchChart api={['/api/k','/api/macd']} args={{db:'tech_macdrate'}} init={init} {...props}/>
+    return <div className={classes.root}>
+        <FetchChart api={['/api/k','/api/macd','/api/buysell']} init={init} {...props}/>
+    </div>;
+}
 
-export default KView;
+export default withStyles(styles)(KView);

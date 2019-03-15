@@ -89,7 +89,7 @@ function calc_macd_wave(done){
             let start = waveDates.length;
             let wave = {};
             for(let i = start;i<kdDates.length;i++)
-                wave[dateString(kdDates[i].date)] = [0,0];
+                wave[dateString(kdDates[i].date)] = [0,0,0,0];
             companys_task('id',com=>cb=>{
                 query(`select id,date,macd from kd_xueqiu where id=${com.id} and date>='${startDate}'`)
                 .then((result)=>{
@@ -98,12 +98,20 @@ function calc_macd_wave(done){
                         for(let i=1;i<result.length;i++){
                             let K = result[i];
                             let lastK = result[i-1];
+                            let dateStr = dateString(K.date);
                             if( K.macd>0&&lastK.macd<=0){ //buy
-                                if(wave[dateString(K.date)])
-                                    wave[dateString(K.date)][0]++;
+                                if(wave[dateStr])
+                                    wave[dateStr][0]++;
                             }else if(K.macd<0&&lastK.macd>=0){ //sell
-                                if(wave[dateString(K.date)])
-                                    wave[dateString(K.date)][1]++;
+                                if(wave[dateStr])
+                                    wave[dateStr][1]++;
+                            }
+                            if(K.macd>=0){
+                                if(wave[dateStr])
+                                    wave[dateStr][2]++;
+                            }else{
+                                if(wave[dateStr])
+                                    wave[dateStr][3]++;
                             }
                         }
                     }else{
@@ -117,7 +125,7 @@ function calc_macd_wave(done){
                     let kd = kdDates[i];
                     let date = dateString(kd.date);
                     task.push(cb=>{
-                        query(`insert ignore into sta_macd_wave values ('${date}',${wave[date][0]},${wave[date][1]})`).then(result=>{cb()}).catch(err=>cb(err));
+                        query(`insert ignore into sta_macd_wave values ('${date}',${wave[date][0]},${wave[date][1]},${wave[date][2]},${wave[date][3]})`).then(result=>{cb()}).catch(err=>cb(err));
                     });
                 }
                 async.series(task,(err,result)=>{
@@ -227,6 +235,7 @@ function calc_macd_select(done){
         }else{
             startDate = dateString(kd[kd.length-2].date);
         }
+        let macdvol = {};
         companys_task('id',com=>cb=>{
             query(`select id,date,macd from kd_xueqiu where id=${com.id} and date>='${startDate}'`)
             .then((result)=>{
@@ -235,14 +244,23 @@ function calc_macd_select(done){
                     for(let i=1;i<result.length;i++){
                         let K = result[i];
                         let lastK = result[i-1];
+                        let dateStr = dateString(K.date);
+                        if(!macdvol[date]){
+                            macdvol[date] = [0,0];
+                        }
+                        if(K.macd>=0){
+                            macdvol[date][0]++;
+                        }else{
+                            macdvol[date][1]++;
+                        }
                         if( K.macd>0&&lastK.macd<=0){ //buy
-                            query(`insert ignore into select_macd values (${com.id},'${dateString(K.date)}',1)`);
+                            query(`insert ignore into select_macd values (${com.id},'${dateStr}',1)`);
                         }else if(K.macd<0&&lastK.macd>=0){ //sell
-                            query(`insert ignore into select_macd values (${com.id},'${dateString(K.date)}',2)`);
+                            query(`insert ignore into select_macd values (${com.id},'${dateStr}',2)`);
                         }else if(K.macd<0&&2*K.macd-lastK.macd>0){ //buy
-                            query(`insert ignore into select_macd_ready values (${com.id},'${dateString(K.date)}',1)`);
+                            query(`insert ignore into select_macd_ready values (${com.id},'${dateStr}',1)`);
                         }else if(K.macd>0&&2*K.macd-lastK.macd<0){ //sell
-                            query(`insert ignore into select_macd_ready values (${com.id},'${dateString(K.date)}',2)`);
+                            query(`insert ignore into select_macd_ready values (${com.id},'${dateStr}',2)`);
                         }
                     }  
                 }else{
@@ -256,7 +274,7 @@ function calc_macd_select(done){
              */
             update_company_daital_select(cb=>{
                 console.log('calc_macd_select DONE',usetime);
-                if(done)done();
+                if(done)done(null,macdvol);
             });
         }).catch(err=>{
             if(done)done(err);
@@ -271,7 +289,7 @@ function calc_macd_select(done){
  * 如果连续计算tech_macd,macd_wave,macd_select
  */
 function macd(done){
-    calc_macd_select((err)=>{
+    calc_macd_select((err,macdvol)=>{
         if(err){
             if(done)done(err);
             return;
@@ -308,8 +326,15 @@ function macd(done){
                                 sells++;
                            ids[it.id]=true;
                        }
-                       query(`insert ignore into sta_macd_wave values ('${ds}',${buys},${sells})`);
-                       cb();
+                       if(macdvol[ds] && macdvol[ds].length===2){
+                        query(`insert ignore into sta_macd_wave values ('${ds}',${buys},${sells},${macdvol[ds][0]},${macdvol[ds][1]})`);
+                        cb();
+                       }
+                        else{
+                            let err = `macdvol ${ds} ${macdvol}`;
+                            console.error(err);
+                            cb(err);
+                        }
                    }).catch(err=>{
                         if(done)done(err);
                         cb(err);

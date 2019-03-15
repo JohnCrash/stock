@@ -142,10 +142,7 @@ function KMacdChart(props){
                 }                    
             },    
             axisPointer: {
-                link: {xAxisIndex: 'all'},
-                label: {
-                    backgroundColor: '#777'
-                }
+                link: {xAxisIndex: 'all'}
             },                      
             grid: [
                 {
@@ -188,7 +185,12 @@ function KMacdChart(props){
                     splitLine: {show: false},
                     splitNumber: 20,
                     min: 'dataMin',
-                    max: 'dataMax'
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
                 },
                 {
                     type: 'category',
@@ -202,7 +204,12 @@ function KMacdChart(props){
                     axisLabel: {show: false},
                     splitNumber: 20,
                     min: 'dataMin',
-                    max: 'dataMax'
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
                 },
                 {
                     type: 'category',
@@ -216,7 +223,12 @@ function KMacdChart(props){
                     axisLabel: {show: false},
                     splitNumber: 20,
                     min: 'dataMin',
-                    max: 'dataMax'
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
                 },                
                 {
                     type: 'category',
@@ -230,7 +242,12 @@ function KMacdChart(props){
                     axisLabel: {show: false},
                     splitNumber: 20,
                     min: 'dataMin',
-                    max: 'dataMax'
+                    max: 'dataMax',
+                    axisPointer: {
+                        label:{
+                            show:false
+                        }
+                    }
                 },                
                 {
                     type: 'category',
