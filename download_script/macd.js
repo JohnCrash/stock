@@ -1,5 +1,7 @@
-let {companys_task,k_company,dateString,query} = require('./k');
-let async = require('async');
+const {companys_task,k_company,dateString,query} = require('./k');
+const async = require('async');
+const math = require('mathjs');
+
 /**
  * 计算tech_macd数据
  * 从上次k死叉点向后搜索kd_xueqiu
@@ -358,6 +360,104 @@ function macd(done){
     })
 }
 
+/**
+ * 可以通过两天的k线可以简单预测明天会有多少股票穿越0线
+ * 如果使用二次曲线拟合macd曲线，应该可以更好的计算穿越点的位置
+ * 下面的函数通过三个坐标点来计算一条二次曲线，然后求解该曲线和0轴的交点
+ * y = a*x^2+b*x+c
+ * pt3[0][0]*pt3[0][0] * a + pt3[0][0] * b + c = pt3[0][1]
+ * pt3[1][0]*pt3[1][0] * a + pt3[1][0] * b + c = pt3[1][1]
+ * pt3[2][0]*pt3[2][0] * a + pt3[2][0] * b + c = pt3[2][1]
+ * 解该方程求出a,b,c 使用函数linear3(pt3)返回[a,b,c]
+ */
+function linear3(pt3){
+    let U = [[pt3[0][0]*pt3[0][0],pt3[0][0]],
+             [pt3[1][0]*pt3[1][0],pt3[1][0]],
+             [pt3[2][0]*pt3[2][0],pt3[2][0]]];
+    let b = [pt3[0][1],pt3[1][1],pt3[2][1]];
+    return math.usolve(U,b);
+}
+function calc_macd_zero(pt3){
+    let [[a],[b],[c]] = calc_linear3(pt3);
+    let delta = b*b-4*a*c;
+    if(delta<0)return -1; //无解,返回-1程序会丢弃负数
+    let sd = Math.sqrt(delta);
+    let x1 = (-b+sd)/(2*a);
+    let x2 = (-b-sd)/(2*a);
+    if(x1>0) //这个解应该是一个正一个为负，返回正的那个
+        return x1;
+    else
+        return x2;
+}
+
+//直线y = k*x + b,和x的交点
+function line0(k,b){
+    if(k!==0)
+        return -b/k;
+    else return 10000;
+}
+/**
+ * kd是K下数据,kd[j]是当前要计算的累计点
+ * acc[kd[j].date] = [0,0,0,0,0,0,0,0,0,0]
+ */
+function accPhase(kd,j,acc){
+    if(kd.length<=j+3)return;
+    //简化模式使用直线来预测，使用最近3天的平均斜率来进行计算
+    let k1 = kd[j].macd-kd[j+1].macd;
+    let k2 = kd[j+1].macd-kd[j+3].macd;
+    let k = (k1+k2)/2;
+    let d = line0(k,kd[j].macd);
+    if(d>0){
+        let dd = Math.floor(d);
+        let ac = acc[dateString(kd[j].date)];
+        if(ac && dd<5){
+            if(kd[j].macd>0){
+                ac[2*dd]++; //下穿
+            }else{
+                ac[2*dd+1]++; //上穿
+            }
+        }
+    }
+}
+/**
+ * 计算1-5天的预报数据
+ * dd就是过去多少天的预算数据
+ */
+function phase(dd,done){
+    query('select date from kd_xueqiu where id=8828 order by date desc')
+    .then(dates=>{
+        let start = dateString(dates[dd+10].date);//加上macd最大周期10个交易日以内
+        let acc = {}; //dd天累计表
+        for(let i = 0;i<dd;i++){
+            acc[dateString(dates[i].date)] = [0,0,0,0,0,0,0,0,0,0];
+        }
+        companys_task('id',com=>cb=>{
+            query(`select date,macd from kd_xueqiu where id=${com.id} and date>'${start}' order by date desc`)
+            .then((result)=>{
+                console.log(com.id);
+                for(let i=0;i<dd;i++){
+                    accPhase(result,i,acc);
+                }
+                cb();
+            });
+        }).then(usetime=>{
+            //将累计出来的数据统计到phase中
+            for(let k in acc){
+                let a = acc[k];
+                query(`insert ignore into phase values ('${k}',${a[0]},${a[1]},${a[2]},${a[3]},${a[4]},${a[5]},${a[6]},${a[7]},${a[8]},${a[9]})`)
+                .then((result)=>{
+                    console.log('phase',k);
+                });
+            }
+            console.log('phase DONE',usetime);
+            if(done)done();
+        }).catch(err=>{
+            console.error('phase',err);
+            if(done)done(err);
+        });    
+    });
+}
+
 module.exports = {
     calc_tech_macd,
     calc_macd_year,
@@ -365,5 +465,8 @@ module.exports = {
     calc_macd_wave,
     calc_macd_select,
     update_company_daital_select,
-    macd
+    macd,
+    linear3,
+    calc_macd_zero,
+    phase
 };

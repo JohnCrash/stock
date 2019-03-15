@@ -309,7 +309,17 @@ app.post('/api/addsub', function(req, res){
 /**
  * 股票的基本信息
  */
-
+/**
+ * phase
+ */
+app.post('/api/phase', function(req, res){
+    query('select * from phase')
+    .then(results=>{
+        res.json({results});
+    }).catch(err=>{
+        res.json({error:err.sqlMessage});
+    });
+});
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
     var err = new Error('Not Found');

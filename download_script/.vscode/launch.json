@@ -7,8 +7,8 @@
     {
         "type": "node",
         "request": "launch",
-        "name": "Launch macdslop",
-        "program": "${workspaceFolder}/macdslop.js"
+        "name": "Launch main",
+        "program": "${workspaceFolder}/main.js"
     },
         {
             "type": "node",

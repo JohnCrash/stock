@@ -25,8 +25,8 @@ class MacdBuyShellChart extends Component{
         const {classes} = this.props;
 
         return (<div className={classes.root}>
-        <FetchChart api='/api/buysell' init={
-            ({results})=>{
+        <FetchChart api={['/api/buysell','/api/phase']} init={
+            ([{results},phase])=>{
                 let dates = [];
                 let buys = [];
                 let sells = [];
@@ -40,6 +40,25 @@ class MacdBuyShellChart extends Component{
                     sells.push(-v.sell);
                     positives.push(v.positive);
                     negatives.push(-v.negative);                    
+                }
+                /**
+                 * 将phase的日期同步主日期
+                 */
+                let p11 = [];
+                let p12 = [];
+                let mapTable = {};
+                for(let p of phase.results){
+                    mapTable[dateString(p.date)] = p;
+                }
+                for(let i=0;i<dates.length;i++){
+                    let it = mapTable[dates[i]];
+                    if(it){
+                        p11.push(-it.d51);
+                        p12.push(it.d52);
+                    }else{
+                        p11.push(0);
+                        p12.push(0);
+                    }
                 }
                 return {
                     tooltip: {
@@ -143,7 +162,7 @@ class MacdBuyShellChart extends Component{
                         stack:'two',
                         xAxisIndex: 1,
                         yAxisIndex: 1,                        
-                        data: positives,
+                        data: p12,//positives,
                         itemStyle:{
                             color : upColor
                         }
@@ -153,7 +172,7 @@ class MacdBuyShellChart extends Component{
                         stack:'two',
                         xAxisIndex: 1,
                         yAxisIndex: 1,
-                        data : negatives,
+                        data : p11,//negatives,
                         itemStyle:{
                             color : downColor
                         }                        
