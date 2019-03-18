@@ -247,13 +247,13 @@ function calc_macd_select(done){
                         let K = result[i];
                         let lastK = result[i-1];
                         let dateStr = dateString(K.date);
-                        if(!macdvol[date]){
-                            macdvol[date] = [0,0];
+                        if(!macdvol[dateStr]){
+                            macdvol[dateStr] = [0,0];
                         }
                         if(K.macd>=0){
-                            macdvol[date][0]++;
+                            macdvol[dateStr][0]++;
                         }else{
-                            macdvol[date][1]++;
+                            macdvol[dateStr][1]++;
                         }
                         if( K.macd>0&&lastK.macd<=0){ //buy
                             query(`insert ignore into select_macd values (${com.id},'${dateStr}',1)`);
@@ -403,9 +403,9 @@ function line0(k,b){
 function accPhase(kd,j,acc){
     if(kd.length<=j+3)return;
     //简化模式使用直线来预测，使用最近3天的平均斜率来进行计算
-    let k1 = kd[j].macd-kd[j+1].macd;
-    let k2 = kd[j+1].macd-kd[j+3].macd;
-    let k = (k1+k2)/2;
+//    let k1 = kd[j].macd-kd[j+1].macd;
+//    let k2 = kd[j+1].macd-kd[j+3].macd;
+    let k = kd[j].macd-kd[j+1].macd;//(k1+k2)/2;
     let d = line0(k,kd[j].macd);
     if(d>0){
         let dd = Math.floor(d);
@@ -458,6 +458,30 @@ function phase(dd,done){
     });
 }
 
+/**
+ * 计算company_value中的static30,income30
+ * 
+ */
+function calc_last_static30(){
+    companys_task('id',com=>cb=>{
+        query(`select * from kd_xueqiu where id=${com.id} and date='2019-2-15'`)
+        .then(result=>{
+            if(result && result.length===1){
+                let price = result[0].close;
+                query(`update company_value set price=${price} where company_id=${com.id}`);
+            }else{
+                console.log(`Not found ${com.id}`);
+            }
+            cb();
+        })
+    }).then(usetime=>{
+        console.log('calc_last_static30 DONE',usetime);
+        if(done)done();
+    }).catch(err=>{
+        console.error('calc_last_static30',err);
+        if(done)done(err);
+    });
+}
 module.exports = {
     calc_tech_macd,
     calc_macd_year,
@@ -468,5 +492,6 @@ module.exports = {
     macd,
     linear3,
     calc_macd_zero,
-    phase
+    phase,
+    calc_last_static30
 };

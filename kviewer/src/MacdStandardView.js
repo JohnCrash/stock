@@ -10,6 +10,7 @@ import SwitchView from './SwitchView';
 import MacdYearRateChart from './MacdYearRateChart';
 import MacdDistributedChart from './MacdDistributedChart';
 import MacdBuyShellChart from './MacdBuyShellChart';
+import MacdStatic30Chart from './MacdStatic30Chart';
 
 const styles = theme => ({
     button: {
@@ -63,7 +64,7 @@ const switchs=[
     {
         title:'股价、市值、市盈率收益分布',
         desc:'将股价、市值、市盈率作为横坐标，将收益率作为纵坐标',
-        view:<MacdDistributedChart width={'100%'} height={640} /> 
+        view:<MacdStatic30Chart width={'100%'} height={640} /> 
     },    
     {
         title:'周期分布',

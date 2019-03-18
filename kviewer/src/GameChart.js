@@ -14,11 +14,72 @@ const styles = theme => ({
     root: {
         width:'100%'
       }
-  });
+});
 
-function KMacdChart(props){
-    let {classes} = props;
-    function init(a){
+
+class GameChart extends Component{  
+    constructor(props){
+        super(props);
+        this.state={}
+    }
+    componentDidMount(){
+        let {thisCallBack} = this.props;
+        thisCallBack(this);
+    }
+    cur(){
+        if(this.i && this.dates && this.i<this.dates.length){
+            return {
+                date : this.dates[this.i],
+                value : this.values[this.i]
+            }
+        }
+    }
+    next(){
+        if(this.i && this.options && this.echart){
+            this.i++;
+            let i = this.i;
+            /**
+             * 更新图表
+             */
+            let options = this.options;
+            let date = this.dates[i];
+            let k = this.values[i];
+            let ma5 = this.ma5[i];
+            let ma10 = this.ma10[i];
+            let ma20 = this.ma20[i];
+            let ma30 = this.ma30[i];
+            let volume = this.volume[i];
+            let macd = this.macd[i];
+            let buy = this.buys[i];
+            let sell = this.sells[i];
+            let positive = this.positives[i];
+            let negative = this.negatives[i];
+
+            options.xAxis[0].data.push(date);
+
+            options.series[0].data.push(k);
+            options.series[1].data.push(ma5);
+            options.series[2].data.push(ma10);
+            options.series[3].data.push(ma20);
+            options.series[4].data.push(ma30);
+            options.series[5].data.push(volume);
+            options.series[6].data.push(macd);
+            options.series[7].data.push(buy);
+            options.series[8].data.push(sell);
+            options.series[9].data.push(positive);
+            options.series[10].data.push(negative);
+
+            let dates = options.xAxis[0].data;
+            let dd = getDayLength(dates[0],dates[dates.length-1]);
+            let dl = 100-Math.abs(Math.floor(6000/dd));
+            options.dataZoom[0].start = dl;
+            options.dataZoom[0].end = 100;
+
+            this.echart.setOption(this.options);
+            return this.cur();
+        }
+    }
+    init = (a)=>{
         let name = a[0].name;
         let results = a[0].results;
         let dates = [];
@@ -31,7 +92,18 @@ function KMacdChart(props){
         let macd = [];
         let merchsData = a[1].results;
         let merchs = [];
+        let {rand} = this.props;
 
+        this.dates = dates;
+        this.values = values;
+        this.ma5 = ma5;
+        this.ma10 = ma10;
+        this.ma20 = ma20;
+        this.ma30 = ma30;
+        this.volume = volume;
+        this.macd = macd;
+        
+        console.log(rand);
         // 将macd交易数据的时间整合到k的时间线上
         let merchsMaps = {};
         for(let v of merchsData){
@@ -55,7 +127,8 @@ function KMacdChart(props){
             ma10.push(element.ma10);
             ma20.push(element.ma20);
             ma30.push(element.ma30);
-            volume.push([i,element.volume,element.close-element.open]);
+            //volume.push([i,element.volume,element.close-element.open]);
+            volume.push(element.volume);
             macd.push(element.macd);
             merchs.push(getMerchsRate(element.date,i)); //将改天的交易数据放入，没有就是0
         });
@@ -65,23 +138,90 @@ function KMacdChart(props){
         let dateBuySell = {};
         let buys = [];
         let sells = [];
+        let positives = [];
+        let negatives = [];
+        
+        this.buys = buys;
+        this.sells = sells;
+        this.positives = positives;
+        this.negatives = negatives;
+
         for(let i=0;i<buysells.length;i++){
             let v = buysells[i];
-            dateBuySell[dateString(v.date)] = {buy:v.buy,sell:v.sell};
+            dateBuySell[dateString(v.date)] = {buy:v.buy,sell:v.sell,positive:v.positive,negative:v.negative};
         }
         for(let d of dates){
-            let v = dateBuySell[d];
+            let v = dateBuySell[dateString(d)];
             if(v){
                 buys.push(v.buy);
-                sells.push(-v.sell);        
+                sells.push(-v.sell);
+                positives.push(v.positive);
+                negatives.push(-v.negative);       
             }else{
                 buys.push(0);
                 sells.push(0);
+                positives.push(0);
+                negatives.push(0);                   
             }
         }
         //=================================
-        let dl = Math.abs(Math.floor(16000/getDayLength(results[0].date,results[results.length-1].date)));
-        return {
+        /**
+         * 重新设置区域
+         */
+        let dates_ = [];
+        let values_ = [];
+        let ma5_ = [];
+        let ma10_ = [];
+        let ma20_ = [];
+        let ma30_ = [];
+        let volume_ = [];
+        let macd_ = [];
+        let merchs_ = [];
+        let buys_ = [];
+        let sells_ = [];
+        let positives_ = [];
+        let negatives_ = [];
+        let start = Math.floor(dates.length*rand);
+        if(start<30)
+            start = 30;
+        this.start = start;
+        this.dates_ = dates_;
+        this.values_ = values_;
+        this.ma5_ = ma5_;
+        this.ma10_ = ma10_;
+        this.ma20_ = ma20_;
+        this.ma30_ = ma30_;
+        this.volume_ = volume_;
+        this.macd_ = macd_;
+        this.buys_ = buys_;
+        this.sells_ = sells_;
+        this.positives_ = positives_;
+        this.negatives_ = negatives_;
+
+        this.i = start-1;
+
+        for(let i=0;i<30;i++){
+            let k = start+i-30;
+            dates_.push(dates[k]);
+            values_.push(values[k]);
+            ma5_.push(ma5[k]);
+            ma10_.push(ma10[k]);
+            ma20_.push(ma20[k]);
+            ma30_.push(ma30[k]);
+            volume_.push(volume[k]);
+            macd_.push(macd[k]);
+            merchs_.push(merchs[k]);
+
+            buys_.push(buys[k]);
+            sells_.push(sells[k]);
+            positives_.push(positives[k]);
+            negatives_.push(negatives[k]);            
+        }
+
+        let dl = Math.abs(Math.floor(6000/getDayLength(dates_[0],dates_[dates_.length-1])));
+        this.dl = dl;
+
+        this.options = {
             tooltip: {
                 trigger: 'axis',
                 axisPointer: {
@@ -89,23 +229,12 @@ function KMacdChart(props){
                 }
             },
             legend: {
-                data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30','成交量','MACD','交易','金叉','死叉']
+                data: ['日K', 'MA5', 'MA10', 'MA20', 'MA30','成交量','MACD','金叉','死叉','macd正','macd负']
             },
-            visualMap: [{
-                show: false,
-                seriesIndex: [5],
-                dimension: 2,
-                pieces: [{
-                    max: 0,
-                    color: downColor
-                }, {
-                    min: 0,
-                    color: upColor
-                }]
-                },
+            visualMap: [
                 {
                     show: false,
-                    seriesIndex: [6,7],
+                    seriesIndex: [6],
                     dimension: 1,
                     pieces: [{
                         max: 0,
@@ -113,18 +242,6 @@ function KMacdChart(props){
                     }, {
                         min: 0,
                         color: upColor
-                    }]
-                },
-                {
-                    show: false,
-                    seriesIndex: [7],
-                    dimension: 2,
-                    pieces: [{
-                        max: 0,
-                        color: goldColor
-                    }, {
-                        min: 0,
-                        color: buyColor
                     }]
                 }
             ],
@@ -143,42 +260,36 @@ function KMacdChart(props){
             },    
             axisPointer: {
                 link: {xAxisIndex: 'all'}
-            },                      
+            },
             grid: [
-                {
-                    left: '6%',
-                    right: '6%',
-                    height: '58%'
+                { //k
+                    left: '5%',
+                    right: '5%',
+                    height: '48%'
                 },
-                {
-                    left: '6%',
-                    right: '6%',
-                    top: '60.3%',
-                    height: '5%'
+                {//volume
+                    left: '5%',
+                    right: '5%',
+                    top: '58%',
+                    height: '12%'
                 },
-                {
-                    left: '6%',
-                    right: '6%',
-                    top: '68%',
-                    height: '6%'
+                {//macd
+                    left: '5%',
+                    right: '5%',
+                    top: '73%',
+                    height: '12%'
                 },
-                {
-                    left: '6%',
-                    right: '6%',
-                    top: '72%',
-                    height: '8%'
-                },
-                {
-                    left: '6%',
-                    right: '6%',
-                    top: '78%',
-                    height: '20%'
-                }                
+                {//sign
+                    left: '5%',
+                    right: '5%',
+                    top: '84%',
+                    height: '16%'
+                }        
             ],
             xAxis: [
-                {
+                { //k
                     type: 'category',
-                    data: dates,
+                    data: dates_,
                     scale: true,
                     boundaryGap : false,
                     axisLine: {onZero: false},
@@ -192,10 +303,10 @@ function KMacdChart(props){
                         }
                     }
                 },
-                {
+                { //volume
                     type: 'category',
                     gridIndex: 1,
-                    data: dates,
+                    data: dates_,
                     scale: true,
                     boundaryGap : false,
                     axisLine: {onZero: true},
@@ -211,10 +322,10 @@ function KMacdChart(props){
                         }
                     }
                 },
-                {
+                { //macd
                     type: 'category',
                     gridIndex: 2,
-                    data: dates,
+                    data: dates_,
                     scale: false,
                     boundaryGap : false,
                     axisLine: {onZero: true},
@@ -230,10 +341,10 @@ function KMacdChart(props){
                         }
                     }
                 },                
-                {
+                { //sign
                     type: 'category',
                     gridIndex: 3,
-                    data: dates,
+                    data: dates_,
                     scale: true,
                     boundaryGap : false,
                     axisLine: {onZero: true},
@@ -248,30 +359,16 @@ function KMacdChart(props){
                             show:false
                         }
                     }
-                },                
-                {
-                    type: 'category',
-                    gridIndex: 4,
-                    data: dates,
-                    scale: true,
-                    boundaryGap : false,
-                    axisLine: {onZero: true},
-                    axisTick: {show: false},
-                    splitLine: {show: false},
-                    axisLabel: {show: false},
-                    splitNumber: 20,
-                    min: 'dataMin',
-                    max: 'dataMax'
                 }
             ],
             yAxis: [
-                {
+                { //k
                     scale: true,
                     splitArea: {
                         show: true
                     }
                 },
-                {
+                { //volume
                     scale: true,
                     gridIndex: 1,
                     splitNumber: 2,
@@ -280,7 +377,7 @@ function KMacdChart(props){
                     axisTick: {show: false},
                     splitLine: {show: false}
                 },
-                {
+                { //macd
                     scale: true,
                     gridIndex: 2,
                     splitNumber: 2,
@@ -289,7 +386,7 @@ function KMacdChart(props){
                     axisTick: {show: false},
                     splitLine: {show: false}
                 },
-                {
+                { //sign
                     scale: true,
                     gridIndex: 3,
                     splitNumber: 2,
@@ -297,38 +394,22 @@ function KMacdChart(props){
                     axisLine: {show: true},
                     axisTick: {show: false},
                     splitLine: {show: false}
-                },
-                {
-                    scale: true,
-                    gridIndex: 4,
-                    splitNumber: 2,
-                    axisLabel: {show: true},
-                    axisLine: {show: true},
-                    axisTick: {show: false},
-                    splitLine: {show: false}
-                }                                 
+                }                         
             ],
             dataZoom: [
                 {
                     type: 'inside',
-                    xAxisIndex: [0, 1],
+                    xAxisIndex: [0,1,2,3],
                     start: 100-dl,
-                    end: 100
-                },
-                {
-                    show: true,
-                    xAxisIndex: [0,1,2,3,4],
-                    type: 'slider',
-                    y: '90%',
-                    start: 100-dl,
-                    end: 100
-                }                   
+                    end: 100,
+                    zoomLock:true
+                }           
             ],
             series: [
                 {
                     name: '日K',
                     type: 'candlestick',
-                    data: values,
+                    data: values_,
                     itemStyle: {
                         normal: {
                             color: upColor,
@@ -342,7 +423,7 @@ function KMacdChart(props){
                     name: 'MA5',
                     type: 'line',
                     symbol: 'none',
-                    data: ma5,
+                    data: ma5_,
                     smooth: true,
                     itemStyle: {
                         normal: {color:'#fdd835'}
@@ -352,7 +433,7 @@ function KMacdChart(props){
                     name: 'MA10',
                     type: 'line',
                     symbol: 'none',
-                    data: ma10,
+                    data: ma10_,
                     smooth: true,
                     itemStyle: {
                         normal: {color:'#0277bd'}
@@ -362,7 +443,7 @@ function KMacdChart(props){
                     name: 'MA20',
                     type: 'line',
                     symbol: 'none',
-                    data: ma20,
+                    data: ma20_,
                     smooth: true,
                     itemStyle: {
                         normal: {color:'#ab47bc'}
@@ -372,7 +453,7 @@ function KMacdChart(props){
                     name: 'MA30',
                     type: 'line',
                     symbol: 'none',
-                    data: ma30,
+                    data: ma30_,
                     smooth: true,
                     itemStyle: {
                         normal: {color:'#ef6c00'}
@@ -383,29 +464,22 @@ function KMacdChart(props){
                     type: 'bar',
                     xAxisIndex: 1,
                     yAxisIndex: 1,
-                    data: volume
+                    data: volume_
                 },                
                 {
                     name: 'MACD',
                     type: 'bar',
                     xAxisIndex: 2,
                     yAxisIndex: 2,
-                    data: macd
+                    data: macd_
                 },               
-                {
-                    name: '交易',
-                    type: 'bar',
-                    xAxisIndex: 3,
-                    yAxisIndex: 3,
-                    data: merchs
-                },
                 {
                     name: '金叉',
                     type: 'bar',
                     stack:'one',
-                    data: buys,
-                    xAxisIndex: 4,
-                    yAxisIndex: 4,                    
+                    data: buys_,
+                    xAxisIndex: 3,
+                    yAxisIndex: 3,                    
                     itemStyle:{
                         color : upColor
                     }
@@ -414,20 +488,50 @@ function KMacdChart(props){
                     name: '死叉',
                     type: 'bar',
                     stack:'one',
-                    data : sells,
-                    xAxisIndex: 4,
-                    yAxisIndex: 4,                    
+                    data : sells_,
+                    xAxisIndex: 3,
+                    yAxisIndex: 3,                    
+                    itemStyle:{
+                        color : downColor
+                    }
+                },
+                {
+                    name: 'macd正',
+                    type: 'line',
+                    stack:'two',
+                    data: positives_,
+                    xAxisIndex: 3,
+                    yAxisIndex: 3,                    
+                    itemStyle:{
+                        color : upColor
+                    }
+                },
+                {
+                    name: 'macd负',
+                    type: 'line',
+                    stack:'two',
+                    data : negatives_,
+                    xAxisIndex: 3,
+                    yAxisIndex: 3,                    
                     itemStyle:{
                         color : downColor
                     }
                 }
             ]            
-        };        
+        };
+        return this.options;      
+    };
+    refChartCallback(echart){
+        this.echart = echart;
     }
-    //<FetchChart api={['/api/k','/api/macd']} args={{db:'tech_macdrate'}} init={init} {...props}/>
-    return <div className={classes.root}>
-        <FetchChart api={['/api/k','/api/macd','/api/buysell']} init={init} {...props}/>
-    </div>;
+    render(){
+        let {classes,step} = this.props;
+    
+        return <div className={classes.root}>
+            <FetchChart api={['/api/k','/api/macd','/api/buysell']} refChartCallback={this.refChartCallback.bind(this)} init={this.init} {...this.props}/>
+        </div>;
+    }
 }
 
-export default withStyles(styles)(KMacdChart);
+
+export default withStyles(styles)(GameChart);

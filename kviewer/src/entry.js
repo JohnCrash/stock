@@ -7,6 +7,7 @@ import MACDView from './MACDView';
 import TrendingUp from '@material-ui/icons/TrendingUp';
 import TrendingDown from '@material-ui/icons/TrendingDown';
 import Typography from '@material-ui/core/Typography';
+import GameView from './GameView';
 
 const Entry = [
     {
@@ -19,6 +20,11 @@ const Entry = [
         icon:<TrendingUp />,
         view:<MACDView />,
         default:true
+    },
+    {
+        title:'练习',
+        icon:<TrendingUp />,
+        view:<GameView />,
     }
 ];
 

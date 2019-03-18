@@ -320,6 +320,18 @@ app.post('/api/phase', function(req, res){
         res.json({error:err.sqlMessage});
     });
 });
+/**
+ * 最近30天的涨幅分布
+ */
+app.post('/api/static30', function(req, res){
+    query('select ttm,pb,value,earnings,assets,dividend,yield,static30,price from company_value')
+    .then(results=>{
+        res.json({results});
+    }).catch(err=>{
+        res.json({error:err.sqlMessage});
+    });
+});
+
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
     var err = new Error('Not Found');

@@ -59,7 +59,7 @@ class FetchChart extends Component{
     }   
     render(){
         let {width,height} = this.props
-        return <EChart options={this.state.options} width={width} height={height}/>;
+        return <EChart options={this.state.options} width={width} height={height} {...this.props}/>;
     }
 }
 

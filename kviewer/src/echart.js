@@ -6,6 +6,9 @@ class EChart extends Component{
     }
     componentDidMount(){
         this.chart = echarts.init(this.node);
+        if(this.props.refChartCallback){
+            this.props.refChartCallback(this.chart);
+        }        
     }
     componentDidUpdate(nextProps, nextState, snapshot){
         if(nextProps.options!==this.props.options){

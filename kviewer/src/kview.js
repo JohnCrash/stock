@@ -86,7 +86,7 @@ function KView(props){
             }
         }
         //=================================
-        let dl = Math.abs(Math.floor(32000/getDayLength(results[0].date,results[results.length-1].date)));
+        let dl = Math.abs(Math.floor(16000/getDayLength(results[0].date,results[results.length-1].date)));
         return {
             tooltip: {
                 trigger: 'axis',
