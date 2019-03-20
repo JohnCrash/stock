@@ -55,6 +55,7 @@ class GameView extends Component{
         rand:Math.random(),
         BuyValue:0,
         SellValue:0,
+        days:0,
         disableBuy:false,
         disableSell:true
     }
@@ -69,28 +70,30 @@ class GameView extends Component{
         let BuyValue = p100(this.state.BuyValue);
         this.setState({SellValue:0,
             BuyValue:0,
-            value:p100(this.state.value+(SellValue-BuyValue)/BuyValue-0.003),
+            value:p100(this.state.value*SellValue/BuyValue-0.003),
             num:this.state.num+1,
             disableBuy:false,
             disableSell:true
         });
     }
     handleNext=()=>{
-        this.stock.next();
+        this.stock.next(this.state.BuyValue);
         this.sh000001.next();
         if(this.state.BuyValue>0)
-            this.setState({disableSell:false,disableBuy:true});
+            this.setState({disableSell:false,disableBuy:true,days:this.state.days+1});
+        else
+            this.setState({days:this.state.days+1});
     }
     callback=(key)=>(self)=>{
         this[key]= self;
     }
     render(){
-        let {value,num,rand,BuyValue,SellValue,disableBuy,disableSell} = this.state;
+        let {value,num,rand,BuyValue,SellValue,disableBuy,disableSell,days} = this.state;
         let {classes} = this.props;
         return <div className={classes.root}>
             <div className={classes.graph}>
                 <GameChart width="100%" rand={rand} args={{code:"SH000001"}} height={860} thisCallBack={this.callback('sh000001')}/>
-                <GameChart width="100%" rand={rand} height={860} ref={this.stock} thisCallBack={this.callback('stock')}/>
+                <GameChart width="100%" rand={rand} height={860} thisCallBack={this.callback('stock')}/>
             </div>
             <div className={classes.control}>
                 <Button className={classes.button} variant="contained" disabled={disableBuy?true:false} color="secondary" onClick={this.handleBuy.bind(this)}>
@@ -103,10 +106,10 @@ class GameView extends Component{
                     下一天
                 </Button>               
                 <Typography variant="h3" >
-                    收益率: {value} 买入价: {BuyValue} 卖出价: {SellValue}
+                    收益率: {value} 买入价: {BuyValue}
                 </Typography>
                 <Typography variant="h3">
-                    交易次数: {num}
+                    交易次数: {num} 用时:{days}天
                 </Typography>
             </div>
         </div>

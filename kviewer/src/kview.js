@@ -463,7 +463,7 @@ function KView(props){
                 },
                 {
                     name: 'macd正',
-                    type: 'bar',
+                    type: 'line',
                     stack:'two',
                     data: positives,
                     xAxisIndex: 5,
@@ -474,7 +474,7 @@ function KView(props){
                 },
                 {
                     name: 'macd负',
-                    type: 'bar',
+                    type: 'line',
                     stack:'two',
                     data : negatives,
                     xAxisIndex: 5,

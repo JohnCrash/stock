@@ -34,8 +34,8 @@ class GameChart extends Component{
             }
         }
     }
-    next(){
-        if(this.i && this.options && this.echart){
+    next(buypt){
+        if(this.i && this.options && this.echart && this.dates.length>this.i+1){
             this.i++;
             let i = this.i;
             /**
@@ -75,6 +75,13 @@ class GameChart extends Component{
             options.dataZoom[0].start = dl;
             options.dataZoom[0].end = 100;
 
+            //将增长显示出来
+            if(buypt){
+                options.series[0].markArea.itemStyle = {color:buypt>k[1]?'#00FF00':'#FF0000',opacity:0.2}
+                options.series[0].markArea.data = [[{yAxis:buypt},{yAxis:k[1]}]];
+            }
+            else
+                options.series[0].markArea.data = [];
             this.echart.setOption(this.options);
             return this.cur();
         }
@@ -220,7 +227,7 @@ class GameChart extends Component{
 
         let dl = Math.abs(Math.floor(6000/getDayLength(dates_[0],dates_[dates_.length-1])));
         this.dl = dl;
-
+        let markarea = [[{yAxis:0},{yAxis:0}]];
         this.options = {
             tooltip: {
                 trigger: 'axis',
@@ -247,6 +254,7 @@ class GameChart extends Component{
             ],
             tooltip: {
                 trigger: 'axis',
+                triggerOn:'click',
                 axisPointer: {
                     type: 'cross'
                 },
@@ -256,7 +264,10 @@ class GameChart extends Component{
                 padding: 10,
                 textStyle: {
                     color: '#000'
-                }                    
+                },
+                formatter:(params)=>{
+                    return ``;
+                }
             },    
             axisPointer: {
                 link: {xAxisIndex: 'all'}
@@ -301,7 +312,8 @@ class GameChart extends Component{
                         label:{
                             show:false
                         }
-                    }
+                    },
+                    axisLabel:{show:false}
                 },
                 { //volume
                     type: 'category',
@@ -417,6 +429,9 @@ class GameChart extends Component{
                             borderColor: upBorderColor,
                             borderColor0: downBorderColor
                         }
+                    },
+                    markArea:{
+                        data: markarea
                     }
                 },
                 {

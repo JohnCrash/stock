@@ -348,9 +348,11 @@ function macd(done){
                     if(done)done(err);
                 }else{
                     if(!ids){
-                        if(done)done();
+                        phase(1,done);
                     }else
-                        calc_tech_macd(done,ids);
+                        calc_tech_macd(()=>{
+                            phase(1,done);
+                        },ids);
                 }
             })
         }).catch(err=>{

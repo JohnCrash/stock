@@ -5,7 +5,7 @@ var Crawler = require("crawler");
 /**
  * 现在单只股票的1分钟k线数据
  */
-function k1_company(id,code,callback){
+function k15_company(id,code,callback){
     let columns = [
         "timestamp",
         "volume",
@@ -18,7 +18,7 @@ function k1_company(id,code,callback){
         "turnoverrate"];
     function xueqiuURI(timestamp){
         //https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=SH000001&begin=1552960020000&period=1m&type=before&count=-224&indicator=kline
-        let uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=1m&type=before&count=-240&indicator=kline`;
+        let uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=15m&type=before&count=-118&indicator=kline`;
         return uri;
     }
     function isCorrect(column){
@@ -30,7 +30,7 @@ function k1_company(id,code,callback){
     /**
      * 第一步找到数据库中最近的一条记录
      */
-    connection.query(`select max(timestamp) as r from k1_xueqiu where id=${id};`,(error, results, field)=>{
+    connection.query(`select max(timestamp) as r from k15_xueqiu where id=${id};`,(error, results, field)=>{
         /**
          * 第二步覆盖最开头的数据
          */
@@ -61,7 +61,7 @@ function k1_company(id,code,callback){
                                     //接头部分需要覆盖
                                     console.log(code,'update : ',dateString);
                                     let cols = columns.map((v,i)=>`${v}=${it[i]}`);
-                                    sqlStr = `update k1_xueqiu set ${cols.slice(1).join()} where id=${id} and timestamp='${dateString}'`;
+                                    sqlStr = `update k15_xueqiu set ${cols.slice(1).join()} where id=${id} and timestamp='${dateString}'`;
                                     needContinue = false;
                                 }else{
                                     let cols = it.map((v)=>`${v}`);
@@ -75,7 +75,7 @@ function k1_company(id,code,callback){
                              */
                             if(datas.length>0){
                                 console.log(code,'insert',datas.length);
-                                connection.query(`insert ignore into k1_xueqiu values ${datas.join(',')}`,(error, results, field)=>{
+                                connection.query(`insert ignore into k15_xueqiu values ${datas.join(',')}`,(error, results, field)=>{
                                     if(error){
                                         console.error(code,error);
                                     }
@@ -127,9 +127,9 @@ function k1_company(id,code,callback){
 /**
  * 更新每分钟k线数据k1_xueqiu
  */
-function k1_companys(done){
+function k15_companys(done){
     paralle_companys_task('id,code',10,com=>cb=>{
-        k1_company(com.id,com.code,cb);
+        k15_company(com.id,com.code,cb);
     }).then(usetime=>{
         if(done)done();
     }).catch(err=>{
@@ -138,4 +138,4 @@ function k1_companys(done){
     });
 }
 
-module.exports = {k1_companys,k1_company};
+module.exports = {k15_companys,k15_company};
