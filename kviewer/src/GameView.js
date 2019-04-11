@@ -84,6 +84,17 @@ class GameView extends Component{
         else
             this.setState({days:this.state.days+1});
     }
+    /**
+     * 弹出对话栏，根据条件卖出或者买入
+     */
+    handleNextIF=()=>{
+        this.stock.next(this.state.BuyValue);
+        this.sh000001.next();
+        if(this.state.BuyValue>0)
+            this.setState({disableSell:false,disableBuy:true,days:this.state.days+1});
+        else
+            this.setState({days:this.state.days+1});
+    }
     callback=(key)=>(self)=>{
         this[key]= self;
     }
@@ -104,7 +115,10 @@ class GameView extends Component{
                 </Button>
                 <Button className={classes.button} variant="contained" color="primary" onClick={this.handleNext.bind(this)}>
                     下一天
-                </Button>               
+                </Button>
+                <Button className={classes.button} variant="contained" color="primary" onClick={this.handleNextIF.bind(this)}>
+                    下一天条件交易
+                </Button>
                 <Typography variant="h3" >
                     收益率: {value} 买入价: {BuyValue}
                 </Typography>

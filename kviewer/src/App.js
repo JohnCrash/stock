@@ -88,12 +88,14 @@ const styles = theme => ({
   }
 });
 
-const searchIndex = 6;
+const searchIndex = 8;
 const cartIndex = 0;
 const bookmarkIndex = 1;
 let menus = [
   {label:'买入的股票',icon:<ShoppingCartIcon/>,key:'cart',tables:[]},
   {label:'收藏夹',icon:<BookmarkIcon/>,key:'bookmark',tables:[]},
+  {label:'K15为正',icon:<ExposurePlus1Icon/>,key:'k15macd',tables:[]},
+  {label:'K15即将为正',icon:<ExposureZeroIcon/>,key:'k15ready',tables:[]},
   {label:'即将为正',icon:<ExposurePlus1Icon/>,key:'ready',tables:[]},
   {label:'当前为正',icon:<ExposureZeroIcon/>,key:'today',tables:[]},
   {label:'昨天为正',icon:<ExposureNeg1Icon/>,key:'yesterday',tables:[]},
@@ -170,9 +172,12 @@ class App extends Component {
       if(this.state.menuSel===searchIndex){
         args.sort((a,b)=>b.income-a.income);
         menus[searchIndex].tables = args;
-        for(let v of args){
-          if(v.isSelected)
+        for(let i in args){
+          let v = args[i];
+          if(v.isSelected){
+            idx = Number(i);
             selects.push(v);
+          }
         }  
       }else{
         menu.tables.sort((a,b)=>b.income-a.income);
@@ -204,7 +209,8 @@ class App extends Component {
     }
     let count =menus[this.state.menuSel].tables.length;
     this.setState({ open:false,anchorEl:null,currentNum:count,currentSel:count>0?idx+1:0 });
-    this.selectCompanyByIndex(this.state.menuSel,idx+1)
+    if(!name)
+      this.selectCompanyByIndex(this.state.menuSel,idx+1)
   }
   selectCompanyByIndex(menuSel,i){
     let t = menus[menuSel].tables;

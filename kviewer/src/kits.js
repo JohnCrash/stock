@@ -26,6 +26,16 @@ export function dateString(date){
         return 'null';
 }
 
+export function timestampString(date){
+    if(typeof(date)==='object')
+        return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
+    else if(typeof(date)==='string'){
+        let d = new Date(date);
+        return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`;
+    }else
+        return 'null';
+}
+
 //取得两个日期的天数差
 export function getDayLength(date0,date1){
     let d0,d1;

@@ -8,6 +8,8 @@ import TrendingUp from '@material-ui/icons/TrendingUp';
 import TrendingDown from '@material-ui/icons/TrendingDown';
 import Typography from '@material-ui/core/Typography';
 import GameView from './GameView';
+import K15View from './K15View';
+import ClassView from './ClassView';
 
 const Entry = [
     {
@@ -22,9 +24,19 @@ const Entry = [
         default:true
     },
     {
+        title:'K15',
+        icon:<TrendingUp />,
+        view:<K15View />
+    },  
+    {
         title:'练习',
         icon:<TrendingUp />,
         view:<GameView />,
+    },
+    {
+        title:'类别',
+        icon:<TrendingUp />,
+        view:<ClassView />,
     }
 ];
 

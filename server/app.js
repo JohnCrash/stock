@@ -105,7 +105,34 @@ app.post('/api/k', function(req, res){
         }
     });
 });
-
+/**
+ * k15线图查询
+ */
+app.post('/api/k15', function(req, res){
+    let queryStr;
+    if(isStockCode(req.body.code)){
+        queryStr = `code='${req.body.code}'`;
+    }else{
+        queryStr = `name='${req.body.code}'`;
+    }
+    connection.query(`select * from company where ${queryStr}`,(error, results, field)=>{
+        if(error){
+            res.json({error});
+        }else if(results.length===1){
+            let name  = results[0].name;
+            let ry = req.body.range?req.body.range:1;
+            connection.query(`select * from k15_xueqiu where id=${results[0].id} order by timestamp desc limit ${ry*243}`,(error, results, field)=>{  
+                if(error){
+                    res.json({error:error.sqlMessage});
+                }else{
+                    res.json({results,field,name});
+                }
+            });        
+        }else{
+            res.json({error:`Not found '${req.body.code}'`});
+        }
+    });
+});
 /**
  * macd交易查询
  */
@@ -223,6 +250,28 @@ app.post('/api/desc', function(req, res){
 });
 
 /**
+ * 分类的涨跌情况
+ */
+app.post('/api/kd_category', function(req, res){
+    query(`select id,name from category`)
+    .then(cats=>{
+        query(`select * from kd_category`).then(kdcats=>{
+            let m = {};
+            for(let c of cats){
+                m[c.id] = c;
+                c.kds = [];
+            }
+            for(let kdc of kdcats){
+                m[kdc.category_id].kds.push({date:kdc.date,rate:kdc.rate,acc:kdc.acc});
+            }
+            res.json({results:cats});
+        });
+    }).catch(err=>{
+        res.json({error:err.sqlMessage});
+    });
+});
+
+/**
  * 最近macd变化接口
  */
 const days = ['ready','today','yesterday','threeday'];
@@ -240,7 +289,7 @@ app.post('/api/macdselect', function(req, res){
  * 将最近买入的都返回让客户端处理
  */
 app.post('/api/selects', function(req, res){
-    query(`select * from company_detail where ready=1 or today=1 or yesterday=1 or threeday=1 or cart=1 or bookmark=1`)
+    query(`select * from company_detail where ready=1 or today=1 or yesterday=1 or threeday=1 or cart=1 or bookmark=1 or k15macd=1 or k15ready=0`)
     .then(results=>{
         res.json({results});
     }).catch(err=>{
@@ -255,7 +304,7 @@ app.post('/api/select', function(req, res){
     let queryStr;
     let cmd = req.body.cmd;
     if(cmd &&cmd[0]==='#'){
-        connection.query(`select * from company_detail where ${cmd.slice(1)}`,(error, results, field)=>{
+        connection.query(`select * from company_select where ${cmd.slice(1)}`,(error, results, field)=>{
             if(error){
                 res.json({error:error.sqlMessage});
             }else if(results.length===0){
@@ -270,7 +319,7 @@ app.post('/api/select', function(req, res){
         }else{
             queryStr = `name='${cmd}'`;
         }
-        connection.query(`select * from company_detail where ${queryStr}`,(error, results, field)=>{
+        connection.query(`select * from company_select where ${queryStr}`,(error, results, field)=>{
             if(error){
                 res.json({error:error.sqlMessage});
             }else if(results.length===0){

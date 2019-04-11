@@ -3,6 +3,8 @@ var async = require("async");
 var bigint = require("big-integer");
 var {companys_task,k_company,dateString,query,connection,xuequeCookie} = require('./k');
 var {macd} = require("./macd");
+const {k15_companys} = require('./xueqiu_k15');
+const {k1_companys} = require('./xueqiu_k1');
 
 /**
  * 从雪球玩获得行业分类表(主要下面代码没有排重)
@@ -262,46 +264,102 @@ function category_base(){
     });
 
 }
+
+let columns = [
+    "timestamp",
+    "volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "chg",
+    "percent",
+    "turnoverrate",
+    "amount",
+    "ma5",
+    "ma10",
+    "ma20",
+    "ma30",
+    "dea",
+    "dif",
+    "macd",
+    "ub",
+    "lb",
+    "ma20",
+    "kdjk",
+    "kdjd",
+    "kdjj",
+    "rsi1",
+    "rsi2",
+    "rsi3",
+    "wr6",
+    "wr10",
+    "bias1",
+    "bias2",
+    "bias3",
+    "cci",
+    "psy",
+    "psyma"
+]; 
+let dbcolumns = [
+    "volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "chg",
+    "percent",
+    "turnoverrate",
+    "ma5",
+    "ma10",
+    "ma20",
+    "ma30",
+    "dea",
+    "dif",
+    "macd",
+    "ub",
+    "lb",
+    "kdjk",
+    "kdjd",
+    "kdjj",
+    "rsi1",
+    "rsi2",
+    "rsi3",
+    "wr6",
+    "wr10",
+    "bias1",
+    "bias2",
+    "bias3",
+    "cci",
+    "psy",
+    "psyma"
+];
+let column2index = {};
+for(let k in columns){
+    column2index[columns[k]] = k;
+}
+
+//incols是描述it的数据键,outcols是要输出的数据键,最后将组合成key=value,...
+function str_pairs(it){
+    let p = [];
+    for(let k of dbcolumns){
+        p.push(`${k}=${it[column2index[k]]}`);
+    }
+    return p.join(',');
+}
+//将dbcolumns中的值都输出value,...
+function str_colums(it){
+    let p = [];
+    for(let k of dbcolumns){
+        p.push(`${it[column2index[k]]}`);
+    }
+    return p.join(',');
+}
 /**
  * 日K线
  * 允许多次调用，确保数据的连续于正确
  */
 function kd_company(id,code,callback){
-    let columns = [
-        "timestamp",
-        "volume",
-        "open",
-        "high",
-        "low",
-        "close",
-        "chg",
-        "percent",
-        "turnoverrate",
-        "ma5",
-        "ma10",
-        "ma20",
-        "ma30",
-        "dea",
-        "dif",
-        "macd",
-        "ub",
-        "lb",
-        "ma20",
-        "kdjk",
-        "kdjd",
-        "kdjj",
-        "rsi1",
-        "rsi2",
-        "rsi3",
-        "wr6",
-        "wr10",
-        "bias1",
-        "bias2",
-        "bias3",
-        "cci",
-        "psy",
-        "psyma"
-    ];   
     /*
      * 一个排重插入的例子
      *  INSERT INTO users (full_name, login, password) 
@@ -309,7 +367,6 @@ function kd_company(id,code,callback){
      *  WHERE NOT EXISTS 
      *  (SELECT login FROM users WHERE login='tito');
      */
-
     function xueqiuURI(date){
         //https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=SZ000063&begin=1529942400000&period=day&type=before&count=-142&indicator=kline,ma,macd,kdj,boll,rsi,wr,bias,cci,psy
         let uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${date}&period=day&type=before&count=-7&indicator=kline,ma,macd,kdj,boll,rsi,wr,bias,cci,psy`;
@@ -321,6 +378,7 @@ function kd_company(id,code,callback){
         }
         return true;
     }
+
     /**
      * 第一步找到数据库中最近的一条记录
      */
@@ -339,7 +397,7 @@ function kd_company(id,code,callback){
                 }else{
                     try{
                         let sl = JSON.parse(res.body);
-                        if(sl.data && sl.data.column && sl.data.item && sl.data.column.length===33 && sl.data.item.length && isCorrect(sl.data.column) && nextdate!=sl.data.item[0][0]){
+                        if(sl.data && sl.data.column && sl.data.item && sl.data.column.length===34 && sl.data.item.length && isCorrect(sl.data.column) && nextdate!=sl.data.item[0][0]){
                             let needContinue = true;
                             let items = sl.data.item;
                             for(let i=items.length-1;i>=0;i--){ //从最近的向过去处理
@@ -351,15 +409,17 @@ function kd_company(id,code,callback){
                                 if(head_date && date.getTime()===head_date.getTime()){
                                     //接头部分需要覆盖
                                     console.log(code,'update : ',dateString);
-                                    let cols = columns.map((v,i)=>`${v}=${it[i]}`);
-                                    sqlStr = `update kd_xueqiu set ${cols.slice(1,18).join()},${cols.slice(19).join()} where id=${id} and date='${dateString}'`;
+                                    //let cols = columns.map((v,i)=>`${v}=${it[i]}`);
+                                    //sqlStr = `update kd_xueqiu set ${cols.slice(1,18).join()},${cols.slice(19).join()} where id=${id} and date='${dateString}'`;
+                                    sqlStr = `update kd_xueqiu set ${str_pairs(it)} where id=${id} and date='${dateString}'`;
                                     needContinue = false;
                                 }else{
                                     //如果存在指定的id和date就不插入，否则就插入
                                     console.log(code,'insert : ',dateString);
                                     //ma20重复了index在18
-                                    let cols = it.map((v)=>`${v}`); //避免join出,,,
-                                    sqlStr =`insert ignore into kd_xueqiu values (${id},'${dateString}',${cols.slice(1,18).join()},${cols.slice(19).join()})`;
+                                    //let cols = it.map((v)=>`${v}`); //避免join出,,,
+                                    //sqlStr =`insert ignore into kd_xueqiu values (${id},'${dateString}',${cols.slice(1,18).join()},${cols.slice(19).join()})`;
+                                    sqlStr =`insert ignore into kd_xueqiu values (${id},'${dateString}',${str_colums(it)})`;
                                 }
                                 connection.query(sqlStr,(error, results, field)=>{
                                     if(error){
@@ -387,7 +447,7 @@ function kd_company(id,code,callback){
                                 //console.log(code,'DONE');
                                 callback();
                             }else if(sl.data && sl.error_code==0){
-                                //console.log(code,'NO K');
+                                console.error(code,'NO K');
                                 callback();                                
                             }else{
                                 console.error(code,err);
@@ -496,8 +556,19 @@ function kd_companys(p){
                         if( week>=1 && week<=5 && hours>9 && hours<15 ){
                             console.log(`Trading ${week} ${hours}!`);
                         }else{
+                            console.log('calc macd');
                             macd((err)=>{
-                                if(!err)console.log('DONE!');
+                                if(!err){
+                                    console.log('download k15');
+                                    k15_companys((err)=>{
+                                        if(!err){
+                                            console.log('download k1');
+                                            k1_companys((err)=>{
+                                                console.log('DONE!');
+                                            });
+                                        }
+                                    });
+                                }
                             });
                         }
                     }

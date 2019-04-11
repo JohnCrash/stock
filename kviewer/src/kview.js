@@ -478,7 +478,7 @@ function KView(props){
                     stack:'two',
                     data : negatives,
                     xAxisIndex: 5,
-                    yAxisIndex: 5,                    
+                    yAxisIndex: 5,
                     itemStyle:{
                         color : downColor
                     }

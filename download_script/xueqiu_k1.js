@@ -1,21 +1,51 @@
 const {paralle_companys_task,k_company,dateString,query,connection,xuequeCookie} = require('./k');
 const async = require('async');
 var Crawler = require("crawler");
-
+let columns = [
+    "timestamp",
+    "volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "chg",
+    "percent",
+    "turnoverrate",
+    "amount"];
+let dbcolumns = [
+    "volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "chg",
+    "percent",
+    "turnoverrate"];
+let column2index = {};
+for(let k in columns){
+    column2index[columns[k]] = k;
+}
+//incols是描述it的数据键,outcols是要输出的数据键,最后将组合成key=value,...
+function str_pairs(it){
+    let p = [];
+    for(let k of dbcolumns){
+        p.push(`${k}=${it[column2index[k]]}`);
+    }
+    return p.join(',');
+}
+//将dbcolumns中的值都输出value,...
+function str_colums(it){
+    let p = [];
+    for(let k of dbcolumns){
+        p.push(`${it[column2index[k]]}`);
+    }
+    return p.join(',');
+}
 /**
  * 现在单只股票的1分钟k线数据
  */
 function k1_company(id,code,callback){
-    let columns = [
-        "timestamp",
-        "volume",
-        "open",
-        "high",
-        "low",
-        "close",
-        "chg",
-        "percent",
-        "turnoverrate"];
+
     function xueqiuURI(timestamp){
         //https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=SH000001&begin=1552960020000&period=1m&type=before&count=-224&indicator=kline
         let uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=1m&type=before&count=-240&indicator=kline`;
@@ -60,12 +90,19 @@ function k1_company(id,code,callback){
                                 if(head_date && date.getTime()===head_date.getTime()){
                                     //接头部分需要覆盖
                                     console.log(code,'update : ',dateString);
-                                    let cols = columns.map((v,i)=>`${v}=${it[i]}`);
-                                    sqlStr = `update k1_xueqiu set ${cols.slice(1).join()} where id=${id} and timestamp='${dateString}'`;
+                                    //let cols = columns.map((v,i)=>`${v}=${it[i]}`);
+                                    //sqlStr = `update k1_xueqiu set ${cols.slice(1).join()} where id=${id} and timestamp='${dateString}'`;
+                                    sqlStr = `update k1_xueqiu set ${str_pairs(it)} where id=${id} and timestamp='${dateString}'`;
+                                    connection.query(sqlStr,(error, results, field)=>{
+                                        if(error){
+                                            console.error(code,error);
+                                        }
+                                    });                                    
                                     needContinue = false;
                                 }else{
-                                    let cols = it.map((v)=>`${v}`);
-                                    datas.push(`(${id},'${dateString}',${cols.slice(1).join()})`);
+                                    //let cols = it.map((v)=>`${v}`);
+                                    //datas.push(`(${id},'${dateString}',${cols.slice(1).join()})`);
+                                    datas.push(`(${id},'${dateString}',${str_colums(it)})`);
                                 }
 
                                 if(!needContinue)break;

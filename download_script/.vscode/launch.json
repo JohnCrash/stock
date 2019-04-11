@@ -4,17 +4,35 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    {
-        "type": "node",
-        "request": "launch",
-        "name": "Launch main",
-        "program": "${workspaceFolder}/main.js"
-    },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch main",
+            "program": "${workspaceFolder}/main.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch select15",
+            "program": "${workspaceFolder}/k15select.js"
+        },
         {
             "type": "node",
             "request": "launch",
             "name": "雪球取得K线数据",
             "program": "${workspaceFolder}/xueqiu.js"
-        }   
+        },    
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "分类涨落",
+            "program": "${workspaceFolder}/kd_category.js"
+        },    
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch research_k15",
+            "program": "${workspaceFolder}/research_k15.js"
+        },
     ]
 }
