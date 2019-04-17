@@ -5,7 +5,7 @@ var {companys_task,k_company,dateString,query,connection,xuequeCookie} = require
 var {macd} = require("./macd");
 const {k15_companys} = require('./xueqiu_k15');
 const {k1_companys} = require('./xueqiu_k1');
-
+const {research_k15} = require('./research_k15');
 /**
  * 沪深全部股票列表，没有分类的category=0
  */
@@ -425,14 +425,18 @@ function kd_companys(p){
                             console.log(`Trading ${week} ${hours}!`);
                         }else{
                             console.log('download k15');
-                            k15_companys((err)=>{
+                            k15_companys((err)=>{ //15分钟级别的k线图
                                 if(!err){
                                     console.log('download k1');
-                                    k1_companys((err)=>{
-                                        console.log('DONE!');
+                                    k1_companys((err)=>{ //1分钟级别的k线图
+                                        console.log('update company_select');
+                                        research_k15(()=>{
+                                            console.log('DONE!');
+                                        });
                                     });
                                 }
                             });
+
                         }
                     }
                     connection.query('select count(*) as count from company where category_base!=9 and done=0 order by id',(error, results, field)=>{

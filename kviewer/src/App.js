@@ -96,10 +96,6 @@ let menus = [
   {label:'收藏夹',icon:<BookmarkIcon/>,key:'bookmark',tables:[]},
   {label:'K15为正',icon:<ExposurePlus1Icon/>,key:'k15macd',tables:[]},
   {label:'K15即将为正',icon:<ExposureZeroIcon/>,key:'k15ready',tables:[]},
-  {label:'即将为正',icon:<ExposurePlus1Icon/>,key:'ready',tables:[]},
-  {label:'当前为正',icon:<ExposureZeroIcon/>,key:'today',tables:[]},
-  {label:'昨天为正',icon:<ExposureNeg1Icon/>,key:'yesterday',tables:[]},
-  {label:'三天前为正',icon:<ExposureNeg2Icon/>,key:'threeday',tables:[]},
   {label:'条件筛选',icon:<SearchIcon/>,key:'search',tables:[]}
 ];
 

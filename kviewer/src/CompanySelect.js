@@ -13,7 +13,10 @@ import CompanySelectTable from './CompanySelectTable';
 import {postJson} from './fetch';
 import {dateString} from './kits';
 
-const styles = theme => ({ 
+const styles = theme => ({
+  button: {
+    margin: theme.spacing.unit
+  }  
 });
 
 /**
@@ -23,6 +26,18 @@ const styles = theme => ({
  * prop.search是否打开搜索栏
  */
  class CompanySelect extends Component{
+   buttons = [
+     {name:'金融房地产',condition:['保险','多元金融','房地产开发','证券','银行']},
+     {name:'半导体',condition:['半导体','电子制造','光学光电子']},
+     {name:'互联网',condition:['互联网']},
+     {name:'5G',condition:''},
+     {name:'药酒',condition:''},
+     {name:'制造业',condition:''},
+     {name:'能源',condition:''},
+     {name:'运输',condition:''},
+     {name:'传媒',condition:''},
+     {name:'农林',condition:''}
+   ];
     state = {
         companys : [],
         openbar : false,
@@ -63,6 +78,9 @@ const styles = theme => ({
         }
      });
     }
+    categoryCombin=(condition)=>()=>{
+      this.requestSelect(condition);
+    };
     render(){
         const { classes,onClose,title,lists,search } = this.props;
         const { companys,openbar,err} = this.state;
@@ -76,10 +94,19 @@ const styles = theme => ({
               >
                 <DialogTitle id="form-dialog-title">{title?title:'股票选择'}</DialogTitle>
                 <DialogContent>
-                  {search?[<DialogContentText>
+                  {search?[
+                    <div>
+                    {this.buttons.map((it,idx)=>{
+                      return <Button variant="contained" color="primary" className={classes.button}
+                        onClick={this.categoryCombin(it.condition)}>
+                          {it.name}
+                      </Button>
+                    })}
+                  </div>,
+                  <DialogContentText>
                       输入股票名称或者代码，也可以以#开头输入一个数据库查询条件。
-                    </DialogContentText>,
-                    <TextField
+                  </DialogContentText>,
+                  <TextField
                       autoFocus
                       margin="dense"
                       id="name"

@@ -43,9 +43,9 @@ const CompanySelectScheme = {
     assets:'number',
     dividend:'number',
     yield:'number',
-    static30:'number',
-    income30:'number',
-    price:'number',
+    static30:'number', //30天静态增长
+    static60:'number', //60天静态增长
+    price:'number', //股价
     k15_gain:'number',
     k15_drawal:'number',
     k30_gain:'number',
@@ -68,10 +68,15 @@ const CompanySelectScheme = {
     kd_maxdrawal:'number',
     bin4:'number',
     glow:'number',
-    class60:'number',
-    class70:'number',
-    class80:'number',
-    class90:'number'
+    ma5diff:'number',
+    ma10diff:'number',
+    ma20diff:'number',
+    ma30diff:'number',
+    bookmark15:'number',
+    bookmark30:'number',
+    bookmark60:'number',
+    bookmark120:'number',
+    bookmarkd:'number'
 };
 
 function eqPair(t,scheme){
