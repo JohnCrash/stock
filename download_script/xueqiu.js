@@ -7,138 +7,6 @@ const {k15_companys} = require('./xueqiu_k15');
 const {k1_companys} = require('./xueqiu_k1');
 
 /**
- * 从雪球玩获得行业分类表(主要下面代码没有排重)
- */
-function category(){
-    var c = new Crawler({
-        maxConnections : 1,
-        // This will be called for each crawled page
-        callback : function (error, res, done) {
-            if(error){
-                console.log(error);
-            }else{
-                var $ = res.$;
-                var li = $("[data-level2code]");
-                connection.connect();
-                for(let i=0;i<li.length;i++){
-                    let it = li[i];
-                    let href = it.attribs['href'];
-                    let l2c = it.attribs['data-level2code'];
-                    if(href && l2c && href.endsWith(l2c)){
-                        //插入的数据库分类表中(没有排重)
-                        connection.query(`insert ignore into category (name,code,url) values ('${it.attribs['title']}','${l2c}','${href}')`,(error, results, field)=>{
-                            if (error){
-                                console.log(error);
-                                console.log(it.attribs['title']);
-                                console.log(href);
-                                console.log(l2c);
-                            }else{
-                                console.log('insert',it.attribs['title'])
-                            }
-                        });
-                    }
-                }
-                connection.end();
-            }
-            done();
-        }
-    });
-    
-    c.queue('https://xueqiu.com/hq');
-}
-
-/**
- * 从雪球网获分类取公司名称和股票代码
- */
-function companyByCategory(){
-    function xueqiuURI(page,name,code){
-        let uri = `https://xueqiu.com/industry/quote_order.json?page=${page}&size=30&order=desc&exchange=CN&plate=${name}&orderBy=percent&level2code=${code}&_=${Date.now()}`;
-        console.log(uri);
-        let encodeUri = encodeURI(uri);
-        console.log(encodeUri);
-        return encodeUri;
-    }
-    //遍历分类
-    connection.query(`select * from stock.category`,(error, results, field)=>{
-        if(error){
-            console.log(error);
-        }else{
-            //这里使用异步库async来处理
-            let tasks = [];
-            for(let it of results){
-                if(it.done!==0)continue; //已经做过了
-
-                tasks.push((cb)=>{
-                    let page = 1;
-                    let timestamp = 0;
-                    //处理指定的分类
-                    let c = new Crawler({
-                        maxConnections : 1,
-                        callback : function (error, res, done) {
-                            if(error || !res.body){
-                                if(error)console.error(error);
-                                console.error(it.name);
-                                cb(null,it.name); //全部页面走完在调用完成
-                            }else if(res.body){
-                                let sl;
-                                try{
-                                    sl = JSON.parse(res.body);
-                                    if(sl.data.length===0){
-                                        cb(null,it.name); //全部页面走完在调用完成
-                                        //标记分类已经完成
-                                        connection.query(`update category set done = 1 where id=${it.id}`,(error, results, field)=>{
-                                            if(error)console.error(error);
-                                        });
-                                    }else{
-                                        //存储本业数据
-                                        console.log(it.name,page-1);
-                                        for(let company of sl.data){
-                                            console.log(company.symbol,company.name);
-                                            connection.query(`insert ignore into company (category,name,code) values ('${it.id}','${company.name}','${company.symbol}')`,(error, results, field)=>{
-                                                if(error){
-                                                    console.log(error);
-                                                }
-                                            });
-                                        }
-                                        //下一页
-                                        c.queue({
-                                            uri:xueqiuURI(page++,it.name,it.code),
-                                            headers:{
-                                                //在雪球网上刷新主页可以获得cookie
-                                                Cookie:xuequeCookie,
-                                            }
-                                        });
-                                    }                                    
-                                }catch(e){
-                                    console.error(it.name,page);
-                                    cb(null,it.name); //全部页面走完在调用完成
-                                }
-                            }
-                            done(); //一次请求结束
-                        }
-                    });
-                    //这里进行分页
-                    c.queue({
-                        uri:xueqiuURI(page++,it.name,it.code),
-                        headers:{
-                            //在雪球网上刷新主页可以获得cookie
-                            Cookie:xuequeCookie,
-                        }
-                    });
-                });
-            }
-            async.series(tasks,(err,results)=>{
-                if(err){
-                    console.log(err);
-                }else{
-                    console.log('done');
-                }
-            });
-        }
-    });
-}
-
-/**
  * 沪深全部股票列表，没有分类的category=0
  */
 function company(){
@@ -556,17 +424,12 @@ function kd_companys(p){
                         if( week>=1 && week<=5 && hours>9 && hours<15 ){
                             console.log(`Trading ${week} ${hours}!`);
                         }else{
-                            console.log('calc macd');
-                            macd((err)=>{
+                            console.log('download k15');
+                            k15_companys((err)=>{
                                 if(!err){
-                                    console.log('download k15');
-                                    k15_companys((err)=>{
-                                        if(!err){
-                                            console.log('download k1');
-                                            k1_companys((err)=>{
-                                                console.log('DONE!');
-                                            });
-                                        }
+                                    console.log('download k1');
+                                    k1_companys((err)=>{
+                                        console.log('DONE!');
                                     });
                                 }
                             });

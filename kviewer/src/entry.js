@@ -10,6 +10,7 @@ import Typography from '@material-ui/core/Typography';
 import GameView from './GameView';
 import K15View from './K15View';
 import ClassView from './ClassView';
+import StockSelectView from './StockSelectView';
 
 const Entry = [
     {
@@ -34,9 +35,9 @@ const Entry = [
         view:<GameView />,
     },
     {
-        title:'类别',
+        title:'选股',
         icon:<TrendingUp />,
-        view:<ClassView />,
+        view:<StockSelectView />,
     }
 ];
 

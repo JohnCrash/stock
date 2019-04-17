@@ -1,22 +1,8 @@
-var mysql   = require('mysql');
-var Crawler = require("crawler");
-var async = require("async");
-var bigint = require("big-integer");
-
-var connection = mysql.createPool({
-    connectionLimit : 10,
-    host     : 'localhost',
-    user     : 'root',
-    password : 'nv30ati2',
-    database : 'stock'
-  });
-  
-//var xuequeCookie = "_ga=GA1.2.430870872.1550643434; device_id=5dc39f85a0a7e8f804d913c6f66bd411; s=f111o4ctz6; __utmz=1.1550648862.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); remember=1; remember.sig=K4F3faYzmVuqC0iXIERCQf55g2Y; xq_a_token=e7120e4e7b4be743f2c74067a44ee0e628770830; xq_a_token.sig=hE4WTsbi-zbUt506L09ZZbdJ_kI; xqat=e7120e4e7b4be743f2c74067a44ee0e628770830; xqat.sig=8PcFgZlZW0v0IH8MsTl27E3deIY; xq_r_token=be060178b1ebd6fa09c111bfbdd3b40db9e98dfc; xq_r_token.sig=WpxrkUwRX5LASIPyFu-1kPlaCJs; xq_is_login=1; xq_is_login.sig=J3LxgPVPUzbBg3Kee_PquUfih7Q; u=6625580533; u.sig=ejkCOIwfh-8tPxr1D63z9yvqWK4; bid=693c9580ce1eeffbf31bb1efd0320f72_jsjwwtrv; _gid=GA1.2.364037776.1551618045; aliyungf_tc=AQAAAIRMQWu3EQ4ACsd2e0ZdK3tv9E1U; Hm_lvt_1db88642e346389874251b5a1eded6e3=1551674476,1551680738,1551754280,1551766767; __utma=1.430870872.1550643434.1551422478.1551766799.20; __utmc=1; __utmb=1.1.10.1551766799; _gat=1; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1551767644";
-var xuequeCookie = "_ga=GA1.2.430870872.1550643434; device_id=5dc39f85a0a7e8f804d913c6f66bd411; s=f111o4ctz6; __utmz=1.1550648862.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); bid=693c9580ce1eeffbf31bb1efd0320f72_jsjwwtrv; _gid=GA1.2.116983169.1552205760; xq_a_token=fbc0017d2f2b4bc08c716edc5bd9d277c241eea6; xqat=fbc0017d2f2b4bc08c716edc5bd9d277c241eea6; xq_r_token=fcc1b1e4ddfb2bc4d55bfcccff1ba4b36e0091ff; xq_is_login=1; u=6625580533; xq_token_expire=Thu%20Apr%2004%202019%2020%3A06%3A35%20GMT%2B0800%20(CST); aliyungf_tc=AQAAAI7m835QIA0AvhvzcntW+6HhF2QE; Hm_lvt_1db88642e346389874251b5a1eded6e3=1552626756,1552633647,1552646787,1552661449; __utma=1.430870872.1550643434.1552500593.1552661457.41; __utmc=1; _gat=1; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1552667642";
-
-function dateString(date){
-    return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
-}
+const {companys_task,k_company,dateString,query,connection,xuequeCookie} = require('./k');
+const Crawler = require("crawler");
+const async = require("async");
+const bigint = require("big-integer");
+const {CompanyScheme,CompanySelectScheme,eqPair,valueList} = require("./dbscheme");
 
 function desc_fetch(company,cb){
     let c = new Crawler({maxConnections : 1,
@@ -100,7 +86,7 @@ function strS(s){
     if(s[s.length-1]==='%'){
         return Num(s.slice(0,-1))*0.01;
     }else{
-        Num(s)*0.01;
+        return Num(s)*0.01;
     }
 }
 
@@ -143,13 +129,16 @@ function base_fetch(company,date,cb){
                     //5-1 股息率
                     let _yield_ = strS(t5[0].children[1].children[1].children[0].data);
                     console.log(company.name,ttm,pb,value,total,earnings,assets,dividend,_yield_);
-                    connection.query(`insert ignore into company_value values (${company.id},'${date}',${ttm},${pb},${value},${total},${earnings},${assets},${dividend},${_yield_},0,0)`,(error)=>{
+                    connection.query(`insert ignore into company_value values (${company.id},'${date}',${ttm},${pb},${value},${total},${earnings},${assets},${dividend},${_yield_},0,0,0)`,(error)=>{
                         if(error)console.error(error);
-                    })
+                        if(!error){
+                            connection.query(`update company_select set ttm=${ttm},pb=${pb},value=${value},total=${total},earnings=${earnings},assets=${assets},dividend=${dividend},yield=${_yield_} where company_id=${company.id}`);
+                        }
+                    });
                     cb();
                 }catch(err){
                     console.error(err,company.name,company.name);
-                    cb(err);
+                    cb();
                 }
             }
             done();
@@ -162,9 +151,9 @@ function base_fetch(company,date,cb){
     });
 }
 /**
- * 下载全部公司的基本数据
+ * 下载全部公司的基本数据(注意这个数据在companyByCategory中已经更新了因此可以不用调用这个函数)
  */
-function base_all(){
+function update_desc(done){
     connection.query("select * from company where category_base!=9",(err,companys)=>{
         if(err){
             console.error(err);
@@ -178,15 +167,235 @@ function base_all(){
             async.parallelLimit(tasks,5,(err)=>{
                 if(err){
                     console.error(err);
+                    if(done)done(err);
                 }else{
                     console.log('DONE!');
+                    if(done)done();
                 }
             })
         }
     })
 }
 
-base_all();
-//desc_all();
-//desc_fetch({code:'SZ000725'},cb=>{console.log('done!')});
-//base_fetch({code:'SZ002179'},cb=>{console.log('done!')});
+/**
+ * 从雪球网获分类取公司名称和股票代码
+ */
+function companyByCategory(done){
+    function xueqiuURI(page,name,code){
+        let uri = `https://xueqiu.com/service/v5/stock/screener/quote/list?page=${page}&size=90&order=desc&order_by=percent&exchange=CN&market=CN&ind_code=${code}&_=${Date.now()}`;
+        let encodeUri = encodeURI(uri);
+        console.log(encodeUri);
+        return encodeUri;
+    }
+    let companys = [];
+    //遍历分类
+    connection.query(`select * from stock.category`,(error, results, field)=>{
+        if(error){
+            console.log(error);
+        }else{
+            //这里使用异步库async来处理
+            let tasks = [];
+            for(let it of results){
+                let a = it.url.split('=');
+                it.code = a[a.length-1];
+                tasks.push((cb)=>{
+                    let page = 1;
+                    let timestamp = 0;
+                    //处理指定的分类
+                    let c = new Crawler({
+                        maxConnections : 1,
+                        callback : function (error, res, done) {
+                            if(error || !res.body){
+                                if(error)console.error(error);
+                                console.log(it.name);
+                                cb(null,it.name); //全部页面走完在调用完成
+                            }else if(res.body){
+                                let sl;
+                                try{
+                                    sl = JSON.parse(res.body);
+                                    if(sl.data.list.length===0){
+                                        cb(null,it.name); //全部页面走完在调用完成
+                                    }else{
+                                        //存储本业数据
+                                        console.log(it.name,page-1);
+                                        for(let company of sl.data.list){
+                                            console.log(it.id,company.symbol,company.name);
+                                            //categoryID:it.id,companyName:company.name,companyCode:company.symbol}
+                                            company.category = it.id;
+                                            company.it = it;
+                                            companys.push(company);
+                                        }
+                                        //下一页
+                                        c.queue({
+                                            uri:xueqiuURI(page++,it.name,it.code),
+                                            headers:{
+                                                //在雪球网上刷新主页可以获得cookie
+                                                Cookie:xuequeCookie,
+                                            }
+                                        });
+                                    }                           
+                                }catch(e){
+                                    console.error(e);
+                                    console.error(it.name,page);
+                                    cb(null,it.name); //全部页面走完在调用完成
+                                }
+                            }
+                            done(); //一次请求结束
+                        }
+                    });
+                    //这里进行分页
+                    c.queue({
+                        uri:xueqiuURI(page++,it.name,it.code),
+                        headers:{
+                            //在雪球网上刷新主页可以获得cookie
+                            Cookie:xuequeCookie,
+                        }
+                    });
+                });
+            }
+            async.parallelLimit(tasks,5,(err,results)=>{
+                if(err){
+                    console.log(err);
+                    if(done)done(err);
+                }else{
+                    let tsk = [];
+                    for(let com of companys){
+                        tsk.push(cb=>{
+                            //如果公司存在更新分类，如果不存在插入
+                            query(`select id from company where code='${com.symbol}'`).then(result=>{
+                                if(result.length>0){
+                                    //存在
+                                    console.log('update company',com.name);
+                                    query(`update company set ${eqPair(com,CompanyScheme)} where code='${com.symbol}'`);
+                                    //更新company_select
+                                    //在company_select中字段category直接使用明文
+                                    query(`select company_id from company_select where code='${com.symbol}'`).then(r=>{
+                                        if(r.length>0){
+                                            com.category = com.it.name;
+                                            console.log('update company_select',com.name,com.category);
+                                            if(com.symbol=='SH603068'){
+                                                console.log(eqPair(com,CompanySelectScheme));
+                                            }
+                                            query(`update company_select set ${eqPair(com,CompanySelectScheme)} where code='${com.symbol}'`);    
+                                        }else{
+                                            com.code = com.symbol;
+                                            com.company_id = result[0].id;
+                                            com.category = com.it.name;
+                                            console.log('insert company_select',com.company_id,com.name,com.category);
+                                            query(`insert ignore into company_select ${valueList(com,CompanySelectScheme)}`);
+                                        }
+                                    });
+                                }else{
+                                    //不存在
+                                    com.code = com.symbol;
+                                    console.log('insert company',com.name);
+                                    query(`insert ignore into company ${valueList(com,CompanyScheme)}`).then(r=>{
+                                        query(`select id from company where code=${com.symbol}`).then(r=>{
+                                            query(`select company_id from company_select where code='${com.symbol}'`).then(R=>{
+                                                if(R.length>0){
+                                                    com.category = com.it.name;
+                                                    console.log('update company_select',com.name,com.category);
+                                                    if(com.symbol=='SH603068'){
+                                                        console.log(eqPair(com,CompanySelectScheme));
+                                                    }                                                    
+                                                    query(`update company_select set ${eqPair(com,CompanySelectScheme)} where code='${com.symbol}'`);  
+                                                }else{
+                                                    com.code = com.symbol;
+                                                    com.company_id = r[0].id;
+                                                    com.category = com.it.name;
+                                                    console.log('insert company_select',com.company_id,com.name,com.category);
+                                                    query(`insert ignore into company_select ${valueList(com,CompanySelectScheme)}`);
+                                                }
+                                            });
+                                        })
+                                    })
+                                }
+                                cb();
+                            }).catch(e=>{
+                                console.error(e);
+                                cb(e);
+                            });
+                        });
+                    }
+                    async.series(tsk,(error,results)=>{
+                        if(error){
+                            console.error(error);
+                        }
+                        console.log('done');
+                        if(done)done(error);
+                    })
+                    
+                }
+            });
+        }
+    });
+}
+
+/**
+ * 从雪球玩获得行业分类表(主要下面代码没有排重)
+ */
+function update_category(done){
+    connection.query('delete from category',(error, results, field)=>{
+        if(error){
+            console.error(error);
+        }else{
+            var c = new Crawler({
+                maxConnections : 1,
+                // This will be called for each crawled page
+                callback : function (error, res, done) {
+                    if(error){
+                        console.log(error);
+                    }else{
+                        var $ = res.$;
+                        var li = $("[data-level2code]");
+                        for(let i=0;i<li.length;i++){
+                            let it = li[i];
+                            let href = it.attribs['href'];
+                            let l2c = it.attribs['data-level2code'];
+                            if(href && l2c && href.endsWith(l2c)){
+                                //插入的数据库分类表中(没有排重)
+                                console.log(it.attribs['title'],l2c);
+                                connection.query(`insert ignore into category (name,code,url) values ('${it.attribs['title']}','${l2c}','${href}')`,(error, results, field)=>{
+                                    if (error){
+                                        console.error(error);
+                                        console.log(it.attribs['title']);
+                                        console.log(href);
+                                        console.log(l2c);
+                                    }else{
+                                        console.log('insert',it.attribs['title'])
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    if(done)done();
+                }
+            });
+            
+            c.queue('https://xueqiu.com/hq');
+        }
+    });
+}
+
+/**
+ * 更新公司的数据包括company,category,company_select
+ */
+function update_company(done){
+    update_category(err=>{
+        if(err){
+            if(done)done(err);
+            return;
+        }
+        companyByCategory(err=>{
+            if(err){
+                if(done)done(err);
+                return;
+            }    
+            update_desc(err=>{
+                if(done)done(err);
+            })
+        });
+    });
+}
+
+module.exports = {update_company};

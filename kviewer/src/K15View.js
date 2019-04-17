@@ -369,7 +369,7 @@ class K15View extends Component{
     render(){
         let {classes} = this.props;
         return <div className={classes.root}>
-            <FetchChart api={['/api/k15']} init={this.init} width="100%" height={860}/>
+            <FetchChart api={['/api/k15']} init={this.init} args={{range:4}} width="100%" height={860}/>
         </div>
     }
 }

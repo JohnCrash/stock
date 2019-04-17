@@ -120,7 +120,7 @@ app.post('/api/k15', function(req, res){
             res.json({error});
         }else if(results.length===1){
             let name  = results[0].name;
-            let ry = req.body.range?req.body.range:1;
+            let ry = Number(req.body.range?req.body.range:4);
             connection.query(`select * from k15_xueqiu where id=${results[0].id} order by timestamp desc limit ${ry*243}`,(error, results, field)=>{  
                 if(error){
                     res.json({error:error.sqlMessage});
