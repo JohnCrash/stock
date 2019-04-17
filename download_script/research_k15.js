@@ -4,6 +4,7 @@ const macd = require('macd');
 const {CompanyScheme,CompanySelectScheme,eqPair,valueList} = require("./dbscheme");
 const {update_company} = require('./desc');
 const Crawler = require("crawler");
+const request = require("request").defaults({jar: true});
 
 function arrayScale(a,n){
     let s = [];
@@ -142,12 +143,244 @@ function bookmarkTask(k,bookmark,total,top){
     };
 }
 
+//https://xueqiu.com/v4/stock/portfolio/addstock.json
+//POST category:2 symbol:code
+function addStock(code){
+    return (cb)=>{
+        let c = new Crawler({
+            maxConnections : 1,
+            callback : function(error, res, done){
+                if(error)console.error(error);
+                try{
+                    let sl = JSON.parse(res.body);
+                    if(sl.error_code!="0"){
+                        console.error(sl.error_code,sl.error_description);
+                    }
+                }catch(e){
+                    console.error(e);
+                }
+                
+                cb();
+                done();
+            }
+        });    
+        c.queue({
+            uri:`https://xueqiu.com/v4/stock/portfolio/addstock.json`,
+            headers:{
+                Cookie:xuequeCookie
+            },
+            method:'POST',
+            form: {symbol:code,category:2}
+        });    
+
+    };
+}
+//https://stock.xueqiu.com/v5/stock/portfolio/stock/cancel.json
+//POST symbol:code
+function deleteStock(code){
+    return (cb)=>{
+        let c = new Crawler({
+            maxConnections : 1,
+            callback : function(error, res, done){
+                if(error)console.error(error);
+                try{
+                    let sl = JSON.parse(res.body);
+                    if(sl.error_code!="0"){
+                        console.error(sl.error_code,sl.error_description);
+                    }
+                }catch(e){
+                    console.error(e);
+                }                
+                cb();
+                done();
+            }
+        });    
+        c.queue({
+            uri:`https://stock.xueqiu.com/v5/stock/portfolio/stock/cancel.json`,
+            headers:{
+                Cookie:xuequeCookie
+            },
+            method:'POST',
+            form: {symbols:code}
+        });
+    };
+}
+
+//对股票进行分组
+function groupStock(group,code){
+    return (cb)=>{
+        let c = new Crawler({
+            maxConnections : 1,
+            callback : function(error, res, done){
+                if(error)console.error(error);
+                try{
+                    let sl = JSON.parse(res.body);
+                    if(sl.error_code!="0"){
+                        console.error(sl.error_code,sl.error_description);
+                    }
+                }catch(e){
+                    console.error(e);
+                }                
+                cb();
+                done();
+            }
+        });    
+        c.queue({
+            uri:`https://stock.xueqiu.com/v5/stock/portfolio/stock/modify_portfolio.json`,
+            headers:{
+                Cookie:xuequeCookie
+            },
+            method:'POST',
+            form: {pnames:group.join(','),symbols:code,category:1}
+        });
+    };
+}
+
+function mapCategory(cat){
+    const cat2 = {
+        '互联网传媒':'传媒',
+        '电信、广播电视和卫星传输服务':'传媒',
+        '新闻和出版业':'传媒',
+
+        '食品加工':'吃喝',
+        '餐饮':'吃喝',
+        '畜禽养殖':'吃喝',
+        '农副食品加工业':'吃喝',
+        '医药制造业':'吃喝',
+        '化学制药':'吃喝',
+
+        '化学原料和化学制品制造业':'原料',
+        '石油加工、炼焦和核燃料加工业':'原料',
+        '橡胶和塑料制品业':'原料',
+        '有色金属冶炼和压延加工业':'原料',
+        '造纸和纸制品业':'原料',
+        '非金属矿物制品业':'原料',
+        '化学原料':'原料',
+        '有色金属矿采选业':'原料',
+
+        '商务服务业':'金融',
+        '贸易':'金融',
+        '资本市场服务':'金融',
+        '房地产业':'金融',
+        '房地产开发':'金融',
+        '其他金融业':'金融',
+
+        '燃气生产和供应业':'能源',
+        '电力、热力生产和供应业':'能源',
+
+        '计算机、通信和其他电子设备制造业':'科技',
+        '计算机应用':'科技',
+        '半导体':'科技',
+        '通信设备':'科技',
+
+        '通用设备制造业':'制造',
+        '金属制品业':'制造',
+        '铁路、船舶、航空航天和其他运输设备制造业':'制造',
+        '专用设备制造业':'制造',
+        '仪器仪表制造业':'制造',
+        '其他制造业':'制造',
+        '家具制造业':'制造',
+        '工业金属':'制造',
+        '电机':'制造',
+        '电气机械和器材制造业':'制造',
+        '白色家电':'制造',
+        '汽车制造业':'制造',
+        '服装家纺':'制造',
+        '纺织业':'制造',
+        '汽车整车':'制造',
+
+        '零售业':'其他',
+        '批发业':'其他',
+        '租赁业':'其他',    
+        '综合':'其他',  
+        '仓储业':'其他',  
+        '包装印刷':'其他',
+        '公共设施管理业':'其他',
+        'null':'其他',
+    }
+    if(cat2[cat]){
+        return cat2[cat];
+    }else{
+        console.error('为分类的',cat);
+        return '其他';
+    }
+}
 /**
  * 使用bookmark15更新雪球上的股票
  */
 function update_xueqiu(){
     //首先下载雪球的股票列表，然后删除不在榜的。加入上榜的。然后重新分类
-    
+    query(`SELECT name,code,category,k15_max,price,ma5diff,ma10diff,ma20diff,ma30diff FROM stock.company_select where bookmark15=1`).then(tops=>{
+
+        let c = new Crawler({
+            maxConnections : 1,
+            callback : function(error, res, done){
+                try{
+                    let sl = JSON.parse(res.body);
+                    let tasks = [];
+                    let xueiquSet = {};
+                    let topSet = {}
+                    for(let a of sl.data.stocks){
+                        xueiquSet[a.symbol] = 1;
+                    }               
+                    for(let a of tops){
+                        topSet[a.code] = 1;
+                    }               
+                    for(let s of tops){
+                        s.symbol = s.code;
+                        if(!xueiquSet[s.symbol]){ //不在雪球列表，加入
+                            //add
+                            console.log('ADD',s.name,s.symbol);
+                            tasks.push(addStock(s.symbol));                            
+                        }
+                    }
+                    for(let s of sl.data.stocks){
+                        if(!topSet[s.symbol]){ //雪球列表中的不在榜上，删除
+                            //delete
+                            console.log('DELETE',s.name,s.symbol);
+                            tasks.push(deleteStock(s.symbol));                       
+                        }
+                    }
+                    async.parallelLimit(tasks,5,(err,results)=>{
+                        if(err)console.error(err);
+                        //进行分类
+                        let groups = {};
+                        for(let s of tops){
+                            groups[s.code] = groups[s.code]?groups[s.code]:[];
+                            if(s.ma5diff<0)
+                                groups[s.code].push('ma5');
+                            if(s.ma10diff<0)
+                                groups[s.code].push('ma10');
+                            if(s.ma20diff<0)
+                                groups[s.code].push('ma20');
+                            if(s.ma30diff<0)
+                                groups[s.code].push('ma30');
+                            groups[s.code].push(mapCategory(s.category));
+                        }
+                        let task = [];
+                        for(let s of tops){
+                            task.push(groupStock(groups[s.code],s.code));
+                        }
+                        async.parallelLimit(task,5,(err,results)=>{
+                            if(err)console.error(err);
+                            console.log('DONE');
+                        });
+                    });
+                }catch(err){
+                    console.error(err);
+                }
+                done();
+            }
+        });
+        c.queue({
+            uri:`https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1`,
+            headers:{
+                Cookie:xuequeCookie,
+            }
+        });
+    }).catch(err=>{
+        console.error(err);
+    });
 }
 
 function research_k15(done){
@@ -227,6 +460,7 @@ function research_k15(done){
             task.push(bookmarkTask('kd_max','bookmarkd',300,5));
             async.series(task,(err,results)=>{
                 console.log('DONE!');
+                update_xueqiu();
                 if(done)done();
             });
         });
