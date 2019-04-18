@@ -25,8 +25,8 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "分类涨落",
-            "program": "${workspaceFolder}/kd_category.js"
+            "name": "热点搜索",
+            "program": "${workspaceFolder}/research_hot.js"
         },    
         {
             "type": "node",

@@ -1,13 +1,18 @@
-const {companys_task,k_company,dateString,query,connection,xuequeCookie} = require('./k');
+/**
+ * 使用macd15,30,60...等的行情进行选股
+ * 先选出前300只然后在选出行业前五名
+ * 将他们分类放入数据库company_select中并且更新xueqiu上关注的股票
+ */
+
+const {companys_task,k_company,dateString,query,connection,
+    xuequeCookie,xueqiuPostJson,xueqiuGetJson} = require('./k');
 const async = require('async');
 const macd = require('macd');
 const {CompanyScheme,CompanySelectScheme,eqPair,valueList} = require("./dbscheme");
 const {update_company} = require('./desc');
-const Crawler = require("crawler");
-const request = require("request").defaults({jar: true});
 
 function arrayScale(a,n){
-    let s = [];
+    let s = [];  
     for(let it of a){
         for(let i=0;i<n;i++)
             s.push(it);
@@ -62,10 +67,11 @@ function calcgain(k0,macd0,r){
     return [gain,maxdrawal>0?(gain-1)/maxdrawal:(gain-1)/0.1];
 }
 
-function calcgain_MAX(k0,macd0,r){
+function calcgain_MAX(k0,macd0,N,r){
     let lastK;
     let lastM;
     let buyK;
+    let buyI;
     let maxK = 0;
     let gain = 1;
     let maxdrawal = 0;
@@ -78,24 +84,27 @@ function calcgain_MAX(k0,macd0,r){
         if(lastK){
             if(lastM<0 && m>0){
                 buyK = v;
+                buyI = Math.floor(i/N);
             }else if(buyK && m<0){
                 //trade(buyK,v);
-                let r = maxK/buyK;
+                if(buyI != Math.floor(i/N) && maxK>0){//交易在一天内进行将被排除
+                    let r = maxK/buyK;
 
-                gain = gain*r;
-
-                if(r<1){
-                    acc += (1-r);
-                }else{
-                    if(acc>maxdrawal)maxdrawal = acc;
-                    acc = 0;
-                }
-
+                    gain = gain*r;
+    
+                    if(r<1){
+                        acc += (1-r);
+                    }else{
+                        if(acc>maxdrawal)maxdrawal = acc;
+                        acc = 0;
+                    }    
+                } 
+                buyI = undefined;
                 buyK = undefined;
                 maxK = 0;
             }
-            if(buyK && v>maxK)maxK = v;
         }
+        if(buyK && v>maxK && buyI != Math.floor(i/N))maxK = v;
         lastK = v;
         lastM = m;
     }
@@ -105,7 +114,7 @@ function calcgain_MAX(k0,macd0,r){
 
 function bookmarkTask(k,bookmark,total,top){
     return (cb)=>{
-        query(`SELECT name,code,category,${k} FROM stock.company_select order by ${k} desc limit ${total}`).then(companys=>{
+        query(`SELECT name,code,category,${k} FROM stock.company_select where static60>=1 and static30>1 order by ${(k==='k15_max'?(`(k15_max+k30_max+k60_max)/3`):k)} desc limit ${total}`).then(companys=>{
             let category = {};
             for(let com of companys){
                 let c = com.category?com.category:'未分类';
@@ -147,91 +156,33 @@ function bookmarkTask(k,bookmark,total,top){
 //POST category:2 symbol:code
 function addStock(code){
     return (cb)=>{
-        let c = new Crawler({
-            maxConnections : 1,
-            callback : function(error, res, done){
-                if(error)console.error(error);
-                try{
-                    let sl = JSON.parse(res.body);
-                    if(sl.error_code!="0"){
-                        console.error(sl.error_code,sl.error_description);
-                    }
-                }catch(e){
-                    console.error(e);
-                }
-                
-                cb();
-                done();
-            }
-        });    
-        c.queue({
-            uri:`https://xueqiu.com/v4/stock/portfolio/addstock.json`,
-            headers:{
-                Cookie:xuequeCookie
-            },
-            method:'POST',
-            form: {symbol:code,category:2}
-        });    
-
+        xueqiuPostJson('https://xueqiu.com/v4/stock/portfolio/addstock.json',
+            {symbol:code,category:2},
+            (err)=>{
+                cb(err);
+        });
     };
 }
 //https://stock.xueqiu.com/v5/stock/portfolio/stock/cancel.json
 //POST symbol:code
 function deleteStock(code){
     return (cb)=>{
-        let c = new Crawler({
-            maxConnections : 1,
-            callback : function(error, res, done){
-                if(error)console.error(error);
-                try{
-                    let sl = JSON.parse(res.body);
-                    if(sl.error_code!="0"){
-                        console.error(sl.error_code,sl.error_description);
-                    }
-                }catch(e){
-                    console.error(e);
-                }                
-                cb();
-                done();
-            }
-        });    
-        c.queue({
-            uri:`https://stock.xueqiu.com/v5/stock/portfolio/stock/cancel.json`,
-            headers:{
-                Cookie:xuequeCookie
-            },
-            method:'POST',
-            form: {symbols:code}
+        xueqiuPostJson('https://stock.xueqiu.com/v5/stock/portfolio/stock/cancel.json',
+            {symbols:code},
+            (err)=>{
+                cb(err);
         });
     };
 }
 
 //对股票进行分组
-function groupStock(group,code){
+function groupStock(group,name,code){
     return (cb)=>{
-        let c = new Crawler({
-            maxConnections : 1,
-            callback : function(error, res, done){
-                if(error)console.error(error);
-                try{
-                    let sl = JSON.parse(res.body);
-                    if(sl.error_code!="0"){
-                        console.error(sl.error_code,sl.error_description);
-                    }
-                }catch(e){
-                    console.error(e);
-                }                
-                cb();
-                done();
-            }
-        });    
-        c.queue({
-            uri:`https://stock.xueqiu.com/v5/stock/portfolio/stock/modify_portfolio.json`,
-            headers:{
-                Cookie:xuequeCookie
-            },
-            method:'POST',
-            form: {pnames:group.join(','),symbols:code,category:1}
+        xueqiuPostJson('https://stock.xueqiu.com/v5/stock/portfolio/stock/modify_portfolio.json',
+            {pnames:group.join(','),symbols:code,category:1},
+            (err)=>{
+                console.log('GROUP',name,code,group.join('|'));
+                cb(err);
         });
     };
 }
@@ -241,13 +192,19 @@ function mapCategory(cat){
         '互联网传媒':'传媒',
         '电信、广播电视和卫星传输服务':'传媒',
         '新闻和出版业':'传媒',
+        '文化艺术业':'传媒',
+        '广播、电视、电影和影视录音制作业':'传媒',
+        '文教、工美、体育和娱乐用品制造业':'传媒',
 
+        '酒、饮料和精制茶制造业':'吃喝',
         '食品加工':'吃喝',
         '餐饮':'吃喝',
         '畜禽养殖':'吃喝',
         '农副食品加工业':'吃喝',
         '医药制造业':'吃喝',
         '化学制药':'吃喝',
+        '餐饮业':'吃喝',
+        '农业':'吃喝',
 
         '化学原料和化学制品制造业':'原料',
         '石油加工、炼焦和核燃料加工业':'原料',
@@ -257,21 +214,39 @@ function mapCategory(cat){
         '非金属矿物制品业':'原料',
         '化学原料':'原料',
         '有色金属矿采选业':'原料',
+        '水的生产和供应业':'原料',
+        '化学纤维制造业':'原料',
+        '黑色金属冶炼和压延加工业':'原料',
+        '金属制品':'原料',
+        '钢铁':'原料',
+        '林业':'原料',
+        '渔业':'原料',
+        '采掘服务':'原料',
+        '煤炭开采和洗选业':'原料',
 
+        '银行':'金融',
         '商务服务业':'金融',
         '贸易':'金融',
         '资本市场服务':'金融',
         '房地产业':'金融',
         '房地产开发':'金融',
         '其他金融业':'金融',
+        '土木工程建筑业':'金融',
+        '建筑装饰和其他建筑业':'金融',
+        '房屋建设':'金融',
+        '保险':'金融',
 
         '燃气生产和供应业':'能源',
         '电力、热力生产和供应业':'能源',
+        '生态保护和环境治理业':'能源',
+        '电力':'能源',
 
         '计算机、通信和其他电子设备制造业':'科技',
         '计算机应用':'科技',
         '半导体':'科技',
         '通信设备':'科技',
+        '软件和信息技术服务业':'科技',
+        '互联网和相关服务':'科技',
 
         '通用设备制造业':'制造',
         '金属制品业':'制造',
@@ -288,6 +263,8 @@ function mapCategory(cat){
         '服装家纺':'制造',
         '纺织业':'制造',
         '汽车整车':'制造',
+        '船舶制造':'制造',
+        '纺织服装、服饰业':'制造',
 
         '零售业':'其他',
         '批发业':'其他',
@@ -296,6 +273,11 @@ function mapCategory(cat){
         '仓储业':'其他',  
         '包装印刷':'其他',
         '公共设施管理业':'其他',
+        '港口':'其他',
+        '水上运输业':'其他',
+        '专业技术服务业':'其他',
+        '管道运输业':'其他',
+        '装卸搬运和运输代理业':'其他',
         'null':'其他',
     }
     if(cat2[cat]){
@@ -311,72 +293,61 @@ function mapCategory(cat){
 function update_xueqiu(){
     //首先下载雪球的股票列表，然后删除不在榜的。加入上榜的。然后重新分类
     query(`SELECT name,code,category,k15_max,price,ma5diff,ma10diff,ma20diff,ma30diff FROM stock.company_select where bookmark15=1`).then(tops=>{
+        xueqiuGetJson('https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1',
+        (err,json)=>{
+            if(err)return;
 
-        let c = new Crawler({
-            maxConnections : 1,
-            callback : function(error, res, done){
-                try{
-                    let sl = JSON.parse(res.body);
-                    let tasks = [];
-                    let xueiquSet = {};
-                    let topSet = {}
-                    for(let a of sl.data.stocks){
-                        xueiquSet[a.symbol] = 1;
-                    }               
-                    for(let a of tops){
-                        topSet[a.code] = 1;
-                    }               
-                    for(let s of tops){
-                        s.symbol = s.code;
-                        if(!xueiquSet[s.symbol]){ //不在雪球列表，加入
-                            //add
-                            console.log('ADD',s.name,s.symbol);
-                            tasks.push(addStock(s.symbol));                            
-                        }
-                    }
-                    for(let s of sl.data.stocks){
-                        if(!topSet[s.symbol]){ //雪球列表中的不在榜上，删除
-                            //delete
-                            console.log('DELETE',s.name,s.symbol);
-                            tasks.push(deleteStock(s.symbol));                       
-                        }
-                    }
-                    async.parallelLimit(tasks,5,(err,results)=>{
-                        if(err)console.error(err);
-                        //进行分类
-                        let groups = {};
-                        for(let s of tops){
-                            groups[s.code] = groups[s.code]?groups[s.code]:[];
-                            if(s.ma5diff<0)
-                                groups[s.code].push('ma5');
-                            if(s.ma10diff<0)
-                                groups[s.code].push('ma10');
-                            if(s.ma20diff<0)
-                                groups[s.code].push('ma20');
-                            if(s.ma30diff<0)
-                                groups[s.code].push('ma30');
-                            groups[s.code].push(mapCategory(s.category));
-                        }
-                        let task = [];
-                        for(let s of tops){
-                            task.push(groupStock(groups[s.code],s.code));
-                        }
-                        async.parallelLimit(task,5,(err,results)=>{
-                            if(err)console.error(err);
-                            console.log('DONE');
-                        });
-                    });
-                }catch(err){
-                    console.error(err);
+            let tasks = [];
+            let xueiquSet = {};
+            let topSet = {}
+            for(let a of json.data.stocks){
+                xueiquSet[a.symbol] = 1;
+            }
+            for(let a of tops){
+                topSet[a.code] = 1;
+            }
+            for(let s of tops){
+                s.symbol = s.code;
+                if(!xueiquSet[s.symbol]){ //不在雪球列表，加入
+                    //add
+                    console.log('ADD',s.name,s.symbol);
+                    tasks.push(addStock(s.symbol));
                 }
-                done();
             }
-        });
-        c.queue({
-            uri:`https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1`,
-            headers:{
-                Cookie:xuequeCookie,
+            for(let s of json.data.stocks){
+                if(!topSet[s.symbol]){ //雪球列表中的不在榜上，删除
+                    //delete
+                    console.log('DELETE',s.name,s.symbol);
+                    tasks.push(deleteStock(s.symbol));
+                }
             }
+            async.parallelLimit(tasks,5,(err,results)=>{
+                if(err)console.error(err);
+                //进行分类
+                let groups = {};
+                for(let s of tops){
+                    groups[s.code] = [];
+
+                    if(s.ma30diff<0)
+                        groups[s.code].push('MA30');
+                    else if(s.ma20diff<0)
+                        groups[s.code].push('MA20');
+                    else if(s.ma10diff<0)
+                        groups[s.code].push('MA10');
+                    else if(s.ma5diff<0)
+                        groups[s.code].push('MA5');
+
+                    groups[s.code].push(mapCategory(s.category));
+                }
+                let task = [];
+                for(let s of tops){
+                    task.push(groupStock(groups[s.code],s.name,s.code));
+                }
+                async.series(task,(err,results)=>{
+                    if(err)console.error(err);
+                    console.log('update_xueqiu DONE');
+                });
+            });
         });
     }).catch(err=>{
         console.error(err);
@@ -412,11 +383,11 @@ function research_k15(done){
                 let [k60_gain,k60_drawal] = calcgain(k60close,macd60);
                 let [k120_gain,k120_drawal] = calcgain(k120close,macd120);
                 let [kd_gain,kd_drawal] = calcgain(kdclose,macdday);
-                let [k15_max,k15_maxdrawal] = calcgain_MAX(k15close,macd15);
-                let [k30_max,k30_maxdrawal] = calcgain_MAX(k30close,macd30);
-                let [k60_max,k60_maxdrawal] = calcgain_MAX(k60close,macd60);
-                let [k120_max,k120_maxdrawal] = calcgain_MAX(k120close,macd120);    
-                let [kd_max,kd_maxdrawal] = calcgain_MAX(kdclose,macdday);
+                let [k15_max,k15_maxdrawal] = calcgain_MAX(k15close,macd15,16);
+                let [k30_max,k30_maxdrawal] = calcgain_MAX(k30close,macd30,8);
+                let [k60_max,k60_maxdrawal] = calcgain_MAX(k60close,macd60,4);
+                let [k120_max,k120_maxdrawal] = calcgain_MAX(k120close,macd120,2);
+                let [kd_max,kd_maxdrawal] = calcgain_MAX(kdclose,macdday,1);
 
 
                 //更新ma5diff,ma10diff,ma20diff,ma30diff,当前股价和均线的差值
@@ -456,10 +427,10 @@ function research_k15(done){
             task.push(bookmarkTask('k15_max','bookmark15',300,5));
             task.push(bookmarkTask('k30_max','bookmark30',300,5));
             task.push(bookmarkTask('k60_max','bookmark60',300,5));
-            task.push(bookmarkTask('k120_max','bookmark120',300,5));
-            task.push(bookmarkTask('kd_max','bookmarkd',300,5));
+            //task.push(bookmarkTask('k120_max','bookmark120',300,5));
+            //task.push(bookmarkTask('kd_max','bookmarkd',300,5));
             async.series(task,(err,results)=>{
-                console.log('DONE!');
+                console.log('research_k15 DONE!');
                 update_xueqiu();
                 if(done)done();
             });
@@ -470,4 +441,6 @@ function research_k15(done){
     });    
 }
 
+update_xueqiu();
+//research_k15();
 module.exports = {research_k15};
