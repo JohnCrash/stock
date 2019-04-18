@@ -343,7 +343,7 @@ function update_xueqiu(){
                 for(let s of tops){
                     task.push(groupStock(groups[s.code],s.name,s.code));
                 }
-                async.series(task,(err,results)=>{
+                async.series(task,(err,results)=>{ //并行xueqiu会出问题(重复的分类)
                     if(err)console.error(err);
                     console.log('update_xueqiu DONE');
                 });

@@ -50,9 +50,15 @@ function watchMainLoop(){
         }
         return false;
     }
+    function isTranTime(t){
+        let day = t.getDay();
+        let hours = t.getHours();
+
+        return day>=1 && day<=5 && hours>=9 && hours<=15 && hours!=12;
+    } 
     function is15M(t){
         let minutes = t.getMinutes();
-        if(lastMinutes!=minutes && minutes%15==0){
+        if( isTranTime(t) && lastMinutes!=minutes && minutes%15==0){ //这里加入判断实在交易时间进行的操作
             return true;
         }
         return false;
@@ -193,14 +199,62 @@ function groupStock(group,name,code){
     };
 }
 
+//参见xueqiu_k15.js
+let columns = [
+    "timestamp",
+    "volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "chg",
+    "percent",
+    "turnoverrate",
+    "amount",
+    "dea",
+    "dif",
+    "macd"];
+let column2index = {};
+for(let k in columns){
+    column2index[columns[k]] = k;
+}
+function checkColumns(c0,c1){
+    if(c0.length===c1.length){
+        for(let i=0;i<c0.length;i++){
+            if(c0[i]!==c1[i])return false;
+        }
+        return true;
+    }
+    return false;
+}
 /**
  * 判断为金叉返回true
  * data = {
- * 
+ *      column:["timestamp","volume"...],
+ *      item:[] //0是最近的
  * }
  */
 function isGoldCross(data,n){
-
+    if(data && data.column && data.item && data.item.length>=8 && checkColumns(columns,data.column)){
+        let macdidx = columns['macd'];
+        let len = data.item.length;
+        //1头是红的尾巴绿两个点，直接确认
+        if(data.item[0][macdidx]>=0 && data.item[len-1][macdidx] < 0 && data.item[len-2][macdidx] < 0){
+            return true;
+        }
+        //2如果全部是绿的，并且结尾向上有收红红迹象
+        for(let i=0;i<data.item.length;i++){
+            if(data.item[i][macdidx]>=0){
+                return false;
+            }
+        }
+        let m0 = data.item[0][macdidx];
+        let m1 = data.item[1][macdidx];
+        if( m0-m1 >= -m0 ){
+            return true;
+        }
+    }
+    return false;
 }
 /**
  * 开始下载每只股票的k线数据，然后最近的macd关系
@@ -211,7 +265,7 @@ function watchStocks(stocks,n,cb){
 
     for(let s of stocks){
         task.push((cb)=>{
-            xueqiuGetJson(`https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${s.symbol}&begin=${timestamp}&period=${n}m&type=before&count=-8&indicator=kline`,
+            xueqiuGetJson(`https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${s.symbol}&begin=${timestamp}&period=${n}m&type=before&count=-8&indicator=kline,macd,dif,dea`,
             (err,json)=>{
                 if(!err && json){
                     if(isGoldCross(json.data,n)){
@@ -241,7 +295,12 @@ function watchHot(stocks,category,n){
                 if(json.data && json.data.stocks && json.data.stocks.length>0){
                     kc = json.data.stocks;
                     watchStocks(stocks,n,(sc)=>{ //sc是即将变正的列表
-                    
+                        for(let s of kc){
+                            //删除
+                        }
+                        for(let s of sc){
+                            //加入
+                        }
                     });
                 }
             }
