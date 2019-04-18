@@ -85,9 +85,7 @@ function watchMainLoop(){
                                 if(json.data && json.data.stocks && json.data.stocks.length>0){
                                     for(let s of json.data.stocks){
                                         it.stocks.push(mapSymbol2Stock[s.symbol]);
-                                        if(s.include){//对应的股票在该分类中
-                                            mapSymbol2Stock[s.symbol].group.push(it.name);
-                                        }
+                                        mapSymbol2Stock[s.symbol].group.push(it.name);
                                     }
                                 }
                             }
@@ -134,14 +132,17 @@ function watchMainLoop(){
             updateGroup(cb);
         });
     }
+    let isUpdateStocks = false; //防止多次同时进入updateStocks
     setInterval(()=>{
         let t = new Date();
-        if(!stocks || is9H(t)){ //如果stocks不存在或者每天早晨9点准时更新监视列表
-            udpdateStocks(()=>{
+        if(!isUpdateStocks && (!stocks || is9H(t))){ //如果stocks不存在或者每天早晨9点准时更新监视列表
+            isUpdateStocks = true;
+            updateStocks(()=>{
                 if(stocks){
                     lastDay = t.getDay();
-                    watchHot(stocks,category);
+                    watchHot(stocks,category,15);
                 }
+                isUpdateStocks = false;
             });
         }
 
@@ -218,6 +219,7 @@ let column2index = {};
 for(let k in columns){
     column2index[columns[k]] = k;
 }
+let macdidx = column2index['macd'];
 function checkColumns(c0,c1){
     if(c0.length===c1.length){
         for(let i=0;i<c0.length;i++){
@@ -227,6 +229,15 @@ function checkColumns(c0,c1){
     }
     return false;
 }
+
+function getMACD(data){
+    if(data && data.column && data.item && data.item.length>=8 && checkColumns(columns,data.column)){
+        return data.item.map((it)=>{
+            return it[macdidx];
+        }).reverse();
+    }
+    return [];
+}
 /**
  * 判断为金叉返回true
  * data = {
@@ -234,23 +245,20 @@ function checkColumns(c0,c1){
  *      item:[] //0是最近的
  * }
  */
-function isGoldCross(data,n){
-    if(data && data.column && data.item && data.item.length>=8 && checkColumns(columns,data.column)){
-        let macdidx = columns['macd'];
-        let len = data.item.length;
+function isGoldCross(m,n){
+    if(m.length>=8){
+        let len = m.length;
         //1头是红的尾巴绿两个点，直接确认
-        if(data.item[0][macdidx]>=0 && data.item[len-1][macdidx] < 0 && data.item[len-2][macdidx] < 0){
+        if(m[0]>=0 && m[len-1] < 0 && m[len-2] < 0){
             return true;
         }
         //2如果全部是绿的，并且结尾向上有收红红迹象
-        for(let i=0;i<data.item.length;i++){
-            if(data.item[i][macdidx]>=0){
+        for(let i=0;i<len;i++){
+            if(m[i]>=0){
                 return false;
             }
         }
-        let m0 = data.item[0][macdidx];
-        let m1 = data.item[1][macdidx];
-        if( m0-m1 >= -m0 ){
+        if( 2*(m[0]-m[1]) >= -m[0] ){ //略微提前一点
             return true;
         }
     }
@@ -268,8 +276,9 @@ function watchStocks(stocks,n,cb){
             xueqiuGetJson(`https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${s.symbol}&begin=${timestamp}&period=${n}m&type=before&count=-8&indicator=kline,macd,dif,dea`,
             (err,json)=>{
                 if(!err && json){
-                    if(isGoldCross(json.data,n)){
+                    if(isGoldCross(getMACD(json.data),n)){
                         s[`k${n}`] = true;
+                        console.log(s.name,'GOLD',`K${n}`);
                     }else{
                         s[`k${n}`] = false;
                     }
@@ -283,28 +292,70 @@ function watchStocks(stocks,n,cb){
         cb();
     });
 }
+function mapTable(t,k){
+    let m = {};
+    for(let it of t){
+        m[it[k]] = it;
+    }
+    return m;
+}
+function removeGroup(group,name){
+    let i = group.indexOf(name);
+    if(i>0){
+        group.splice(i,1);
+    }
+}
+function insertGroup(group,name){
+    if(group.indexOf(name)==-1){
+        group.push(name);
+    }
+}
+function getCategoryByName(cats,name){
+    for(let it of cats){
+        if(it.name==name)
+            return it;
+    }
+    return null;
+}
 /**
  * 使用15分钟k线图监视stocks列表中的股票，如果macd由负即将转正，或者转正4个点内，该股票将被放入到K15中去
  * 首先找到需要加入的，然后删除不需要加入的
  */
 function watchHot(stocks,category,n){
-    xueqiuGetJson(`https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=${getPID(category,n)}&category=1`,
-        (err,json)=>{
-            if(json){
-                let kc; //分类中现存的股票列表
-                if(json.data && json.data.stocks && json.data.stocks.length>0){
-                    kc = json.data.stocks;
-                    watchStocks(stocks,n,(sc)=>{ //sc是即将变正的列表
-                        for(let s of kc){
-                            //删除
-                        }
-                        for(let s of sc){
-                            //加入
-                        }
-                    });
+    let cats = getCategoryByName(category,`K${n}`);
+    if(cats){
+        watchStocks(stocks,n,()=>{ 
+            let sc = []; //sc是即将变正的列表
+            for(let it of stocks){
+                if(it[`k${n}`]){
+                    sc.push(it);
+                }
+            }
+            let kc =  cats.stocks;//分类中现存的股票列表
+            let symbol2sc = mapTable(sc,'symbol');
+            let symbol2kc = mapTable(kc,'symbol');
+    
+            let i = kc.length;
+            while(i--){
+                let s = kc[i];
+                if(!symbol2sc[s.symbol]){//如果不在sc表中,删除
+                    kc.splice(i,1);//分类中的删除
+                    removeGroup(s.group,`K${n}`); //这只股票将不在该组中了
+                    groupStock(s.group,s.name,s.symbol)(()=>{}); //调整分组
+                }
+            }
+            for(let s of sc){
+                //如果不在kc表中,加入
+                if(!symbol2kc[s.symbol]){
+                    kc.push(s);//分类中添加
+                    insertGroup(s.group,`K${n}`);
+                    groupStock(s.group,s.name,s.symbol)(()=>{}); //调整分组
                 }
             }
         });
+    }else{
+        console.error(`Can't found category K${n}`);
+    }
 }
 
 watchMainLoop();
