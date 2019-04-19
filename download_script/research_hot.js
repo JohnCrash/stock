@@ -148,6 +148,7 @@ function watchMainLoop(){
 
         if(stocks && is15M(t)){ //每15分钟就做一次监视处理
             lastMinutes = t.getMinutes();
+            console.log(`===== ${t.getHours()}:${lastMinutes} =====`)
             watchHot(stocks,category,15);
         }                
     },1000);
@@ -232,9 +233,10 @@ function checkColumns(c0,c1){
 
 function getMACD(data){
     if(data && data.column && data.item && data.item.length>=8 && checkColumns(columns,data.column)){
-        return data.item.map((it)=>{
+        let r = data.item.map((it)=>{
             return it[macdidx];
         }).reverse();
+        return r;
     }
     return [];
 }
@@ -258,7 +260,7 @@ function isGoldCross(m,n){
                 return false;
             }
         }
-        if( 2*(m[0]-m[1]) >= -m[0] ){ //略微提前一点
+        if( (m[0]-m[1]) > -m[0] ){ //略微提前一点
             return true;
         }
     }
@@ -278,7 +280,6 @@ function watchStocks(stocks,n,cb){
                 if(!err && json){
                     if(isGoldCross(getMACD(json.data),n)){
                         s[`k${n}`] = true;
-                        console.log(s.name,'GOLD',`K${n}`);
                     }else{
                         s[`k${n}`] = false;
                     }
@@ -299,16 +300,22 @@ function mapTable(t,k){
     }
     return m;
 }
-function removeGroup(group,name){
-    let i = group.indexOf(name);
-    if(i>0){
-        group.splice(i,1);
+function removeGroup(s,name){
+    let i = s.group.indexOf(name);
+    if(i>=0){
+        s.group.splice(i,1);
+        s.groupNeedUpdate = true;
+        return true;
     }
+    return false;
 }
-function insertGroup(group,name){
-    if(group.indexOf(name)==-1){
-        group.push(name);
+function insertGroup(s,name){
+    if(s.group.indexOf(name)==-1){
+        s.group.push(name);
+        s.groupNeedUpdate = true;
+        return true;
     }
+    return false;
 }
 function getCategoryByName(cats,name){
     for(let it of cats){
@@ -334,24 +341,40 @@ function watchHot(stocks,category,n){
             let kc =  cats.stocks;//分类中现存的股票列表
             let symbol2sc = mapTable(sc,'symbol');
             let symbol2kc = mapTable(kc,'symbol');
-    
+
             let i = kc.length;
+            let task = [];
+            for(let s of stocks){ //重置
+                s.groupNeedUpdate = false;
+                removeGroup(s,`U${n}`);//分类中D,U上的股票都要清除
+                removeGroup(s,`D${n}`);
+            }
             while(i--){
                 let s = kc[i];
                 if(!symbol2sc[s.symbol]){//如果不在sc表中,删除
                     kc.splice(i,1);//分类中的删除
-                    removeGroup(s.group,`K${n}`); //这只股票将不在该组中了
-                    groupStock(s.group,s.name,s.symbol)(()=>{}); //调整分组
+                    removeGroup(s,`K${n}`); //这只股票将不在该组中了
+                    insertGroup(s,`D${n}`); //下榜
                 }
             }
             for(let s of sc){
                 //如果不在kc表中,加入
                 if(!symbol2kc[s.symbol]){
                     kc.push(s);//分类中添加
-                    insertGroup(s.group,`K${n}`);
-                    groupStock(s.group,s.name,s.symbol)(()=>{}); //调整分组
+                    insertGroup(s,`K${n}`);
+                    insertGroup(s,`U${n}`); //上榜
                 }
             }
+            //调整需要变动的分组
+            for(let s of stocks){
+                if(s.groupNeedUpdate)
+                    task.push(groupStock(s.group,s.name,s.symbol)); //调整分组
+            }
+            
+            async.series(task,(err,results)=>{
+                if(err)console.error(err);
+                console.log('===== DONE =====');
+            });
         });
     }else{
         console.error(`Can't found category K${n}`);
