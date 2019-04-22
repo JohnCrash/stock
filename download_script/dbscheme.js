@@ -152,6 +152,10 @@ const KDScheme={
     chg:"number",
     percent:"number",
     turnoverrate:"number",
+    ma5:'number',
+    ma10:'number',
+    ma20:'number',
+    ma30:'number',
     dea:'number',
     dif:"number",
     macd:'number'
