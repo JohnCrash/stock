@@ -9,7 +9,7 @@ const {companys_task,k_company,dateString,query,connection,
 const async = require('async');
 const macd = require('macd');
 const {CompanyScheme,CompanySelectScheme,eqPair,valueList} = require("./dbscheme");
-const {update_company} = require('./desc');
+
 
 function arrayScale(a,n){
     let s = [];  
@@ -67,7 +67,7 @@ function calcgain(k0,macd0,r){
     return [gain,maxdrawal>0?(gain-1)/maxdrawal:(gain-1)/0.1];
 }
 
-function calcgain_MAX(k0,macd0,N,r){
+function calcgain_MAX(k,macd,N){
     let lastK;
     let lastM;
     let buyK;
@@ -76,8 +76,7 @@ function calcgain_MAX(k0,macd0,N,r){
     let gain = 1;
     let maxdrawal = 0;
     let acc = 0;
-    let k = tailArray(k0,r);
-    let macd = tailArray(macd0,r);    
+
     for(let i = 0;i<k.length;i++){
         let v = k[i];
         let m = macd[i];
@@ -114,7 +113,7 @@ function calcgain_MAX(k0,macd0,N,r){
 
 function bookmarkTask(k,bookmark,total,top){
     return (cb)=>{
-        query(`SELECT name,code,category,${k} FROM stock.company_select where static60>=1 and static30>1 order by ${(k==='k15_max'?(`(k15_max+k30_max+k60_max)/3`):k)} desc limit ${total}`).then(companys=>{
+        query(`SELECT name,code,category,${k} FROM stock.company_select where static60>=1 and static30>1 order by ${(k)} desc limit ${total}`).then(companys=>{
             let category = {};
             for(let com of companys){
                 let c = com.category?com.category:'未分类';
@@ -205,6 +204,8 @@ function mapCategory(cat){
         '化学制药':'吃喝',
         '餐饮业':'吃喝',
         '农业':'吃喝',
+        '动物保健':'吃喝',
+        '中药':'吃喝',
 
         '化学原料和化学制品制造业':'原料',
         '石油加工、炼焦和核燃料加工业':'原料',
@@ -215,6 +216,7 @@ function mapCategory(cat){
         '化学原料':'原料',
         '有色金属矿采选业':'原料',
         '水的生产和供应业':'原料',
+        '化学纤维':'原料',
         '化学纤维制造业':'原料',
         '黑色金属冶炼和压延加工业':'原料',
         '金属制品':'原料',
@@ -223,6 +225,7 @@ function mapCategory(cat){
         '渔业':'原料',
         '采掘服务':'原料',
         '煤炭开采和洗选业':'原料',
+        '化学制品':'原料',
 
         '银行':'金融',
         '商务服务业':'金融',
@@ -235,11 +238,14 @@ function mapCategory(cat){
         '建筑装饰和其他建筑业':'金融',
         '房屋建设':'金融',
         '保险':'金融',
+        '多元金融':'金融',
+        '证券':'金融',
 
         '燃气生产和供应业':'能源',
         '电力、热力生产和供应业':'能源',
         '生态保护和环境治理业':'能源',
         '电力':'能源',
+        '高低压设备':'能源',
 
         '计算机、通信和其他电子设备制造业':'科技',
         '计算机应用':'科技',
@@ -247,6 +253,9 @@ function mapCategory(cat){
         '通信设备':'科技',
         '软件和信息技术服务业':'科技',
         '互联网和相关服务':'科技',
+        "其他电子":'科技',
+        "计算机设备":'科技',
+        "电子制造":'科技',
 
         '通用设备制造业':'制造',
         '金属制品业':'制造',
@@ -265,6 +274,12 @@ function mapCategory(cat){
         '汽车整车':'制造',
         '船舶制造':'制造',
         '纺织服装、服饰业':'制造',
+        '地面兵装':'制造',
+        '电气自动化设备':'制造',
+        '纺织制造':'制造',
+        '电源设备':'制造',
+        '光学光电子':'制造',
+        '专用设备':'制造',
 
         '零售业':'其他',
         '批发业':'其他',
@@ -278,6 +293,7 @@ function mapCategory(cat){
         '专业技术服务业':'其他',
         '管道运输业':'其他',
         '装卸搬运和运输代理业':'其他',
+        '环保工程及服务':'其他',
         'null':'其他',
     }
     if(cat2[cat]){
@@ -336,6 +352,8 @@ function update_xueqiu(){
                         groups[s.code].push('MA10');
                     else if(s.ma5diff<0)
                         groups[s.code].push('MA5');
+                    else
+                        groups[s.code].push('MA0');
 
                     groups[s.code].push(mapCategory(s.category));
                 }
@@ -354,93 +372,87 @@ function update_xueqiu(){
     });
 }
 
+const klv={
+    "15":{N:16,limit:16*22}, //一个月
+    "60":{N:4,limit:4*44}  //两个月
+}
+/**
+ * 根据不同的k线级别进行标记
+ */
+function bookmark_by_level(com,lv,cb){
+    query(`select * from k${lv}_xueqiu where id=${com.id} order by timestamp desc limit ${klv[lv].limit}`).then(results=>{
+        let kclose = [];
+        let macd = [];
+        
+        results.reverse().forEach((k) => {
+            kclose.push(k.close);
+            macd.push(k.macd);
+        });
+        let r = calcgain_MAX(kclose,macd,klv[lv].N);
+        r.push(kclose[0]);
+        cb(null,r);
+    }).catch(err=>{
+        cb(err);
+    });
+}
+/**
+ * 计算15,60,kd的macd并进行选股
+ */
 function research_k15(done){
-    query(`delete from research_k15`).then(result=>{
-        companys_task('id',com=>cb=>{
-            query(`select * from k15_xueqiu where id=${com.id} order by timestamp desc limit 800`).then(results=>{
-                let k15close = [];
-                let k30close = [];
-                let k60close = [];
-                let k120close = [];
-                let kdclose = [];
-                let length = results.length;
+    companys_task('id',com=>cb=>{
+        //更新ma5diff,ma10diff,ma20diff,ma30diff,当前股价和均线的差值
+        query(`select close,ma5,ma10,ma20,ma30 from kd_xueqiu where id=${com.id} order by date desc limit 1`).then(R=>{
+            if(R.length===1){
+                let price = R[0].close;//更新当前股价price
+                let ma5diff = price-R[0].ma5;
+                let ma10diff = price-R[0].ma10;
+                let ma20diff = price-R[0].ma20;
+                let ma30diff = price-R[0].ma30;
                 
-                results.reverse().forEach((k,i) => {
-                    k15close.push(k.close);
-                    if(i%2==0)k30close.push(k.close);
-                    if(i%4==0)k60close.push(k.close);
-                    if(i%8==0)k120close.push(k.close);
-                    if(i%16==0)kdclose.push(k.close);            
-                });
-                let macd15 = macd(k15close).histogram;
-                let macd30 = macd(k30close).histogram;
-                let macd60 = macd(k60close).histogram;
-                let macd120 = macd(k120close).histogram;
-                let macdday = macd(kdclose).histogram;
-                //减少数据量根据反应最近的变化
-                let [k15_gain,k15_drawal] = calcgain(k15close,macd15);
-                let [k30_gain,k30_drawal] = calcgain(k30close,macd30);
-                let [k60_gain,k60_drawal] = calcgain(k60close,macd60);
-                let [k120_gain,k120_drawal] = calcgain(k120close,macd120);
-                let [kd_gain,kd_drawal] = calcgain(kdclose,macdday);
-                let [k15_max,k15_maxdrawal] = calcgain_MAX(k15close,macd15,16);
-                let [k30_max,k30_maxdrawal] = calcgain_MAX(k30close,macd30,8);
-                let [k60_max,k60_maxdrawal] = calcgain_MAX(k60close,macd60,4);
-                let [k120_max,k120_maxdrawal] = calcgain_MAX(k120close,macd120,2);
-                let [kd_max,kd_maxdrawal] = calcgain_MAX(kdclose,macdday,1);
-
-
-                //更新ma5diff,ma10diff,ma20diff,ma30diff,当前股价和均线的差值
-                query(`select close,ma5,ma10,ma20,ma30 from kd_xueqiu where id=${com.id} order by date desc limit 1`).then(R=>{
-                    if(R.length===1){
-                        let price = R[0].close;//更新当前股价price
-                        let ma5diff = price-R[0].ma5;
-                        let ma10diff = price-R[0].ma10;
-                        let ma20diff = price-R[0].ma20;
-                        let ma30diff = price-R[0].ma30;
-                        //更新静态收益static30,static60
-                        let static30,static60;
-                        let b30 = k15close.length>16*22?k15close.length-16*22:k15close.length;
-                        let b60 = k15close.length>16*44?k15close.length-16*44:k15close.length;
-                        static30 = price/k15close[k15close.length-b30];
-                        static60 = price/k15close[k15close.length-b60];               
-                        console.log(com.id,price,static30,static60)
-                        let db = {price,static30,static60,ma5diff,ma10diff,ma20diff,ma30diff,k15_gain,k15_drawal,k30_gain,k30_drawal,k60_gain,k60_drawal,k120_gain,k120_drawal,kd_gain,kd_drawal,
-                            k15_max,k15_maxdrawal,k30_max,k30_maxdrawal,k60_max,k60_maxdrawal,k120_max,k120_maxdrawal,kd_max,kd_maxdrawal};
-                        query(`update company_select set ${eqPair(db,CompanySelectScheme)} where company_id=${com.id}`).then(results=>{
-                            cb();
-                        });
-                    }else{
-                        console.error(com.id);
+                async.series([callback=>bookmark_by_level(com,15,callback),
+                        callback=>bookmark_by_level(com,60,callback)],
+                    (err,results)=>{
+                    if(err){
+                        console.error(err);
                         cb();
                     }
+                    let [k15_max,k15_maxdrawal,b15] = results[0];
+                    let [k60_max,k60_maxdrawal,b60] = results[1];
+                    //更新静态收益static30,static60
+                    let static30,static60;
+                    static30 = b15?price/b15:1;
+                    static60 = b60?price/b60:1;
+                    console.log(com.id,price,static30,static60);
+                    let db = {price,static30,static60,ma5diff,ma10diff,ma20diff,ma30diff,k15_max,k15_maxdrawal,k60_max,k60_maxdrawal};
+                    query(`update company_select set ${eqPair(db,CompanySelectScheme)} where company_id=${com.id}`).then(results=>{
+                        cb();
+                    }).catch(err=>{
+                        console.error(err);
+                        cb();
+                    });
                 });
-            }).catch(err=>{
-                cb(err);
-            });
-        }).then(usetime=>{
-            /**
-             * 着这里计算bookmark
-             * 使用每个级别分类里面的的前5名将被标记出来
-             */
-            let task = [];
-            task.push(bookmarkTask('k15_max','bookmark15',300,5));
-            task.push(bookmarkTask('k30_max','bookmark30',300,5));
-            task.push(bookmarkTask('k60_max','bookmark60',300,5));
-            //task.push(bookmarkTask('k120_max','bookmark120',300,5));
-            //task.push(bookmarkTask('kd_max','bookmarkd',300,5));
-            async.series(task,(err,results)=>{
-                console.log('research_k15 DONE!');
-                update_xueqiu();
-                if(done)done();
-            });
+            }else{
+                console.error(com.id);
+                cb();
+            }
         });
-    }).catch(err=>{
-        console.error(err);
-        if(done)done(err);
-    });    
+    }).then(usetime=>{
+        /**
+         * 着这里计算bookmark
+         * 使用每个级别分类里面的的前5名将被标记出来
+         */
+        let task = [];
+        task.push(bookmarkTask('k15_max','bookmark15',300,5));
+        task.push(bookmarkTask('k60_max','bookmark60',300,5));
+
+        async.series(task,(err,results)=>{
+            console.log('research_k15 DONE!');
+            update_xueqiu();
+            if(done)done();
+        });
+    });   
 }
 
-update_xueqiu();
-//research_k15();
+//update_xueqiu();
+research_k15();
 module.exports = {research_k15};

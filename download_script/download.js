@@ -1,8 +1,10 @@
 /**
  * 将K5,K15,KD数据都下载下来
+ * 然后进行短线选股
  */
 const {download_kline} = require('./xueqiu_kline');
 const {download_kd} = require('./xueqiu_kd');
+const {} = require('');
 const async = require('async');
 const kline = [5,15,60];
 

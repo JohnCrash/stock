@@ -325,12 +325,12 @@ function xueqiuGetJson(uri,cb){
             if(error)console.error(error);
             try{
                 let sl = JSON.parse(res.body);
-                if(sl.error_code!="0"){
+                if(sl.error_code=="0" || sl.success){
+                    cb(null,sl);
+                }else{
                     console.error(sl.error_code,sl.error_description,uri);
                     console.log(res.body);
-                    cb(sl);
-                }else{
-                    cb(null,sl);
+                    cb(sl);                    
                 }
             }catch(e){
                 console.error(e);
@@ -355,12 +355,12 @@ function xueqiuPostJson(uri,form,cb){
             if(error)console.error(error);
             try{
                 let sl = JSON.parse(res.body);
-                if(sl.error_code!="0"){
+                if(sl.error_code=="0" || sl.success){
+                    cb();
+                }else{
                     console.error(sl.error_code,sl.error_description,uri);
                     console.log(res.body);
-                    cb(sl);
-                }else{
-                    cb();
+                    cb(sl);                    
                 }
             }catch(e){
                 console.error(e);
