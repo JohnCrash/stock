@@ -1,16 +1,12 @@
 
 const CompanyScheme = {
     id:'number',
-    category:'number',
-    category_base:'number',
-    name:'string',
     code:'string',
+    name:'string',
+    category:'number',
     done:'number',
     kbegin:'string',
     kend:'string',
-    cart:'number',
-    tech_macd:'string',
-    select_macd:'string',
     amount:'number',
     amplitude:'number',
     chg:'number',
@@ -30,10 +26,28 @@ const CompanyScheme = {
     volume_ratio:'number'
 };
 
-const CompanySelectScheme = {
-    company_id:'number',
+const CategoryScheme = {
+    id:'number',
     name:'string',
     code:'string',
+    url:'string'
+};
+
+const DescriptScheme = {
+    id:'number',
+    name:'string',
+    code:'string',
+    desc:'string',
+    site:'string',
+    phone:'string',
+    address:'string',
+    business:'string'
+};
+
+const CompanySelectScheme = {
+    company_id:'number',
+    code:'string',
+    name:'string',
     category:'string',
     ttm:'number',
     pb:'number',
@@ -128,6 +142,8 @@ function valueSeries(t,scheme){
 
 module.exports={
     CompanyScheme,
+    CategoryScheme,
+    DescriptScheme,
     CompanySelectScheme,
     eqPair,
     valueList,
