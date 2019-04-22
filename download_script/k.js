@@ -95,7 +95,7 @@ function k_company(id,kstart,db,trader_callback){
 function companys_task(itemStr,task){
     return new Promise((resolve,reject)=>{
         let t0 = Date.now();
-        connection.query(`select ${itemStr?itemStr:"*"} from company where category_base!=9`,(error, results, field)=>{
+        connection.query(`select ${itemStr?itemStr:"*"} from company`,(error, results, field)=>{
             if(error){    
                 console.error(error);
                 reject(error);
@@ -122,7 +122,7 @@ function companys_task(itemStr,task){
 function paralle_companys_task(itemStr,n,task){
     return new Promise((resolve,reject)=>{
         let t0 = Date.now();
-        connection.query(`select ${itemStr?itemStr:"*"} from company where category_base!=9`,(error, results, field)=>{
+        connection.query(`select ${itemStr?itemStr:"*"} from company`,(error, results, field)=>{
             if(error){    
                 console.error(error);
                 reject(error);
@@ -236,7 +236,7 @@ function macd_year(){
         }else{
             if(results.length>0){
                 let year = results[0].year;
-                connection.query('select id,category from company where category_base!=9',(error, results, field)=>{
+                connection.query('select id,category from company',(error, results, field)=>{
                     if(error){
                         console.error(error);
                     }else{

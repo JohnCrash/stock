@@ -7,6 +7,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Download K",
+            "program": "${workspaceFolder}/download_script/download.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Init Company infomation",
             "program": "${workspaceFolder}/download_script/desc.js"
         },

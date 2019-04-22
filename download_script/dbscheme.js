@@ -93,6 +93,70 @@ const CompanySelectScheme = {
     bookmarkd:'number'
 };
 
+const K5Scheme={
+    id:'number',
+    date:'string',
+    volume:"number",
+    open:"number",
+    high:"number",
+    low:"number",
+    close:"number",
+    chg:"number",
+    percent:"number",
+    turnoverrate:"number",
+    dea:'number',
+    dif:"number",
+    macd:'number'
+};
+
+const K15Scheme={
+    id:'number',
+    date:'string',
+    volume:"number",
+    open:"number",
+    high:"number",
+    low:"number",
+    close:"number",
+    chg:"number",
+    percent:"number",
+    turnoverrate:"number",
+    dea:'number',
+    dif:"number",
+    macd:'number'
+};
+
+const K60Scheme={
+    id:'number',
+    date:'string',
+    volume:"number",
+    open:"number",
+    high:"number",
+    low:"number",
+    close:"number",
+    chg:"number",
+    percent:"number",
+    turnoverrate:"number",
+    dea:'number',
+    dif:"number",
+    macd:'number'
+};
+
+const KDScheme={
+    id:'number',
+    date:'string',
+    volume:"number",
+    open:"number",
+    high:"number",
+    low:"number",
+    close:"number",
+    chg:"number",
+    percent:"number",
+    turnoverrate:"number",
+    dea:'number',
+    dif:"number",
+    macd:'number'
+};
+
 function eqPair(t,scheme){
     let a = [];
     for(let k in t){
@@ -145,6 +209,10 @@ module.exports={
     CategoryScheme,
     DescriptScheme,
     CompanySelectScheme,
+    K5Scheme,
+    K15Scheme,
+    K60Scheme,
+    KDScheme,
     eqPair,
     valueList,
     valueSeries

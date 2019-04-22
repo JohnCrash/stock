@@ -115,11 +115,71 @@ function initMySQL(){
         \`phone\` VARCHAR(128) NULL,
         \`address\` VARCHAR(128) NULL,
         \`business\` VARCHAR(128) NULL,
-        PRIMARY KEY (\`company_id\`, \`code\`, \`name\`));`);    
-    //创建xueqiu_kd
-    //创建xueqiu_k60
-    //创建xueqiu_k15
-    //创建xueqiu_k5
+        PRIMARY KEY (\`company_id\`, \`code\`, \`name\`));`); 
+    //创建kd_xueqiu
+    addTask(task,`CREATE TABLE \`stock\`.\`kd_xueqiu\` (
+        \`id\` INT NOT NULL,
+        \`date\` DATE NOT NULL,
+        \`volume\` FLOAT NULL,
+        \`open\` FLOAT NULL,
+        \`high\` FLOAT NULL,
+        \`low\` FLOAT NULL,
+        \`close\` FLOAT NULL,
+        \`chg\` FLOAT NULL,
+        \`percent\` FLOAT NULL,
+        \`turnoverrate\` FLOAT NULL,
+        \`dea\` FLOAT NULL,
+        \`dif\` FLOAT NULL,
+        \`macd\` FLOAT NULL,
+        PRIMARY KEY (\`id\`, \`date\`)) PARTITION BY HASH(id) PARTITIONS 64 ;`);    
+    //创建k60_xueqiu
+    addTask(task,`CREATE TABLE \`stock\`.\`k60_xueqiu\` (
+        \`id\` INT NOT NULL,
+        \`timestamp\` TIMESTAMP NOT NULL,
+        \`volume\` FLOAT NULL,
+        \`open\` FLOAT NULL,
+        \`high\` FLOAT NULL,
+        \`low\` FLOAT NULL,
+        \`close\` FLOAT NULL,
+        \`chg\` FLOAT NULL,
+        \`percent\` FLOAT NULL,
+        \`turnoverrate\` FLOAT NULL,
+        \`dea\` FLOAT NULL,
+        \`dif\` FLOAT NULL,
+        \`macd\` FLOAT NULL,
+        PRIMARY KEY (\`id\`, \`timestamp\`)) PARTITION BY HASH(id) PARTITIONS 128 ;`);
+    //创建k15_xueqiu
+    addTask(task,`CREATE TABLE \`stock\`.\`k15_xueqiu\` (
+        \`id\` INT NOT NULL,
+        \`timestamp\` TIMESTAMP NOT NULL,
+        \`volume\` FLOAT NULL,
+        \`open\` FLOAT NULL,
+        \`high\` FLOAT NULL,
+        \`low\` FLOAT NULL,
+        \`close\` FLOAT NULL,
+        \`chg\` FLOAT NULL,
+        \`percent\` FLOAT NULL,
+        \`turnoverrate\` FLOAT NULL,
+        \`dea\` FLOAT NULL,
+        \`dif\` FLOAT NULL,
+        \`macd\` FLOAT NULL,
+        PRIMARY KEY (\`id\`, \`timestamp\`)) PARTITION BY HASH(id) PARTITIONS 256 ;`);
+    //创建k5_xueqiu
+    addTask(task,`CREATE TABLE \`stock\`.\`k5_xueqiu\` (
+        \`id\` INT NOT NULL,
+        \`timestamp\` TIMESTAMP NOT NULL,
+        \`volume\` FLOAT NULL,
+        \`open\` FLOAT NULL,
+        \`high\` FLOAT NULL,
+        \`low\` FLOAT NULL,
+        \`close\` FLOAT NULL,
+        \`chg\` FLOAT NULL,
+        \`percent\` FLOAT NULL,
+        \`turnoverrate\` FLOAT NULL,
+        \`dea\` FLOAT NULL,
+        \`dif\` FLOAT NULL,
+        \`macd\` FLOAT NULL,
+        PRIMARY KEY (\`id\`, \`timestamp\`)) PARTITION BY HASH(id) PARTITIONS 512 ;`);
     async.series(task,(err,results)=>{
         if(err)
             console.error(err);
