@@ -4,7 +4,7 @@
  */
 const {download_kline} = require('./xueqiu_kline');
 const {download_kd} = require('./xueqiu_kd');
-const {} = require('');
+const {research_k15} = require('./research_k15');
 const async = require('async');
 const kline = [5,15,60];
 
@@ -31,5 +31,7 @@ task.push((cb)=>{
 
 async.series(task,(err,result)=>{
     if(err)console.error(err);
-    console.log('DONE!');
+    research_k15((e)=>{
+        console.log('DONE!');
+    });
 });

@@ -7,6 +7,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Search k15 hot",
+            "program": "${workspaceFolder}/download_script/research_hot.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Research k15",
             "program": "${workspaceFolder}/download_script/research_k15.js"
         },
