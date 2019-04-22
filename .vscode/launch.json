@@ -7,6 +7,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Init Company infomation",
+            "program": "${workspaceFolder}/download_script/desc.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Init MySQL",
             "program": "${workspaceFolder}\\download_script\\init_mysql.js"
         }

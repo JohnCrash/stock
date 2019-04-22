@@ -26,7 +26,7 @@ function initMySQL(){
         \`name\` VARCHAR(16) NOT NULL,
         \`code\` VARCHAR(16) NOT NULL,
         \`url\` VARCHAR(128) NULL,
-        PRIMARY KEY (\`id\`, \`code\`, \`name\`));`);
+        PRIMARY KEY (\`id\`, \`code\`, \`name\`));`);    
     //创建company
     addTask(task,`CREATE TABLE \`stock\`.\`company\` (
         \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -115,8 +115,11 @@ function initMySQL(){
         \`phone\` VARCHAR(128) NULL,
         \`address\` VARCHAR(128) NULL,
         \`business\` VARCHAR(128) NULL,
-        PRIMARY KEY (\`id\`, \`code\`, \`name\`));`);    
-    //创建xueqiu_kd    
+        PRIMARY KEY (\`company_id\`, \`code\`, \`name\`));`);    
+    //创建xueqiu_kd
+    //创建xueqiu_k60
+    //创建xueqiu_k15
+    //创建xueqiu_k5
     async.series(task,(err,results)=>{
         if(err)
             console.error(err);

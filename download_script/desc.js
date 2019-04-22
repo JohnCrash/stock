@@ -54,8 +54,8 @@ function desc_fetch(company,cb){
 /**
  * 下载全部公司描述数据
  */
-function desc_all(){
-    connection.query("select * from company where category_base!=9 and code='SH600613'",(err,companys)=>{
+function desc_all(done){
+    connection.query("select * from company",(err,companys)=>{
         if(err){
             console.error(err);
         }else{
@@ -67,7 +67,8 @@ function desc_all(){
                 if(err){
                     console.error(err);
                 }else{
-                    console.log('DONE!');
+                    console.log('desc_all DONE!');
+                    if(done)done();
                 }
             })
         }
@@ -129,13 +130,10 @@ function base_fetch(company,date,cb){
                     //5-1 股息率
                     let _yield_ = strS(t5[0].children[1].children[1].children[0].data);
                     console.log(company.name,ttm,pb,value,total,earnings,assets,dividend,_yield_);
-                    connection.query(`insert ignore into company_value values (${company.id},'${date}',${ttm},${pb},${value},${total},${earnings},${assets},${dividend},${_yield_},0,0,0)`,(error)=>{
+                    connection.query(`update company_select set ttm=${ttm},pb=${pb},value=${value},total=${total},earnings=${earnings},assets=${assets},dividend=${dividend},yield=${_yield_} where company_id=${company.id}`,(error)=>{
                         if(error)console.error(error);
-                        if(!error){
-                            connection.query(`update company_select set ttm=${ttm},pb=${pb},value=${value},total=${total},earnings=${earnings},assets=${assets},dividend=${dividend},yield=${_yield_} where company_id=${company.id}`);
-                        }
+                        cb();
                     });
-                    cb();
                 }catch(err){
                     console.error(err,company.name,company.name);
                     cb();
@@ -154,7 +152,7 @@ function base_fetch(company,date,cb){
  * 下载全部公司的基本数据(注意这个数据在companyByCategory中已经更新了因此可以不用调用这个函数)
  */
 function update_desc(done){
-    connection.query("select * from company where category_base!=9",(err,companys)=>{
+    connection.query("select * from company",(err,companys)=>{
         if(err){
             console.error(err);
         }else{
@@ -290,7 +288,7 @@ function companyByCategory(done){
                                     com.code = com.symbol;
                                     console.log('insert company',com.name);
                                     query(`insert ignore into company ${valueList(com,CompanyScheme)}`).then(r=>{
-                                        query(`select id from company where code=${com.symbol}`).then(r=>{
+                                        query(`select id from company where code='${com.symbol}'`).then(r=>{
                                             query(`select company_id from company_select where code='${com.symbol}'`).then(R=>{
                                                 if(R.length>0){
                                                     com.category = com.it.name;
@@ -342,7 +340,7 @@ function update_category(done){
             var c = new Crawler({
                 maxConnections : 1,
                 // This will be called for each crawled page
-                callback : function (error, res, done) {
+                callback : function (error, res, callback) {
                     if(error){
                         console.log(error);
                     }else{
@@ -368,6 +366,7 @@ function update_category(done){
                             }
                         }
                     }
+                    callback();
                     if(done)done();
                 }
             });
@@ -392,10 +391,14 @@ function update_company(done){
                 return;
             }    
             update_desc(err=>{
-                if(done)done(err);
+                desc_all((err)=>{
+                    if(done)done(err);
+                });
             })
         });
     });
 }
-
+update_company((err)=>{
+    console.log('DONE!');
+});
 module.exports = {update_company};

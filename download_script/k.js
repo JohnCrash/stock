@@ -3,11 +3,16 @@ const Crawler = require("crawler");
 const async = require("async");
 const bigint = require("big-integer");
 
+/**
+ * FIXBUG: "Client does not support authentication protocol requested by server"
+ * ALTER USER 'root'@'localhost' IDENTIFIED BY 'your new password'; 
+ * ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your new password';
+ */
 var connection = mysql.createPool({
     connectionLimit : 30,
     host     : 'localhost',
     user     : 'root',
-    password : '7890',
+    password : '789',
     database : 'stock'
   });
 
