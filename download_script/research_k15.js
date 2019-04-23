@@ -86,8 +86,12 @@ function calcgain_MAX(k,macd,N){
                 buyI = Math.floor(i/N);
             }else if(buyK && m<0){
                 //trade(buyK,v);
-                if(buyI != Math.floor(i/N) && maxK>0){//交易在一天内进行将被排除
-                    let r = maxK/buyK;
+                if(buyI != Math.floor(i/N)){//交易在一天内进行将被排除
+                    let r;
+                    if(maxK>0)
+                        r = maxK/buyK; //最大值
+                    else
+                        r = v/buyK; //止损
 
                     gain = gain*r;
     

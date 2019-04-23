@@ -13,8 +13,8 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Research k15",
-            "program": "${workspaceFolder}/download_script/research_k15.js"
+            "name": "Bookmark k15",
+            "program": "${workspaceFolder}/download_script/bookmark_k15.js"
         },
         {
             "type": "node",
