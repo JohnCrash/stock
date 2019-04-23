@@ -11,6 +11,7 @@ const bigint = require("big-integer");
 var connection = mysql.createPool({
     connectionLimit : 30,
     host     : 'localhost',
+    port    : 3307,
     user     : 'root',
     password : '789',
     database : 'stock'

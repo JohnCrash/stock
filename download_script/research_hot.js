@@ -535,6 +535,7 @@ function watchHot(stocks,category,n){
     let cats = getCategoryByName(category,`K${n}`);
     if(cats){
         watchStocks(stocks,n,()=>{ 
+            try{
             let sc = []; //sc是即将变正的列表
             for(let it of stocks){
                 if(it[`k${n}`]){
@@ -578,13 +579,16 @@ function watchHot(stocks,category,n){
                 if(err)console.error(err);
                 console.log('===== DONE =====');
             });
+            }catch(e){
+                console.error(e);
+            }
         });
     }else{
         console.error(`Can't found category K${n}`);
     }
 }
 
-update_xueqiu_list(60,(err)=>{
+update_xueqiu_list(15,(err)=>{
     if(!err)
         watchMainLoop();
 });
