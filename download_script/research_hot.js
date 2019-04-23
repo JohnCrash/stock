@@ -577,7 +577,8 @@ function watchHot(stocks,category,n){
             
             async.series(task,(err,results)=>{
                 if(err)console.error(err);
-                console.log('===== DONE =====');
+                let t = new Date();
+                console.log(`===== DONE ${t.getHours()}:${t.getMinutes()}=====`);
             });
             }catch(e){
                 console.error(e);

@@ -53,6 +53,7 @@ function initMySQL(){
         \`type\` FLOAT NULL,
         \`volume\` FLOAT NULL,
         \`volume_ratio\` FLOAT NULL,
+        \`ignore\` TINYINT NULL,
         PRIMARY KEY (\`id\`, \`code\`, \`name\`));
     `);
     //创建company_select

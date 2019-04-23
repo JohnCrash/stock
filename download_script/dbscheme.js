@@ -23,7 +23,8 @@ const CompanyScheme = {
     tick_size:'number',
     type:'number',
     volume:'number',
-    volume_ratio:'number'
+    volume_ratio:'number',
+    ignore:'number'
 };
 
 const CategoryScheme = {
