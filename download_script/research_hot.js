@@ -6,130 +6,71 @@ const {companys_task,k_company,dateString,query,connection,
 const async = require('async');
 const macd = require('macd');
 
-function mapCategory(cat){
-    const cat2 = {
-        '互联网传媒':'传媒',
-        '电信、广播电视和卫星传输服务':'传媒',
-        '新闻和出版业':'传媒',
-        '文化艺术业':'传媒',
-        '广播、电视、电影和影视录音制作业':'传媒',
-        '文教、工美、体育和娱乐用品制造业':'传媒',
-
-        '酒、饮料和精制茶制造业':'吃喝',
-        '食品加工':'吃喝',
-        '餐饮':'吃喝',
-        '畜禽养殖':'吃喝',
-        '农副食品加工业':'吃喝',
-        '医药制造业':'吃喝',
-        '化学制药':'吃喝',
-        '餐饮业':'吃喝',
-        '农业':'吃喝',
-        '动物保健':'吃喝',
-        '中药':'吃喝',
-
-        '化学原料和化学制品制造业':'原料',
-        '石油加工、炼焦和核燃料加工业':'原料',
-        '橡胶和塑料制品业':'原料',
-        '有色金属冶炼和压延加工业':'原料',
-        '造纸和纸制品业':'原料',
-        '非金属矿物制品业':'原料',
-        '化学原料':'原料',
-        '有色金属矿采选业':'原料',
-        '水的生产和供应业':'原料',
-        '化学纤维':'原料',
-        '化学纤维制造业':'原料',
-        '黑色金属冶炼和压延加工业':'原料',
-        '金属制品':'原料',
-        '钢铁':'原料',
-        '林业':'原料',
-        '渔业':'原料',
-        '采掘服务':'原料',
-        '煤炭开采和洗选业':'原料',
-        '化学制品':'原料',
-
-        '银行':'金融',
-        '商务服务业':'金融',
-        '贸易':'金融',
-        '资本市场服务':'金融',
-        '房地产业':'金融',
-        '房地产开发':'金融',
-        '其他金融业':'金融',
-        '土木工程建筑业':'金融',
-        '建筑装饰和其他建筑业':'金融',
-        '房屋建设':'金融',
-        '保险':'金融',
-        '多元金融':'金融',
-        '证券':'金融',
-
-        '燃气生产和供应业':'能源',
-        '电力、热力生产和供应业':'能源',
-        '生态保护和环境治理业':'能源',
-        '电力':'能源',
-        '高低压设备':'能源',
-
-        '计算机、通信和其他电子设备制造业':'科技',
-        '计算机应用':'科技',
-        '半导体':'科技',
-        '通信设备':'科技',
-        '软件和信息技术服务业':'科技',
-        '互联网和相关服务':'科技',
-        "其他电子":'科技',
-        "计算机设备":'科技',
-        "电子制造":'科技',
-
-        '通用设备制造业':'制造',
-        '金属制品业':'制造',
-        '铁路、船舶、航空航天和其他运输设备制造业':'制造',
-        '专用设备制造业':'制造',
-        '仪器仪表制造业':'制造',
-        '其他制造业':'制造',
-        '家具制造业':'制造',
-        '工业金属':'制造',
-        '电机':'制造',
-        '电气机械和器材制造业':'制造',
-        '白色家电':'制造',
-        '汽车制造业':'制造',
-        '服装家纺':'制造',
-        '纺织业':'制造',
-        '汽车整车':'制造',
-        '船舶制造':'制造',
-        '纺织服装、服饰业':'制造',
-        '地面兵装':'制造',
-        '电气自动化设备':'制造',
-        '纺织制造':'制造',
-        '电源设备':'制造',
-        '光学光电子':'制造',
-        '专用设备':'制造',
-
-        '零售业':'其他',
-        '批发业':'其他',
-        '租赁业':'其他',    
-        '综合':'其他',  
-        '仓储业':'其他',  
-        '包装印刷':'其他',
-        '公共设施管理业':'其他',
-        '港口':'其他',
-        '水上运输业':'其他',
-        '专业技术服务业':'其他',
-        '管道运输业':'其他',
-        '装卸搬运和运输代理业':'其他',
-        '环保工程及服务':'其他',
-        'null':'其他',
-    }
-    if(cat2[cat]){
-        return cat2[cat];
-    }else{
-        console.error('为分类的',cat);
-        return '其他';
-    }
-}
-
 /**
  * 使用bookmark15更新雪球上的股票
  */
 function update_xueqiu_list(lv,done){
     //首先下载雪球的股票列表，然后删除不在榜的。加入上榜的。然后重新分类
-    query(`SELECT name,code,category,k${lv}_max,price,ma5diff,ma10diff,ma20diff,ma30diff FROM stock.company_select where bookmark${lv}=1`).then(tops=>{
+    let task = [];
+    task.push((cb)=>{
+        query(`SELECT name,code,category,k${lv}_max,price,ma5diff,ma10diff,ma20diff,ma30diff FROM stock.company_select where bookmark${lv}=1`)
+        .then(results=>{
+            cb(null,results);
+        })
+        .catch(err=>{
+            cb(err);
+        });
+    });
+    task.push((cb)=>{
+        query(`SELECT id,name,simple FROM stock.category`)
+        .then(results=>{
+            cb(null,results);
+        })
+        .catch(err=>{
+            cb(err);
+        });        
+    });
+    task.push((cb)=>{
+        //为了排除观察列表中的股票不被删除掉
+        xueqiuGetJson('https://stock.xueqiu.com/v5/stock/portfolio/list.json',
+        (err,json)=>{
+            if(!err && json){
+                if(json.data && json.data.stocks && json.data.stocks.length>0){
+                    for(let c of json.data.stocks){
+                        if(c.name=='观察'){
+                            xueqiuGetJson(`https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=${c.id}&category=1`,
+                            (err,json)=>{
+                                if(!err && json && json.data && json.data.stocks){
+                                    let map2 = {};
+                                    for(let s of json.data.stocks){
+                                        map2[s.symbol] = s;
+                                    }
+                                    cb(null,map2);
+                                    return;
+                                }
+                                cb('获取xueqiu“观察”分组失败.2',err,json);
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+            cb('获取xueqiu“观察”分组失败.1',err,json);
+        });
+    });
+    async.series(task,(err,results)=>{
+        if(err){
+            console.error(err);
+            if(done)done();
+            return;
+        }
+        let tops = results[0];
+        let map2simple = {};
+        for(let c of results[1]){
+            map2simple[c.name] = c.simple;
+        }
+        let map2observed = results[2];
+
         xueqiuGetJson('https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1',
         (err,json)=>{
             if(err){
@@ -155,7 +96,7 @@ function update_xueqiu_list(lv,done){
                 }
             }
             for(let s of json.data.stocks){
-                if(!topSet[s.symbol]){ //雪球列表中的不在榜上，删除
+                if(!topSet[s.symbol] && !map2observed[s.symbol]){ //雪球列表中的不在榜上，删除(但是要排除观察表中的)
                     //delete
                     console.log('DELETE',s.name,s.symbol);
                     tasks.push(deleteStock(s.symbol));
@@ -183,7 +124,7 @@ function update_xueqiu_list(lv,done){
                     else
                         groups[s.code].push('MA0');
 
-                    groups[s.code].push(mapCategory(s.category));
+                    groups[s.code].push(map2simple[s.category]?map2simple[s.category]:'其他');
                 }
                 let task = [];
                 for(let s of tops){
@@ -196,9 +137,6 @@ function update_xueqiu_list(lv,done){
                 });
             });
         });
-    }).catch(err=>{
-        console.error(err);
-        if(done)done(err);
     });
 }
 
@@ -281,13 +219,13 @@ function watchMainLoop(){
                             if(json){
                                 if(json.data && json.data.stocks && json.data.stocks.length>0){
                                     for(let s of json.data.stocks){
-                                        it.stocks.push(mapSymbol2Stock[s.symbol]);
                                         //fixbug:分类的股票不在全部之中
                                         if(!mapSymbol2Stock[s.symbol]){
                                             s.group = [];
                                             mapSymbol2Stock[s.symbol] = s;
                                             stocks.push(s);
                                         }
+                                        it.stocks.push(mapSymbol2Stock[s.symbol]);
                                         mapSymbol2Stock[s.symbol].group.push(it.name);
                                     }
                                 }
@@ -498,8 +436,12 @@ function watchStocks(stocks,n,cb){
 }
 function mapTable(t,k){
     let m = {};
-    for(let it of t){
-        m[it[k]] = it;
+    try{
+        for(let it of t){
+            m[it[k]] = it;
+        }    
+    }catch(e){
+        console.error(e,t,k);
     }
     return m;
 }
@@ -590,8 +532,8 @@ function watchHot(stocks,category,n){
 }
 
 update_xueqiu_list(15,(err)=>{
-    if(!err)
-        watchMainLoop();
+    //不管数据库部分操作是否成功，列表中都可以进行继续监控
+    watchMainLoop();
 });
 
 module.exports = {watchMainLoop};

@@ -25,6 +25,7 @@ function initMySQL(){
         \`id\` INT NOT NULL AUTO_INCREMENT,
         \`name\` VARCHAR(16) NOT NULL,
         \`code\` VARCHAR(16) NOT NULL,
+        \`simple\` VARCHAR(16) NOT NULL,
         \`url\` VARCHAR(128) NULL,
         PRIMARY KEY (\`id\`, \`code\`, \`name\`));`);    
     //创建company
