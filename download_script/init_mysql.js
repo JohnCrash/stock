@@ -20,6 +20,7 @@ function addTask(task,str){
 
 function initMySQL(){
     let task = [];
+
     //创建category表
     addTask(task,`CREATE TABLE \`stock\`.\`category\` (
         \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -186,6 +187,39 @@ function initMySQL(){
         \`dif\` FLOAT NULL,
         \`macd\` FLOAT NULL,
         PRIMARY KEY (\`id\`, \`timestamp\`)) PARTITION BY HASH(id) PARTITIONS 512 ;`);
+    //创建k5_segment
+    addTask(task,`CREATE TABLE \`stock\`.\`k5_segment\` (
+        \`id\` INT NOT NULL,
+        \`timestamp\` TIMESTAMP NOT NULL,
+        \`price\` FLOAT NULL,
+        \`cycle\` int(11) DEFAULT NULL,
+        \`pos\` int(11) DEFAULT NULL,        
+        PRIMARY KEY (\`id\`, \`timestamp\`));`);
+    //创建k15_segment
+    addTask(task,`CREATE TABLE \`stock\`.\`k15_segment\` (
+        \`id\` INT NOT NULL,
+        \`timestamp\` TIMESTAMP NOT NULL,
+        \`price\` FLOAT NULL,
+        \`cycle\` int(11) DEFAULT NULL,
+        \`pos\` int(11) DEFAULT NULL,        
+        PRIMARY KEY (\`id\`, \`timestamp\`));`);
+    //创建k60_segment
+    addTask(task,`CREATE TABLE \`stock\`.\`k60_segment\` (
+        \`id\` INT NOT NULL,
+        \`timestamp\` TIMESTAMP NOT NULL,
+        \`price\` FLOAT NULL,
+        \`cycle\` int(11) DEFAULT NULL,
+        \`pos\` int(11) DEFAULT NULL,        
+        PRIMARY KEY (\`id\`, \`timestamp\`));`);
+    //创建kd_segment
+    addTask(task,`CREATE TABLE \`stock\`.\`kd_segment\` (
+        \`id\` INT NOT NULL,
+        \`date\` DATE NOT NULL,
+        \`price\` FLOAT NULL,
+        \`cycle\` int(11) DEFAULT NULL,
+        \`pos\` int(11) DEFAULT NULL,        
+        PRIMARY KEY (\`id\`, \`date\`));`);
+
     async.series(task,(err,results)=>{
         if(err)
             console.error(err);
