@@ -67,43 +67,35 @@ function calcgain(k0,macd0,r){
     return [gain,maxdrawal>0?(gain-1)/maxdrawal:(gain-1)/0.1];
 }
 
-function calcgain_MAX(k,macd,N){
+/**
+ * 计算周期中最大增长
+ * N 代表一天有多少个macd数据
+ */
+function calcMaxGrow(k,macd,N){
     let lastK;
     let lastM;
-    let buyK;
-    let buyI;
+    let buyK = null;
+    let buyI = null;
     let maxK = 0;
     let gain = 1;
-    let maxdrawal = 0;
-    let acc = 0;
 
     for(let i = 0;i<k.length;i++){
         let v = k[i];
         let m = macd[i];
         if(lastK){
-            if(lastM<0 && m>0){
+            if(lastM<0 && !buyK && m>0){
                 buyK = v;
                 buyI = Math.floor(i/N);
-            }else if(buyK && m<0){
-                //trade(buyK,v);
-                if(buyI != Math.floor(i/N)){//交易在一天内进行将被排除
-                    let r;
-                    if(maxK>0)
-                        r = maxK/buyK; //最大值
-                    else
-                        r = v/buyK; //止损
+            }else if(buyK && buyI != Math.floor(i/N) && m<=0 ){//交易在一天内进行将被排除
+                let r;
+                if(maxK>0)
+                    r = maxK/buyK; //最大值
+                else
+                    r = v/buyK; //止损
 
-                    gain = gain*r;
-    
-                    if(r<1){
-                        acc += (1-r);
-                    }else{
-                        if(acc>maxdrawal)maxdrawal = acc;
-                        acc = 0;
-                    }    
-                } 
-                buyI = undefined;
-                buyK = undefined;
+                gain = gain*r;
+                buyI = null;
+                buyK = null;
                 maxK = 0;
             }
         }
@@ -111,13 +103,60 @@ function calcgain_MAX(k,macd,N){
         lastK = v;
         lastM = m;
     }
-    if(acc>maxdrawal)maxdrawal = acc;
-    return [gain,maxdrawal>0?(gain-1)/maxdrawal:(gain-1)/0.1];
+    if(buyK && buyI != Math.floor((k.length-1)/N) ){ //如果数据最后还没有结算，使用当前价结算
+        let r;
+        if(maxK>0)
+            r = maxK/buyK; //最大值
+        else
+            r = k[k.length-1]/buyK; //止损
+
+        gain = gain*r;
+    }
+    return gain;
+}
+
+/**
+ * 计算周期中最大亏损
+ * N 代表一天有多少个macd数据
+ */
+function calcMaxLoss(k,macd,N){
+    let lastK;
+    let lastM;
+    let buyK = null;
+    let buyI = null;
+    let gain = 1;
+
+    for(let i = 0;i<k.length;i++){
+        let v = k[i];
+        let m = macd[i];
+        if(lastK){
+            if(lastM<0 && !buyK && m < 0){
+                buyK = v;
+                buyI = Math.floor(i/N);
+            }else if(buyK && buyI != Math.floor(i/N) && m > 0 ){//交易在一天内进行将被排除
+                let r = v/buyK; 
+                gain = gain*r;
+                buyI = null;
+                buyK = null;
+            }
+        }
+        lastK = v;
+        lastM = m;
+    }
+    if(buyK && buyI != Math.floor((k.length-1)/N) ){ //如果数据最后还没有结算，使用当前价结算
+        let r = k[k.length-1]/buyK;
+        gain = gain*r;
+    }
+    return gain;
+}
+
+function calcgain_MAX(k,macd,N){
+    return [calcMaxGrow(k,macd,N),calcMaxLoss(k,macd,N)];
 }
 
 function bookmarkTask(k,bookmark,total,top){
     return (cb)=>{
-        query(`SELECT name,code,category,${k} FROM stock.company_select where static60>=1 and static30>1 order by ${(k)} desc limit ${total}`).then(companys=>{
+        query(`SELECT name,code,category,${k} FROM stock.company_select where k15_maxdrawal>0.9 and k15_maxdrawal<1.1 and k15_max*.9 > k15_maxdrawal and static60>=1 and static30>1 order by ${(k)} desc limit ${total}`).then(companys=>{
             let category = {};
             for(let com of companys){
                 let c = com.category?com.category:'未分类';
