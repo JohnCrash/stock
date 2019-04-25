@@ -37,7 +37,7 @@ for(let k in columns){
 }
 
 const columns_d = [
-    "date",
+    "timestamp",
     "volume",
     "open",
     "high",
@@ -173,7 +173,7 @@ function company_kline(id,code,lv,callback){
                                 
                                 if(head_date && date.getTime()===head_date.getTime()){
                                     //接头部分需要覆盖
-                                    console.log(code,'update : ',dateString);
+                                    console.log(code,`update k${lv}: `,dateString);
                                     sqlStr = `update k${lv}_xueqiu set ${str_pairs(lv,it)} where id=${id} and ${lv=='d'?'date':'timestamp'}='${dateString}'`;
                                     connection.query(sqlStr,(error, results, field)=>{
                                         if(error){
@@ -191,7 +191,7 @@ function company_kline(id,code,lv,callback){
                              * 批量插入数据
                              */
                             if(datas.length>0){
-                                console.log(code,'insert',datas.length);
+                                console.log(code,`insert k${lv}: `,datas.length);
                                 connection.query(`insert ignore into k${lv}_xueqiu values ${datas.join(',')}`,(error, results, field)=>{
                                     if(error){
                                         console.error(code,error);
@@ -245,7 +245,7 @@ function company_kline(id,code,lv,callback){
 }
 /**
  * 下载kline数据
- * lv是k线级别1,5,15,30,60,120,'d'
+ * lvs是k线级别1,5,15,30,60,120,'d'数组
  */
 function download_kline(lvs,done){
     paralle_companys_task('id,code',10,com=>cb=>{
@@ -258,7 +258,9 @@ function download_kline(lvs,done){
             );    
         }
         async.series(task,(err,results)=>{
-
+            if(err)
+                console.error(err);
+            cb(err);
         });
     }).then(usetime=>{
         if(done)done();

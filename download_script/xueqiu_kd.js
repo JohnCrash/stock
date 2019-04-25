@@ -6,7 +6,7 @@ const async = require('async');
 const Crawler = require("crawler");
 
 const columns = [
-    "date",
+    "timestamp",
     "volume",
     "open",
     "high",
