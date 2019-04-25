@@ -154,6 +154,44 @@ function calcgain_MAX(k,macd,N){
     return [calcMaxGrow(k,macd,N),calcMaxLoss(k,macd,N)];
 }
 
+/**
+ * 策略1
+ */
+function strategy1(k,macd,N){
+    let gain = 1;
+    let maxK = 0;
+    let minK = 10000;
+    let minI;
+    let maxI;
+    for(let i = 0;i<k.length;i++){
+        let v = k[i];
+        let m = macd[i];
+        if(m>0){
+            if(maxK==0 && minK==10000)continue; //跳过第一个上涨周期
+            if(maxK<v){
+                maxI = Math.floor((i)/N);
+                maxK = v;
+            }
+        }else{
+            if(maxK!=0 && minK!=10000){
+               let r = minI==maxI?minK/maxK:maxK/minK; //碰到一天内骗的这里做惩罚性处理
+                gain *= r;
+                maxK = 0;
+                minK = 10000;
+            }
+            if(minK>v){
+                minI =  Math.floor((i)/N);
+                minK = v;
+            }
+        }
+    }
+    if(maxK!=0 && minK!=10000){
+        let r = minI==maxI?minK/maxK:maxK/minK; //碰到一天内骗的这里做惩罚性处理
+        gain *= r;
+    }
+    return gain;
+ }
+
 function bookmarkTask(k,bookmark,total,top){
     return (cb)=>{
         query(`SELECT name,code,category,${k} FROM stock.company_select where k15_maxdrawal>0.9 and k15_maxdrawal<1.1 and k15_max*.9 > k15_maxdrawal and static60>=1 and static30>1 order by ${(k)} desc limit ${total}`).then(companys=>{
@@ -212,6 +250,9 @@ function bookmark_by_level(com,lv,cb){
         });
         let r = calcgain_MAX(kclose,macd,klv[lv].N);
         r.push(kclose[0]);
+        if(lv==15){
+            r.push(strategy1(kclose,macd,klv[lv].N));
+        }
         cb(null,r);
     }).catch(err=>{
         cb(err);
@@ -238,14 +279,14 @@ function research_k15(done){
                         console.error(err);
                         cb();
                     }
-                    let [k15_max,k15_maxdrawal,b15] = results[0];
+                    let [k15_max,k15_maxdrawal,b15,strategy1] = results[0];
                     let [k60_max,k60_maxdrawal,b60] = results[1];
                     //更新静态收益static30,static60
                     let static30,static60;
                     static30 = b15?price/b15:1;
                     static60 = b60?price/b60:1;
                     console.log(com.id,price,static30,static60);
-                    let db = {price,static30,static60,ma5diff,ma10diff,ma20diff,ma30diff,k15_max,k15_maxdrawal,k60_max,k60_maxdrawal};
+                    let db = {price,static30,static60,ma5diff,ma10diff,ma20diff,ma30diff,k15_max,k15_maxdrawal,k60_max,k60_maxdrawal,strategy1};
                     query(`update company_select set ${eqPair(db,CompanySelectScheme)} where company_id=${com.id}`).then(results=>{
                         cb();
                     }).catch(err=>{
@@ -263,15 +304,21 @@ function research_k15(done){
          * 着这里计算bookmark
          * 使用每个级别分类里面的的前5名将被标记出来
          */
+        /*
         let task = [];
-        task.push(bookmarkTask('k15_max','bookmark15',300,5));
-        task.push(bookmarkTask('k60_max','bookmark60',300,5));
+        task.push(bookmarkTask('k15_max','bookmark15',200,2));
+        task.push(bookmarkTask('k60_max','bookmark60',200,2));
 
         async.series(task,(err,results)=>{
             console.log('research_k15 DONE!');
 
             if(done)done();
         });
+        */
+       //不做bookmark,简单的看谁强,见(research_hot.js)
+       console.log('research_k15 DONE!');
+
+       if(done)done();
     });   
 }
 

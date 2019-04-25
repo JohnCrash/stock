@@ -398,7 +398,10 @@ function update_company(done){
         });
     });
 }
-update_company((err)=>{
-    console.log('DONE!');
-});
-module.exports = {update_company};
+//update_company((err)=>{
+//    console.log('DONE!');
+//});
+//update_desc((err)=>{
+//    console.log('DONE!');
+//});
+module.exports = {update_company,update_desc};

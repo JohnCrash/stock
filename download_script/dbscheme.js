@@ -61,27 +61,12 @@ const CompanySelectScheme = {
     static30:'number', //30天静态增长
     static60:'number', //60天静态增长
     price:'number', //股价
-    k15_gain:'number',
-    k15_drawal:'number',
-    k30_gain:'number',
-    k30_drawal:'number',
-    k60_gain:'number',
-    k60_drawal:'number',
-    k120_gain:'number',
-    k120_drawal:'number',
-    kd_gain:'number',
-    kd_drawal:'number',
     k15_max:'number',
     k15_maxdrawal:'number',
     k30_max:'number',
     k30_maxdrawal:'number',
     k60_max:'number',
     k60_maxdrawal:'number',
-    k120_max:'number',
-    k120_maxdrawal:'number',
-    kd_max:'number',
-    kd_maxdrawal:'number',
-    bin4:'number',
     glow:'number',
     ma5diff:'number',
     ma10diff:'number',
@@ -90,8 +75,9 @@ const CompanySelectScheme = {
     bookmark15:'number',
     bookmark30:'number',
     bookmark60:'number',
-    bookmark120:'number',
-    bookmarkd:'number'
+    strategy1:'number',
+    strategy2:'number',
+    strategy3:'number'
 };
 
 const K5Scheme={
