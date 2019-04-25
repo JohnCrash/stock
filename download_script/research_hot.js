@@ -12,15 +12,7 @@ const macd = require('macd');
 function update_xueqiu_list(lv,done){
     //首先下载雪球的股票列表，然后删除不在榜的。加入上榜的。然后重新分类
     let task = [];
-    task.push((cb)=>{
-        query(`SELECT name,code,category,k${lv}_max,price,ma5diff,ma10diff,ma20diff,ma30diff FROM stock.company_select where bookmark${lv}=1`)
-        .then(results=>{
-            cb(null,results);
-        })
-        .catch(err=>{
-            cb(err);
-        });
-    });
+
     task.push((cb)=>{
         query(`SELECT id,name,simple FROM stock.category`)
         .then(results=>{
@@ -31,7 +23,7 @@ function update_xueqiu_list(lv,done){
         });        
     });
     task.push((cb)=>{
-        //为了排除观察列表中的股票不被删除掉
+        //为了排除雪球'观察'列表中的股票不被删除掉
         xueqiuGetJson('https://stock.xueqiu.com/v5/stock/portfolio/list.json',
         (err,json)=>{
             if(!err && json){
@@ -58,19 +50,69 @@ function update_xueqiu_list(lv,done){
             cb('获取xueqiu“观察”分组失败.1',err,json);
         });
     });
+    task.push((cb)=>{
+        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k15_max FROM company_select  WHERE ttm>0 AND ttm<100 AND ma5diff>0  ORDER BY k15_max DESC LIMIT 50 `)
+        .then(results=>{
+            cb(null,{name:'MACD15',results});
+        })
+        .catch(err=>{
+            cb(err);
+        });
+    }); 
+    task.push((cb)=>{
+        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k60_max FROM company_select WHERE ttm>0 AND ttm<100 AND ma5diff>0 ORDER BY k60_max DESC LIMIT 50 `)
+        .then(results=>{
+            cb(null,{name:'MACD60',results});
+        })
+        .catch(err=>{
+            cb(err);
+        });
+    });
+    task.push((cb)=>{
+        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k60_max FROM company_select WHERE ttm>0 AND ttm<100 AND ma5diff>0 ORDER BY strategy1 DESC LIMIT 50 `)
+        .then(results=>{
+            cb(null,{name:'MAX15',results});
+        })
+        .catch(err=>{
+            cb(err);
+        });
+    });     
     async.series(task,(err,results)=>{
         if(err){
             console.error(err);
             if(done)done();
             return;
         }
-        let tops = results[0];
+        
         let map2simple = {};
-        for(let c of results[1]){
+        for(let c of results[0]){
             map2simple[c.name] = c.simple;
         }
-        let map2observed = results[2];
-
+        let map2observed = results[1];
+        let tops = [];
+        let code2tops = {};
+        //合并不同策略搜索出来的列表
+        for(let i=2;i<results.length;i++){
+            let R = results[i];
+            if(R && R.name && R.results){
+                for(let it of R.results){
+                    if(!code2tops[it.code])
+                        code2tops[it.code] = it;
+                    let IT = code2tops[it.code];
+                    if(IT.xueqiuCategory){
+                        IT.xueqiuCategory += `,${R.name}`;
+                    }else{
+                        IT.xueqiuCategory = R.name;
+                    }
+                }
+            }else{
+                console.error('merge tops ',R);
+            }
+        }
+        for(let k in code2tops){
+            tops.push(code2tops[k]);
+        }
+        //这里将任务搜索出来的股票合并到tops中去
         xueqiuGetJson('https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1',
         (err,json)=>{
             if(err){
@@ -111,24 +153,30 @@ function update_xueqiu_list(lv,done){
                 //进行分类
                 let groups = {};
                 for(let s of tops){
-                    groups[s.code] = [];
+                    let g = {group:[]};
+                    groups[s.code] = g;
 
                     if(s.ma30diff<0)
-                        groups[s.code].push('MA30');
+                        insertGroup(g,'MA30');
                     else if(s.ma20diff<0)
-                        groups[s.code].push('MA20');
+                        insertGroup(g,'MA20');
                     else if(s.ma10diff<0)
-                        groups[s.code].push('MA10');
+                        insertGroup(g,'MA10');
                     else if(s.ma5diff<0)
-                        groups[s.code].push('MA5');
+                        insertGroup(g,'MA5');
                     else
-                        groups[s.code].push('MA0');
+                        insertGroup(g,'MA0');
 
-                    groups[s.code].push(map2simple[s.category]?map2simple[s.category]:'其他');
+                    if(map2observed[s.symbol]) //观察组中的股票不变
+                        insertGroup(g,'观察');
+                    if(s.xueqiuCategory)
+                        insertGroup(g,s.xueqiuCategory);
                 }
                 let task = [];
                 for(let s of tops){
-                    task.push(groupStock(groups[s.code],s.name,s.code));
+                    let g = groups[s.code];
+                    if(g.groupNeedUpdate)
+                        task.push(groupStock(g.group,s.name,s.code));
                 }
                 async.series(task,(err,results)=>{ //并行xueqiu会出问题(重复的分类)
                     if(err)console.error(err);
