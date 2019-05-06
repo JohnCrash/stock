@@ -77,7 +77,12 @@ const CompanySelectScheme = {
     bookmark60:'number',
     strategy1:'number',
     strategy2:'number',
-    strategy3:'number'
+    strategy3:'number',
+    max60:'string',
+    max60price:'number',
+    min60:'string',
+    min60price:'number',
+    begin60price:'number',
 };
 
 const K5Scheme={
