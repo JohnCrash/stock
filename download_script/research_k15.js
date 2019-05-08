@@ -156,6 +156,7 @@ function calcgain_MAX(k,macd,N){
 
 /**
  * 策略1
+ * 在macd<0时找到最低点买入，在macd>0时找最高的抛出。不在一天的做惩罚性计算
  */
 function strategy1(k,macd,N){
     let gain = 1;
@@ -233,8 +234,8 @@ function bookmarkTask(k,bookmark,total,top){
 }
 
 const klv={
-    "15":{N:16,limit:16*22}, //一个月
-    "60":{N:4,limit:4*44}  //两个月
+    "15":{N:16,limit:16*11}, //半月
+    "60":{N:4,limit:4*22}  //一个月
 }
 /**
  * 根据不同的k线级别进行标记
