@@ -51,8 +51,8 @@ function update_xueqiu_list(lv,done){
         });
     });
     task.push((cb)=>{
-        //ttm>0 <200,股价在5日均线上方,k15涨势最好的前50只股票
-        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k15_max FROM company_select  WHERE ttm>0 AND ttm<200 AND ma5diff>0  ORDER BY k15_max DESC LIMIT 50 `)
+        //ttm>0 <100,股价在5日均线上方,k15涨势最好的前50只股票
+        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k15_max FROM company_select  WHERE ttm>0 AND ttm<90 AND ma5diff>0  ORDER BY k15_max DESC LIMIT 50 `)
         .then(results=>{
             cb(null,{name:'MACD15',results});
         })
@@ -61,8 +61,8 @@ function update_xueqiu_list(lv,done){
         });
     }); 
     task.push((cb)=>{
-        //ttm>0 <200,股价在5日均线上方,k60涨势最好的前50只股票
-        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k60_max FROM company_select WHERE ttm>0 AND ttm<200 AND ma5diff>0 ORDER BY k60_max DESC LIMIT 50 `)
+        //ttm>0 <100,股价在5日均线上方,k60涨势最好的前50只股票
+        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k60_max FROM company_select WHERE ttm>0 AND ttm<90 AND ma5diff>0 ORDER BY k60_max DESC LIMIT 50 `)
         .then(results=>{
             cb(null,{name:'MACD60',results});
         })
@@ -71,8 +71,8 @@ function update_xueqiu_list(lv,done){
         });
     });
     task.push((cb)=>{
-        //ttm>0 <200,股价在5日均线上方,k15涨势最好的前50只股票会做惩罚
-        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k60_max FROM company_select WHERE ttm>0 AND ttm<200 AND ma5diff>0 ORDER BY strategy1 DESC LIMIT 50 `)
+        //ttm>0 <100,股价在5日均线上方,k15涨势最好的前50只股票会做惩罚
+        query(`SELECT name,code,category,ttm,price,ma5diff,ma10diff,ma20diff,ma30diff,k60_max FROM company_select WHERE ttm>0 AND ttm<90 AND ma5diff>0 ORDER BY strategy1 DESC LIMIT 50 `)
         .then(results=>{
             cb(null,{name:'MAX15',results});
         })
