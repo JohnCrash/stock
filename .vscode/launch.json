@@ -21,7 +21,7 @@
             "request": "launch",
             "name": "Download K",
             "program": "${workspaceFolder}/download_script/download.js"
-        },
+        },     
         {
             "type": "node",
             "request": "launch",

@@ -1,5 +1,5 @@
 /**
- * 专门用来下载雪球网的k线数据
+ * 复制xueqiu_kline.js,为了下载2013-2005的日线数据
  */
 const {paralle_companys_task,k_company,dateString,query,connection,xuequeCookie} = require('./k');
 const async = require('async');
@@ -116,7 +116,7 @@ function company_kline(id,code,lv,callback){
     function xueqiuURI(timestamp){
         let uri;
         if(lv=='d')
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-2&indicator=kline,ma,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-142&indicator=kline,ma,macd`;
         else
             uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${ucount[lv]}&indicator=kline,macd`;
         
@@ -140,7 +140,7 @@ function company_kline(id,code,lv,callback){
     /**
      * 第一步找到数据库中最近的一条记录
      */
-    connection.query(`select max(${lv=='d'?'date':'timestamp'}) as r from k${lv}_xueqiu where id=${id};`,(error, results, field)=>{
+    connection.query(`select min(${lv=='d'?'date':'timestamp'}) as r from k${lv}_xueqiu where id=${id};`,(error, results, field)=>{
         /**
          * 第二步覆盖最开头的数据
          */
@@ -175,19 +175,7 @@ function company_kline(id,code,lv,callback){
                                 }else
                                     dateString = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}:0`;
                                 
-                                if(head_date && date.getTime()===head_date.getTime()){
-                                    //接头部分需要覆盖
-                                    console.log(code,`update k${lv}: `,dateString);
-                                    sqlStr = `update k${lv}_xueqiu set ${str_pairs(lv,it)} where id=${id} and ${lv=='d'?'date':'timestamp'}='${dateString}'`;
-                                    connection.query(sqlStr,(error, results, field)=>{
-                                        if(error){
-                                            console.error(code,error);
-                                        }
-                                    });                                    
-                                    needContinue = false;
-                                }else{
-                                    datas.push(`(${id},'${dateString}',${str_colums(lv,it)})`);
-                                }
+                                datas.push(`(${id},'${dateString}',${str_colums(lv,it)})`);
 
                                 if(!needContinue)break;
                             }
@@ -213,16 +201,16 @@ function company_kline(id,code,lv,callback){
                                     }
                                 });
                             }else{
-                                //console.log(code,'DONE');
+                                console.log(code,'DONE1');
                                 callback();    
                             }
                         }else{
                             let err = res.body;
                             if(sl.data && sl.data.column && sl.data.item && sl.data.item.length && isCorrect(sl.data.column)){
-                                //console.log(code,'DONE');
+                                console.log(code,'DONE2');
                                 callback();
                             }else if(sl.data && sl.error_code==0){
-                                //console.log(code,'NO K');
+                                console.log(code,'NO K');
                                 callback();                                
                             }else{
                                 console.error(code,err);
@@ -237,7 +225,8 @@ function company_kline(id,code,lv,callback){
                 done();
             }
         });
-        nextdate = Date.now();
+        //nextdate = Date.now();
+        nextdate = head_date.getTime();
         c.queue({
             uri:xueqiuURI(nextdate),
             headers:{
@@ -252,7 +241,7 @@ function company_kline(id,code,lv,callback){
  * lvs是k线级别1,5,15,30,60,120,'d'数组
  */
 function download_kline(lvs,done){
-    paralle_companys_task('id,code',1,com=>cb=>{
+    paralle_companys_task('id,code',10,com=>cb=>{
         let task = [];
         for(let lv of lvs){
             task.push(
@@ -273,5 +262,18 @@ function download_kline(lvs,done){
         if(done)done();
     });
 }
+
+/**
+ * 补齐2013年到2005年的日线数据
+ * download_kline自动从数据的最早时间开始向前一直到目标时间
+ */
+/*
+download_kline([60],(err)=>{
+    if(err)
+        console.error(err);
+    else
+        console.log('DONE!');
+});
+*/
 
 module.exports = {download_kline,company_kline};
