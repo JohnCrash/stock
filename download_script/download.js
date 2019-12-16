@@ -6,7 +6,7 @@ const {download_kline,company_kline} = require('./xueqiu_kline');
 const {research_k15} = require('./research_k15');
 const async = require('async');
 const kline = [5,15,60,'d'];
-/*
+
 download_kline(kline,(err)=>{
     if(err)
         console.error(err);
@@ -15,9 +15,3 @@ download_kline(kline,(err)=>{
             console.log('DONE!');
         });
 });
-*/
-for(let lv of kline){
-    company_kline(8829,'SZ399001',lv,(err)=>{
-        console.error(err);
-    });
-}
