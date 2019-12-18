@@ -11,6 +11,7 @@ download_kline(kline,(err)=>{
     if(err)
         console.error(err);
     else
+        console.log('DONE!');
     //    research_k15((e)=>{
     //        console.log('DONE!');
     //    });
