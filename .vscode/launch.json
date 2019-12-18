@@ -21,7 +21,13 @@
             "request": "launch",
             "name": "Download K",
             "program": "${workspaceFolder}/download_script/download.js"
-        },     
+        },  
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Update Company",
+            "program": "${workspaceFolder}/download_script/update_company.js"
+        },           
         {
             "type": "node",
             "request": "launch",
