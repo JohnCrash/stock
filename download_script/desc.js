@@ -405,4 +405,4 @@ function update_company(done){
 //update_desc((err)=>{
 //    console.log('DONE!');
 //});
-module.exports = {update_company,update_desc};
+module.exports = {update_company,update_desc,desc_all};
