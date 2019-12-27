@@ -6,6 +6,7 @@ import math
 import ipywidgets as widgets
 from IPython.display import display
 from ipywidgets import Layout, Button, Box
+import time
 
 """绘制k线图"""
 def plotK(axs,k,bi,ei):
@@ -51,7 +52,8 @@ class MyFormatter(Formatter):
         ind = int(np.round(x))
         if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
             return ''
-        return str(self.dates[ind][0])
+        t = self.dates[ind][0]
+        return '%s-%s-%s'%(t.year,t.month,t.day)
 """kline 图显示"""
 """
 config {
@@ -68,7 +70,7 @@ config {
 }
 """
 class Plote:
-    def config(self,config):
+    def config(self,config={}):
         for k in config:
             self._config[k] = config[k]
         self._axsInx = 0
@@ -78,6 +80,7 @@ class Plote:
         self._showvolume = False
         self._showboll = False
         self._showvlines = False
+        self._showbest = False
         if 'ma' in self._config:
             self._showma = True
         if 'macd' in self._config and self._config['macd']:
@@ -93,38 +96,85 @@ class Plote:
         if 'volume' in self._config and self._config['volume']:
             self._volInx =self._axsInx+1
             self._axsInx += 1
+            self._volumeboll = stock.boll(self._k[:,0],20)
             self._showvolume = True
         self._widths = [1]
         self._heights = [3]
         for i in range(self._axsInx):
             self._heights.append(1)
         if 'boll' in self._config:            
-            self._boll = stock.bollLine(self._k,self._config['boll'])
+            self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
         if 'vlines' in self._config:
             self._showvlines = True
+        if 'best' in self._config and self._config['best']:
+            if self._showmacd:
+                self._minpt,self._maxpt = stock.MacdBestPt(self._k,self._macd)
+            else:
+                macd,_ = stock.macd(self._k)
+                self._minpt,self._maxpt = stock.MacdBestPt(self._k,macd)
+            self._showbest = True
 
     #company可以是kline数据，可以是code，也可以是公司名称
-    def __init__(self,company,config={}):
-        self._config = {"boll":20,"macd":True,"kdj":None,"volume":True,"debug":False}
+    def __init__(self,company,period='d',config={}):
+        self._config = {"boll":20,"macd":True,"volume":True,"debug":False}
+        self._period = period
+        if self._period=='d':
+            self._showcount = 120
+        elif int(self._period)==5: #48
+            self._showcount = 144
+        elif int(self._period)==15: #16
+            self._showcount = 112
+        elif int(self._period)==60: #4
+            self._showcount = 120
+        else:
+            self._showcount = 120
         if type(company)==np.ndarray:
             self._k = company
             self._company = None
             self._date = None
         elif type(company)==str:
-            self._company,self._k,self._date = stock.loadKline(company)
+            self._company,self._k,self._date = stock.loadKline(company,self._period)
         self.config(config)
+        self._backup = self._config
 
     def enable(self,k):
-        print('enable',k)
+        if k=='ma':
+            if 'ma' in self._backup:
+                self._config['ma'] = self._backup['ma']
+            else:
+                self._config['ma'] = [5,10,20,30,60]
+        elif k=='macd':
+            self._config['macd'] = True
+        elif k=='boll':
+            if 'boll' in self._backup:
+                self._config['boll'] = self._backup['boll']
+            else:
+                self._config['boll'] = 20
+        elif k=='kdj':
+            if 'kdj' in self._backup:
+                self._config['kdj'] = self._backup['kdj']
+            else:
+                self._config['kdj'] = 9
+        elif k=='vlines':
+            if 'vlines' in self._backup:
+                self._config['vlines'] = self._backup['vlines']
+            else:
+                self._config['vlines'] = []
+        elif k=='volume':
+            self._config['volume'] = True
+        elif k=='best':
+            self._config['best'] = True
+        self.config()
 
     def disable(self,k):
-        print('disable',k)
+        del self._config[k]
+        self.config()
 
     #显示K线图
-    def showKline(self,bi=None,ei=None,figsize=(28,16)):
+    def showKline(self,bi=None,ei=None,figsize=(30,16)):
         if bi is None:
-            bi = len(self._k)-100
+            bi = len(self._k)-self._showcount
         if ei is None:
             ei = len(self._k)
         gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
@@ -133,7 +183,27 @@ class Plote:
         
         if self._date is not None:
             axs[0].xaxis.set_major_formatter(MyFormatter(self._date))
-            
+        
+        if self._period=='d':
+            if self._date is not None:
+                xticks = []
+                for i in range(bi,ei):
+                    if self._date[i][0].weekday()==0:
+                        xticks.append(i)
+                xticks = np.array(xticks)
+            else:
+                xticks = np.arange(bi,ei,10)
+        else:
+            if int(self._period) == 15:
+                xticks = np.arange(bi,ei,16)
+            elif int(self._period) == 5:
+                xticks = np.arange(bi,ei,48)
+            elif int(self._period) == 60:
+                xticks = np.arange(bi,ei,4)
+        for i in range(self._axsInx+1):
+            axs[i].set_xlim(bi,ei)
+            axs[i].set_xticks(xticks)
+
         x = np.linspace(bi,ei-1,ei-bi)
         #绘制一系列的竖线贯彻整个图例
         if self._showvlines:
@@ -143,11 +213,19 @@ class Plote:
                 for v in lines:
                     if v>=bi and v<=ei:
                         plotVline(axs,v,c,linewidth=4 if c=='red' or c=='green' else 1)
+        if self._showbest:
+            for v in self._minpt:
+                if v>=bi and v<=ei:
+                    plotVline(axs,v,'green',linewidth=4)
+            for v in self._maxpt:
+                if v>=bi and v<=ei:
+                    plotVline(axs,v,'red',linewidth=4)
+
         """绘制均线"""                
         if self._showma:
             ct = {5:"orange",10:"cornflowerblue",20:"pink",30:"salmon",60:"violet",242:"lime"}
             for m in self._config['ma']:
-                xx,alv = stock.maRange(self._k,m,bi,ei)
+                xx,alv = stock.maRangeK(self._k,m,bi,ei)
                 if m in ct:
                     axs[0].plot(xx,alv,label="MA"+str(m),color=ct[m])
                 else:
@@ -164,6 +242,10 @@ class Plote:
         if self._showvolume:
             axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
             axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
+            axs[self._volInx].plot(x,self._volumeboll[bi:ei,0],label='low',color='magenta') #low
+            axs[self._volInx].plot(x,self._volumeboll[bi:ei,1],label='low',color='red') #mid
+            axs[self._volInx].plot(x,self._volumeboll[bi:ei,2],label='upper',color='orange') #upper            
+            axs[self._volInx].grid(True)
 
         if 'trans' in self._config:
             plotTransPt(axs,self._axsInx,self._config['trans'],bi,ei) 
@@ -182,9 +264,9 @@ class Plote:
         fig.autofmt_xdate()
         plt.show()
 
-    def show(self,bi=None,ei=None,figsize=(28,14)):
+    def show(self,bi=None,ei=None,figsize=(30,14)):
         if bi is None:
-            bi = len(self._k)-100
+            bi = len(self._k)-self._showcount
         if ei is None:
             ei = len(self._k)        
         nextbutton = widgets.Button(description="下一页")
@@ -203,6 +285,13 @@ class Plote:
             button_style='',
             tooltip='均线',
             icon='check')
+        volumetoggle = widgets.ToggleButton(
+            value=self._showvolume,
+            description='VOLUME',
+            disabled=False,
+            button_style='',
+            tooltip='成交量',
+            icon='check')            
         macdtoggle = widgets.ToggleButton(
             value=self._showmacd,
             description='MACD',
@@ -216,7 +305,14 @@ class Plote:
             disabled=False,
             button_style='',
             tooltip='KDJ',
-            icon='check')                     
+            icon='check')
+        besttoggle = widgets.ToggleButton(
+            value=self._showbest,
+            description='BEST',
+            disabled=False,
+            button_style='',
+            tooltip='BEST',
+            icon='check')                                 
         output = widgets.Output()
 
         items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
@@ -228,7 +324,7 @@ class Plote:
                             width='100%')
 
         words = ['correct', 'horse', 'battery', 'staple']
-        items = [prevbutton,nextbutton,bolltoggle,matoggle,macdtoggle,kdjtoggle]
+        items = [prevbutton,nextbutton,bolltoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
         box = Box(children=items, layout=box_layout)
         
         beginPT = bi
@@ -262,7 +358,7 @@ class Plote:
             if event['new']:
                 self.enable(source.description.lower())
             else:
-                self.disable(source.description.upper())
+                self.disable(source.description.lower())
             output.clear_output(wait=True)
             with output:
                 self.showKline(beginPT,endPT,figsize=figsize)
@@ -271,8 +367,10 @@ class Plote:
         prevbutton.on_click(on_prevbutton_clicked)
         bolltoggle.observe(on_change,names='value')
         matoggle.observe(on_change,names='value')
+        volumetoggle.observe(on_change,names='value')
         macdtoggle.observe(on_change,names='value')
         kdjtoggle.observe(on_change,names='value')
+        besttoggle.observe(on_change,names='value')
         display(box,output)
         with output:
             self.showKline(beginPT,endPT,figsize=figsize)

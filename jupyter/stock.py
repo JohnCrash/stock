@@ -1,11 +1,5 @@
 import MySQLdb
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import Formatter
-import math
-import ipywidgets as widgets
-from IPython.display import display
-from ipywidgets import Layout, Button, Box
 
 """
 加载股票数据
@@ -32,8 +26,9 @@ kdate {
     0 - [date,]
 }
 code 可以是代码或名称
+period = 'd','30','15','5'
 """
-def loadKline(code):
+def loadKline(code,period='d'):
     db = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
     if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
         if code[2]==':':
@@ -44,10 +39,13 @@ def loadKline(code):
         db.query("""select * from company where name='%s'"""%code)
     r = db.store_result()
     company = r.fetch_row()
-    db.query("""select volume,open,high,low,close,macd from kd_xueqiu where id=%s"""%company[0][0])
+    db.query("""select volume,open,high,low,close,macd from k%s_xueqiu where id=%s"""%(period,company[0][0]))
     r = db.store_result()
     k = r.fetch_row(r.num_rows())
-    db.query("""select date from kd_xueqiu where id=%s"""%company[0][0])
+    if period=='d':
+        db.query("""select date from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+    else:
+        db.query("""select timestamp from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
     r = db.store_result()
     kdate = r.fetch_row(r.num_rows())
     db.close()
@@ -161,13 +159,23 @@ def ma(k,n):
     m = np.empty(len(k))
     for i in range(len(k)):
         if i-n+1>=0:
+            m[i] = k[i-n+1:i+1].sum()/n
+        else:
+            m[i] = k[0:i+1].sum()/(i+1)
+    return m
+
+"""计算均线 n 表示多少日均线"""
+def maK(k,n):
+    m = np.empty(len(k))
+    for i in range(len(k)):
+        if i-n+1>=0:
             m[i] = k[i-n+1:i+1,4].sum()/n
         else:
             m[i] = k[0:i+1,4].sum()/(i+1)
     return m
 
 """计算指定范围的均线值"""
-def maRange(k,n,bi,ei):
+def maRangeK(k,n,bi,ei):
     m = np.empty(ei-bi)
     x = np.arange(bi,ei)
     for i in range(bi,ei):
@@ -205,8 +213,8 @@ def boll(k,n):
 """
 计算BOLL线
 """
-def bollLine(k,n):
-    mid = ma(k,n)
+def bollLineK(k,n):
+    mid = maK(k,n)
     """计算标准差"""
     MD = np.empty(len(k))
     for i in range(len(k)):
@@ -226,191 +234,6 @@ WIDTH=（布林上限值-布林下限值）/布林股价平均值
 """
 def bollWidth(b):
     return ((b[:,2]-b[:,0]))/b[:,1]
-
-"""绘制k线图"""
-def plotK(axs,k,bi,ei):
-    for i in range(bi,ei):
-        if k[i,1]>k[i,4]:
-            c = 'green'
-        else:
-            c = 'red'
-        axs.vlines(i,k[i,3],k[i,2],color=c,zorder=0)
-        if k[i,1]>k[i,4]:
-            axs.broken_barh([(i-0.4,0.8)],(k[i,1],k[i,4]-k[i,1]),facecolor=c,zorder=1)
-        else:
-            axs.broken_barh([(i-0.4,0.8)],(k[i,1],k[i,4]-k[i,1]),facecolor="white",edgecolor=c,zorder=1)
-            
-def plotVLine(axs,x,c):
-    for i in x:
-        axs.axvline(i,color=c,linestyle='--')
-        
-"""标注交易点"""
-def plotTransPt(axs,n,tr,bi,ei):
-    inx = np.logical_and(tr[:,0]>=bi,tr[:,0]<=ei)
-    axs[0].scatter(tr[inx,0],tr[inx,2],label='buy',marker=">",s=180,color='red')
-    plotVLine(axs[0],tr[inx,0],'red')
-    for i in range(1,n+1):
-        plotVLine(axs[i],tr[inx,0],'red')
-    inx = np.logical_and(tr[:,1]>=bi,tr[:,1]<=ei)
-    axs[0].scatter(tr[inx,1],tr[inx,3],label='sell',marker="<",s=180,color='blue')
-    plotVLine(axs[0],tr[inx,1],'blue')
-    for i in range(1,n+1):
-        plotVLine(axs[i],tr[inx,1],'blue')
-
-"""打印交易点"""
-def printTrans(k,ma,tr,bi,ei):
-    inx = np.logical_and(tr[:,0]>=bi,tr[:,0]<=ei)
-    #tr[inx,0] #buy pt
-    for ti in tr[inx,0]:
-        i = int(ti.item())
-        print("buy",i,k[i],ma[i])
-    inx = np.logical_and(tr[:,1]>=bi,tr[:,1]<=ei)
-    #tr[inx,1] #sell pt
-    for ti in tr[inx,1]:
-        i = int(ti.item())
-        print("sell",i,k[i],ma[i])
-
-def plotVline(axs,v,c,linestyle='--',linewidth=1):
-    for i in range(len(axs)):
-        axs[i].axvline(v,color=c,linestyle=linestyle,linewidth=linewidth)
-        
-class MyFormatter(Formatter):
-    def __init__(self, dates, fmt='%Y-%m-%d'):
-        self.dates = dates
-        self.fmt = fmt
-
-    def __call__(self, x, pos=0):
-        'Return the label for time x at position pos'
-        ind = int(np.round(x))
-        if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
-            return ''
-        return str(self.dates[ind][0])
-
-"""显示K线图，可以组合显示mas,kdj,macd"""
-def showKline(k,bi,ei,figsize=(28,16),volume=False,kdate=None,vlines=None,mas=None,boll=False,macd=None,kdj=None,trans=None,errors=None,print=False):
-    axsInx = 0
-    if macd is not None:
-        macdInx = axsInx+1
-        axsInx += 1
-    if kdj is not None:
-        kdjInx = axsInx+1
-        axsInx += 1
-    if volume:
-        volInx = axsInx+1
-        axsInx += 1
-    ht = [[1],[3,1],[3,1,1],[3,1,1,1],[3,1,1,1,1]]
-    widths = [1]
-    heights = ht[axsInx]
-    gs_kw = dict(width_ratios=widths, height_ratios=heights)
-    fig, axs = plt.subplots(axsInx+1, 1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
-    fig.subplots_adjust(hspace=0.02) #调整子图上下间距
-    
-    if kdate is not None:
-        axs[0].xaxis.set_major_formatter(MyFormatter(kdate))
-        
-    x = np.linspace(bi,ei-1,ei-bi)
-    
-    if vlines is not None:
-        for c in vlines:
-            lines = vlines[c]
-            for v in lines:
-                if v>=bi and v<=ei:
-                    plotVline(axs,v,c,linewidth=4 if c=='red' or c=='green' else 1)
-    """绘制均线"""                
-    if mas is not None:
-        ct = {5:"orange",10:"cornflowerblue",20:"pink",30:"salmon",60:"violet",242:"lime"}
-        for m in mas:
-            xx,alv = maRange(k,m,bi,ei)
-            if m in ct:
-                axs[0].plot(xx,alv,label="MA"+str(m),color=ct[m])
-            else:
-                axs[0].plot(xx,alv,label="MA"+str(m))
-    """绘制BOLL线"""
-    if boll:
-        bo = bollLine(k,boll if type(boll)==int else 20)
-        axs[0].plot(x,bo[bi:ei,0],label='low',color='magenta') #low
-        axs[0].plot(x,bo[bi:ei,1],label='mid',color='royalblue') #mid
-        axs[0].plot(x,bo[bi:ei,2],label='upper',color='orange') #upper
-    plotK(axs[0],k,bi,ei)
-    if volume:
-        axs[volInx].step(x, k[bi:ei,0],where='mid',label='volume')
-        axs[volInx].plot(x,k[bi:ei,0],label="volume",alpha=0.)
-    #axs[0].scatter(x,k[bi:ei+1,4],label="kline",color='orange')
-    if trans is not None:
-        plotTransPt(axs,axsInx,trans,bi,ei)
-        if print:
-            printTrans(k,kdj,trans,bi,ei)        
-    if errors is not None:
-        plotTransPt(axs,axsInx,errors,bi,ei)
-        if print:
-            printTrans(k,kdj,errors,bi,ei)        
-    axs[0].grid(True)
-
-    if macd is not None:
-        axs[macdInx].plot(x,macd[bi:ei],label="MACD",color='blue')
-        axs[macdInx].axhline(color='black')
-        axs[macdInx].grid(True)
-    if kdj is not None:
-        axs[kdjInx].plot(x,kdj[bi:ei,0],label="K",color='orange')
-        axs[kdjInx].plot(x,kdj[bi:ei,1],label="D",color='blue')
-        axs[kdjInx].plot(x,kdj[bi:ei,2],label="J",color='purple')
-        axs[kdjInx].grid(True)
-    fig.autofmt_xdate()
-    plt.show()
-
-"""支持翻看K线图"""
-def Kline(k,bi,ei,figsize=(28,14),volume=False,kdate=None,vlines=None,mas=None,boll=False,macd=None,kdj=None,trans=None,errors=None,print=False):
-    nextbutton = widgets.Button(description="下一页")
-    prevbutton = widgets.Button(description="上一页")
-    output = widgets.Output()
-    
-    #display([prevbutton,nextbutton], output)
-    #display(nextbutton, output)
-
-    items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
-
-    box_layout = Layout(display='flex',
-                        flex_flow='row',
-                        align_items='stretch',
-                        border='solid',
-                        width='50%')
-
-    words = ['correct', 'horse', 'battery', 'staple']
-    items = [prevbutton,nextbutton]
-    box = Box(children=items, layout=box_layout)
-    
-    beginPT = bi
-    endPT = ei
-    showRange = ei-bi
-    
-    def on_nextbutton_clicked(b):
-        nonlocal beginPT,endPT,showRange
-        beginPT += showRange
-        endPT += showRange
-        if endPT >= len(k):
-            endPT = len(k)
-            beginPT = endPT-showRange        
-        output.clear_output(wait=True)
-        with output:
-            showKline(k,beginPT,endPT,figsize=figsize,volume=volume,kdate=kdate,vlines=vlines,mas=mas,boll=boll,macd=macd,kdj=kdj,trans=trans,errors=errors)
-    
-    def on_prevbutton_clicked(b):
-        nonlocal beginPT,endPT,showRange
-        beginPT -= showRange
-        endPT -= showRange
-        if beginPT < 0 :
-            endPT = showRange
-            beginPT = 0
-        output.clear_output(wait=True)        
-        with output:
-            showKline(k,beginPT,endPT,figsize=figsize,volume=volume,kdate=kdate,vlines=vlines,mas=mas,boll=boll,macd=macd,kdj=kdj,trans=trans,errors=errors)
-            
-    nextbutton.on_click(on_nextbutton_clicked)
-    prevbutton.on_click(on_prevbutton_clicked)
-    
-    display(box,output)
-    with output:
-        showKline(k,beginPT,endPT,figsize=figsize,volume=volume,kdate=kdate,vlines=vlines,mas=mas,boll=boll,macd=macd,kdj=kdj,trans=trans,errors=errors)
 
 """
 计算MACD周期内的最低点和最高点
