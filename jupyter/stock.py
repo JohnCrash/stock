@@ -177,7 +177,24 @@ def SlopeRates(m):
     r[0] = 0
     r[1:len(m)] = m[1:len(m)]-m[0:len(m)-1]
     return r
-    
+
+"""
+单纯的计算boll
+"""
+def boll(k,n):
+    mid = ma(k,n)
+    """计算标准差"""
+    MD = np.empty(len(k))
+    for i in range(len(k)):
+        MA = mid[i]
+        if i-n+1>=0:
+            MD[i] = np.sqrt(((k[i-n+1:i+1]-MA)**2).sum()/n)
+        else:
+            MD[i] = np.sqrt(((k[0:i+1]-MA)**2).sum()/(i+1))
+    MB = mid
+    UP = MB+2*MD
+    DN = MB-2*MD
+    return np.hstack((DN.reshape(-1,1),MB.reshape(-1,1),UP.reshape(-1,1))) 
 """
 计算BOLL线
 """
