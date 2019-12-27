@@ -31,10 +31,17 @@ kline {
 kdate {
     0 - [date,]
 }
+code 可以是代码或名称
 """
 def loadKline(code):
     db = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
-    db.query("""select * from company where code='%s'"""%code)
+    if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
+        if code[2]==':':
+            db.query("""select * from company where code='%s'"""%code.replace(':',''))
+        else:
+            db.query("""select * from company where code='%s'"""%code)
+    else:
+        db.query("""select * from company where name='%s'"""%code)
     r = db.store_result()
     company = r.fetch_row()
     db.query("""select volume,open,high,low,close,macd from kd_xueqiu where id=%s"""%company[0][0])
@@ -45,7 +52,7 @@ def loadKline(code):
     kdate = r.fetch_row(r.num_rows())
     db.close()
     kline = np.array(k).reshape(-1,6)
-    return company,kline,kdate
+    return company[0],kline,kdate
 
 """计算指数移动平均线ema,公式来源于baidu"""
 def ema(k,n):
