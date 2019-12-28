@@ -67,6 +67,16 @@ config {
     trans : 交易点
     figsize : (w,h)
     debug : True or False 打印调试信息
+    figure : [[
+        {
+            name
+            color
+            linewidth
+            linestyle
+            data
+        },
+        ...
+    ],...]
 }
 """
 class Plote:
@@ -81,8 +91,15 @@ class Plote:
         self._showboll = False
         self._showvlines = False
         self._showbest = False
+        self._showfigure = False
         if 'ma' in self._config:
             self._showma = True
+        if 'figure' in self._config:
+            self._figureInx = []
+            for f in self._config['figure']:
+                self._figureInx.append(self._axsInx+1)
+                self._axsInx += 1
+            self._showfigure = True              
         if 'macd' in self._config and self._config['macd']:
             self._macdInx = self._axsInx+1
             self._axsInx += 1
@@ -114,6 +131,7 @@ class Plote:
                 macd,_ = stock.macd(self._k)
                 self._minpt,self._maxpt = stock.MacdBestPt(self._k,macd)
             self._showbest = True
+
 
     #company可以是kline数据，可以是code，也可以是公司名称
     def __init__(self,company,period='d',config={}):
@@ -165,6 +183,9 @@ class Plote:
             self._config['volume'] = True
         elif k=='best':
             self._config['best'] = True
+        elif k=='figure':
+            if 'figure' in self._backup:
+                self._config['figure'] = self._backup['figure']
         self.config()
 
     def disable(self,k):
@@ -180,10 +201,10 @@ class Plote:
         gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
         fig, axs = plt.subplots(self._axsInx+1, 1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
         fig.subplots_adjust(hspace=0.02) #调整子图上下间距
-        
+        axsK = axs if self._axsInx==0 else axs[0]
         if self._date is not None:
-            axs[0].xaxis.set_major_formatter(MyFormatter(self._date))
-        
+            axsK.xaxis.set_major_formatter(MyFormatter(self._date))
+        #时间坐标网格线，天的画在星期一，其他的以天为单位
         if self._period=='d':
             if self._date is not None:
                 xticks = []
@@ -200,9 +221,16 @@ class Plote:
                 xticks = np.arange(bi,ei,48)
             elif int(self._period) == 60:
                 xticks = np.arange(bi,ei,4)
-        for i in range(self._axsInx+1):
-            axs[i].set_xlim(bi,ei)
-            axs[i].set_xticks(xticks)
+
+        if self._axsInx==0:
+            axsK.set_xlim(bi,ei)
+            axsK.set_xticks(xticks)
+            axsK.grid(True)
+        else:
+            for i in range(self._axsInx+1):
+                axs[i].set_xlim(bi,ei)
+                axs[i].set_xticks(xticks)
+                axs[i].grid(True)
 
         x = np.linspace(bi,ei-1,ei-bi)
         #绘制一系列的竖线贯彻整个图例
@@ -213,6 +241,7 @@ class Plote:
                 for v in lines:
                     if v>=bi and v<=ei:
                         plotVline(axs,v,c,linewidth=4 if c=='red' or c=='green' else 1)
+        #绘制macd最佳买卖点
         if self._showbest:
             for v in self._minpt:
                 if v>=bi and v<=ei:
@@ -227,40 +256,55 @@ class Plote:
             for m in self._config['ma']:
                 xx,alv = stock.maRangeK(self._k,m,bi,ei)
                 if m in ct:
-                    axs[0].plot(xx,alv,label="MA"+str(m),color=ct[m])
+                    axsK.plot(xx,alv,label="MA"+str(m),color=ct[m])
                 else:
-                    axs[0].plot(xx,alv,label="MA"+str(m))
+                    axsK.plot(xx,alv,label="MA"+str(m))
         """绘制BOLL线"""
         if self._showboll:
-            axs[0].plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
-            axs[0].plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
-            axs[0].plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
-
-        axs[0].set_title('%s %s'%(self._company[2],self._company[1]))
-        plotK(axs[0],self._k,bi,ei)
-
+            axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
+            axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
+            axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
+        if self._company is not None:
+            axsK.set_title('%s %s'%(self._company[2],self._company[1]))
+        #绘制k线图
+        plotK(axsK,self._k,bi,ei)
+        #绘制成交量
         if self._showvolume:
             axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
             axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
             axs[self._volInx].plot(x,self._volumeboll[bi:ei,0],label='low',color='magenta') #low
             axs[self._volInx].plot(x,self._volumeboll[bi:ei,1],label='low',color='red') #mid
-            axs[self._volInx].plot(x,self._volumeboll[bi:ei,2],label='upper',color='orange') #upper            
+            axs[self._volInx].plot(x,self._volumeboll[bi:ei,2],label='upper',color='orange') #upper 
+            axs[self._volInx].axhline(color='black')           
             axs[self._volInx].grid(True)
-
+        #绘制交易点
         if 'trans' in self._config:
             plotTransPt(axs,self._axsInx,self._config['trans'],bi,ei) 
       
-        axs[0].grid(True)
-
+        axsK.grid(True)
+        #绘制macd
         if self._showmacd:
             axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue')
             axs[self._macdInx].axhline(color='black')
-            axs[self._macdInx].grid(True)
+        #绘制kdj
         if self._showkdj:
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,0],label="K",color='orange')
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,1],label="D",color='blue')
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,2],label="J",color='purple')
-            axs[self._kdjInx].grid(True)
+        #绘制额外的图表
+        if self._showfigure:
+            i = 0
+            for f in self._config['figure']:
+                axsinx = self._figureInx[i]
+                for p in f:
+                    if 'data' in p:
+                        axs[axsinx].plot(x,p['data'][bi:ei],
+                        label=p['name'] if 'name' in p else '',
+                        color=p['color'] if 'color' in p else 'blue',
+                        linewidth=p['linewidth'] if 'linewidth' in p else 1,
+                        linestyle=p['linestyle'] if 'linestyle' in p else '-'
+                        )
+                i+=1
         fig.autofmt_xdate()
         plt.show()
 
@@ -312,7 +356,15 @@ class Plote:
             disabled=False,
             button_style='',
             tooltip='BEST',
-            icon='check')                                 
+            icon='check')
+        if self._showfigure:
+            figuretoggle = widgets.ToggleButton(
+                value=self._showfigure,
+                description='FIGURE',
+                disabled=False,
+                button_style='',
+                tooltip='FIGURE',
+                icon='check')                               
         output = widgets.Output()
 
         items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
@@ -325,6 +377,8 @@ class Plote:
 
         words = ['correct', 'horse', 'battery', 'staple']
         items = [prevbutton,nextbutton,bolltoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+        if self._showfigure:
+            items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
         
         beginPT = bi
@@ -371,6 +425,9 @@ class Plote:
         macdtoggle.observe(on_change,names='value')
         kdjtoggle.observe(on_change,names='value')
         besttoggle.observe(on_change,names='value')
+        if self._showfigure:
+            figuretoggle.observe(on_change,names='value')
+
         display(box,output)
         with output:
             self.showKline(beginPT,endPT,figsize=figsize)
