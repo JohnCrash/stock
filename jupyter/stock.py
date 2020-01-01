@@ -101,12 +101,36 @@ def macdPrediction(k,m,emA,i,n):
         elif prevMacd < 0: #买入时预测值小于最大值
             return 1,cur
     return 0,cur
-        
+
+"""
+计算一般一个值的kdj
+"""
+def kdj(k,n=9):
+    kdj = np.empty([len(k),3]) #K,D,J
+    for i in range(len(k)):
+        if i-n+1>=0:
+            prevn = k[i-n+1:i+1]
+        else:
+            prevn = k[0:i+1]
+        Ln = prevn.min()
+        Hn = prevn.max()
+        if Hn-Ln==0:
+            rsv = (k[i]-Ln)*100.    
+        else:
+            rsv = (k[i]-Ln)*100./(Hn-Ln)
+        if i>=1:
+            kdj[i,0] = 2.*kdj[i-1,0]/3.+rsv/3.
+            kdj[i,1] = 2.*kdj[i-1,1]/3.+kdj[i,0]/3.
+        else:
+            kdj[i,0] = 2.*50./3.+rsv/3.
+            kdj[i,1] = 2.*50./3.+kdj[i,0]/3.            
+        kdj[i,2] = 3.*kdj[i,0]-2.*kdj[i,1]
+    return kdj        
 """计算kdj
 n日RSV=（Cn－Ln）/（Hn－Ln）×100
 公式中，Cn为第n日收盘价；Ln为n日内的最低价；Hn为n日内的最高价。
 """
-def kdj(k,n):
+def kdjK(k,n=9):
     kdj = np.empty([len(k),3]) #K,D,J
     for i in range(len(k)):
         if i-n+1>=0:
@@ -115,7 +139,10 @@ def kdj(k,n):
             prevn = k[0:i+1,2:4]
         Ln = prevn.min()
         Hn = prevn.max()
-        rsv = (k[i,4]-Ln)*100./ (Hn-Ln)
+        if Hn-Ln==0:
+            rsv = (k[i,4]-Ln)*100.
+        else:
+            rsv = (k[i,4]-Ln)*100./ (Hn-Ln)
         if i>=1:
             kdj[i,0] = 2.*kdj[i-1,0]/3.+rsv/3.
             kdj[i,1] = 2.*kdj[i-1,1]/3.+kdj[i,0]/3.
@@ -196,7 +223,7 @@ def SlopeRates(m):
 """
 单纯的计算boll
 """
-def boll(k,n):
+def boll(k,n=20):
     mid = ma(k,n)
     """计算标准差"""
     MD = np.empty(len(k))
@@ -213,7 +240,7 @@ def boll(k,n):
 """
 计算BOLL线
 """
-def bollLineK(k,n):
+def bollLineK(k,n=20):
     mid = maK(k,n)
     """计算标准差"""
     MD = np.empty(len(k))

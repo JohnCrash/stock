@@ -38,7 +38,7 @@ def plotVLine(axs,x,c):
     for i in x:
         axs.axvline(i,color=c,linestyle='--')
 
-def plotVline(axs,v,c,linestyle='--',linewidth=1):
+def plotVline(axs,v,c,linestyle='-',linewidth=1):
     for i in range(len(axs)):
         axs[i].axvline(v,color=c,linestyle=linestyle,linewidth=linewidth)
 
@@ -67,7 +67,7 @@ config {
     trans : 交易点
     figsize : (w,h)
     debug : True or False 打印调试信息
-    figure : [[
+    figure : [[ 额外的图例
         {
             name
             color
@@ -77,6 +77,7 @@ config {
         },
         ...
     ],...]
+    cb : function(self,axs,bi,ei)
 }
 """
 class Plote:
@@ -108,13 +109,18 @@ class Plote:
         if 'kdj' in self._config and self._config['kdj'] is not None:
             self._kdjInx = self._axsInx+1
             self._axsInx += 1
-            self._kdj = stock.kdj(self._k,self._config['kdj'])
+            if type(self._config['kdj'])==int:
+                self._kdj = stock.kdjK(self._k,self._config['kdj'])
+            elif type(self._config['kdj'])==np.ndarray:
+                self._kdj = self._config['kdj']
             self._showkdj = True
         if 'volume' in self._config and self._config['volume']:
             self._volInx =self._axsInx+1
             self._axsInx += 1
             self._volumeboll = stock.boll(self._k[:,0],20)
             self._showvolume = True
+        #将大盘指数的收盘价显示在图表中
+        
         self._widths = [1]
         self._heights = [3]
         for i in range(self._axsInx):
@@ -153,8 +159,23 @@ class Plote:
             self._date = None
         elif type(company)==str:
             self._company,self._k,self._date = stock.loadKline(company,self._period)
+        #将大盘指数画在图表中            
+        if "index" in self._config and self._config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
+            #这里做日期对齐
+            _,szk,szd = stock.loadKline('SZ:399001',self._period)
+            K = np.zeros((len(self._k)))
+            j = 0
+            for i in range(len(self._date)):
+                for k in range(j,len(szd)-i):
+                    if szd[i+k][0] == self._date[i][0]:
+                        K[i] = szk[i+k,4]
+                        j = k
+                        break
+            self._szclose = K
+        else:
+            self._szclose = None
         self.config(config)
-        self._backup = self._config
+        self._backup = self._config.copy()
 
     def enable(self,k):
         if k=='ma':
@@ -191,6 +212,19 @@ class Plote:
     def disable(self,k):
         del self._config[k]
         self.config()
+
+    #给出时间返回索引
+    def date2index(self,d):
+        for i in range(len(self._date)):
+            if d == self._date[i][0]:
+                return i
+        return 0
+    
+    def index2date(self,i):
+        if i>=len(self._date):
+            return self._date[-1][0]
+        else:
+            return self._date[i][0]
 
     #显示K线图
     def showKline(self,bi=None,ei=None,figsize=(30,16)):
@@ -236,11 +270,12 @@ class Plote:
         #绘制一系列的竖线贯彻整个图例
         if self._showvlines:
             vlines = self._config['vlines']
-            for c in vlines:
-                lines = vlines[c]
-                for v in lines:
+            for lines in vlines:
+                for v in lines['x']:
                     if v>=bi and v<=ei:
-                        plotVline(axs,v,c,linewidth=4 if c=='red' or c=='green' else 1)
+                        plotVline(axs,v,lines['color'] if 'color' in lines else 'blue',
+                        linewidth=lines['linewidth'] if 'linewidth' in lines else 1,
+                        linestyle=lines['linestyle'] if 'linestyle' in lines else '-',)
         #绘制macd最佳买卖点
         if self._showbest:
             for v in self._minpt:
@@ -268,6 +303,13 @@ class Plote:
             axsK.set_title('%s %s'%(self._company[2],self._company[1]))
         #绘制k线图
         plotK(axsK,self._k,bi,ei)
+        #将大盘数据绘制在K线图上
+        if self._szclose is not None:
+            kmax = self._k[bi:ei,1:4].max()
+            kmin = self._k[bi:ei,1:4].min()
+            szkmax = self._szclose[bi:ei].max()
+            szkmin = self._szclose[bi:ei].min()
+            axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='red',linewidth=2,alpha=0.5)
         #绘制成交量
         if self._showvolume:
             axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
@@ -305,16 +347,27 @@ class Plote:
                         linestyle=p['linestyle'] if 'linestyle' in p else '-'
                         )
                 i+=1
+        #一个从外部进行调整图表的手段                
+        if 'cb' in self._config:
+            self._config['cb'](self,axs,bi,ei)
         fig.autofmt_xdate()
         plt.show()
 
-    def show(self,bi=None,ei=None,figsize=(30,14)):
+    #code2另一只股票，进行比较显示
+    def show(self,bi=None,ei=None,code2=None,figsize=(30,14)):
         if bi is None:
             bi = len(self._k)-self._showcount
         if ei is None:
-            ei = len(self._k)        
+            ei = len(self._k)
+        if code2 is not None:
+            figsize = (30,8)
+            figure2 = Plote(code2,self._period)
+        else:
+            figure2 = None
         nextbutton = widgets.Button(description="下一页")
         prevbutton = widgets.Button(description="上一页")
+        zoominbutton = widgets.Button(description="+")
+        zoomoutbutton = widgets.Button(description="-")
         bolltoggle = widgets.ToggleButton(
             value=self._showboll,
             description='BOLL',
@@ -376,7 +429,7 @@ class Plote:
                             width='100%')
 
         words = ['correct', 'horse', 'battery', 'staple']
-        items = [prevbutton,nextbutton,bolltoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -385,6 +438,17 @@ class Plote:
         endPT = ei
         showRange = ei-bi
         
+        def showline():
+            output.clear_output(wait=True)
+            with output:
+                self.showKline(beginPT,endPT,figsize=figsize)
+                if figure2 is not None:
+                    bi = figure2.date2index( self.index2date(beginPT) )
+                    ei = figure2.date2index( self.index2date(endPT) )
+                    if bi != ei:
+                        figure2.showKline(bi,ei,figsize=figsize)
+
+
         def on_nextbutton_clicked(b):
             nonlocal beginPT,endPT,showRange
             beginPT += showRange
@@ -392,9 +456,7 @@ class Plote:
             if endPT >= len(self._k):
                 endPT = len(self._k)
                 beginPT = endPT-showRange        
-            output.clear_output(wait=True)
-            with output:
-                self.showKline(beginPT,endPT,figsize=figsize)
+            showline()
         
         def on_prevbutton_clicked(b):
             nonlocal beginPT,endPT,showRange
@@ -403,22 +465,37 @@ class Plote:
             if beginPT < 0 :
                 endPT = showRange
                 beginPT = 0
-            output.clear_output(wait=True)        
-            with output:
-                self.showKline(beginPT,endPT,figsize=figsize)
-        
+            showline()
+
+        def on_zoomin(b):
+            nonlocal beginPT,endPT,showRange
+            showRange = math.floor(showRange/2)
+            beginPT = endPT - showRange
+            showline()
+
+        def on_zoomout(b):
+            nonlocal beginPT,endPT,showRange
+            showRange *= 2
+            beginPT = endPT - showRange
+            if beginPT < 0:
+                beginPT = 0
+                endPT = beginPT+showRange
+            showline()
+
         def on_change(event):
             source = event['owner']
             if event['new']:
                 self.enable(source.description.lower())
             else:
                 self.disable(source.description.lower())
-            output.clear_output(wait=True)
-            with output:
-                self.showKline(beginPT,endPT,figsize=figsize)
+            showline()
 
         nextbutton.on_click(on_nextbutton_clicked)
         prevbutton.on_click(on_prevbutton_clicked)
+
+        zoominbutton.on_click(on_zoomin)
+        zoomoutbutton.on_click(on_zoomout)
+
         bolltoggle.observe(on_change,names='value')
         matoggle.observe(on_change,names='value')
         volumetoggle.observe(on_change,names='value')
@@ -431,3 +508,9 @@ class Plote:
         display(box,output)
         with output:
             self.showKline(beginPT,endPT,figsize=figsize)
+            if figure2 is not None:
+                bi = figure2.date2index( self.index2date(beginPT) )
+                ei = figure2.date2index( self.index2date(endPT) )
+                if bi != ei:
+                    figure2.showKline(bi,ei,figsize=figsize)
+
