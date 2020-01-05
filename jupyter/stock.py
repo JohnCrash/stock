@@ -1,5 +1,6 @@
 import MySQLdb
 import numpy as np
+import math
 
 """
 加载股票数据
@@ -39,7 +40,7 @@ def loadKline(code,period='d'):
         db.query("""select * from company where name='%s'"""%code)
     r = db.store_result()
     company = r.fetch_row()
-    db.query("""select volume,open,high,low,close,macd from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+    db.query("""select volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))
     r = db.store_result()
     k = r.fetch_row(r.num_rows())
     if period=='d':
@@ -49,7 +50,7 @@ def loadKline(code,period='d'):
     r = db.store_result()
     kdate = r.fetch_row(r.num_rows())
     db.close()
-    kline = np.array(k).reshape(-1,6)
+    kline = np.array(k).reshape(-1,5)
     return company[0],kline,kdate
 
 """计算指数移动平均线ema,公式来源于baidu"""
@@ -296,4 +297,42 @@ def MacdBestPt(k,m):
             maxi = i
         prev = m[i]
     return np.array(minpts),np.array(maxpts)        
+
+"""
+将k进行合并，例如日k合并为周k
+"""
+def mergeK(k,n):
+    m = len(k)%n
+    L = math.floor(len(k)/n)
+    l = L+(1 if m!=0 else 0)
+    w = np.zeros((l,5))
+    for i in range(L):
+        w[i,0] = k[i*n:i*n+n,0].sum() #volume
+        w[i,1] = k[i*n,1] #open
+        w[i,2] = k[i*n:i*n+n,2].max() #high
+        w[i,3] = k[i*n:i*n+n,3].min() #low
+        w[i,4] = k[i*n+n-1,4] #close
+    if m>0:
+        w[-1,0] = k[L*n:,0].sum() #volume
+        w[-1,1] = k[L*n,1] #open
+        w[-1,2] = k[L*n:,2].max() #high
+        w[-1,3] = k[L*n:,3].min() #low
+        w[-1,4] = k[-1,4] #close
+    return w
+
+"""
+将数据d放大到L的长度，中间用临近相同数据填充
+"""
+def scaleTo1d(d,L):
+    n = len(d)
+    s = L/n - math.floor(L/n)
+    if s<0.5:
+        N = math.floor(L/n)
+    else:
+        N = math.floor(L/n)+1
     
+    p = np.empty((math.ceil(L/N),N))
+    for i in range(N):
+        p[:,i] = d
+    a = p.reshape(-1)
+    return a[0:L]

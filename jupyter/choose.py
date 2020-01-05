@@ -168,7 +168,7 @@ def analysisBuySell(company,k,t):
         wr.append(len(t[i]))
 
     gs_kw = dict(width_ratios=wr, height_ratios=[1])
-    fig, axs = plt.subplots(1, len(t),figsize=(28,12),sharey=True,gridspec_kw = gs_kw)
+    fig, axs = plt.subplots(1, len(t),figsize=(30,5),sharey=True,gridspec_kw = gs_kw)
     fig.subplots_adjust(wspace=0.01)
     axs[0].set_title('%s %s'%(company[2],company[1]))
     R = []
@@ -177,7 +177,7 @@ def analysisBuySell(company,k,t):
         r = buySellReturnRate(k,p)
         R.append(r)
         n = len(r)
-        print(r.mean(),(r>1).sum()/len(r))
+        print('平均收益',r.mean(),'成功率',(r>1).sum()/len(r))
         axs[i].plot(np.arange(n),r)
         axs[i].axhline(r.mean(),color='red')
         axs[i].axhline(1,color='black')
@@ -187,4 +187,4 @@ def analysisBuySell(company,k,t):
     for i in range(maxx-minx):
         r[i] = R[maxi][i:i+minx].mean()
         s[i] = (R[maxi][i:i+minx]>1).sum()/minx
-    print(r.max(),s.max())
+    print('平移最佳平均收益：',r.max(),'平移最佳成功率：',s.max())
