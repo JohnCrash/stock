@@ -93,6 +93,7 @@ class Plote:
         self._showvlines = False
         self._showbest = False
         self._showfigure = False
+        self._showbollwidth = False
         if 'ma' in self._config:
             self._showma = True
         if 'figure' in self._config:
@@ -100,7 +101,17 @@ class Plote:
             for f in self._config['figure']:
                 self._figureInx.append(self._axsInx+1)
                 self._axsInx += 1
-            self._showfigure = True              
+            self._showfigure = True
+
+        if 'boll' in self._config:            
+            self._boll = stock.bollLineK(self._k,self._config['boll'])
+            self._showboll = True            
+        if 'bollwidth' in self._config and self._config['bollwidth']:
+            self._bollwidthInx = self._axsInx+1
+            self._axsInx += 1
+            self._showbollwidth = True
+            self._bollwidth = stock.bollWidth(self._boll)
+
         if 'macd' in self._config and self._config['macd']:
             self._macdInx = self._axsInx+1
             self._axsInx += 1
@@ -125,9 +136,6 @@ class Plote:
         self._heights = [3]
         for i in range(self._axsInx):
             self._heights.append(1)
-        if 'boll' in self._config:            
-            self._boll = stock.bollLineK(self._k,self._config['boll'])
-            self._showboll = True
         if 'vlines' in self._config:
             self._showvlines = True
         if 'best' in self._config and self._config['best']:
@@ -141,7 +149,7 @@ class Plote:
 
     #company可以是kline数据，可以是code，也可以是公司名称
     def __init__(self,company,period='d',config={}):
-        self._config = {"boll":20,"macd":True,"volume":True,"debug":False}
+        self._config = {"boll":20,"bollwidth":0.2,"macd":True,"volume":True,"debug":False}
         self._period = period
         if self._period=='d':
             self._showcount = 120
@@ -190,6 +198,11 @@ class Plote:
                 self._config['boll'] = self._backup['boll']
             else:
                 self._config['boll'] = 20
+        elif k=='bollwidth':
+            if 'bollwidth' in self._backup:
+                self._config['bollwidth'] = self._backup['bollwidth']
+            else:
+                self._config['bollwidth'] = 0.2
         elif k=='kdj':
             if 'kdj' in self._backup:
                 self._config['kdj'] = self._backup['kdj']
@@ -276,6 +289,11 @@ class Plote:
                         plotVline(axs,v,lines['color'] if 'color' in lines else 'blue',
                         linewidth=lines['linewidth'] if 'linewidth' in lines else 1,
                         linestyle=lines['linestyle'] if 'linestyle' in lines else '-',)
+        #绘制bollwidth
+        if self._showbollwidth:
+            axs[self._bollwidthInx].plot(x,self._bollwidth[bi:ei],color='red',linewidth=2)
+            axs[self._bollwidthInx].axhline(self._config['bollwidth'],color='black') 
+            axs[self._bollwidthInx].axhline(0.1,color='green') 
         #绘制macd最佳买卖点
         if self._showbest:
             for v in self._minpt:
@@ -375,6 +393,13 @@ class Plote:
             button_style='',
             tooltip='BOLL线',
             icon='check')
+        bollwidthtoggle = widgets.ToggleButton(
+            value=self._showbollwidth,
+            description='BOLLWIDTH',
+            disabled=False,
+            button_style='',
+            tooltip='BOLL宽度',
+            icon='check')            
         matoggle = widgets.ToggleButton(
             value=self._showma,
             description='MA',
@@ -429,7 +454,7 @@ class Plote:
                             width='100%')
 
         words = ['correct', 'horse', 'battery', 'staple']
-        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -497,6 +522,7 @@ class Plote:
         zoomoutbutton.on_click(on_zoomout)
 
         bolltoggle.observe(on_change,names='value')
+        bollwidthtoggle.observe(on_change,names='value')
         matoggle.observe(on_change,names='value')
         volumetoggle.observe(on_change,names='value')
         macdtoggle.observe(on_change,names='value')

@@ -1,5 +1,6 @@
 import numpy as np
 import stock
+import matplotlib.pyplot as plt
 
 #返回满足条件的范围数据
 def argRange(d):
@@ -40,15 +41,17 @@ def macdRange(k):
     macd,_= stock.macd(k)
     return argRange(macd>0)
 
-#返回窄布林通道,UT表示布林宽的上限,WT表示通道最小和最大的差上限,LT表示通道的长度下限
+"""
+返回窄布林通道,UT表示布林宽的上限,WT表示通道最小和最大的差上限,LT表示通道的长度下限
+"""
 def bollSelectRange(k,n=20,UT=0.2,LT=15):
     bo = stock.bollLineK(k,n)
     bw = stock.bollWidth(bo)
     r = argRange(bw<UT)
     R = []
     for b in r:
-        if b[1]-b[0]>LT:
-            R.append([b[0]-LT,b[1]])
+        if b[1]-b[0]>LT: 
+            R.append([b[0]+LT,b[1]])
     return np.array(R)
 
 #将范围表示转换为索引表示
@@ -79,9 +82,19 @@ def priceLandRange(k,UT=0.2,LT=15):
     pass
 
 #返回成交量大于n日均线值多少的r倍
-def volumeIndexs(k,r=1.5,n=20):
+def volumeMaIndexs(k,r=1.5,n=20):
     ma = stock.ma(k[:,0],n)
     return argWhere(k[:,0]/ma>r)
+
+#价格必须站上n日均线上
+def priceMaIndexs(k,n=20):
+    ma = stock.maK(k,n)
+    return argWhere(k[:,4]>ma)
+
+#价格增长
+def priceGrowIndexs(k):
+    g = k[:,4]-k[:,1]
+    return argWhere(g>0)
 
 #返回符合量价条件的范围点
 def volumePriceIndexs(k,n,r):
@@ -112,3 +125,66 @@ def rangeFirstIndexs(r,inds,n):
                 R.append(i)
                 break
     return np.array(R,dtype=np.int32)
+
+#将买入点索引buy和卖出点索引sell，匹配成完整的交易
+def buySellMatch(buy,sell):
+    p = flatIndexs(sell,sell.max()+1)
+    t = []
+    buyL = len(buy)
+    for i in range(buyL):
+        inx = buy[i]
+        nex = buy[i+1] if i+1<buyL else len(p)
+        for j in range(inx,min(nex,len(p))):
+            if p[j]:
+                t.append([inx,j])
+                break
+    return np.array(t,dtype=np.int32)
+
+#计算买卖获利表
+def buySellReturnRate(k,t):
+    return k[t[:,1],4]/k[t[:,0],4]
+
+def minMaxLength(t):
+    minx = 9999999
+    mini = 0
+    maxx = 0
+    maxi = 0
+    for i in range(len(t)):
+        v = t[i]
+        if maxx < len(v):
+            maxx = len(v)
+            maxi = i
+        if minx > len(v):
+            minx = len(v)
+            mini = i
+    return minx,mini,maxx,maxi
+
+#t是交易买入点和卖出点对,数组
+def analysisBuySell(company,k,t):
+    wr = []
+    minx,mini,maxx,maxi = minMaxLength(t)
+
+    for i in range(len(t)):
+        wr.append(len(t[i]))
+
+    gs_kw = dict(width_ratios=wr, height_ratios=[1])
+    fig, axs = plt.subplots(1, len(t),figsize=(28,12),sharey=True,gridspec_kw = gs_kw)
+    fig.subplots_adjust(wspace=0.01)
+    axs[0].set_title('%s %s'%(company[2],company[1]))
+    R = []
+    for i in range(len(t)):
+        p = t[i]
+        r = buySellReturnRate(k,p)
+        R.append(r)
+        n = len(r)
+        print(r.mean(),(r>1).sum()/len(r))
+        axs[i].plot(np.arange(n),r)
+        axs[i].axhline(r.mean(),color='red')
+        axs[i].axhline(1,color='black')
+
+    r = np.zeros((maxx-minx))
+    s = np.zeros((maxx-minx))
+    for i in range(maxx-minx):
+        r[i] = R[maxi][i:i+minx].mean()
+        s[i] = (R[maxi][i:i+minx]>1).sum()/minx
+    print(r.max(),s.max())
