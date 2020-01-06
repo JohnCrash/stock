@@ -271,6 +271,7 @@ m 为macd数组
 def MacdBestPt(k,m):
     minpts = []
     maxpts = []
+    pts = []
     prev = m[0]
     minx = 10*k[0,2]
     mini = 0
@@ -289,14 +290,23 @@ def MacdBestPt(k,m):
         else:
             if m[i]>0:
                 minpts.append(mini)
+                pts.append(mini)
             else:
                 maxpts.append(maxi)
+                pts.append(maxi)
             minx = k[i,3]
             mini = i
             maxx = k[i,2]
             maxi = i
         prev = m[i]
-    return np.array(minpts),np.array(maxpts)        
+    if mini!=maxi:
+        if m[-1]<0:
+            minpts.append(mini)
+            pts.append(mini)
+        else:
+            maxpts.append(maxi)
+            pts.append(maxi)
+    return np.array(minpts),np.array(maxpts),np.array(pts)  
 
 """
 将k进行合并，例如日k合并为周k

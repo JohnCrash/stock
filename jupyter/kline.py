@@ -7,6 +7,7 @@ import ipywidgets as widgets
 from IPython.display import display
 from ipywidgets import Layout, Button, Box
 import time
+import trend
 
 """绘制k线图"""
 def plotK(axs,k,bi,ei):
@@ -62,6 +63,7 @@ config {
     volume : True or False
     macd : True or False
     boll : n
+    trend: True or False #趋势线
     kdate : 日期表
     vlines : {} 竖线
     trans : 交易点
@@ -94,6 +96,7 @@ class Plote:
         self._showbest = False
         self._showfigure = False
         self._showbollwidth = False
+        self._showtrend = False
         if 'ma' in self._config:
             self._showma = True
         if 'figure' in self._config:
@@ -105,7 +108,12 @@ class Plote:
 
         if 'boll' in self._config:            
             self._boll = stock.bollLineK(self._k,self._config['boll'])
-            self._showboll = True            
+            self._showboll = True
+        if 'trend' in self._config and self._config['trend']:
+            macd,_ = stock.macd(self._k)
+            self._trend = trend.trendK(self._k,macd)
+            self._showtrend = True
+
         if 'bollwidth' in self._config and self._config['bollwidth']:
             self._bollwidthInx = self._axsInx+1
             self._axsInx += 1
@@ -115,7 +123,11 @@ class Plote:
         if 'macd' in self._config and self._config['macd']:
             self._macdInx = self._axsInx+1
             self._axsInx += 1
-            self._macd,_ = stock.macd(self._k)
+            #防止计算两边macd
+            if self._showtrend:
+                self._macd = macd
+            else:
+                self._macd,_ = stock.macd(self._k)
             self._showmacd = True
         if 'kdj' in self._config and self._config['kdj'] is not None:
             self._kdjInx = self._axsInx+1
@@ -140,16 +152,16 @@ class Plote:
             self._showvlines = True
         if 'best' in self._config and self._config['best']:
             if self._showmacd:
-                self._minpt,self._maxpt = stock.MacdBestPt(self._k,self._macd)
+                self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             else:
                 macd,_ = stock.macd(self._k)
-                self._minpt,self._maxpt = stock.MacdBestPt(self._k,macd)
+                self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,macd)
             self._showbest = True
 
 
     #company可以是kline数据，可以是code，也可以是公司名称
     def __init__(self,company,period='d',config={}):
-        self._config = {"boll":20,"bollwidth":0.2,"macd":True,"volume":True,"debug":False}
+        self._config = {"boll":20,"bollwidth":0.2,"macd":True,"volume":True,"trend":True,"debug":False}
         self._period = period
         if self._period=='d':
             self._showcount = 120
@@ -191,6 +203,8 @@ class Plote:
                 self._config['ma'] = self._backup['ma']
             else:
                 self._config['ma'] = [5,10,20,30,60]
+        elif k=='trend':
+            self._config['trend'] = True
         elif k=='macd':
             self._config['macd'] = True
         elif k=='boll':
@@ -298,10 +312,10 @@ class Plote:
         if self._showbest:
             for v in self._minpt:
                 if v>=bi and v<=ei:
-                    plotVline(axs,v,'green',linewidth=4)
+                    plotVline(axs,v,'green',linewidth=4,linestyle='-.')
             for v in self._maxpt:
                 if v>=bi and v<=ei:
-                    plotVline(axs,v,'red',linewidth=4)
+                    plotVline(axs,v,'red',linewidth=4,linestyle='-.')
 
         """绘制均线"""                
         if self._showma:
@@ -317,6 +331,15 @@ class Plote:
             axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
             axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
             axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
+        #绘制趋势线
+        if self._showtrend:
+            for line in self._trend:
+                if line[1]>bi and line[0]<ei:
+                    x0 = line[0]
+                    x1 = line[1]
+                    k = line[2]
+                    b = line[3]
+                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=3)
         if self._company is not None:
             axsK.set_title('%s %s'%(self._company[2],self._company[1]))
         #绘制k线图
@@ -324,7 +347,7 @@ class Plote:
         #将大盘数据绘制在K线图上
         if self._szclose is not None:
             kmax = self._k[bi:ei,1:4].max()
-            kmin = self._k[bi:ei,1:4].min()
+            kmin = self._k[bi:ei,1:4].min()  
             szkmax = self._szclose[bi:ei].max()
             szkmin = self._szclose[bi:ei].min()
             axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='red',linewidth=2,alpha=0.5)
@@ -393,6 +416,13 @@ class Plote:
             button_style='',
             tooltip='BOLL线',
             icon='check')
+        trendtoggle = widgets.ToggleButton(
+            value=self._showbollwidth,
+            description='trend',
+            disabled=False,
+            button_style='',
+            tooltip='趋势线',
+            icon='check')              
         bollwidthtoggle = widgets.ToggleButton(
             value=self._showbollwidth,
             description='BOLLWIDTH',
@@ -454,7 +484,7 @@ class Plote:
                             width='100%')
 
         words = ['correct', 'horse', 'battery', 'staple']
-        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -521,6 +551,7 @@ class Plote:
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
 
+        trendtoggle.observe(on_change,names='value')
         bolltoggle.observe(on_change,names='value')
         bollwidthtoggle.observe(on_change,names='value')
         matoggle.observe(on_change,names='value')
