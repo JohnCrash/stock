@@ -36,14 +36,14 @@ def k2x4(bi,ei,k):
     x[:,1] = k[bi:ei,1:5].reshape(-1)
     return x
 """
-返回趋势数组
+返回基于macd最值的趋势数组
 [
-    [bi,ei,k,b,R,b1,b2], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度，b1表示下限斜截，b2表示上限斜截
+    [bi,ei,k,b,R,b1,b2], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
     ...
 ]
 m是macd，该算法基于macd的周期
 """
-def trendK(k,m):
+def macdTrend(k,m):
     lo,hi,pts = stock.MacdBestPt(k,m)
     lines = []
     bi = 0
@@ -51,9 +51,78 @@ def trendK(k,m):
     for i in range(len(pts)-1):
         bi = pts[i]
         ei = pts[i+1]
-        line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
-        lines.append(line)
-    if ei!=0 and ei<len(k):
+        if bi<ei:
+            line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
+            lines.append(line)
+    if ei!=0 and ei<len(k)-1:
         line = [ei,len(k)-1]+lastSequaresLine(k2x4(ei,len(k)-1,k))
         lines.append(line)
     return np.array(lines)
+
+"""
+返回最大偏离值
+"""
+def maxDeviation(k,bi,ei,line):
+    x = np.arange(bi,ei+1)
+    p = (k[x,1]+k[x,2]+k[x,3]+k[x,4])/4-line[0]*x-line[1]
+    return np.abs(p).max()
+
+"""
+返回符合条件的匹配
+"""
+def fit(k,bi,ei,dt):
+    if ei>bi:
+        line = lastSequaresLine(k2x4(bi,ei+1,k))
+        return maxDeviation(k,bi,ei,line)<dt,line
+    else:
+        return False,[]
+"""
+返回最大偏离小于dt的趋势数组
+[
+    [bi,ei,k,b,R], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
+    ...
+]
+"""
+def fractal(k,dt):
+    lines = []
+    bi = 0
+    while bi<len(k)-1:
+        ei = bi
+        line=None
+        for i in range(bi+1,len(k)):
+            b,li = fit(k,bi,i,dt)
+            if not b:
+                if ei != bi:
+                    lines.append([bi,ei]+line)
+                    line=None
+                else:
+                    ei+=1
+                break
+            ei = i
+            line = li
+        if line is not None:
+            lines.append([bi,ei]+line)
+        bi = ei
+    return np.array(lines)
+
+"""
+将小趋势合并成大趋势,偏离小于dt
+返回更大的趋势
+[
+    [bi,ei,k,b,R], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
+    ...
+]
+"""
+def large(k,tr,dt):
+    pass
+
+"""
+返回一个二级结构lv0是一级结构的偏离量上限，lv1是二级机构的偏离量上限
+返回
+[
+    [bi0,ei0,k0,b0,R0,bi1,ei1,k1,b1,R1], #0级保持重复
+    ....
+]
+"""
+def cascade(k,lv0,lv1):
+    pass
