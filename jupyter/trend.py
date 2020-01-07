@@ -66,7 +66,8 @@ def macdTrend(k,m):
 """
 def maxDeviation(k,bi,ei,line):
     x = np.arange(bi,ei+1)
-    p = (k[x,1]+k[x,2]+k[x,3]+k[x,4])/4-line[0]*x-line[1]
+    y = line[0]*x+line[1]
+    p = (k[x,1]+k[x,2]+k[x,3]+k[x,4])/(4*y)-1
     return np.abs(p).max()
 
 """
@@ -153,20 +154,47 @@ def subdivtion(k,tr,dt):
 将小趋势合并成大趋势,偏离小于dt
 返回更大的趋势
 [
-    [bi,ei,k,b,R], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
+    [bi0,ei0,k0,b0,R0,bi1,ei1,k1,b1,R1], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
     ...
 ]
 """
 def large(k,tr,dt):
-    pass
+    ltr = []
+    i = 0
+    line = None
+    while i<len(tr):
+        ei = i
+        for j in range(i+1,len(tr)):
+            b,li = fit(k,int(tr[i][0]),int(tr[j][1]),dt)
+            if not b:
+                if line is not None:
+                    ltr.append([i,ei]+line)
+                    line = None
+                else:
+                    ltr.append([i,i,tr[i][2],tr[i][3],tr[i][4]])
+                break
+            else:
+                line = li
+                ei = j
+        
+        if line is not None:
+            ltr.append([i,ei]+line)
+        i = ei+1
 
-"""
-返回一个二级结构lv0是一级结构的偏离量上限，lv1是二级机构的偏离量上限
-返回
-[
-    [bi0,ei0,k0,b0,R0,bi1,ei1,k1,b1,R1], #0级保持重复
-    ....
-]
-"""
-def cascade(k,lv0,lv1):
-    pass
+    result = np.zeros((len(tr),10))
+    for b in ltr:
+        bi = tr[b[0],0]
+        ei = tr[b[1],1]
+        for i in range(b[0],b[1]+1):
+            result[i,0] = bi
+            result[i,1] = ei
+            result[i,2] = b[2] #K
+            result[i,3] = b[3] #B
+            result[i,4] = b[4] #R
+            result[i,5] = tr[i,0] #bi
+            result[i,6] = tr[i,1] #ei
+            result[i,7] = tr[i,2] #k
+            result[i,8] = tr[i,3] #b
+            result[i,9] = tr[i,4] #R
+
+    return result
