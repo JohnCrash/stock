@@ -110,7 +110,7 @@ class Plote:
             self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
         if 'trend' in self._config and self._config['trend']:
-            macd,_ = stock.macd(self._k)
+            macd = stock.macd(self._k)
             self._macd = macd
             self._trend = trend.macdTrend(self._k,self._macd)
             #self._trend2 = trend.large(self._k,self._trend,0.15)
@@ -128,7 +128,7 @@ class Plote:
             self._axsInx += 1
             #防止计算两边macd
             if not self._showtrend:
-                self._macd,_ = stock.macd(self._k)
+                self._macd = stock.macd(self._k)
             self._showmacd = True
         if 'kdj' in self._config and self._config['kdj'] is not None:
             self._kdjInx = self._axsInx+1
@@ -155,8 +155,9 @@ class Plote:
             if self._showmacd:
                 self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             else:
-                macd,_ = stock.macd(self._k)
-                self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,macd)
+                if not self._showtrend:
+                    self._macd = stock.macd(self._k)
+                self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             self._showbest = True
 
 

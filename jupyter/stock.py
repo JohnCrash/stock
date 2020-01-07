@@ -78,7 +78,7 @@ def macd(k):
     emA[:,0] = ema9
     emA[:,1] = ema12
     emA[:,2] = ema26
-    return 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.,emA
+    return 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
 
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
@@ -309,7 +309,7 @@ def MacdBestPt(k,m):
     return np.array(minpts),np.array(maxpts),np.array(pts)  
 
 """
-将k进行合并，例如日k合并为周k
+将k进行合并，例如日k合并为周k，该方法不进行周对齐，精确的方法使用weekK
 """
 def mergeK(k,n):
     m = len(k)%n
@@ -346,3 +346,70 @@ def scaleTo1d(d,L):
         p[:,i] = d
     a = p.reshape(-1)
     return a[0:L]
+
+#两个日期在同一个周
+def issameweek(d0,d1):
+    if d1>d0:
+        dt = d1-d0
+        return 7-d0.weekday()<dt.days #0,1,2,3,4,5,6
+    else:
+        dt = d0-d1
+        return 7-d1.weekday()<dt.days #0,1,2,3,4,5,6
+"""
+计算周K,date是日期
+返回
+[
+    [volume,open,high,low,close,bi,ei], #bi,ei是原来的起始和结束(包括结束)
+    ...
+]
+"""
+def weekK(k,date):
+    wk = []
+    assert len(k)==len(date)
+    i = 0
+    n = len(k)
+    while i<n:
+        ei = i
+        for j in range(i+1,n):
+            if not issameweek(date[i][0],date[j][0]):
+                ei = j-1
+                break
+            else:
+                ei = j
+        if ei > i:
+            wk.append([k[i:ei+1,0].sum(),k[i,1],k[i:ei+1,2].max(),k[i:ei+1,3].min(),k[ei,4],i,ei])
+        i = ei+1
+    if wk[-1][6]!=n-1:
+        i = n-1
+        ei = n-1
+        wk.append([k[i:ei+1,0].sum(),k[i,1],k[i:ei+1,2].max(),k[i:ei+1,3].min(),k[ei,4],i,ei])
+    return np.array(wk)
+
+"""
+将周数据放大到日数据
+wk是周K,从weekK返回 ， m是周ma,macd,或者kdj,
+"""
+def weekToDay(wk,m):
+    assert len(wk)==len(m)
+    assert wk[0,5]==0
+    n = wk[-1,6]+1 #展开后的尺寸
+    if len(m.shape)==1:
+        dm = np.zeros((n))
+    elif len(m.shape)==2:
+        dm = np.zeros((n,m.shape[1]))
+    else:
+        raise ValueError("m只能是一维或者二维数组")
+
+    for i in range(len(wk)):
+        b = wk[i]
+        bi = b[5] #bi
+        ei = b[6] #ei
+        dm[bi:ei] = np.repeat(m[i],ei-bi+1)
+    return dm
+
+"""
+d1是k1的日期表,将k1和日期表date对齐
+d1和date来自于loadKline的返回日期
+"""
+def alignK(date,k1,d1):
+    pass
