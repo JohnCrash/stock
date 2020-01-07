@@ -111,8 +111,10 @@ class Plote:
             self._showboll = True
         if 'trend' in self._config and self._config['trend']:
             macd,_ = stock.macd(self._k)
-            self._trend = trend.macdTrend(self._k,macd)
+            self._macd = macd
+            self._trend = trend.macdTrend(self._k,self._macd)
             self._trend2 = trend.large(self._k,self._trend,0.15)
+            self._trendHeadPos = len(self._k)
             self._showtrend = True
 
         if 'bollwidth' in self._config and self._config['bollwidth']:
@@ -125,9 +127,7 @@ class Plote:
             self._macdInx = self._axsInx+1
             self._axsInx += 1
             #防止计算两边macd
-            if self._showtrend:
-                self._macd = macd
-            else:
+            if not self._showtrend:
                 self._macd,_ = stock.macd(self._k)
             self._showmacd = True
         if 'kdj' in self._config and self._config['kdj'] is not None:
@@ -162,7 +162,7 @@ class Plote:
 
     #company可以是kline数据，可以是code，也可以是公司名称
     def __init__(self,company,period='d',config={}):
-        self._config = {"boll":20,"bollwidth":0.2,"macd":True,"volume":True,"trend":True,"debug":False}
+        self._config = {"boll":20,"macd":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
         self._period = period
         if self._period=='d':
             self._showcount = 120
@@ -340,14 +340,17 @@ class Plote:
                     x1 = line[1]
                     k = line[2]
                     b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=2)
+                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=3,linestyle='-.')
             for line in self._trend2:
                 if line[1]>bi and line[0]<ei:
                     x0 = line[0]
                     x1 = line[1]
                     k = line[2]
                     b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=4,linestyle='-.')
+                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',alpha=0.8,linewidth=6,linestyle='-.')
+            axsK.axvline(self._trendHeadPos-1,color="red",linewidth=2,linestyle='--')
+            for i in range(self._axsInx+1):
+                axs[i].axvline(self._trendHeadPos-1,color="red",linewidth=2,linestyle='--')
 
         if self._company is not None:
             axsK.set_title('%s %s'%(self._company[2],self._company[1]))
@@ -418,6 +421,23 @@ class Plote:
         prevbutton = widgets.Button(description="上一页")
         zoominbutton = widgets.Button(description="+")
         zoomoutbutton = widgets.Button(description="-")
+        
+        if self._showtrend:
+            backbutton = widgets.Button(description="<")
+            frontbutton = widgets.Button(description=">")
+            slider = widgets.IntSlider(
+                value=ei,
+                min=bi,
+                max=ei,
+                step=1,
+                description='',
+                disabled=False,
+                continuous_update=False,
+                orientation='horizontal',
+                readout=True,
+                readout_format='d'
+            )
+
         bolltoggle = widgets.ToggleButton(
             value=self._showboll,
             description='BOLL',
@@ -487,13 +507,16 @@ class Plote:
         items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
 
         box_layout = Layout(display='flex',
-                            flex_flow='row',
+                            flex_flow='wrap',
                             align_items='stretch',
                             border='solid',
                             width='100%')
 
         words = ['correct', 'horse', 'battery', 'staple']
-        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+        if self._showtrend:
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+        else:
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -517,18 +540,33 @@ class Plote:
             nonlocal beginPT,endPT,showRange
             beginPT += showRange
             endPT += showRange
+            
             if endPT >= len(self._k):
                 endPT = len(self._k)
-                beginPT = endPT-showRange        
+                beginPT = endPT-showRange
+            if self._showtrend:
+                self._trendHeadPos = endPT
+                slider.min = beginPT
+                slider.max = endPT
+                slider.value = endPT
+
             showline()
         
         def on_prevbutton_clicked(b):
             nonlocal beginPT,endPT,showRange
             beginPT -= showRange
             endPT -= showRange
+
             if beginPT < 0 :
                 endPT = showRange
                 beginPT = 0
+
+            if self._showtrend:
+                self._trendHeadPos = endPT
+                slider.min = beginPT
+                slider.max = endPT
+                slider.value = endPT
+
             showline()
 
         def on_zoomin(b):
@@ -544,6 +582,7 @@ class Plote:
             if beginPT < 0:
                 beginPT = 0
                 endPT = beginPT+showRange
+                self._trendHeadPos = endPT
             showline()
 
         def on_change(event):
@@ -554,12 +593,42 @@ class Plote:
                 self.disable(source.description.lower())
             showline()
 
+        def on_sliderChange(event):
+            self._trendHeadPos = event['new']
+            updateTrend()
+            showline()
+
+        def updateTrend():
+            self._trend = trend.macdTrend(self._k[:self._trendHeadPos,:],self._macd[:self._trendHeadPos])
+            self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
+
+        def on_prev(b):
+            self._trendHeadPos -= 1
+            if self._trendHeadPos<0:
+                self._trendHeadPos = 0
+            slider.value = self._trendHeadPos
+            updateTrend()
+            showline()
+            
+        def on_next(b):
+            self._trendHeadPos += 1
+            if self._trendHeadPos>len(self._k):
+                self._trendHeadPos = len(self._k)
+            slider.value = self._trendHeadPos
+            updateTrend()
+            showline()
+
         nextbutton.on_click(on_nextbutton_clicked)
         prevbutton.on_click(on_prevbutton_clicked)
 
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
 
+        if self._showtrend:
+            backbutton.on_click(on_prev)
+            frontbutton.on_click(on_next)
+            slider.observe(on_sliderChange,names='value')
+            
         trendtoggle.observe(on_change,names='value')
         bolltoggle.observe(on_change,names='value')
         bollwidthtoggle.observe(on_change,names='value')
