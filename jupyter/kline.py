@@ -113,7 +113,7 @@ class Plote:
             macd,_ = stock.macd(self._k)
             self._macd = macd
             self._trend = trend.macdTrend(self._k,self._macd)
-            self._trend2 = trend.large(self._k,self._trend,0.15)
+            #self._trend2 = trend.large(self._k,self._trend,0.15)
             self._trendHeadPos = len(self._k)
             self._showtrend = True
 
@@ -340,7 +340,8 @@ class Plote:
                     x1 = line[1]
                     k = line[2]
                     b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=3,linestyle='-.')
+                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+            """
             for line in self._trend2:
                 if line[1]>bi and line[0]<ei:
                     x0 = line[0]
@@ -348,9 +349,10 @@ class Plote:
                     k = line[2]
                     b = line[3]
                     axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',alpha=0.8,linewidth=6,linestyle='-.')
-            axsK.axvline(self._trendHeadPos-1,color="red",linewidth=2,linestyle='--')
+            """
+            axsK.axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
             for i in range(self._axsInx+1):
-                axs[i].axvline(self._trendHeadPos-1,color="red",linewidth=2,linestyle='--')
+                axs[i].axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
 
         if self._company is not None:
             axsK.set_title('%s %s'%(self._company[2],self._company[1]))
@@ -600,7 +602,7 @@ class Plote:
 
         def updateTrend():
             self._trend = trend.macdTrend(self._k[:self._trendHeadPos,:],self._macd[:self._trendHeadPos])
-            self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
+            #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):
             self._trendHeadPos -= 1

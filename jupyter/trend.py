@@ -56,8 +56,8 @@ def macdTrend(k,m):
         if bi<ei:
             line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
             lines.append(line)
-    if ei!=0 and ei<len(k)-1:
-        line = [ei,len(k)-1]+lastSequaresLine(k2x4(ei,len(k)-1,k))
+    if ei!=0 and ei<len(k):
+        line = [ei,len(k)-1]+lastSequaresLine(k2x4(ei,len(k),k))
         lines.append(line)
     return np.array(lines)
 
