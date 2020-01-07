@@ -111,8 +111,8 @@ class Plote:
             self._showboll = True
         if 'trend' in self._config and self._config['trend']:
             macd,_ = stock.macd(self._k)
-            self._trend = trend.fractal(self._k,0.2)
-            self._trend2 = trend.fractal(self._k,0.8)
+            self._trend = trend.macdTrend(self._k,macd)
+            #self._trend2 = trend.fractal(self._k,0.8)
             self._showtrend = True
 
         if 'bollwidth' in self._config and self._config['bollwidth']:
@@ -341,13 +341,6 @@ class Plote:
                     k = line[2]
                     b = line[3]
                     axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=2)
-            for line in self._trend2:
-                if line[1]>bi and line[0]<ei:
-                    x0 = line[0]
-                    x1 = line[1]
-                    k = line[2]
-                    b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='red' if k>0 else 'green',linewidth=4)                    
         if self._company is not None:
             axsK.set_title('%s %s'%(self._company[2],self._company[1]))
         #绘制k线图

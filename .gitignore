@@ -4,3 +4,4 @@ server/node_modules/
 server/app.js
 server/release
 jupyter/.ipynb_checkpoints/
+jupyter/__pycache__/

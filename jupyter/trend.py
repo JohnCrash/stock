@@ -30,11 +30,13 @@ def parallelLine(l,d):
 def distancePtLine(l,x):
     return (l[0]*x[:,0]-x[:,1]+l[1])/np.sqrt(1+l[0]**2)
 
+#使用全部open,high,low,close
 def k2x4(bi,ei,k):
     x = np.empty((4*(ei-bi),2))
     x[:,0] = np.repeat(np.arange(bi,ei),4)
     x[:,1] = k[bi:ei,1:5].reshape(-1)
     return x
+
 """
 返回基于macd最值的趋势数组
 [
@@ -60,7 +62,7 @@ def macdTrend(k,m):
     return np.array(lines)
 
 """
-返回最大偏离值
+返回最大平均偏离值
 """
 def maxDeviation(k,bi,ei,line):
     x = np.arange(bi,ei+1)
@@ -104,7 +106,49 @@ def fractal(k,dt):
             lines.append([bi,ei]+line)
         bi = ei
     return np.array(lines)
-
+"""
+双向延申趋势的头部于尾部，但是偏离要小于dt
+"""
+def extends(k,tr,dt):
+    #先做两侧拓展
+    for t in tr:
+        bi = int(t[0])
+        ei = int(t[1])
+        newbi = bi
+        newline = None
+        #向过去拓展
+        for i in range(1,bi):
+            b,li = fit(k,bi-i,ei,dt)
+            if b:
+                newbi = bi-i
+                newline = li
+            else:
+                break
+        newei = ei
+        #向前拓展
+        for i in range(ei+1,len(k)):
+            b,li = fit(k,newbi,i,dt)
+            if b:
+                newei = i
+                newline = li
+            else:
+                break
+        if newline is not None:
+            t[0] = newbi
+            t[1] = newei
+            t[2] = newline[0] #k
+            t[3] = newline[1] #b
+            t[4] = newline[2] #R
+"""
+将大趋势细化为小趋势,偏离小于dt
+返回细化的趋势
+[
+    [bi,ei,k,b,R], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
+    ...
+]
+"""
+def subdivtion(k,tr,dt):
+    pass
 """
 将小趋势合并成大趋势,偏离小于dt
 返回更大的趋势
