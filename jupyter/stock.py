@@ -351,10 +351,10 @@ def scaleTo1d(d,L):
 def issameweek(d0,d1):
     if d1>d0:
         dt = d1-d0
-        return 7-d0.weekday()<dt.days #0,1,2,3,4,5,6
+        return 7-d0.weekday()>dt.days #0,1,2,3,4,5,6
     else:
         dt = d0-d1
-        return 7-d1.weekday()<dt.days #0,1,2,3,4,5,6
+        return 7-d1.weekday()>dt.days #0,1,2,3,4,5,6
 """
 计算周K,date是日期
 返回
@@ -376,8 +376,7 @@ def weekK(k,date):
                 break
             else:
                 ei = j
-        if ei > i:
-            wk.append([k[i:ei+1,0].sum(),k[i,1],k[i:ei+1,2].max(),k[i:ei+1,3].min(),k[ei,4],i,ei])
+        wk.append([k[i:ei+1,0].sum(),k[i,1],k[i:ei+1,2].max(),k[i:ei+1,3].min(),k[ei,4],i,ei])
         i = ei+1
     if wk[-1][6]!=n-1:
         i = n-1
@@ -392,7 +391,7 @@ wk是周K,从weekK返回 ， m是周ma,macd,或者kdj,
 def weekToDay(wk,m):
     assert len(wk)==len(m)
     assert wk[0,5]==0
-    n = wk[-1,6]+1 #展开后的尺寸
+    n = int(wk[-1,6])+1 #展开后的尺寸
     if len(m.shape)==1:
         dm = np.zeros((n))
     elif len(m.shape)==2:
@@ -402,9 +401,9 @@ def weekToDay(wk,m):
 
     for i in range(len(wk)):
         b = wk[i]
-        bi = b[5] #bi
-        ei = b[6] #ei
-        dm[bi:ei] = np.repeat(m[i],ei-bi+1)
+        bi = int(b[5]) #bi
+        ei = int(b[6]) #ei
+        dm[bi:ei+1] = np.repeat(m[i],ei-bi+1,axis=0)
     return dm
 
 """
@@ -412,4 +411,16 @@ d1是k1的日期表,将k1和日期表date对齐
 d1和date来自于loadKline的返回日期
 """
 def alignK(date,k1,d1):
-    pass
+    if len(k1.shape)==1:
+        k = np.zeros((len(date)))
+    else:
+        k = np.zeros((len(date),k1.shape[1]))
+    off = 0
+    for i in range(len(date)):
+        d = date[i][0]
+        for j in range(off,len(d1)):
+            if d==d1[j][0]:
+                k[i] = k1[j]
+                off = j+1
+                break
+    return k 

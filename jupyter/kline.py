@@ -402,6 +402,8 @@ class Plote:
                         linewidth=p['linewidth'] if 'linewidth' in p else 1,
                         linestyle=p['linestyle'] if 'linestyle' in p else '-'
                         )
+                        if 'hline' in p:
+                            axs[axsinx].axhline(p['hline']['y'] if 'y' in p['hline'] else 0,color= p['hline']['color'] if 'color' in p['hline'] else 'black')
                 i+=1
         #一个从外部进行调整图表的手段                
         if 'cb' in self._config:
