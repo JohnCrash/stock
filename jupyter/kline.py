@@ -358,7 +358,7 @@ class Plote:
             kmin = self._k[bi:ei,1:4].min()  
             szkmax = self._szclose[bi:ei].max()
             szkmin = self._szclose[bi:ei].min()
-            axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='red',linewidth=2,alpha=0.5)
+            axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',linewidth=2)
         #绘制成交量
         if self._showvolume:
             axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
@@ -396,7 +396,11 @@ class Plote:
                         linestyle=p['linestyle'] if 'linestyle' in p else '-'
                         )
                         if 'hline' in p:
-                            axs[axsinx].axhline(p['hline']['y'] if 'y' in p['hline'] else 0,color= p['hline']['color'] if 'color' in p['hline'] else 'black')
+                            axs[axsinx].axhline(p['hline']['y'] if 'y' in p['hline'] else 0,
+                            color= p['hline']['color'] if 'color' in p['hline'] else 'black',
+                            linewidth=p['hline']['linewidth'] if 'linewidth' in p['hline'] else 1,
+                            linestyle=p['hline']['linestyle'] if 'linestyle' in p['hline'] else '-'
+                            )
                 i+=1
         #一个从外部进行调整图表的手段                
         if 'cb' in self._config:

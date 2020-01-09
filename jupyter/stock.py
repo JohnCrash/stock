@@ -126,7 +126,19 @@ def kdj(k,n=9):
             kdj[i,0] = 2.*50./3.+rsv/3.
             kdj[i,1] = 2.*50./3.+kdj[i,0]/3.            
         kdj[i,2] = 3.*kdj[i,0]-2.*kdj[i,1]
-    return kdj        
+    return kdj  
+
+"""
+价格和均线的差的积分
+"""      
+def volumeEnergyK(k,n=20):
+    ve = np.zeros((len(k)))
+    ma20 = ma(k[:,0],n)
+    for i in range(1,len(k)):
+        ve[i] = ve[i-1]+k[i,0]-ma20[i]
+    return ve
+
+
 """计算kdj
 n日RSV=（Cn－Ln）/（Hn－Ln）×100
 公式中，Cn为第n日收盘价；Ln为n日内的最低价；Hn为n日内的最高价。
