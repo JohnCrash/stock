@@ -182,18 +182,11 @@ class Plote:
         elif type(company)==str:
             self._company,self._k,self._date = stock.loadKline(company,self._period)
         #将大盘指数画在图表中            
-        if "index" in self._config and self._config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
+        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             _,szk,szd = stock.loadKline('SZ:399001',self._period)
-            K = np.zeros((len(self._k)))
-            j = 0
-            for i in range(len(self._date)):
-                for k in range(j,len(szd)-i):
-                    if szd[i+k][0] == self._date[i][0]:
-                        K[i] = szk[i+k,4]
-                        j = k
-                        break
-            self._szclose = K
+            K = stock.alignK(self._date,szk,szd)
+            self._szclose = K[:,4]
         else:
             self._szclose = None
         self.config(config)
