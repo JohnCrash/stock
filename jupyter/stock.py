@@ -403,7 +403,7 @@ def weekToDay(wk,m):
         b = wk[i]
         bi = int(b[5]) #bi
         ei = int(b[6]) #ei
-        dm[bi:ei+1] = np.repeat(m[i],ei-bi+1,axis=0)
+        dm[bi:ei+1] = np.repeat(m[i:i+1],ei-bi+1,axis=0)
     return dm
 
 """
