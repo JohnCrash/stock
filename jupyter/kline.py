@@ -575,6 +575,11 @@ class Plote:
             nonlocal beginPT,endPT,showRange
             showRange = math.floor(showRange/2)
             beginPT = endPT - showRange
+            if self._showtrend:
+                self._trendHeadPos = endPT
+                slider.min = beginPT
+                slider.max = endPT
+                slider.value = endPT            
             showline()
 
         def on_zoomout(b):
@@ -584,7 +589,11 @@ class Plote:
             if beginPT < 0:
                 beginPT = 0
                 endPT = beginPT+showRange
+            if self._showtrend:
                 self._trendHeadPos = endPT
+                slider.min = beginPT
+                slider.max = endPT
+                slider.value = endPT                
             showline()
 
         def on_change(event):

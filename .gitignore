@@ -5,3 +5,4 @@ server/app.js
 server/release
 jupyter/.ipynb_checkpoints/
 jupyter/__pycache__/
+jupyter/config/

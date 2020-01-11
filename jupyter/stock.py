@@ -138,6 +138,19 @@ def volumeEnergyK(k,n=20):
         ve[i] = ve[i-1]+k[i,0]-ma20[i]
     return ve
 
+"""
+对上面指标的改进
+"""
+def volumeEnergyK2(k,n=20):
+    ve = np.zeros((len(k)))
+    ma20 = ma(k[:,0],n)
+    for i in range(1,len(k)):
+        r = min( (k[i,3]-k[i-1,4])/k[i-1,4],(k[i,4]-k[i,1])/k[i-1,4])
+        if r<0 and r<-0.05:
+            ve[i] = ve[i-1]-k[i,0]+ma20[i] #股价有较大跌幅
+        else:
+            ve[i] = ve[i-1]+k[i,0]-ma20[i] #正常情况
+    return ve
 
 """计算kdj
 n日RSV=（Cn－Ln）/（Hn－Ln）×100
