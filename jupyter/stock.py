@@ -80,6 +80,24 @@ def macd(k):
     emA[:,2] = ema26
     return 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
 
+def emaV(k,n):
+    m = np.empty([len(k)])
+    for i in range(len(k)):
+        if i==0:
+            m[0] = k[i]
+        else:
+            m[i] = (2*k[i]+(n-1)*m[i-1])/(n+1)
+    return m
+"""计算一般macd"""
+def macdV(k):
+    ema9 = emaV(k,9)
+    ema12 = emaV(k,12)
+    ema26 = emaV(k,26)
+    emA = np.empty([len(k),3])
+    emA[:,0] = ema9
+    emA[:,1] = ema12
+    emA[:,2] = ema26
+    return 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
     if i-1<0:
