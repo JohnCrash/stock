@@ -146,6 +146,13 @@ def kdj(k,n=9):
         kdj[i,2] = 3.*kdj[i,0]-2.*kdj[i,1]
     return kdj  
 
+def volumeEnergy(k,n=20):
+    ve = np.zeros((len(k)))
+    ma20 = ma(k,n)
+    for i in range(1,len(k)):
+        ve[i] = ve[i-1]+k[i]-ma20[i]
+    return ve
+
 """
 价格和均线的差的积分
 """      
@@ -408,6 +415,7 @@ def issameweek(d0,d1):
 """
 def weekK(k,date):
     wk = []
+    wdate = []
     assert len(k)==len(date)
     i = 0
     n = len(k)
@@ -420,12 +428,14 @@ def weekK(k,date):
             else:
                 ei = j
         wk.append([k[i:ei+1,0].sum(),k[i,1],k[i:ei+1,2].max(),k[i:ei+1,3].min(),k[ei,4],i,ei])
+        wdate.append(date[i])
         i = ei+1
     if wk[-1][6]!=n-1:
         i = n-1
         ei = n-1
         wk.append([k[i:ei+1,0].sum(),k[i,1],k[i:ei+1,2].max(),k[i:ei+1,3].min(),k[ei,4],i,ei])
-    return np.array(wk)
+        wdate.append(date[i])
+    return np.array(wk),wdate
 
 """
 将周数据放大到日数据

@@ -63,6 +63,7 @@ config {
     volume : True or False
     macd : True or False
     boll : n
+    energy: True or False #能量线
     trend: True or False #趋势线
     kdate : 日期表
     vlines : {} 竖线
@@ -97,6 +98,7 @@ class Plote:
         self._showfigure = False
         self._showbollwidth = False
         self._showtrend = False
+        self._showenergy = False
         if 'ma' in self._config:
             self._showma = True
         if 'figure' in self._config:
@@ -105,7 +107,6 @@ class Plote:
                 self._figureInx.append(self._axsInx+1)
                 self._axsInx += 1
             self._showfigure = True
-
         if 'boll' in self._config:            
             self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
@@ -116,7 +117,12 @@ class Plote:
             #self._trend2 = trend.large(self._k,self._trend,0.15)
             self._trendHeadPos = len(self._k)
             self._showtrend = True
-
+        if 'energy' in self._config and self._config['energy']:
+            self._energyInx = self._axsInx+1
+            self._axsInx += 1
+            self._volumeenergy = stock.kdj(stock.volumeEnergyK(self._k))[:,2]
+            self._volumekdj = stock.kdj(self._k[:,0])[:,2]
+            self._showenergy = True
         if 'bollwidth' in self._config and self._config['bollwidth']:
             self._bollwidthInx = self._axsInx+1
             self._axsInx += 1
@@ -162,10 +168,10 @@ class Plote:
 
 
     #company可以是kline数据，可以是code，也可以是公司名称
-    def __init__(self,company,period='d',config={}):
-        self._config = {"boll":20,"macd":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None):
+        self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
         self._period = period
-        if self._period=='d':
+        if self._period=='d' or self._period=='w':
             self._showcount = 120
         elif int(self._period)==5: #48
             self._showcount = 144
@@ -177,16 +183,30 @@ class Plote:
             self._showcount = 120
         if type(company)==np.ndarray:
             self._k = company
-            self._company = None
-            self._date = None
+            self._company = companyInfo
+            self._date = date
         elif type(company)==str:
-            self._company,self._k,self._date = stock.loadKline(company,self._period)
+            if self._period == 'w': #周线
+                self._company,k,date = stock.loadKline(company,'d')
+                self._k,self._date = stock.weekK(k,date)
+            else:
+                self._company,self._k,self._date = stock.loadKline(company,self._period)
         #将大盘指数画在图表中            
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
-            _,szk,szd = stock.loadKline('SZ:399001',self._period)
-            K = stock.alignK(self._date,szk,szd)
-            self._szclose = K[:,4]
+            if self._period=='w':
+                _,szk,szd = stock.loadKline('SZ:399001','d')
+                K = stock.alignK(self._date,szk,szd)
+                WK,WD = stock.weekK(K,self._date)
+                self._szclose = WK[:,4]
+                self._szvolumekdj = stock.kdj(WK[:,0])[:,2]
+                self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
+            else:
+                _,szk,szd = stock.loadKline('SZ:399001',self._period)
+                K = stock.alignK(self._date,szk,szd)
+                self._szclose = K[:,4]
+                self._szvolumekdj = stock.kdj(K[:,0])[:,2]
+                self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(K))[:,2]
         else:
             self._szclose = None
         self.config(config)
@@ -261,7 +281,7 @@ class Plote:
         if self._date is not None:
             axsK.xaxis.set_major_formatter(MyFormatter(self._date))
         #时间坐标网格线，天的画在星期一，其他的以天为单位
-        if self._period=='d':
+        if self._period=='d' or self._period=='w':
             if self._date is not None:
                 xticks = []
                 for i in range(bi,ei):
@@ -298,6 +318,12 @@ class Plote:
                         plotVline(axs,v,lines['color'] if 'color' in lines else 'blue',
                         linewidth=lines['linewidth'] if 'linewidth' in lines else 1,
                         linestyle=lines['linestyle'] if 'linestyle' in lines else '-',)
+        #绘制能量线
+        if self._showenergy:
+            axs[self._energyInx].plot(x,self._volumeenergy[bi:ei],color='red',linewidth=2)
+            axs[self._energyInx].plot(x,self._volumekdj[bi:ei],color='blue',linewidth=1,linestyle='-.')
+            axs[self._energyInx].axhline(0,color='green',linestyle='-.')
+            axs[self._energyInx].axhline(100,color='red',linestyle='-.')
         #绘制bollwidth
         if self._showbollwidth:
             axs[self._bollwidthInx].plot(x,self._bollwidth[bi:ei],color='red',linewidth=2)
