@@ -53,6 +53,39 @@ def loadKline(code,period='d'):
     kline = np.array(k).reshape(-1,5)
     return company[0],kline,kdate
 
+gdb = None
+
+def opendb():
+    global gdb
+    if gdb is None:
+        gdb = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
+
+def closedb():
+    global gdb
+    if gdb is not None:
+        gdb.close()
+        gdb = None
+
+def query(s):
+    global gdb
+    if gdb is None:
+        opendb()
+    gdb.query(s)
+    r = gdb.store_result()
+    return r.fetch_row(r.num_rows())
+
+def execute(s):
+    global gdb
+    cursor = gdb.cursor()
+    if gdb is None:
+        opendb()    
+    try:
+        cursor.execute(s)
+        gdb.commit()
+    except Exception as e:
+        print(e)
+        gdb.rollback()
+
 """计算指数移动平均线ema,公式来源于baidu"""
 def ema(k,n):
     m = np.empty([len(k)])

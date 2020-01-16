@@ -207,6 +207,20 @@ function initMySQL(){
         \`pos\` int(11) DEFAULT NULL,        
         PRIMARY KEY (\`id\`, \`date\`));`);
 
+    addTask(task,`CREATE TABLE \`company_status\` (
+        \`id\` int(11) NOT NULL COMMENT '公司id',
+        \`date\` date NOT NULL,
+        \`close\` float DEFAULT NULL COMMENT '收盘价',
+        \`volume\` float DEFAULT NULL COMMENT '成交量',
+        \`macd\` float DEFAULT NULL COMMENT 'macd',
+        \`energy\` float DEFAULT NULL COMMENT '能量',
+        \`volumeJ\` float DEFAULT NULL COMMENT '成交量kdj 的J',
+        \`wmacd\` float DEFAULT NULL COMMENT '周macd',
+        \`wenergy\` float DEFAULT NULL COMMENT '周能量线',
+        \`wvolumeJ\` float DEFAULT NULL,
+        PRIMARY KEY (\`id\`,\`date\`)
+        ) PARTITION BY HASH(id) PARTITIONS 256`);
+        
     async.series(task,(err,results)=>{
         if(err)
             console.error(err);

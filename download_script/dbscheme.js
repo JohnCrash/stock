@@ -27,6 +27,19 @@ const CompanyScheme = {
     ignore:'number'
 };
 
+const CompanyStatusScheme = {
+    id:'number',
+    date:'string',
+    close:'number',
+    volume:'number',
+    macd:'number',
+    energy:'number',
+    volumeJ:'number',
+    wmacd:'number',
+    wenergy:'number',
+    wvolumeJ:'number'
+};
+
 const CategoryScheme = {
     id:'number',
     name:'string',
@@ -205,6 +218,7 @@ module.exports={
     CategoryScheme,
     DescriptScheme,
     CompanySelectScheme,
+    CompanyStatusScheme,
     K5Scheme,
     K15Scheme,
     K60Scheme,
