@@ -144,6 +144,50 @@ function paralle_companys_task(itemStr,n,task){
     });
 }
 
+/**
+ * 雪球更新用
+ */
+function companys_task_continue(itemStr,n,task){
+    return new Promise((resolve,reject)=>{
+        let t0 = Date.now();
+        connection.query(`select ${itemStr?itemStr:"*"} from company`,(error, results, field)=>{
+            if(error){    
+                console.error(error);
+                reject(error);
+            }else{
+                //如果kd_xueqiu数据已经更新就不进行处理了
+                connection.query(`select distinct id from kd_xueqiu where date='${dateString(new Date())}'`,(err,res,fie)=>{
+                    if(err){
+                        console.error(err);
+                        reject(err);
+                    }else{
+                        let tasks = [];
+                        let has = {};
+                        for( let r of res){
+                            has[r.id] = true;
+                        }
+                        for(let com of results){
+                            if( !has[com.id] ) //已经存在的就不进行更新了
+                                tasks.push(task(com,connection));
+                        }
+                        console.info('需要更新：',tasks.length,'只股票信息')
+                        if(tasks.length>0)
+                            async.parallelLimit(tasks,n,(err,result)=>{
+                                if(err){
+                                    reject(error);
+                                }else{
+                                    resolve(Date.now()-t0);
+                                }
+                            });                    
+                        else
+                            resolve(Date.now()-t0);
+                    }
+                });
+            } 
+        });
+    });
+}
+
 function query(querys){
     let queryArray = (typeof(query)==='object' && query.length) ? query : arguments;
     return new Promise((resolve,reject)=>{
@@ -403,4 +447,4 @@ var xuequeCookie = 's=ds1bgvygz9; device_id=e037be1499841fb99f5fe54a66e1240b; __
 //var xuequeCookie = '_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; __utmz=1.1555945599.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; aliyungf_tc=AQAAAOIpumBckAMAiQbzchVmEU+Ji7i7; __utmc=1; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; __utma=1.528987204.1555945543.1571234998.1573824873.28; Hm_lvt_1db88642e346389874251b5a1eded6e3=1574067809; acw_tc=2760822d15749152971941684e7f4320cc69616649eafea22bc5d90f26efbe; remember=1; xq_a_token=6ed8f0f9f30bc4f13f65bb3102333a0ead64c3ca; xqat=6ed8f0f9f30bc4f13f65bb3102333a0ead64c3ca; xq_r_token=aa3abe067eed22f1c36774dec016a669fa845891; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1575272484; snbim_minify=true'
 var xuequeCookie = '_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; __utmz=1.1555945599.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; aliyungf_tc=AQAAAOIpumBckAMAiQbzchVmEU+Ji7i7; __utmc=1; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; acw_tc=2760822d15756229262972757e6f293b44f4b01eff4ceb7a180f0a4c9ed067; Hm_lvt_1db88642e346389874251b5a1eded6e3=1577774083,1577774182,1577774249,1577774257; __utma=1.528987204.1555945543.1577775593.1577826553.72; remember=1; xq_a_token=c44d723738529eb6b274022a320258d92f31cc1e; xqat=c44d723738529eb6b274022a320258d92f31cc1e; xq_r_token=b926ebba0cf9dcf8c01a628b525f93191a24ca0d; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1577924260'
 module.exports = {k_company,companys_task,dateString,query,connection,
-    paralle_companys_task,xuequeCookie,xueqiuPostJson,xueqiuGetJson};
+    paralle_companys_task,xuequeCookie,xueqiuPostJson,xueqiuGetJson,companys_task_continue};

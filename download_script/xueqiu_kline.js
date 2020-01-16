@@ -1,7 +1,7 @@
 /**
  * 专门用来下载雪球网的k线数据
  */
-const {paralle_companys_task,k_company,dateString,query,connection,xuequeCookie} = require('./k');
+const {paralle_companys_task,companys_task_continue,k_company,dateString,query,connection,xuequeCookie} = require('./k');
 const async = require('async');
 const Crawler = require("crawler");
 
@@ -252,7 +252,7 @@ function company_kline(id,code,lv,callback){
  * lvs是k线级别1,5,15,30,60,120,'d'数组
  */
 function download_kline(lvs,done){
-    paralle_companys_task('id,code',1,com=>cb=>{
+    companys_task_continue('id,code',1,com=>cb=>{
         let task = [];
         for(let lv of lvs){
             task.push(

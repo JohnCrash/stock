@@ -17,3 +17,8 @@ def xueqiuK15(code):
     timestamp = math.floor(time.time()*1000)
     uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-32&indicator=kline"""%(code,timestamp)
     return xueqiuJson(uri)
+
+#自选全部
+def xueqiuList():
+    uri = """https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1"""
+    return xueqiuJson(uri)

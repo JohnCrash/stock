@@ -8,7 +8,8 @@ from IPython.display import display
 from ipywidgets import Layout, Button, Box
 import time
 import trend
-
+import  warnings
+warnings.filterwarnings("ignore", module="matplotlib")
 """绘制k线图"""
 def plotK(axs,k,bi,ei):
     for i in range(bi,ei):
@@ -201,12 +202,14 @@ class Plote:
                 self._szclose = WK[:,4]
                 self._szvolumekdj = stock.kdj(WK[:,0])[:,2]
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
+                self._szmacd = stock.macd(WK)
             else:
                 _,szk,szd = stock.loadKline('SZ:399001',self._period)
                 K = stock.alignK(self._date,szk,szd)
                 self._szclose = K[:,4]
                 self._szvolumekdj = stock.kdj(K[:,0])[:,2]
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(K))[:,2]
+                self._szmacd = stock.macd(K)
         else:
             self._szclose = None
         self.config(config)
@@ -274,6 +277,18 @@ class Plote:
             bi = len(self._k)-self._showcount
         if ei is None:
             ei = len(self._k)
+        if bi>0:
+            if bi>len(self._k):
+                bi = len(self._k)-1
+        else:
+            if bi<=-len(self._k):
+                bi = -len(self._k)+1
+        if ei>0:
+            if ei>len(self._k):
+                ei = len(self._k)-1
+        else:
+            if ei<=-len(self._k):
+                ei = -len(self._k)+1
         gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
         fig, axs = plt.subplots(self._axsInx+1, 1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
         fig.subplots_adjust(hspace=0.02) #调整子图上下间距
@@ -284,9 +299,14 @@ class Plote:
         if self._period=='d' or self._period=='w':
             if self._date is not None:
                 xticks = []
-                for i in range(bi,ei):
-                    if self._date[i][0].weekday()==0:
-                        xticks.append(i)
+                if self._period=='d':
+                    for i in range(bi,ei):
+                        if self._date[i][0].weekday()==0:
+                            xticks.append(i)
+                else:
+                    for i in range(bi,ei):
+                        if i>0 and self._date[i][0].month!=self._date[i-1][0].month:
+                            xticks.append(i)
                 xticks = np.array(xticks)
             else:
                 xticks = np.arange(bi,ei,10)
@@ -324,6 +344,9 @@ class Plote:
             axs[self._energyInx].plot(x,self._volumekdj[bi:ei],color='blue',linewidth=1,linestyle='-.')
             axs[self._energyInx].axhline(0,color='green',linestyle='-.')
             axs[self._energyInx].axhline(100,color='red',linestyle='-.')
+            if self._szclose is not None:
+                axs[self._energyInx].plot(x,self._szvolumeenergy[bi:ei],color='black',linewidth=2,linestyle='--')
+                axs[self._energyInx].plot(x,self._szvolumekdj[bi:ei],color='gray',linewidth=1,linestyle='-.')
         #绘制bollwidth
         if self._showbollwidth:
             axs[self._bollwidthInx].plot(x,self._bollwidth[bi:ei],color='red',linewidth=2)
@@ -375,7 +398,13 @@ class Plote:
                 axs[i].axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
 
         if self._company is not None:
-            axsK.set_title('%s %s'%(self._company[2],self._company[1]))
+            if self._period=='w':
+                p = '周线'
+            elif self._period=='d':
+                p = '日线'
+            else:
+                p = '%d分钟线'%(self._period)
+            axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
         #绘制k线图
         plotK(axsK,self._k,bi,ei)
         #将大盘数据绘制在K线图上
@@ -384,7 +413,7 @@ class Plote:
             kmin = self._k[bi:ei,1:4].min()  
             szkmax = self._szclose[bi:ei].max()
             szkmin = self._szclose[bi:ei].min()
-            axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',linewidth=2)
+            axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',linewidth=2,linestyle='--')
         #绘制成交量
         if self._showvolume:
             axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
@@ -401,8 +430,15 @@ class Plote:
         axsK.grid(True)
         #绘制macd
         if self._showmacd:
-            axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue')
+            axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
             axs[self._macdInx].axhline(color='black')
+            if self._szclose is not None: #绘制大盘macd
+                kmax = self._macd[bi:ei].max()
+                kmin = self._macd[bi:ei].min()                  
+                szkmax = self._szmacd[bi:ei].max()
+                szkmin = self._szmacd[bi:ei].min()
+                axs[self._macdInx].plot(x,self._szmacd[bi:ei]*(kmax-kmin)/(szkmax-szkmin),color='black',linestyle='--')
+                
         #绘制kdj
         if self._showkdj:
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,0],label="K",color='orange')
@@ -438,6 +474,8 @@ class Plote:
     def show(self,bi=None,ei=None,code2=None,figsize=(30,14)):
         if bi is None:
             bi = len(self._k)-self._showcount
+            if bi<0:
+                bi = 0
         if ei is None:
             ei = len(self._k)
         if code2 is not None:
@@ -540,7 +578,6 @@ class Plote:
                             border='solid',
                             width='100%')
 
-        words = ['correct', 'horse', 'battery', 'staple']
         if self._showtrend:
             items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
         else:

@@ -25,6 +25,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Comany Select",
+            "program": "${workspaceFolder}/download_script/company_select.js"
+        },        
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Update Company",
             "program": "${workspaceFolder}/download_script/update_company.js"
         },           
