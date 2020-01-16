@@ -53,6 +53,9 @@ def loadKline(code,period='d'):
     kline = np.array(k).reshape(-1,5)
     return company[0],kline,kdate
 
+def dateString(t):
+    return '%s-%s-%s'%(t.year,t.month,t.day)
+    
 gdb = None
 
 def opendb():

@@ -35,9 +35,6 @@ const CompanyStatusScheme = {
     macd:'number',
     energy:'number',
     volumeJ:'number',
-    wmacd:'number',
-    wenergy:'number',
-    wvolumeJ:'number'
 };
 
 const CategoryScheme = {

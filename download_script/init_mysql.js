@@ -212,12 +212,10 @@ function initMySQL(){
         \`date\` date NOT NULL,
         \`close\` float DEFAULT NULL COMMENT '收盘价',
         \`volume\` float DEFAULT NULL COMMENT '成交量',
+        \`volumema20\` float DEFAULT NULL COMMENT '成交量20日均线',
         \`macd\` float DEFAULT NULL COMMENT 'macd',
         \`energy\` float DEFAULT NULL COMMENT '能量',
         \`volumeJ\` float DEFAULT NULL COMMENT '成交量kdj 的J',
-        \`wmacd\` float DEFAULT NULL COMMENT '周macd',
-        \`wenergy\` float DEFAULT NULL COMMENT '周能量线',
-        \`wvolumeJ\` float DEFAULT NULL,
         PRIMARY KEY (\`id\`,\`date\`)
         ) PARTITION BY HASH(id) PARTITIONS 256`);
         
