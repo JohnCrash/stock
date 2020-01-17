@@ -9,6 +9,7 @@ from ipywidgets import Layout, Button, Box
 import time
 import trend
 import  warnings
+
 warnings.filterwarnings("ignore", module="matplotlib")
 """绘制k线图"""
 def plotK(axs,k,bi,ei):
@@ -610,11 +611,12 @@ class Plote:
                             align_items='stretch',
                             border='solid',
                             width='100%')
-
+                              
+        link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(self._comarg,self._comarg))
         if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle,link]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle,link]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
