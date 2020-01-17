@@ -174,10 +174,14 @@ class Plote:
                 self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             self._showbest = True
 
+    def switchweek(self):
+        self.init(self._comarg,'w',self._config)
+        self.config()
+    def switchday(self):
+        self.init(self._comarg,'d',self._config)
+        self.config()
 
-    #company可以是kline数据，可以是code，也可以是公司名称
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None):
-        self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
+    def init(self,company,period,config,date = None,companyInfo=None):
         self._period = period
         if self._period=='d' or self._period=='w':
             self._showcount = 120
@@ -219,6 +223,12 @@ class Plote:
                 self._szmacd = stock.macd(K)
         else:
             self._szclose = None
+
+    #company可以是kline数据，可以是code，也可以是公司名称
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None):
+        self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
+        self._comarg = company
+        self.init(company,period,config,date)
         self.config(config)
         self._backup = self._config.copy()
 
@@ -279,7 +289,7 @@ class Plote:
             return self._date[i][0]
 
     #显示K线图
-    def showKline(self,bi=None,ei=None,figsize=(30,16)):
+    def showKline(self,bi=None,ei=None,figsize=(30,16)):        
         if bi is None:
             bi = len(self._k)-self._showcount
         if ei is None:
@@ -574,7 +584,23 @@ class Plote:
                 disabled=False,
                 button_style='',
                 tooltip='FIGURE',
-                icon='check')                               
+                icon='check')    
+        #加入周线和日线的切换
+        weektoggle = widgets.ToggleButton(
+            value=self._period=='w',
+            description='周线',
+            disabled=False,
+            button_style='',
+            tooltip='周线',
+            icon='check')
+        daytoggle = widgets.ToggleButton(
+            value=self._period=='d',
+            description='日线',
+            disabled=False,
+            button_style='',
+            tooltip='日线',
+            icon='check')
+                                   
         output = widgets.Output()
 
         items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
@@ -586,17 +612,17 @@ class Plote:
                             width='100%')
 
         if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
         
         beginPT = bi
         endPT = ei
-        showRange = ei-bi
-        
+        showRange = ei-bi            
+
         def showline():
             output.clear_output(wait=True)
             with output:
@@ -704,6 +730,22 @@ class Plote:
 
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
+        def recalcRange():
+            nonlocal beginPT,endPT
+            endPT = len(self._k)
+            beginPT = len(self._k)-self._showcount
+            if beginPT<0:
+                beginPT = 0    
+        def on_week(event):
+            self.switchweek()
+            recalcRange()
+            showline()
+        def on_day(event):
+            self.switchday()
+            recalcRange()
+            showline()
+        weektoggle.observe(on_week,names='value')
+        daytoggle.observe(on_day,names='value')
 
         if self._showtrend:
             backbutton.on_click(on_prev)
