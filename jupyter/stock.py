@@ -86,7 +86,7 @@ def execute(s):
         cursor.execute(s)
         gdb.commit()
     except Exception as e:
-        print(e)
+        print(e,s)
         gdb.rollback()
 
 """计算指数移动平均线ema,公式来源于baidu"""
