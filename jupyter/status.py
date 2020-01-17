@@ -88,5 +88,3 @@ def update_status():
     else:
         update_status_begin('2010-1-2',True)
     stock.closedb()
-
-update_status()
