@@ -56,7 +56,7 @@
             "type": "python",
             "request": "launch",
             "name": "Debug xueqiu.py",
-            "program": "${workspaceFolder}\\jupyter\\xueqiu.py"
+            "program": "${workspaceFolder}\\jupyter\\status.py"
         }        
     ]
 }

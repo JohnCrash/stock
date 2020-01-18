@@ -197,6 +197,7 @@ class Plote:
         if type(company)==np.ndarray:
             self._k = company
             self._company = companyInfo
+            self._comarg = companyInfo[1] #code
             self._date = date
         elif type(company)==str:
             if self._period == 'w': #周线
@@ -204,7 +205,7 @@ class Plote:
                 self._k,self._date = stock.weekK(k,date)
             else:
                 self._company,self._k,self._date = stock.loadKline(company,self._period)
-        #将大盘指数画在图表中            
+        #将大盘指数画在图表中   
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             if self._period=='w':
@@ -229,7 +230,7 @@ class Plote:
     def __init__(self,company,period='d',config={},date=None,companyInfo=None):
         self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
         self._comarg = company
-        self.init(company,period,config,date)
+        self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
         self._backup = self._config.copy()
 
