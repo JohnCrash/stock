@@ -203,8 +203,6 @@ def update_status_week():
     stock.execute("update data set status_week_update='%s' where id=1"%(lastday[0][0]))
     stock.closedb()
 
-update_status_week()
-
 """
 用于判断是不是有崛起迹象
 """

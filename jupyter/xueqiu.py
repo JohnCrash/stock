@@ -1,6 +1,8 @@
 import requests
 import time
 import math
+import numpy as np
+from datetime import date,datetime
 
 def xueqiuJson(url):
     s = requests.session()
@@ -13,11 +15,34 @@ def xueqiuJson(url):
         print(url,r.status_code,r.reason)
         return False,r.reason
 
-def xueqiuK15(code):
+def xueqiuK15(code,n=32):
     timestamp = math.floor(time.time()*1000)
-    uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-32&indicator=kline"""%(code,timestamp)
+    uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-%d&indicator=kline"""%(code,timestamp,n)
     return xueqiuJson(uri)
 
+#以k15为基础给出当日的k数据，成交量为预估
+#返回b,[volume,open,high,low,close],date
+def xueqiuK15day(code):
+    data = xueqiuK15(code,48)
+    if len(data)>0:
+        if data[0] and data[1] and data[1]['data'] and data[1]['data']['item']:
+            items = data[1]['data']['item']
+            dd = date.fromtimestamp(items[-1][0]/1000)
+            for i in range(len(items)-1,-1,-1):
+                it = items[i]
+                if dd!=date.fromtimestamp(it[0]/1000):
+                    lasti = i
+                    break
+            #0 timestamp,1 volume,2 open,3 high,4 low,5 close,chg,....
+            yesterday = np.array(items[lasti-15:lasti+1])
+            today = np.array(items[lasti+1:])
+     
+            #这里要预测今天的volume
+            i = len(today)
+            volume = yesterday[:,1].sum()*today[:,1].sum()/yesterday[0:i,1].sum()
+            k = [volume,today[0][2],today[:,3].max(),today[:,4].min(),today[-1][5]]
+            return True,k,dd
+    return False,0,0
 #自选全部
 def xueqiuList():
     uri = """https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1"""
