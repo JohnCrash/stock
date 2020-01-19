@@ -218,7 +218,7 @@ def isRasing(a):
     return False
 
 #找到有崛起继续的个股id , dd是搜索指定日期
-def searchRasingCompanyStatus(dd,period):
+def searchRasingCompanyStatus(dd,period,cb):
     if period=='d':
         db = 'company_status'
     else:
@@ -239,14 +239,14 @@ def searchRasingCompanyStatus(dd,period):
         idds[cs[i][0]].append(cs[i])
     rasing = []
     for c in idds:
-        if len(idds[c])==3 and isRasing(idds[c]):
+        if len(idds[c])==3 and cb(idds[c]):
             rasing.append(int(c))
     return rasing
 
 """
 按分类列出崛起的股票的数量与列表
 """
-def RasingCategoryList(period='d'):
+def RasingCategoryList(period='d',cb=isRasing):
     if period=='d':
         update_status() #更新公司日状态
     else:
@@ -263,7 +263,7 @@ def RasingCategoryList(period='d'):
     companys = stock.query("""select id,code,name,category from company""")
     
     def onCatsList(E):
-        rasing = searchRasingCompanyStatus(E.description,period)
+        rasing = searchRasingCompanyStatus(E.description,period,cb)
         cats = {}
         rasingCompany = []
         for c in companys:

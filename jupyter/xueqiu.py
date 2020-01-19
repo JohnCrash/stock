@@ -23,7 +23,7 @@ def xueqiuK15(code,n=32):
 #以k15为基础给出当日的k数据，成交量为预估
 #返回b,[volume,open,high,low,close],date
 def xueqiuK15day(code):
-    data = xueqiuK15(code,48)
+    data = xueqiuK15(code,32)
     if len(data)>0:
         if data[0] and data[1] and data[1]['data'] and data[1]['data']['item']:
             items = data[1]['data']['item']
