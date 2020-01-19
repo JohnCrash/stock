@@ -9,6 +9,7 @@ from ipywidgets import Layout, Button, Box
 import time
 import trend
 import  warnings
+import xueqiu
 
 warnings.filterwarnings("ignore", module="matplotlib")
 """绘制k线图"""
@@ -205,6 +206,8 @@ class Plote:
                 self._k,self._date = stock.weekK(k,date)
             else:
                 self._company,self._k,self._date = stock.loadKline(company,self._period)
+                if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
+                    _,self._k,self._date = xueqiu.appendTodayK(self._company[1],self._k,self._date)                        
         #将大盘指数画在图表中   
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐

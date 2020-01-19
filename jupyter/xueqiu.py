@@ -20,6 +20,23 @@ def xueqiuK15(code,n=32):
     uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-%d&indicator=kline"""%(code,timestamp,n)
     return xueqiuJson(uri)
 
+#当前是交易时间
+def isTransTime():
+    to = datetime.today()
+    if to.weekday()>=0 and to.weekday()<=4 and to.hour>=9 and to.hour<=15:
+        if to.hour==9 and to.minute<45:
+            return False
+        return True
+    return False
+
+#将今日数据写入到k,d中去，成功返回True
+def appendTodayK(code,k,d):
+    b,K,D = xueqiuK15day(code)
+    if b:
+        d.append((D,))
+        return b,k.append(k,K,axis=0),d
+    return b,k,d
+
 #以k15为基础给出当日的k数据，成交量为预估
 #返回b,[volume,open,high,low,close],date
 def xueqiuK15day(code):

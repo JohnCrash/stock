@@ -5,6 +5,7 @@
 """
 import numpy as np
 import stock
+import xueqiu
 import kline
 from datetime import date
 from IPython.display import display
@@ -205,8 +206,9 @@ def update_status_week():
 
 """
 用于判断是不是有崛起迹象
+istoday 是要使用xueqiu今日数据
 """
-def isRasing(a):
+def isRasing(a,company,istoday):
     #a[0] a[1] a[2]最近三天的数据a[2]是最近的一天
     #macd 在两日日内有翻红趋势，energy从1以下崛起到大于5，volumeJ趋势向上,close趋势向上
     #0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ
@@ -218,18 +220,25 @@ def isRasing(a):
     return False
 
 #找到有崛起继续的个股id , dd是搜索指定日期
-def searchRasingCompanyStatus(dd,period,cb):
+def searchRasingCompanyStatus(dd,period,cb,id2companys):
     if period=='d':
         db = 'company_status'
     else:
         db = 'company_status_week'
-    lastday = stock.query("""select date from %s where id=8828 order by date desc limit 20"""%(db))
-    d = lastday[-1][0]
+    lastday = stock.query("""select date from %s where id=8828 order by date desc limit 50"""%(db))
     
+    endDate = None
+    beginDate = None
+    istoday = False
     for i in range(len(lastday)):
         if str(lastday[i][0])==dd:
             endDate = lastday[i][0]
             beginDate = lastday[i+2][0]
+    if beginDate is None:
+        #数据还没有进入数据库
+        endDate = lastday[0][0]
+        beginDate = lastday[40][0]
+        istoday = xueqiu.isTransTime()
     cs = np.array(stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(beginDate),stock.dateString(endDate))))
     stock.closedb()
     idds = {}
@@ -239,7 +248,7 @@ def searchRasingCompanyStatus(dd,period,cb):
         idds[cs[i][0]].append(cs[i])
     rasing = []
     for c in idds:
-        if len(idds[c])==3 and cb(idds[c]):
+        if len(idds[c])>=3 and c in id2companys and cb(idds[c],id2companys[c],istoday):
             rasing.append(int(c))
     return rasing
 
@@ -260,10 +269,13 @@ def RasingCategoryList(period='d',cb=isRasing):
                         width='100%')
     #可以提前准备的数据
     categorys = stock.query("""select id,name from category""")
-    companys = stock.query("""select id,code,name,category from company""")
-    
+    companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+    id2companys = {}
+    for c in companys:
+        id2companys[c[0]] = c
+
     def onCatsList(E):
-        rasing = searchRasingCompanyStatus(E.description,period,cb)
+        rasing = searchRasingCompanyStatus(E.description,period,cb,id2companys)
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -271,8 +283,8 @@ def RasingCategoryList(period='d',cb=isRasing):
                 rasingCompany.append(c)
         # cats = {"id":{"name":,"ls":,"count":0}}
         for c in categorys:
-            if c[0] not in cats:
-                cats[c[0]] = {"name":c[1],"ls":[],"count":0}
+            if c[1] not in cats:
+                cats[c[1]] = {"name":c[1],"ls":[],"count":0}
         for c in companys:
             if c[0] in rasing and c[3] in cats:
                 cats[c[3]]['ls'].append(c)
@@ -281,7 +293,7 @@ def RasingCategoryList(period='d',cb=isRasing):
         items = []
         def onClick(e):
             output.clear_output(wait=True)
-            key = int(e.tooltip)
+            key = e.tooltip
             with output:
                 display(box)
                 for c in cats[key]['ls']:
@@ -294,7 +306,7 @@ def RasingCategoryList(period='d',cb=isRasing):
                     description=s,
                     disabled=False,
                     button_style='',
-                    tooltip=str(c))
+                    tooltip=c)
                 but.on_click(onClick)
                 items.append(but)
         box = Box(children=items, layout=box_layout)
@@ -303,11 +315,18 @@ def RasingCategoryList(period='d',cb=isRasing):
             display(box)
 
     items = []
+
+    dates = stock.query('select date from %s where id=8828 order by date desc limit 10'%('company_status' if period=='d' else 'company_status_week'))
     if period=='d':
-        db = 'company_status'
-    else:
-        db = 'company_status_week'
-    dates = stock.query('select date from %s where id=8828 order by date desc limit 10'%(db))
+        today = date.today()
+        #如果今天是一个交易日，并且不在数据库中，那么从雪球直接下载数据
+        but = widgets.Button(
+            description=str(today),
+            disabled=False,
+            button_style='danger')
+        but.on_click(onCatsList)
+        items.append(but)
+
     for d in dates:
         but = widgets.Button(
             description=str(d[0]),
