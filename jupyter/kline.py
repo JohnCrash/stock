@@ -220,7 +220,9 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
                 self._szmacd = stock.macd(WK)
             else:
-                _,szk,szd = stock.loadKline('SZ:399001',self._period)
+                _,szk,szd = stock.loadKline('SZ399001',self._period)
+                if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
+                    _,szk,szd = xueqiu.appendTodayK('SZ399001',szk,szd)
                 K = stock.alignK(self._date,szk,szd)
                 self._szclose = K[:,4]
                 self._szvolumekdj = stock.kdj(K[:,0])[:,2]

@@ -33,13 +33,21 @@ def isTransTime():
 def appendTodayK(code,k,d):
     b,K,D = xueqiuK15day(code)
     if b:
-        d.append((D,))
-        return b,k.append(k,K,axis=0),d
+        return b,np.vstack((k,[K])),d+((D,),)
     return b,k,d
 
 #以k15为基础给出当日的k数据，成交量为预估
 #返回b,[volume,open,high,low,close],date
+#同时在这里做一个15分钟的缓存区
+k15daycache = {}
 def xueqiuK15day(code):
+    global k15daycache
+    if code in k15daycache:
+        cct = k15daycache[code]['time']
+        tot = datetime.today()
+        if cct.hour==tot.hour and math.floor(cct.minute/15)==math.floor(tot.minute/15):
+            data = k15daycache[code]['data']
+            return True,data[0],data[1]
     data = xueqiuK15(code,32)
     if len(data)>0:
         if data[0] and data[1] and data[1]['data'] and data[1]['data']['item']:
@@ -58,6 +66,8 @@ def xueqiuK15day(code):
             i = len(today)
             volume = yesterday[:,1].sum()*today[:,1].sum()/yesterday[0:i,1].sum()
             k = [volume,today[0][2],today[:,3].max(),today[:,4].min(),today[-1][5]]
+            
+            k15daycache[code] = {'time':datetime.today(),'data':(k,dd)}
             return True,k,dd
     return False,0,0
 #自选全部
