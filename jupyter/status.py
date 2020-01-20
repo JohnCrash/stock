@@ -267,11 +267,9 @@ def searchRasingCompanyStatus(dd,period,cb,id2companys,progress):
 #        progress(i*10)
 #        css+=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s' and id>=%d and id<%d"""%(db,stock.dateString(beginDate),stock.dateString(endDate),1000*(i-1),1000*i))
 #    print(datetime.today()-t0)
-    t0 = datetime.today()
     def progressCB(i):
         progress(i*10)
     css=stock.queryProgress("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(beginDate),stock.dateString(endDate)),9,progressCB)
-    print(datetime.today()-t0)
     cs = np.array(css)
     progress(90)
     stock.closedb()
