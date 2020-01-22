@@ -20,10 +20,17 @@ def plotK(axs,k,bi,ei):
         else:
             c = 'red'
         axs.vlines(i,k[i,3],k[i,2],color=c,zorder=0)
-        if k[i,1]>k[i,4]:
-            axs.broken_barh([(i-0.4,0.8)],(k[i,1],k[i,4]-k[i,1]),facecolor=c,zorder=1)
+        #对涨停和跌停加粗标注
+        if i>0 and abs((k[i,4]-k[i-1,4])/k[i-1,4])>=0.097:
+            lw = 4
+            fc = "white"
         else:
-            axs.broken_barh([(i-0.4,0.8)],(k[i,1],k[i,4]-k[i,1]),facecolor="white",edgecolor=c,zorder=1)
+            lw = 1
+            fc = c
+        if k[i,1]>k[i,4]:
+            axs.broken_barh([(i-0.4,0.8)],(k[i,1],k[i,4]-k[i,1]),facecolor=fc,edgecolor=c,zorder=1,linewidth=lw)
+        else:
+            axs.broken_barh([(i-0.4,0.8)],(k[i,1],k[i,4]-k[i,1]),facecolor="white",edgecolor=c,zorder=1,linewidth=lw)
   
 """标注交易点"""
 def plotTransPt(axs,n,tr,bi,ei):
@@ -617,8 +624,8 @@ class Plote:
                             align_items='stretch',
                             border='solid',
                             width='100%')
-                              
-        link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(self._comarg,self._comarg))
+        stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
+        link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
         if self._showtrend:
             items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle,link]
         else:

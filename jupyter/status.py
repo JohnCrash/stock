@@ -16,6 +16,13 @@ import matplotlib.pyplot as plt
 import math
 
 PROD = 40
+
+def isPopularCategory(name): #如果是主流分类返回True
+    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
+          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
+    return name in ls
+
 #见数据插入到company_status表
 def insert_company_status(k,vma20,energy,volumeJ,idd):
     if len(k)>0:
@@ -398,5 +405,40 @@ def RasingCategoryList(period='d',cb=isRasing):
         but.on_click(onCatsList)
         items.append(but)
 
+    box = Box(children=items, layout=box_layout)
+    display(box,output)
+
+def RasingBollCategoryList(categorys = None,cb=isRasing):
+    box_layout = Layout(display='flex',
+                        flex_flow='wrap',
+                        align_items='stretch',
+                        border='solid',
+                        width='100%')
+    lastday = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 50""")
+
+    companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+    selectComs = []
+    if categorys is not None:
+        for c in companys:
+            if c[2] in categorys:
+                selectComs.append(c)
+    else:
+        selectComs = companys
+    
+    rasings = []
+    for c in selectComs:
+        _,k,d = stock.loadKline(c[1])
+        if isRasing(c,k,d):
+            rasings.append(c)
+    
+    for i in range(len(lastday)):
+        lastday[i]
+        but = widgets.Button(
+            description=str(today),
+            disabled=False,
+            button_style='danger')
+        but.on_click(onCatsList)
+        items.append(but)
+    
     box = Box(children=items, layout=box_layout)
     display(box,output)
