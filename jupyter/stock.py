@@ -2,57 +2,6 @@ import MySQLdb
 import numpy as np
 import math
 
-"""
-加载股票数据
-返回的第一个数据
-company{
-    0 - id,
-    1 - code,
-    2 - name,
-    3 - category,
-    4 - done,
-    5 - kbegin,
-    6 - kend
-    ...
-}
-kline {
-    0 - volume,
-    1 - open,
-    2 - high,
-    3 - low,
-    4 - close,
-    5 - macd
-}
-kdate {
-    0 - [date,]
-}
-code 可以是代码或名称
-period = 'd','30','15','5'
-"""
-def loadKline(code,period='d'):
-    db = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
-    if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
-        if code[2]==':':
-            db.query("""select * from company where code='%s'"""%code.replace(':',''))
-        else:
-            db.query("""select * from company where code='%s'"""%code)
-    else:
-        db.query("""select * from company where name='%s'"""%code)
-    r = db.store_result()
-    company = r.fetch_row()
-    db.query("""select volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))
-    r = db.store_result()
-    k = r.fetch_row(r.num_rows())
-    if period=='d':
-        db.query("""select date from k%s_xueqiu where id=%s"""%(period,company[0][0]))
-    else:
-        db.query("""select timestamp from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
-    r = db.store_result()
-    kdate = r.fetch_row(r.num_rows())
-    db.close()
-    kline = np.array(k).reshape(-1,5)
-    return company[0],kline,kdate
-
 def dateString(t):
     return '%s-%s-%s'%(t.year,t.month,t.day)
     
@@ -105,6 +54,95 @@ def execute(s):
     except Exception as e:
         print(e,s)
         gdb.rollback()
+
+"""
+加载股票数据
+返回的第一个数据
+company{
+    0 - id,
+    1 - code,
+    2 - name,
+    3 - category,
+    4 - done,
+    5 - kbegin,
+    6 - kend
+    ...
+}
+kline {
+    0 - volume,
+    1 - open,
+    2 - high,
+    3 - low,
+    4 - close,
+    5 - macd
+}
+kdate {
+    0 - [date,]
+}
+code 可以是代码或名称
+period = 'd','30','15','5'
+"""
+def loadKline(code,period='d'):
+    db = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
+    if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
+        if code[2]==':':
+            db.query("""select * from company where code='%s'"""%code.replace(':',''))
+        else:
+            db.query("""select * from company where code='%s'"""%code)
+    else:
+        db.query("""select * from company where name='%s'"""%code)
+    r = db.store_result()
+    company = r.fetch_row()
+    db.query("""select volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+    r = db.store_result()
+    k = r.fetch_row(r.num_rows())
+    if period=='d':
+        db.query("""select date from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+    else:
+        db.query("""select timestamp from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
+    r = db.store_result()
+    kdate = r.fetch_row(r.num_rows())
+    db.close()
+    kline = np.array(k).reshape(-1,5)
+    return company[0],kline,kdate
+
+"""
+从共享内存加载k线数据
+"""
+def loadKlineFromSharedMemory(code):
+    pass
+
+"""
+创建共享内存k线数据
+"""
+def createKlineSharedMemory(beginDate):
+    companys = query("select company_id,code,name,category,ttm,pb from company_select")
+    drs = query("select id,date,volume,open,high,low,close from kd_xueqiu where date>='%s'"%(beginDate))
+    """
+    将数据收集成
+    [id,date,feild]
+    """
+    ids = {}
+    dates = {}
+    for i in range(len(drs)):
+        it = drs[i]
+        idd = it[0]
+        if idd not in ids:
+            ids[idd] = []
+            dates[idd] = []
+        ids[idd].append([it[2],it[3],it[4],it[5],it[6]])
+        dates[idd].append([it[1]])
+    idc = {}
+    for c in companys:
+        idc[c[0]] = c
+    for idd in ids:
+        k = np.array(ids[idd])
+        d = dates[idd]
+        k = alignK(dates[8828],k,d)
+
+#    print('d:/temp/%s'%(idc[idd][1]),k.shape)
+#    mk = np.memmap('d:/temp/%s'%(idc[idd][1]),dtype='float32',mode='w+',shape=k.shape)
+#    mk[:] = k[:]
 
 """计算指数移动平均线ema,公式来源于baidu"""
 def ema(k,n):
@@ -530,3 +568,5 @@ def alignK(date,k1,d1):
                 off = j+1
                 break
     return k 
+
+createKlineSharedMemory('2019-1-1')
