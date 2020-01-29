@@ -3,6 +3,8 @@ d1是k1的日期表,将k1和日期表date对齐
 d1和date来自于loadKline的返回日期
 """
 import numpy as np
+import stock
+
 def alignK(date,k1,d1):
     if len(k1.shape)==1:
         k = np.zeros((len(date)))
@@ -18,3 +20,9 @@ def alignK(date,k1,d1):
                 off = j+1
                 break
     return k 
+
+a = []
+def rea():
+    global a
+    return a
+#stock.createKlineCache('2012-1-1')

@@ -33,7 +33,10 @@ def isTransTime():
 def appendTodayK(code,k,d):
     b,K,D = xueqiuK15day(code)
     if b:
-        return b,np.vstack((k,[K])),d+((D,),)
+        if date.today()==D: #返回的日期就是今天
+            return b,np.vstack((k,[K])),d+((D,),)
+        else:
+            return b,k,d
     return b,k,d
 
 #以k15为基础给出当日的k数据，成交量为预估

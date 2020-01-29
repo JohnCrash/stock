@@ -1,6 +1,7 @@
 import MySQLdb
 import numpy as np
 import math
+from datetime import date,datetime
 
 def dateString(t):
     return '%s-%s-%s'%(t.year,t.month,t.day)
@@ -109,13 +110,28 @@ def loadKline(code,period='d'):
 """
 从共享内存加载k线数据
 """
-def loadKlineFromSharedMemory(code):
+def loadKlineCache():
+    K = np.memmap('d:/temp/K',dtype='float32',mode='r')
+    C = np.memmap('d:/temp/C',dtype='<U11',mode='r')
+    D = np.memmap('d:/temp/D',dtype='float32',mode='r')
+    Date = []
+    for i in range(len(D)):
+        Date.append((date.fromtimestamp(D[i]),))
+    nCom = int(len(C)/7)
+    Kmm = K.reshape((len(D),nCom,5))
+    Kline = np.empty((len(D),nCom,5))
+    Kline[:] = Kmm[:]
+    Companys = C.reshape((nCom,7))
+    return Companys,Kline,Date
+"""
+将最新的数据存入到Cache中去
+"""
+def updateKlineCache():
     pass
-
 """
 创建共享内存k线数据
 """
-def createKlineSharedMemory(beginDate):
+def createKlineCache(beginDate):
     companys = query("select company_id,code,name,category,ttm,pb from company_select")
     drs = query("select id,date,volume,open,high,low,close from kd_xueqiu where date>='%s'"%(beginDate))
     """
@@ -135,14 +151,29 @@ def createKlineSharedMemory(beginDate):
     idc = {}
     for c in companys:
         idc[c[0]] = c
-    for idd in ids:
+    #这里有3个表一个是K放置全部的Kline数据，D放置日期的timestramp，C是一个id到K中行号的映射表
+    K = np.memmap('d:/temp/K',dtype='float32',mode='w+',shape=(len(ids[8828]),len(companys),5))
+    C = np.memmap('d:/temp/C',dtype='<U11',mode='w+',shape=(len(companys),7))
+    D = np.memmap('d:/temp/D',dtype='float32',mode='w+',shape=(len(dates[8828]),))
+    for i in range(len(dates[8828])):
+        D[i] = datetime.fromisoformat(str(dates[8828][i][0])).timestamp()
+    print('size:',len(companys)*len(ids[8828])*5*4/1024/1024,'MB')
+    i = 0
+    for idd in idc:
         k = np.array(ids[idd])
         d = dates[idd]
-        k = alignK(dates[8828],k,d)
-
-#    print('d:/temp/%s'%(idc[idd][1]),k.shape)
-#    mk = np.memmap('d:/temp/%s'%(idc[idd][1]),dtype='float32',mode='w+',shape=k.shape)
-#    mk[:] = k[:]
+        K[:,i,:] = alignK(dates[8828],k,d)
+        C[i,0:6] = idc[idd]
+        C[i,6] = i
+        print(i)
+        i+=1
+    K.flush()
+    C.flush()
+    D.flush()
+    del K
+    del C
+    del D
+    print('DONE!')
 
 """计算指数移动平均线ema,公式来源于baidu"""
 def ema(k,n):
@@ -568,5 +599,3 @@ def alignK(date,k1,d1):
                 off = j+1
                 break
     return k 
-
-createKlineSharedMemory('2019-1-1')
