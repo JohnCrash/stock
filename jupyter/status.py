@@ -14,6 +14,7 @@ from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
 import matplotlib.pyplot as plt
 import math
+import shared
 
 PROD = 40
 
@@ -128,6 +129,7 @@ def update_status(progress):
         kdd = stock.query('select date from kd_xueqiu where id=8828 order by date desc limit 1')
         progress(20)
         if lastday[0][0] != kdd[0][0]:
+            shared.delKey('company_status') #清除redis中的缓存数据
             update_status_begin(lastday[0][0],False,progress)
     else:
         update_status_begin('2010-1-2',True,progress)
@@ -143,6 +145,8 @@ def update_status_week(progress):
     if lastupdate[0][0] == lastday[0][0]:
         progress(100)
         return #已经更新了
+    
+    shared.delKey('company_status_week') #清除redis中的缓存数据
     alldate = stock.query("select date from company_status_week where id=8828 order by date desc")
     progress(20)
     if len(alldate)==0:
@@ -246,6 +250,67 @@ def isRasing(a,company,istoday):
         return True
     return False
 
+#最近50天的status数据
+#同时返回50天的日期数组和数据
+def redisStatusCache50(db):
+    b1,a = shared.numpyFromRedis("%s_last50"%(db))
+    b2,d = shared.fromRedis("%s_date50"%(db))
+    if not (b1 and b2):
+        #缓存中没有准备数据
+        d = stock.query("""select date from %s where id=8828 order by date desc limit 50"""%(db))
+        cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[-1][0]),stock.dateString(d[0][0])))
+        r = stock.query("""select count(*) from company""")
+        n = r[0][0] #公司数量
+        a = np.zeros((n,len(d),7))
+        lastid = -1
+        i = len(d)-1
+        nc = -1
+        for c in cs:
+            if c[0]!=lastid:
+                i = len(d)-1
+                nc += 1
+                lastid = c[0]
+                if nc>=n:
+                    break
+            a[nc,i,:] = c
+            i-=1
+        shared.numpyToRedis(a,"%s_last50"%(db))
+        shared.toRedis(d,"%s_date50"%(db))
+    #数据d存放的是时间，d[0]最近的时间 d[-1]最远的时间
+    #数据a的时间序列和d相同,shape = (公司数,日期,数据)
+    return d,a
+    
+#这是使用Redis进行优化的版本    
+def searchRasingCompanyStatusByRedis(dd,period,cb,id2companys,progress):
+    if period=='d':
+        db = 'company_status'
+    else:
+        db = 'company_status_week'
+    progress(10)
+    d,a = redisStatusCache50(db)
+    progress(30)
+    istoday = False
+    bi = 0
+    for i in range(len(d)):
+        if str(d[i][0])==dd:
+            bi = i
+    if bi==0:
+        #数据还没有进入数据库
+        istoday = xueqiu.isTransTime()
+
+    rasing = []
+    n20 = math.floor(len(a)/20)
+    for i in range(len(a)):
+        c = a[i]
+        idd = int(c[-1][0])
+        if idd in id2companys and cb(c[bi:,:],id2companys[idd],istoday):
+            rasing.append(idd)
+        #progress
+        if i%n20== 0:
+            progress(30+math.floor(70*i/len(a)))
+    progress(100)
+    return rasing
+
 #找到有崛起继续的个股id , dd是搜索指定日期
 def searchRasingCompanyStatus(dd,period,cb,id2companys,progress):
     if period=='d':
@@ -274,9 +339,8 @@ def searchRasingCompanyStatus(dd,period,cb,id2companys,progress):
 #        progress(i*10)
 #        css+=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s' and id>=%d and id<%d"""%(db,stock.dateString(beginDate),stock.dateString(endDate),1000*(i-1),1000*i))
 #    print(datetime.today()-t0)
-    def progressCB(i):
-        progress(i*10)
-    css=stock.queryProgress("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(beginDate),stock.dateString(endDate)),9,progressCB)
+    print(beginDate,endDate)
+    css=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(beginDate),stock.dateString(endDate)))
     cs = np.array(css)
     progress(90)
     stock.closedb()
@@ -345,7 +409,7 @@ def RasingCategoryList(period='d',cb=isRasing):
         with output2:
             display(progress)            
         progressCallback(0)
-        rasing = searchRasingCompanyStatus(E.description,period,cb,id2companys,progressCallback)
+        rasing = searchRasingCompanyStatusByRedis(E.description,period,cb,id2companys,progressCallback)
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -405,40 +469,5 @@ def RasingCategoryList(period='d',cb=isRasing):
         but.on_click(onCatsList)
         items.append(but)
 
-    box = Box(children=items, layout=box_layout)
-    display(box,output)
-
-def RasingBollCategoryList(categorys = None,cb=isRasing):
-    box_layout = Layout(display='flex',
-                        flex_flow='wrap',
-                        align_items='stretch',
-                        border='solid',
-                        width='100%')
-    lastday = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 50""")
-
-    companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
-    selectComs = []
-    if categorys is not None:
-        for c in companys:
-            if c[2] in categorys:
-                selectComs.append(c)
-    else:
-        selectComs = companys
-    
-    rasings = []
-    for c in selectComs:
-        _,k,d = stock.loadKline(c[1])
-        if isRasing(c,k,d):
-            rasings.append(c)
-    
-    for i in range(len(lastday)):
-        lastday[i]
-        but = widgets.Button(
-            description=str(today),
-            disabled=False,
-            button_style='danger')
-        but.on_click(onCatsList)
-        items.append(but)
-    
     box = Box(children=items, layout=box_layout)
     display(box,output)

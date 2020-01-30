@@ -127,12 +127,13 @@ class Plote:
             #self._trend2 = trend.large(self._k,self._trend,0.15)
             if self._date and 'markpos' in self._config:
                 dd = self._config['markpos']
+                self._trendHeadPos = len(self._k)-1
                 for i in range(len(self._date)):
                     if self._date[i][0] == dd:
                         self._trendHeadPos = i
                         break
             else:
-                self._trendHeadPos = len(self._k)
+                self._trendHeadPos = len(self._k)-1
             self._showtrend = True
         if 'energy' in self._config and self._config['energy']:
             self._energyInx = self._axsInx+1

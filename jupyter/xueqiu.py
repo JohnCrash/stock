@@ -3,6 +3,7 @@ import time
 import math
 import numpy as np
 from datetime import date,datetime
+import shared
 
 def xueqiuJson(url):
     s = requests.session()
@@ -42,20 +43,24 @@ def appendTodayK(code,k,d):
 #以k15为基础给出当日的k数据，成交量为预估
 #返回b,[volume,open,high,low,close],date
 #同时在这里做一个15分钟的缓存区
-k15daycache = {}
 def xueqiuK15day(code):
-    global k15daycache
-    if code in k15daycache:
-        cct = k15daycache[code]['time']
+    b,k15d = shared.fromRedis('TODAY_'+code)
+    if b:
         tot = datetime.today()
+        cct = k15d['time']
         if cct.hour==tot.hour and math.floor(cct.minute/15)==math.floor(tot.minute/15):
-            data = k15daycache[code]['data']
-            return True,data[0],data[1]
+            return True,k15d['data'],cct
+    b,v = shared.fromRedis('ISEXPIRSE?')
+    if b and v:
+        return False,0,0
     data = xueqiuK15(code,32)
     if len(data)>0:
         if data[0] and data[1] and data[1]['data'] and data[1]['data']['item']:
             items = data[1]['data']['item']
             dd = date.fromtimestamp(items[-1][0]/1000)
+            if dd!=date.today():
+                shared.toRedis(True,'ISEXPIRSE?',ex=10)
+                return False,0,0
             for i in range(len(items)-1,-1,-1):
                 it = items[i]
                 if dd!=date.fromtimestamp(it[0]/1000):
@@ -70,7 +75,7 @@ def xueqiuK15day(code):
             volume = yesterday[:,1].sum()*today[:,1].sum()/yesterday[0:i,1].sum()
             k = [volume,today[0][2],today[:,3].max(),today[:,4].min(),today[-1][5]]
             
-            k15daycache[code] = {'time':datetime.today(),'data':(k,dd)}
+            shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=15*60) #15分钟后过期
             return True,k,dd
     return False,0,0
 #自选全部

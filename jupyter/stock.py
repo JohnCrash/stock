@@ -27,23 +27,6 @@ def query(s):
     r = gdb.store_result()
     return r.fetch_row(r.num_rows())
 
-def queryProgress(s,n,cb):
-    global gdb
-    if gdb is None:
-        opendb()
-    gdb.query(s)
-    r = gdb.store_result()
-    result = []
-    count = r.num_rows()
-    onn = math.floor(count/n)
-    for i in range(n):
-        result+=r.fetch_row(onn)
-        count-=onn
-        cb(i)
-    if count>0:
-        result += r.fetch_row(count)
-    return result
-
 def execute(s):
     global gdb
     cursor = gdb.cursor()
