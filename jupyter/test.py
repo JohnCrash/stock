@@ -5,6 +5,7 @@ d1和date来自于loadKline的返回日期
 import numpy as np
 import stock
 import status
+import shared
 
 def alignK(date,k1,d1):
     if len(k1.shape)==1:
@@ -25,5 +26,6 @@ def alignK(date,k1,d1):
 #stock.createKlineCache('2012-1-1')
 import time
 t0 = time.time()
-status.redisStatusCache50('company_status')
+shared.delKey('company_status_date50')
+shared.delKey('company_status_week_date50')
 print(time.time()-t0)
