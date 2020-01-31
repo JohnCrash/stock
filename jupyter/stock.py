@@ -2,6 +2,7 @@ import MySQLdb
 import numpy as np
 import math
 from datetime import date,datetime
+import shared
 
 def dateString(t):
     return '%s-%s-%s'%(t.year,t.month,t.day)
@@ -65,29 +66,61 @@ kdate {
 }
 code 可以是代码或名称
 period = 'd','30','15','5'
+after 载入该日期之后的数据
+expire 缓存过期时间（秒）
 """
-def loadKline(code,period='d'):
-    db = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
+def loadKline(code,period='d',after=None,expire=None):
+    #if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
+    #    if code[2]==':':
+    #        company = query("""select * from company where code='%s'"""%code.replace(':',''))
+    #    else:
+    #        company = query("""select * from company where code='%s'"""%code)
+    #else:
+    #    company = query("""select * from company where name='%s'"""%code)
+    """
+    如果使用缓存先尝试使用缓存数据
+    """
+    if expire is not None and period=='d':
+        b1,kline = shared.numpyFromRedis(code+'_K')
+        b2,kdate = shared.fromRedis(code+'_D')
+        b3,company = shared.fromRedis(code)
+        if b1 and b2 and b3:
+            return company[0],kline,kdate
+    if expire is not None: #如果使用缓存则加载全部数据
+        after = None
+    """
+    这里对code到id的映射进行缓存
+    """
     if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
         if code[2]==':':
-            db.query("""select * from company where code='%s'"""%code.replace(':',''))
-        else:
-            db.query("""select * from company where code='%s'"""%code)
+            code = code.replace(':','')
+        b,company = shared.fromRedis(code)
+        if not b:
+            company = query("""select id,code,name,category from company where code='%s'"""%code)
+            shared.toRedis(company,code)
     else:
-        db.query("""select * from company where name='%s'"""%code)
-    r = db.store_result()
-    company = r.fetch_row()
-    db.query("""select volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))
-    r = db.store_result()
-    k = r.fetch_row(r.num_rows())
+        company = query("""select id,code,name,category from company where name='%s'"""%code)
+        
     if period=='d':
-        db.query("""select date from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+        if after is None:
+            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+        else:
+            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(period,company[0][0],after))
     else:
-        db.query("""select timestamp from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
-    r = db.store_result()
-    kdate = r.fetch_row(r.num_rows())
-    db.close()
+        if after is None:
+            data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
+        else:
+            data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(str(period),company[0][0],after))
+    kdate = []
+    k = []
+    for i in range(len(data)):
+        kdate.append((data[i][0],))
+        k.append(data[i][1:])
     kline = np.array(k).reshape(-1,5)
+
+    if expire is not None and period=='d':
+        shared.numpyToRedis(kline,code+'_K',ex=expire)
+        shared.toRedis(kdate,code+'_D',ex=expire)
     return company[0],kline,kdate
 
 """

@@ -220,7 +220,7 @@ class Plote:
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             if self._period=='w':
-                _,szk,szd = stock.loadKline('SZ:399001','d')
+                _,szk,szd = stock.loadKline('SZ:399001','d',expire=3600) #缓存保持1小时
                 K = stock.alignK(self._date,szk,szd)
                 WK,WD = stock.weekK(K,self._date)
                 self._szclose = WK[:,4]
@@ -228,7 +228,7 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
                 self._szmacd = stock.macd(WK)
             else:
-                _,szk,szd = stock.loadKline('SZ399001',self._period)
+                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=3600) #缓存保持1小时
                 if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
                     _,szk,szd = xueqiu.appendTodayK('SZ399001',szk,szd)
                 K = stock.alignK(self._date,szk,szd)
