@@ -91,6 +91,7 @@ config {
         ...
     ],...]
     cb : function(self,axs,bi,ei)
+    lightweight: True or False 如果是True仅仅加载一年的数据
 }
 """
 class Plote:
