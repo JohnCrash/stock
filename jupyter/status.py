@@ -290,7 +290,7 @@ def redisStatusCache50(db):
     return d,a
     
 #这是使用Redis进行优化的版本    
-def searchRasingCompanyStatusByRedis(dd,period,cb,id2companys,progress):
+def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     if period=='d':
         db = 'company_status'
     else:
@@ -310,66 +310,52 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,id2companys,progress):
     rasing = []
     n20 = math.floor(len(a)/20)
     for i in range(len(a)):
-        c = a[i]
-        idd = int(c[-1][0])
-        if idd in id2companys and cb(c[bi:,:],id2companys[idd],istoday):
-            rasing.append(idd)
         #progress
         if i%n20== 0:
-            progress(30+math.floor(70*i/len(a)))
+            progress(30+math.floor(70*i/len(a)))        
+        c = a[i]
+        idd = int(c[-1][0])
+        #反转数组的前后顺序，反转后-1代表最近的数据
+        k = np.flip(c[bi:,:],0)#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
+        if idd in id2companys and filter(k,id2companys[idd],istoday,period):
+            if istoday and period=='d': #将当日数据叠加进数据中
+                b,k_,d_ = xueqiu.xueqiuK15day(c[1])
+                if b:
+                    A = np.vstack(([[c,k_[4],k_[0],0,0,0,0,0,0,0,0]],k))
+                    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
+                    A[-1,4] = stock.macdV(A[:,1])[-1] #macd
+                    A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
+                    A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
+                    boll = stock.boll(A[:,1])
+                    bo = boll[-1] #boll
+                    A[-1,7] = bo[2] #bollup
+                    A[-1,8] = bo[1] #bollmid
+                    A[-1,9] = bo[0] #bolldn
+                    A[-1,10] = stock.bollWidth(bo)[-1] #bollw
+                    k = A
+            if idd in id2companys and cb(k,id2companys[idd],istoday):
+                rasing.append(idd)
+
     progress(100)
     return rasing
 
-#找到有崛起继续的个股id , dd是搜索指定日期
-def searchRasingCompanyStatus(dd,period,cb,id2companys,progress):
-    if period=='d':
-        db = 'company_status'
+"""
+前置过滤器，用于初选。这样在处理当日数据下载时可以少下载很多数据
+"""
+def defaultFilter(a,c,istoday,period):
+    #istoday True可以使用xueqiu数据
+    #c [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]
+    #a 0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
+    #a[0] a[1] a[2]... a[0]是最近一天的数据
+    if istoday and period=='d':
+        return a[-1][5]<5 and isPopularCategory(c[3])
     else:
-        db = 'company_status_week'
-    lastday = stock.query("""select date from %s where id=8828 order by date desc limit 50"""%(db))
-    progress(10)
-    endDate = None
-    beginDate = None
-    istoday = False
-    for i in range(len(lastday)):
-        if str(lastday[i][0])==dd:
-            endDate = lastday[i][0]
-            beginDate = lastday[i+2][0]
-    if beginDate is None:
-        #数据还没有进入数据库
-        endDate = lastday[0][0]
-        beginDate = lastday[40][0]
-        istoday = xueqiu.isTransTime()
-    #技能根据id将加载分成9份
-#使用分布加载将大幅度增加耗时    
-#    css = []
-#    t0 = datetime.today()
-#    for i in range(1,9):
-#        progress(i*10)
-#        css+=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s' and id>=%d and id<%d"""%(db,stock.dateString(beginDate),stock.dateString(endDate),1000*(i-1),1000*i))
-#    print(datetime.today()-t0)
-    print(beginDate,endDate)
-    css=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(beginDate),stock.dateString(endDate)))
-    cs = np.array(css)
-    progress(90)
-    stock.closedb()
-    idds = {}
-    for i in range(len(cs)):
-        if cs[i][0] not in idds:
-            idds[cs[i][0]] = []
-        idds[cs[i][0]].append(cs[i])
-    progress(95)
-    rasing = []
-    for c in idds:
-        if len(idds[c])>=3 and c in id2companys and cb(idds[c],id2companys[c],istoday):
-            rasing.append(int(c))
-    progress(100)
-    return rasing
+        return isPopularCategory(c[3])
 
 """
 按分类列出崛起的股票的数量与列表
 """
-def RasingCategoryList(period='d',cb=isRasing):
+def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
     output = widgets.Output()
     output2 = widgets.Output()
     box_layout = Layout(display='flex',
@@ -418,7 +404,7 @@ def RasingCategoryList(period='d',cb=isRasing):
         with output2:
             display(progress)            
         progressCallback(0)
-        rasing = searchRasingCompanyStatusByRedis(E.description,period,cb,id2companys,progressCallback)
+        rasing = searchRasingCompanyStatusByRedis(E.description,period,cb,filter,id2companys,progressCallback)
         cats = {}
         rasingCompany = []
         for c in companys:

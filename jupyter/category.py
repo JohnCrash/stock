@@ -49,7 +49,7 @@ def CatgoryVolumeEnergyPlote():
     sz_energy_kdj = stock.kdj(sz_energy)
     for c in cats:
         if status.isPopularCategory(c[1]):
-            fig, axs = plt.subplots(1, 1,sharex=True,figsize=(36,5))
+            fig, axs = plt.subplots(1, 1,sharex=True,figsize=(32,5))
             axs.xaxis.set_major_formatter(MyFormatter(D))    
             volume,ve20 = calcCatgoryVolumeEnergy(c[0])
             x = np.arange(len(ve20))
