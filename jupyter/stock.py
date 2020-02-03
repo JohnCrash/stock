@@ -100,7 +100,10 @@ def loadKline(code,period='d',after=None,expire=None):
             shared.toRedis(company,code)
     else:
         company = query("""select id,code,name,category from company where name='%s'"""%code)
-        
+    
+    if len(company)==0:
+        print('数据库中没有该股票:',code)
+        return (code,code,code),np.array([]).reshape(-1,5),()
     if period=='d':
         if after is None:
             data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))

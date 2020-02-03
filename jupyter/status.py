@@ -319,9 +319,9 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
         k = np.flip(c[bi:,:],0)#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
         if idd in id2companys and filter(k,id2companys[idd],istoday,period):
             if istoday and period=='d': #将当日数据叠加进数据中
-                b,k_,d_ = xueqiu.xueqiuK15day(c[1])
+                b,k_,d_ = xueqiu.xueqiuK15day(id2companys[idd][1])
                 if b:
-                    A = np.vstack(([[c,k_[4],k_[0],0,0,0,0,0,0,0,0]],k))
+                    A = np.vstack(([[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]],k))
                     #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
                     A[-1,4] = stock.macdV(A[:,1])[-1] #macd
                     A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
@@ -331,7 +331,7 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
                     A[-1,7] = bo[2] #bollup
                     A[-1,8] = bo[1] #bollmid
                     A[-1,9] = bo[0] #bolldn
-                    A[-1,10] = stock.bollWidth(bo)[-1] #bollw
+                    A[-1,10] = stock.bollWidth(boll)[-1] #bollw
                     k = A
             if idd in id2companys and cb(k,id2companys[idd],istoday):
                 rasing.append(idd)

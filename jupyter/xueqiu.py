@@ -35,7 +35,13 @@ def appendTodayK(code,k,d):
     b,K,D = xueqiuK15day(code)
     if b:
         if date.today()==D: #返回的日期就是今天
-            return b,np.vstack((k,[K])),d+((D,),)
+            if type(d)==list:
+                rd = d+[(D,)]
+            elif type(d)==tuple:
+                rd = d+((D,),)
+            else:
+                print('appendTodayK 错误的参数d = ',d,type(d))
+            return b,np.vstack((k,[K])),rd
         else:
             return b,k,d
     return b,k,d
@@ -49,7 +55,7 @@ def xueqiuK15day(code):
         tot = datetime.today()
         cct = k15d['time']
         if cct.hour==tot.hour and math.floor(cct.minute/15)==math.floor(tot.minute/15):
-            return True,k15d['data'],cct
+            return True,k15d['data'][0],k15d['data'][1]
     b,v = shared.fromRedis('ISEXPIRSE?')
     if b and v:
         return False,0,0
