@@ -321,7 +321,7 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
             if istoday and period=='d': #将当日数据叠加进数据中
                 b,k_,d_ = xueqiu.xueqiuK15day(id2companys[idd][1])
                 if b:
-                    A = np.vstack(([[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]],k))
+                    A = np.vstack((k,[[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]]))
                     #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
                     A[-1,4] = stock.macdV(A[:,1])[-1] #macd
                     A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
