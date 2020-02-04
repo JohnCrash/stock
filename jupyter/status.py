@@ -18,8 +18,12 @@ import shared
 
 PROD = 40
 
-def isPopularCategory(name): #如果是主流分类返回True
-    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+def isPopularCategory(name):
+#    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+#          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
+#          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
+    ls = ['白色家电','电力',
+    '半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
           '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
           '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
     return name in ls
@@ -267,25 +271,28 @@ def redisStatusCache50(db):
     if not (b1 and b2):
         #缓存中没有准备数据
         d = stock.query("""select date from %s where id=8828 order by date desc limit 50"""%(db))
-        cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[-1][0]),stock.dateString(d[0][0])))
+        d = list(d)
+        d.reverse()
+        cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
         r = stock.query("""select count(*) from company""")
         n = r[0][0] #公司数量
-        a = np.zeros((n,len(d),11))
+        dn = len(d)
+        a = np.zeros((n,dn,11))
         lastid = -1
-        i = len(d)-1
+        i = 0
         nc = -1
         for c in cs:
             if c[0]!=lastid:
-                i = len(d)-1
+                i = 0
                 nc += 1
                 lastid = c[0]
                 if nc>=n:
                     break
             a[nc,i,:] = c
-            i-=1
+            i+=1
         shared.numpyToRedis(a,"%s_last50"%(db))
         shared.toRedis(d,"%s_date50"%(db))
-    #数据d存放的是时间，d[0]最近的时间 d[-1]最远的时间
+    #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
     #数据a的时间序列和d相同,shape = (公司数,日期,数据)
     return d,a
     
@@ -299,11 +306,11 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     d,a = redisStatusCache50(db)
     progress(30)
     istoday = False
-    bi = 0
+    bi = len(d)-1
     for i in range(len(d)):
         if str(d[i][0])==dd:
             bi = i
-    if bi==0:
+    if bi==len(d)-1:
         #数据还没有进入数据库
         istoday = xueqiu.isTransTime()
 
@@ -316,7 +323,7 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
         c = a[i]
         idd = int(c[-1][0])
         #反转数组的前后顺序，反转后-1代表最近的数据
-        k = np.flip(c[bi:,:],0)#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
+        k = c[:bi+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
         if idd in id2companys and filter(k,id2companys[idd],istoday,period):
             if istoday and period=='d': #将当日数据叠加进数据中
                 b,k_,d_ = xueqiu.xueqiuK15day(id2companys[idd][1])

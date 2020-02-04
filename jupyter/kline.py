@@ -111,6 +111,8 @@ class Plote:
         self._showbollwidth = False
         self._showtrend = False
         self._showenergy = False
+        if len(self._k)==0: #完全没有数据
+            return
         if 'ma' in self._config:
             self._showma = True
         if 'figure' in self._config:
@@ -222,7 +224,9 @@ class Plote:
             else:
                 self._company,self._k,self._date = stock.loadKline(company,self._period,self._after)
                 if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
-                    _,self._k,self._date = xueqiu.appendTodayK(self._company[1],self._k,self._date)                        
+                    _,self._k,self._date = xueqiu.appendTodayK(self._company[1],self._k,self._date)
+        if len(self._k)==0: #完全没有数据不进行进一步处理
+            return
         #将大盘指数画在图表中   
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐

@@ -27,8 +27,7 @@ def alignK(date,k1,d1):
 #stock.createKlineCache('2012-1-1')
 import time
 t0 = time.time()
-b,K,D = xueqiu.xueqiuK15day('SZ300682')
-k = np.array([]).reshape(-1,5)
-d = ()
-np.vstack((k,[K])),d+((D,))
+shared.delKey("company_status_last50")
+shared.delKey("company_status_date50")
+d,k = status.redisStatusCache50('company_status')
 print(time.time()-t0)

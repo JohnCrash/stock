@@ -24,7 +24,7 @@ def xueqiuK15(code,n=32):
 #当前是交易时间
 def isTransTime():
     to = datetime.today()
-    if to.weekday()>=0 and to.weekday()<=4 and to.hour>=9 and to.hour<=15:
+    if to.weekday()>=0 and to.weekday()<=4 and to.hour>=9 and to.hour<=14:
         if to.hour==9 and to.minute<45:
             return False
         return True
