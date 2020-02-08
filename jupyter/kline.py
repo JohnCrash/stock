@@ -213,7 +213,7 @@ class Plote:
             self._comarg = companyInfo[1] #code
             self._date = date_
         elif type(company)==str:
-            if self._after is None:
+            if self._after is None and 'figure' not in config:
                 if self._period == 'w':
                     self._after = stock.dateString(date.today()-timedelta(days=5*365))
                 elif self._period == 'd':

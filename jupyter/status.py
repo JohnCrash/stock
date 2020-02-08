@@ -22,8 +22,7 @@ def isPopularCategory(name):
 #    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
 #          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
 #          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
-    ls = ['白色家电','电力',
-    '半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+    ls = ['白色家电','半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
           '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
           '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
     return name in ls
@@ -310,9 +309,8 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     for i in range(len(d)):
         if str(d[i][0])==dd:
             bi = i
-    if bi==len(d)-1:
-        #数据还没有进入数据库
-        istoday = xueqiu.isTransTime()
+    if date.today()==date.fromisoformat(dd):
+        istoday = True
 
     rasing = []
     n20 = math.floor(len(a)/20)
@@ -325,7 +323,7 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
         #反转数组的前后顺序，反转后-1代表最近的数据
         k = c[:bi+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
         if idd in id2companys and filter(k,id2companys[idd],istoday,period):
-            if istoday and period=='d': #将当日数据叠加进数据中
+            if istoday and xueqiu.isTransTime() and period=='d': #将当日数据叠加进数据中
                 b,k_,d_ = xueqiu.xueqiuK15day(id2companys[idd][1])
                 if b:
                     A = np.vstack((k,[[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]]))
@@ -355,7 +353,7 @@ def defaultFilter(a,c,istoday,period):
     #a 0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
     #a[0] a[1] a[2]... a[0]是最近一天的数据
     if istoday and period=='d':
-        return a[-1][5]<5 and isPopularCategory(c[3])
+        return isPopularCategory(c[3])
     else:
         return isPopularCategory(c[3])
 
