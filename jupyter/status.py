@@ -259,8 +259,8 @@ def isRasing(a,company,istoday):
     dVolumeJ = a[2][6]-a[1][6]
     dClose = a[2][1]-a[1][1]
     if a[2][4]<0 and a[2][4] + 2*dMACD >= 0 and dVolumeJ>0 and dClose>0 and a[2][5]>=5 and a[1][5]<5:
-        return True
-    return False
+        return True,[{'x':[-1],'color':'red','linestyle':'--','linewidth':2}]
+    return False,[]
 
 #最近50天的status数据
 #同时返回50天的日期数组和数据
@@ -313,6 +313,7 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
         istoday = True
 
     rasing = []
+    vlines = {}
     n20 = math.floor(len(a)/20)
     for i in range(len(a)):
         #progress
@@ -338,11 +339,14 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
                     A[-1,9] = bo[0] #bolldn
                     A[-1,10] = stock.bollWidth(boll)[-1] #bollw
                     k = A
-            if idd in id2companys and cb(k,id2companys[idd],istoday):
-                rasing.append(idd)
+            if idd in id2companys:
+                b,vline = cb(k,id2companys[idd],istoday)
+                if b:
+                    rasing.append(idd)
+                    vlines[idd] = vline
 
     progress(100)
-    return rasing
+    return rasing,vlines
 
 """
 前置过滤器，用于初选。这样在处理当日数据下载时可以少下载很多数据
@@ -360,7 +364,7 @@ def defaultFilter(a,c,istoday,period):
 """
 按分类列出崛起的股票的数量与列表
 """
-def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
+def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
     output = widgets.Output()
     output2 = widgets.Output()
     box_layout = Layout(display='flex',
@@ -395,12 +399,23 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
     #可以提前准备的数据
     categorys = stock.query("""select id,name from category""")
     companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+    dates = stock.query('select date from %s where id=8828 order by date desc limit 50'%('company_status' if period=='d' else 'company_status_week'))
+
     id2companys = {}
     for c in companys:
         id2companys[c[0]] = c
-
+    
+    prevClickButton = None
+    prevClickButtonStyle = None
+    #点击日期
     def onCatsList(E):
-        nonlocal progress
+        nonlocal progress,prevClickButton,prevClickButtonStyle
+        if prevClickButton is not None:
+            prevClickButton.button_style = prevClickButtonStyle
+        prevClickButton = E
+        prevClickButtonStyle = E.button_style
+        E.button_style = 'warning' #选择时的高亮
+
         progress = widgets.IntProgress(value=0,
             min=0,max=100,step=1,
             description='Loading:',
@@ -409,7 +424,7 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
         with output2:
             display(progress)            
         progressCallback(0)
-        rasing = searchRasingCompanyStatusByRedis(E.description,period,cb,filter,id2companys,progressCallback)
+        rasing,vlines = searchRasingCompanyStatusByRedis(E.date,period,cb,filter,id2companys,progressCallback)
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -425,15 +440,41 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
                 cats[c[3]]['count'] += 1
         #计算分类中的崛起数量，不列出那些没有崛起的分类
         items = []
+        #计算从当前日期
+        current_date = date.fromisoformat(E.date)
+        date_offset=0
+        for i in range(len(dates)):
+            d = dates[i][0]
+            if current_date==d:
+                date_offset = i
+                break
+        #点击分类
+        prevCatButton = None
+        preCatButtonStyle = None
         def onClick(e):
+            nonlocal prevCatButton,preCatButtonStyle,E,vlines
+            if prevCatButton is not None:
+                prevCatButton.button_style = preCatButtonStyle
+            prevCatButton = e
+            preCatButtonStyle = e.button_style
+            e.button_style = 'warning'
             output.clear_output(wait=True)
             key = e.tooltip
             with output:
                 display(box)
                 for c in cats[key]['ls']:
-                    kline.Plote(c[1],period,config={"index":True,"markpos":date.fromisoformat(E.description)}).show(figsize=(32,15))
-                
-        for c in cats:
+                    #对vlines的位置是相对于当前日期，因此需要做偏移调整
+                    vls = vlines[c[0]]
+                    for vline in vls:
+                        if 'x' in vline:
+                            for i in range(len(vline['x'])):
+                                vline['x'][i] -= date_offset
+                    #kline.Plote(c[1],period,config={"index":True,"markpos":current_date,"vlines":vls}).show(figsize=(32,15))
+                    kline.Plote(c[1],period,config={"index":True,"vlines":vls}).show(figsize=(32,15))
+        
+        sortedKeys = sorted(cats,key=lambda it:cats[it]['count'],reverse=True)
+        count = 0
+        for c in sortedKeys:
             if cats[c]["count"]>0:
                 s = "%s %d"%(cats[c]["name"],cats[c]["count"])
                 but = widgets.Button(
@@ -443,6 +484,11 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
                     tooltip=c)
                 but.on_click(onClick)
                 items.append(but)
+                count+=cats[c]["count"]
+        E.description = E.date+' ('+str(count)+')'
+        #将数据记录到redis中去过期20天过期
+        if name is not None:
+            shared.toRedis(count,name+'@'+E.date,ex=20*24*3600) #20天后过期
         box = Box(children=items, layout=box_layout)
         output.clear_output(wait=True)
         with output:
@@ -450,7 +496,6 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
 
     items = []
 
-    dates = stock.query('select date from %s where id=8828 order by date desc limit 10'%('company_status' if period=='d' else 'company_status_week'))
     today = date.today()
     if period=='d' and dates[0][0] != today:
         #如果今天是一个交易日，并且不在数据库中，那么从雪球直接下载数据
@@ -458,14 +503,22 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter):
             description=str(today),
             disabled=False,
             button_style='danger')
+        but.date = str(today)
         but.on_click(onCatsList)
         items.append(but)
-
-    for d in dates:
+    
+    for i in range(15):
+        d = dates[i]
+        desc = str(d[0])
+        if name is not None:
+            b,count = shared.fromRedis(name+'@'+str(d[0]))
+            if b:
+                desc = str(d[0])+' ('+str(count)+')'
         but = widgets.Button(
-            description=str(d[0]),
+            description=desc,
             disabled=False,
             button_style='')
+        but.date = str(d[0])
         but.on_click(onCatsList)
         items.append(but)
 

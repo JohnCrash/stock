@@ -77,7 +77,12 @@ config {
     energy: True or False #能量线
     trend: True or False #趋势线
     kdate : 日期表
-    vlines : {} 竖线
+    vlines : [{
+        x : []
+        color,
+        linewidth
+        linestyle
+    }] 竖线
     trans : 交易点
     figsize : (w,h)
     debug : True or False 打印调试信息
@@ -213,7 +218,7 @@ class Plote:
             self._comarg = companyInfo[1] #code
             self._date = date_
         elif type(company)==str:
-            if self._after is None and 'figure' not in config:
+            if self._after is None and 'figure' not in config and 'cb' not in config:
                 if self._period == 'w':
                     self._after = stock.dateString(date.today()-timedelta(days=5*365))
                 elif self._period == 'd':
@@ -410,6 +415,8 @@ class Plote:
             vlines = self._config['vlines']
             for lines in vlines:
                 for v in lines['x']:
+                    if v<0:
+                        v = len(self._k)+v
                     if v>=bi and v<=ei:
                         plotVline(axs,v,lines['color'] if 'color' in lines else 'blue',
                         linewidth=lines['linewidth'] if 'linewidth' in lines else 1,
