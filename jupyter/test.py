@@ -7,6 +7,9 @@ import stock
 import status
 import shared
 import xueqiu
+import threading
+import queue
+import time
 
 def alignK(date,k1,d1):
     if len(k1.shape)==1:
@@ -22,12 +25,40 @@ def alignK(date,k1,d1):
                 k[i] = k1[j]
                 off = j+1
                 break
-    return k 
+    return k
 
-#stock.createKlineCache('2012-1-1')
-import time
+barrier = threading.Barrier(2)
+CCC = 0
+def downloadXueqiuK15(tasks,ThreadCount=10):
+    results = []
+    lock = threading.Lock()
+    count = 0
+    #t[0] = k,t[1] = c(0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw)
+    def xueqiuK15(t):
+        nonlocal count
+        b,k_,d_ = xueqiu.xueqiuK15day(t[1][1])
+        lock.acquire()
+        results.append({'arg':t,'result':(b,k_,d_)})
+        count-=1
+        lock.release()
+    for t in tasks:
+        threading.Thread(target=xueqiuK15,args=((t,))).start()
+        lock.acquire()
+        count+=1
+        lock.release()
+        while count>=ThreadCount:
+            time.sleep(.1)
+    while count>0:
+        time.sleep(.1)
+    
+    return results
+
 t0 = time.time()
-shared.delKey("company_status_last50")
-shared.delKey("company_status_date50")
-d,k = status.redisStatusCache50('company_status')
-print(time.time()-t0)
+print('BEGIN',t0)
+t1 = threading.Thread(target=f,args=('A',10))
+t2 = threading.Thread(target=f,args=('B',5))
+t1.start()
+t2.start()
+t1.join()
+print('DONE',time.time())
+print(time.time(),time.time()-t0)

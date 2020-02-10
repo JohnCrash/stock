@@ -15,7 +15,8 @@ from datetime import date,datetime,timedelta
 import matplotlib.pyplot as plt
 import math
 import shared
-
+import threading
+import time
 PROD = 40
 
 def isPopularCategory(name):
@@ -294,7 +295,56 @@ def redisStatusCache50(db):
     #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
     #数据a的时间序列和d相同,shape = (公司数,日期,数据)
     return d,a
-    
+
+#多线程下载加快速度
+def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
+    results = []
+    lock = threading.Lock()
+    count = 0
+    #t[0] = k,t[1] = c(0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw)
+    def xueqiuK15(t):
+        nonlocal count
+        b,k_,d_ = xueqiu.xueqiuK15day(t[1][1])
+        lock.acquire()
+        results.append({'arg':t,'result':(b,k_,d_)})
+        count-=1
+        lock.release()
+
+    for t in tasks:
+        threading.Thread(target=xueqiuK15,args=((t,))).start()
+        lock.acquire()
+        count+=1
+        lock.release()
+        progress(30+math.floor(70*len(results)/tatoal))         
+        while count>=ThreadCount:
+            time.sleep(.1)
+    #等等全部处理结束
+    while count>0:
+        progress(30+math.floor(70*len(results)/tatoal))   
+        time.sleep(.1)
+    final_results = []
+    for it in results:
+        t = it['arg']
+        r = it['result']
+        k = t[0]
+        c = t[1]
+        if r[0]: #b
+            k_ = r[1]
+            idd = c[0]
+            A = np.vstack((k,[[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]]))
+            #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
+            A[-1,4] = stock.macdV(A[:,1])[-1] #macd
+            A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
+            A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
+            boll = stock.boll(A[:,1])
+            bo = boll[-1] #boll
+            A[-1,7] = bo[2] #bollup
+            A[-1,8] = bo[1] #bollmid
+            A[-1,9] = bo[0] #bolldn
+            A[-1,10] = stock.bollWidth(boll)[-1] #bollw
+            k = A
+        final_results.append((k,c))
+    return final_results  
 #这是使用Redis进行优化的版本    
 def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     if period=='d':
@@ -314,36 +364,29 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
 
     rasing = []
     vlines = {}
-    n20 = math.floor(len(a)/20)
+    tasks = []
+    results = []
     for i in range(len(a)):
-        #progress
-        if i%n20== 0:
-            progress(30+math.floor(70*i/len(a)))        
+        #progress       
         c = a[i]
         idd = int(c[-1][0])
         #反转数组的前后顺序，反转后-1代表最近的数据
         k = c[:bi+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
         if idd in id2companys and filter(k,id2companys[idd],istoday,period):
             if istoday and xueqiu.isTransTime() and period=='d': #将当日数据叠加进数据中
-                b,k_,d_ = xueqiu.xueqiuK15day(id2companys[idd][1])
-                if b:
-                    A = np.vstack((k,[[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]]))
-                    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
-                    A[-1,4] = stock.macdV(A[:,1])[-1] #macd
-                    A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
-                    A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
-                    boll = stock.boll(A[:,1])
-                    bo = boll[-1] #boll
-                    A[-1,7] = bo[2] #bollup
-                    A[-1,8] = bo[1] #bollmid
-                    A[-1,9] = bo[0] #bolldn
-                    A[-1,10] = stock.bollWidth(boll)[-1] #bollw
-                    k = A
-            if idd in id2companys:
-                b,vline = cb(k,id2companys[idd],istoday)
-                if b:
-                    rasing.append(idd)
-                    vlines[idd] = vline
+                tasks.append((k,id2companys[idd]))
+            else:
+                results.append((k,id2companys[idd]))
+    
+    if len(tasks)>0:
+        results = downloadXueqiuK15(tasks,progress,len(a))
+    
+    for it in results:
+        b,vline = cb(it[0],it[1],istoday)
+        if b:
+            idd = it[1][0]
+            rasing.append(idd)
+            vlines[idd] = vline
 
     progress(100)
     return rasing,vlines
