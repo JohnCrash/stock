@@ -17,15 +17,16 @@ import math
 import shared
 import threading
 import time
+import copy
 PROD = 40
 
 def isPopularCategory(name):
 #    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
 #          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
-#          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
+#          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易']
     ls = ['白色家电','半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
-          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
-          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','专用设备']
+          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程','采掘服务','化学制品','化学纤维',
+          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','林业',' 畜禽养殖','农产品加工','种植业']
     return name in ls
 
 #见数据插入到company_status表
@@ -485,12 +486,19 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
         items = []
         #计算从当前日期
         current_date = date.fromisoformat(E.date)
-        date_offset=0
-        for i in range(len(dates)):
-            d = dates[i][0]
-            if current_date==d:
-                date_offset = i
-                break
+
+        def index2date(inx):
+            if current_date==today:
+                if inx == -1:
+                    return today
+            for i in range(len(dates)):
+                d = dates[i][0]
+                if current_date==d:
+                    if current_date==today:
+                        return dates[i-inx-2][0]
+                    else:
+                        return dates[i-inx-1][0]
+            return None
         #点击分类
         prevCatButton = None
         preCatButtonStyle = None
@@ -507,11 +515,12 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
                 display(box)
                 for c in cats[key]['ls']:
                     #对vlines的位置是相对于当前日期，因此需要做偏移调整
-                    vls = vlines[c[0]]
+                    vls = copy.deepcopy(vlines[c[0]])
                     for vline in vls:
                         if 'x' in vline:
-                            for i in range(len(vline['x'])):
-                                vline['x'][i] -= date_offset
+                            vline['dates'] = []
+                            for i in vline['x']:
+                                vline['dates'].append(index2date(i)) #将负索引转换为日期
                     #kline.Plote(c[1],period,config={"index":True,"markpos":current_date,"vlines":vls}).show(figsize=(32,15))
                     kline.Plote(c[1],period,config={"index":True,"vlines":vls}).show(figsize=(32,15))
         

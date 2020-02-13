@@ -11,6 +11,21 @@ import time
 import trend
 import  warnings
 import xueqiu
+import threading
+import asyncio
+
+class Timer:
+    def __init__(self, timeout, callback):
+        self._timeout = timeout
+        self._callback = callback
+        self._task = asyncio.ensure_future(self._job())
+
+    async def _job(self):
+        await asyncio.sleep(self._timeout)
+        self._callback()
+
+    def cancel(self):
+        self._task.cancel()
 
 warnings.filterwarnings("ignore", module="matplotlib")
 """绘制k线图"""
@@ -79,6 +94,7 @@ config {
     kdate : 日期表
     vlines : [{
         x : []
+        dates:[]
         color,
         linewidth
         linestyle
@@ -183,6 +199,13 @@ class Plote:
         for i in range(self._axsInx):
             self._heights.append(1)
         if 'vlines' in self._config:
+            #支持使用日期
+            vlines = self._config['vlines']
+            for lines in vlines:
+                if 'dates' in lines:
+                    lines['x'] = []
+                    for d in lines['dates']:
+                        lines['x'].append(self.date2index(d))
             self._showvlines = True
         if 'best' in self._config and self._config['best']:
             if self._showmacd:
@@ -236,7 +259,7 @@ class Plote:
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             if self._period=='w':
-                _,szk,szd = stock.loadKline('SZ:399001','d',expire=3600) #缓存保持1小时
+                _,szk,szd = stock.loadKline('SZ:399001','d',expire=5*60) #缓存保持5分钟
                 K = stock.alignK(self._date,szk,szd)
                 WK,WD = stock.weekK(K,self._date)
                 self._szclose = WK[:,4]
@@ -244,7 +267,7 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
                 self._szmacd = stock.macd(WK)
             else:
-                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=3600) #缓存保持1小时
+                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=5*60) #缓存保持5分钟
                 if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
                     _,szk,szd = xueqiu.appendTodayK('SZ399001',szk,szd)
                 K = stock.alignK(self._date,szk,szd)
@@ -254,13 +277,15 @@ class Plote:
                 self._szmacd = stock.macd(K)
         else:
             self._szclose = None
-    #重新加载对象
-    def reload(self):
+    #重新加载对象数据all=True加载全部数据,all=False更新数据
+    def reload(self,all=True):
+        if all:
+            self._after = None
         if self._period == 'w': #周线
-            self._company,k,d = stock.loadKline(self._comarg,'d')
+            self._company,k,d = stock.loadKline(self._comarg,'d',self._after)
             self._k,self._date = stock.weekK(k,d)
         else:
-            self._company,self._k,self._date = stock.loadKline(self._comarg,self._period)
+            self._company,self._k,self._date = stock.loadKline(self._comarg,self._period,self._after)
             if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
                 _,self._k,self._date = xueqiu.appendTodayK(self._company[1],self._k,self._date)
         if "index" in self._backup and self._backup["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
@@ -283,9 +308,14 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(K))[:,2]
                 self._szmacd = stock.macd(K)
         self.config()
+    
+    def __del__(self):
+        if self._timer is not None:
+            self._timer.cancel()
 
     #company可以是kline数据，可以是code，也可以是公司名称
     def __init__(self,company,period='d',config={},date=None,companyInfo=None):
+        self._timer = None
         self._configarg = config
         self._comarg = company
         self._datearg = date
@@ -691,6 +721,9 @@ class Plote:
         showRange = ei-bi            
 
         def showline():
+            nonlocal output
+            output.append_stdout(str(output))
+            output.append_stdout(str(dir(output)))
             output.clear_output(wait=True)
             with output:
                 self.showKline(beginPT,endPT,figsize=figsize)
@@ -699,7 +732,6 @@ class Plote:
                     ei = figure2.date2index( self.index2date(endPT) )
                     if bi != ei:
                         figure2.showKline(bi,ei,figsize=figsize)
-
 
         def on_nextbutton_clicked(b):
             nonlocal beginPT,endPT,showRange
@@ -843,6 +875,7 @@ class Plote:
             figuretoggle.observe(on_change,names='value')
 
         display(box,output)
+
         with output:
             self.showKline(beginPT,endPT,figsize=figsize)
             if figure2 is not None:
@@ -851,3 +884,19 @@ class Plote:
                 if bi != ei:
                     figure2.showKline(bi,ei,figsize=figsize)
 
+        #如果是在开盘状态则15分钟更新一次数据
+        """
+        def nextdt15():
+            t = datetime.today()
+            return 1 #(15-t.minute%15)*60-t.second+5
+        #import pdb; pdb.set_trace()
+        def updatek15():
+            if xueqiu.isTransTime():
+                self.reload(all=False)
+            self._k[-1,4] -= 200
+            showline()
+            self._timer = threading.Timer(nextdt15(),updatek15)
+            self._timer.start()
+        self._timer = Timer(nextdt15(),updatek15)
+        self._timer.start()
+        """

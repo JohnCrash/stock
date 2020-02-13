@@ -8,6 +8,7 @@ import shared
 def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+            'Accept-Encoding': 'gzip, deflate',
             'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; cookiesu=611580616600184; Hm_lvt_1db88642e346389874251b5a1eded6e3=1580196127,1580197850,1580447002,1580630322; remember=1; xq_a_token=0e0638737a1c6fc314110dbcfaca3650f71fce4b; xqat=0e0638737a1c6fc314110dbcfaca3650f71fce4b; xq_r_token=b2004307cb6bd998b245347262380833b61ce0f4; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1580630785'}
     for i in range(10):
         try:
@@ -17,9 +18,30 @@ def xueqiuJson(url):
             else:
                 print(url,r.status_code,r.reason)
                 return False,r.reason
-        except ConnectionError as e:
+        except Exception as e:
             print('第',i,'次尝试',e)
 
+#新浪财经数据
+def sinaK15Native(code,n=32):
+    s = requests.session()
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+               'Accept-Encoding': 'gzip, deflate',
+               'Accept-Language': 'zh-CN,zh;q=0.9'}
+    timestramp = math.floor(time.time()*1000)
+    url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_15_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=15&ma=no&datalen=%d"""%(code.lower(),timestramp,code.lower(),n)
+    print(url)
+    for i in range(10):
+        try:
+            r = s.get(url,headers=headers)
+            if r.status_code==200:
+                return True,r
+            else:
+                print(url,r.status_code,r.reason)
+                return False,r.reason
+        except Exception as e:
+            print('第',i,'次尝试',e)    
+    return False,None
+#雪球数据
 def xueqiuK15(code,n=32):
     timestamp = math.floor(time.time()*1000)
     uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-%d&indicator=kline"""%(code,timestamp,n)
