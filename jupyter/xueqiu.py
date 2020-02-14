@@ -4,48 +4,122 @@ import math
 import numpy as np
 from datetime import date,datetime
 import shared
+import json
 
 def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
             'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; cookiesu=611580616600184; Hm_lvt_1db88642e346389874251b5a1eded6e3=1580196127,1580197850,1580447002,1580630322; remember=1; xq_a_token=0e0638737a1c6fc314110dbcfaca3650f71fce4b; xqat=0e0638737a1c6fc314110dbcfaca3650f71fce4b; xq_r_token=b2004307cb6bd998b245347262380833b61ce0f4; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1580630785'}
-    for i in range(10):
-        try:
-            r = s.get(url,headers=headers)
-            if r.status_code==200:
-                return True,r.json()
-            else:
-                print(url,r.status_code,r.reason)
-                return False,r.reason
-        except Exception as e:
-            print('第',i,'次尝试',e)
+    r = s.get(url,headers=headers)
+    if r.status_code==200:
+        return True,r.json()
+    else:
+        return False,r.reason
 
 #新浪财经数据
-def sinaK15Native(code,n=32):
+# True , [(timesramp,volume,open,high,low,close),...]
+# False, "Error infomation"
+def sinaK15(code,n=32):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
                'Accept-Encoding': 'gzip, deflate',
                'Accept-Language': 'zh-CN,zh;q=0.9'}
     timestramp = math.floor(time.time()*1000)
     url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_15_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=15&ma=no&datalen=%d"""%(code.lower(),timestramp,code.lower(),n)
-    print(url)
-    for i in range(10):
-        try:
-            r = s.get(url,headers=headers)
-            if r.status_code==200:
-                return True,r
-            else:
-                print(url,r.status_code,r.reason)
-                return False,r.reason
-        except Exception as e:
-            print('第',i,'次尝试',e)    
-    return False,None
+    r = s.get(url,headers=headers)
+    if r.status_code==200:
+        """
+        var jsvar =([{"day":"2020-02-13 09:45:00","open":"2927.144","high":"2934.652","low":"2923.232","close":"2934.303","volume":"5111848800"},
+        ...}]);
+        """
+        bi = r.text.find("=([{")
+        ei = r.text.find("}]);")
+        if bi>0 and ei>0 and ei>bi and ei+2<len(r.text):
+            try:
+                k = json.loads(r.text[bi+2:ei+2])
+                K = []
+                for v in k:
+                    K.append((datetime.fromisoformat(v['day']),float(v['volume']),float(v['open']),float(v['high']),float(v['low']),float(v['close'])))
+                assert(len(K)==n)
+                return True,K
+            except Exception as e:
+                print(str(e))
+                return False,str(e)
+        else:
+            return False,"返回错误或者格式发生变化:"+str(r.text)
+    else:
+        return False,r.reason
+
 #雪球数据
+#返回标准格式
+# True , ((timesramp,volume,open,high,low,close),...)
+# False, "Error infomation"
 def xueqiuK15(code,n=32):
     timestamp = math.floor(time.time()*1000)
     uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-%d&indicator=kline"""%(code,timestamp,n)
-    return xueqiuJson(uri)
+    b,dd = xueqiuJson(uri)
+    if b:
+        """
+        {
+            'data':{
+                'symbol':code,
+                'column':[
+                    'timestamp',
+                    'volume',
+                    'open',
+                    'high',
+                    'low',
+                    'close',
+                    'chg',
+                    'percent',
+                    'turnoverrate',
+                    'amount',
+                    'volume_post',
+                    'amount_post'
+                ],
+                'item':[
+                    [timestamp,volume,....]
+                ]
+            }
+        }
+        """
+        K = []
+        try:
+            d = dd['data']
+            for i in range(len(d['column'])):
+                if d['column'][i]=='open':
+                    open_inx = i
+                elif d['column'][i]=='close':
+                    close_inx = i
+                elif d['column'][i]=='high':
+                    high_inx = i
+                elif d['column'][i]=='low':
+                    low_inx = i
+                elif d['column'][i]=='timestamp':
+                    timestamp_inx = i
+                elif d['column'][i]=='volume':
+                    volume_inx = i
+            for v in d['item']:
+                K.append((datetime.fromtimestamp(v[timestamp_inx]/1000),v[volume_inx],v[open_inx],v[high_inx],v[low_inx],v[close_inx]))
+            assert(len(K)==n)
+            return True,K
+        except Exception as e:
+            return False,str(e)
+    else:
+        return b,d
+
+#sina财经作为主下载站点，xueqiu作为备份站点
+def k15(code,n=32):
+    for i in range(5):
+        b,d = sinaK15(code,n)
+        if b:
+            return b,d
+        else:
+            b,d = xueqiuK15(code,n)
+            if b:
+                return b,d
+    return False,"k15多次尝试下载："+code+" 失败"
 
 #当前是交易时间
 def isTransTime():
@@ -85,30 +159,30 @@ def xueqiuK15day(code):
     b,v = shared.fromRedis('ISEXPIRSE?')
     if b and v:
         return False,0,0
-    data = xueqiuK15(code,32)
-    if len(data)>0:
-        if data[0] and data[1] and data[1]['data'] and data[1]['data']['item']:
-            items = data[1]['data']['item']
-            dd = date.fromtimestamp(items[-1][0]/1000)
-            if dd!=date.today():
-                shared.toRedis(True,'ISEXPIRSE?',ex=60)
-                return False,0,0
-            for i in range(len(items)-1,-1,-1):
-                it = items[i]
-                if dd!=date.fromtimestamp(it[0]/1000):
-                    lasti = i
-                    break
-            #0 timestamp,1 volume,2 open,3 high,4 low,5 close,chg,....
-            yesterday = np.array(items[lasti-15:lasti+1])
-            today = np.array(items[lasti+1:])
-     
-            #这里要预测今天的volume
-            i = len(today)
-            volume = yesterday[:,1].sum()*today[:,1].sum()/yesterday[0:i,1].sum()
-            k = [volume,today[0][2],today[:,3].max(),today[:,4].min(),today[-1][5]]
-            
-            shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=15*60) #15分钟后过期
-            return True,k,dd
+    b,k = k15(code,32)
+    if b:
+        dd = date(k[-1].year,k[-1].month,k[-1].day)
+        if dd!=date.today():
+            shared.toRedis(True,'ISEXPIRSE?',ex=60)
+            return False,0,0
+        for i in range(len(k)-1,-1,-1):
+            it = k[i]
+            if dd!=it[0]:
+                lasti = i
+                break
+        #0 timestamp,1 volume,2 open,3 high,4 low,5 close
+        yesterday = np.array(k[lasti-15:lasti+1])
+        today = np.array(k[lasti+1:])
+    
+        #这里要预测今天的volume
+        i = len(today)
+        volume = yesterday[:,1].sum()*today[:,1].sum()/yesterday[0:i,1].sum()
+        k = [volume,today[0][2],today[:,3].max(),today[:,4].min(),today[-1][5]]
+        def nextdt15():
+            t = datetime.today()
+            return (15-t.minute%15)*60-t.second
+        shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=nextdt15()) #到下一个15整点过期
+        return True,k,dd
     return False,0,0
 #自选全部
 def xueqiuList():

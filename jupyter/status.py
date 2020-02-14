@@ -491,13 +491,12 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
             if current_date==today:
                 if inx == -1:
                     return today
+                else:
+                    return dates[-inx-2][0]
             for i in range(len(dates)):
                 d = dates[i][0]
                 if current_date==d:
-                    if current_date==today:
-                        return dates[i-inx-2][0]
-                    else:
-                        return dates[i-inx-1][0]
+                    return dates[i-inx-1][0]
             return None
         #点击分类
         prevCatButton = None

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import Formatter
 import math
 import ipywidgets as widgets
-from IPython.display import display
+from IPython.display import display,update_display,clear_output
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
 import time
@@ -12,6 +12,10 @@ import trend
 import  warnings
 import xueqiu
 import threading
+import uuid
+#定制show
+from matplotlib._pylab_helpers import Gcf
+from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show
 import asyncio
 
 class Timer:
@@ -21,13 +25,36 @@ class Timer:
         self._task = asyncio.ensure_future(self._job())
 
     async def _job(self):
-        await asyncio.sleep(self._timeout)
+        await asyncio.sleep(self._timeout) 
         self._callback()
 
     def cancel(self):
         self._task.cancel()
 
 warnings.filterwarnings("ignore", module="matplotlib")
+
+def plt_show(display_id,isupdate):
+    try:
+        for figure_manager in Gcf.get_all_fig_managers():
+            if isupdate:
+                update_display(
+                    figure_manager.canvas.figure,
+                    metadata=_fetch_figure_metadata(figure_manager.canvas.figure),
+                    display_id=display_id
+                )                
+            else:
+                display(
+                    figure_manager.canvas.figure,
+                    metadata=_fetch_figure_metadata(figure_manager.canvas.figure),
+                    display_id=display_id
+                )
+    finally:
+        show._to_draw = []
+        # only call close('all') if any to close
+        # close triggers gc.collect, which can be slow
+        if Gcf.get_all_fig_managers():
+            plt.close('all')
+
 """绘制k线图"""
 def plotK(axs,k,bi,ei):
     for i in range(bi,ei):
@@ -321,6 +348,8 @@ class Plote:
         self._datearg = date
         self._companyInfoarg = companyInfo
         self._after = None
+        self._display_id = str(uuid.uuid1())
+        self._isupdate = False
         self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
         self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
@@ -411,9 +440,13 @@ class Plote:
             if self._date is not None:
                 xticks = []
                 if self._period=='d':
+                    last = bi
                     for i in range(bi,ei):
                         if self._date[i][0].weekday()==0:
                             xticks.append(i)
+                            last = i
+                    if last != ei-1:
+                        xticks.append(ei-1)
                 else:
                     for i in range(bi,ei):
                         if i>0 and self._date[i][0].month!=self._date[i-1][0].month:
@@ -577,11 +610,21 @@ class Plote:
                             linestyle=p['hline']['linestyle'] if 'linestyle' in p['hline'] else '-'
                             )
                 i+=1
-        #一个从外部进行调整图表的手段                
+        #一个从外部进行调整图表的手段
         if 'cb' in self._config:
             self._config['cb'](self,axs,bi,ei)
         fig.autofmt_xdate()
-        plt.show()
+        #plt.show()
+        """
+        这里定制plt.show函数，参加backend_inline.py
+        plt.show()调用backend_inline.show
+        这里加入命名的display,这保证每次都更新相同的cell
+        """
+        if self._isupdate:
+            plt_show(display_id=self._display_id,isupdate=True)
+        else:
+            plt_show(display_id=self._display_id,isupdate=False)
+            self._isupdate = True
 
     #code2另一只股票，进行比较显示
     def show(self,bi=None,ei=None,code2=None,figsize=(30,14)):
@@ -697,7 +740,7 @@ class Plote:
             tooltip='日线',
             icon='check')
                                    
-        output = widgets.Output()
+        #output = widgets.Output()
 
         items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
 
@@ -721,17 +764,12 @@ class Plote:
         showRange = ei-bi            
 
         def showline():
-            nonlocal output
-            output.append_stdout(str(output))
-            output.append_stdout(str(dir(output)))
-            output.clear_output(wait=True)
-            with output:
-                self.showKline(beginPT,endPT,figsize=figsize)
-                if figure2 is not None:
-                    bi = figure2.date2index( self.index2date(beginPT) )
-                    ei = figure2.date2index( self.index2date(endPT) )
-                    if bi != ei:
-                        figure2.showKline(bi,ei,figsize=figsize)
+            self.showKline(beginPT,endPT,figsize=figsize)
+            if figure2 is not None:
+                bi = figure2.date2index( self.index2date(beginPT) )
+                ei = figure2.date2index( self.index2date(endPT) )
+                if bi != ei:
+                    figure2.showKline(bi,ei,figsize=figsize)
 
         def on_nextbutton_clicked(b):
             nonlocal beginPT,endPT,showRange
@@ -874,29 +912,29 @@ class Plote:
         if self._showfigure:
             figuretoggle.observe(on_change,names='value')
 
-        display(box,output)
-
-        with output:
-            self.showKline(beginPT,endPT,figsize=figsize)
-            if figure2 is not None:
-                bi = figure2.date2index( self.index2date(beginPT) )
-                ei = figure2.date2index( self.index2date(endPT) )
-                if bi != ei:
-                    figure2.showKline(bi,ei,figsize=figsize)
+        display(box)
+        
+        self.showKline(beginPT,endPT,figsize=figsize)
+        if figure2 is not None:
+            bi = figure2.date2index( self.index2date(beginPT) )
+            ei = figure2.date2index( self.index2date(endPT) )
+            if bi != ei:
+                figure2.showKline(bi,ei,figsize=figsize)
 
         #如果是在开盘状态则15分钟更新一次数据
-        """
         def nextdt15():
             t = datetime.today()
-            return 1 #(15-t.minute%15)*60-t.second+5
-        #import pdb; pdb.set_trace()
+            return (15-t.minute%15)*60-t.second+5
+
         def updatek15():
             if xueqiu.isTransTime():
+                #print('update ',self._display_id)
+                #import random
+                #self._k[-1,4] = self._lastclose+200*random.random()
                 self.reload(all=False)
-            self._k[-1,4] -= 200
-            showline()
-            self._timer = threading.Timer(nextdt15(),updatek15)
-            self._timer.start()
+                showline()
+                self._timer = Timer(nextdt15(),updatek15)
+            else:
+                self._timer = None
+        #self._lastclose = self._k[-1,4]
         self._timer = Timer(nextdt15(),updatek15)
-        self._timer.start()
-        """
