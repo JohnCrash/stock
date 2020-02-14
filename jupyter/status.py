@@ -344,7 +344,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             A[-1,9] = bo[0] #bolldn
             A[-1,10] = stock.bollWidth(boll)[-1] #bollw
             k = A
-        final_results.append((k,c))
+            final_results.append((k,c))
     return final_results  
 #这是使用Redis进行优化的版本    
 def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):

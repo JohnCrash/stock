@@ -5,6 +5,7 @@ import numpy as np
 from datetime import date,datetime
 import shared
 import json
+import threading
 
 def xueqiuJson(url):
     s = requests.session()
@@ -110,15 +111,37 @@ def xueqiuK15(code,n=32):
         return b,d
 
 #sina财经作为主下载站点，xueqiu作为备份站点
+stockK15Service = [
+    {
+        "name":"新浪",
+        "k15":sinaK15,
+        "error":0,
+        "success":0
+    },
+    {
+        "name":"雪球",
+        "k15":xueqiuK15,
+        "error":0,
+        "success":0
+    }
+]
+current = 0
+lock = threading.Lock()
 def k15(code,n=32):
-    for i in range(5):
-        b,d = sinaK15(code,n)
+    for i in range(10):
+        service = stockK15Service[current]
+        b,d = service["k15"](code,n)
         if b:
+            service['success'] += 1
             return b,d
         else:
-            b,d = xueqiuK15(code,n)
-            if b:
-                return b,d
+            service['error'] += 1
+            lock.acquire()
+            if current<len(stockK15Service)-1:
+                current+=1
+            else:
+                current = 0
+            lock.release()
     return False,"k15多次尝试下载："+code+" 失败"
 
 #当前是交易时间
@@ -180,6 +203,8 @@ def xueqiuK15day(code):
         k = [volume,today[0][2],today[:,3].max(),today[:,4].min(),today[-1][5]]
         def nextdt15():
             t = datetime.today()
+            if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
+                return (datetime(t.year,t.month,t.day,13,0,0)-t).second+15*60
             return (15-t.minute%15)*60-t.second
         shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=nextdt15()) #到下一个15整点过期
         return True,k,dd

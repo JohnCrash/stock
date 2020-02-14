@@ -762,17 +762,20 @@ class Plote:
         beginPT = bi
         endPT = ei
         showRange = ei-bi            
-
+        needUpdateSlider = True
         def showline():
+            nonlocal needUpdateSlider
+
             self.showKline(beginPT,endPT,figsize=figsize)
             if figure2 is not None:
                 bi = figure2.date2index( self.index2date(beginPT) )
                 ei = figure2.date2index( self.index2date(endPT) )
                 if bi != ei:
                     figure2.showKline(bi,ei,figsize=figsize)
+            needUpdateSlider = True
 
         def on_nextbutton_clicked(b):
-            nonlocal beginPT,endPT,showRange
+            nonlocal beginPT,endPT,showRange,needUpdateSlider
             beginPT += showRange
             endPT += showRange
             
@@ -780,6 +783,7 @@ class Plote:
                 endPT = len(self._k)
                 beginPT = endPT-showRange
             if self._showtrend:
+                needUpdateSlider = False
                 self._trendHeadPos = endPT
                 slider.min = beginPT
                 slider.max = endPT
@@ -788,7 +792,7 @@ class Plote:
             showline()
         
         def on_prevbutton_clicked(b):
-            nonlocal beginPT,endPT,showRange
+            nonlocal beginPT,endPT,showRange,needUpdateSlider
             #这里进行一个优化，在加载数据的时候正常只加载一年的数据，当向上翻页的时候出发加载全部数据
             if self._after is not None:
                 self._after = None
@@ -809,6 +813,7 @@ class Plote:
                 beginPT = 0
 
             if self._showtrend:
+                needUpdateSlider = False
                 self._trendHeadPos = endPT
                 slider.max = endPT
                 slider.min = beginPT
@@ -817,18 +822,19 @@ class Plote:
             showline()
 
         def on_zoomin(b):
-            nonlocal beginPT,endPT,showRange
+            nonlocal beginPT,endPT,showRange,needUpdateSlider
             showRange = math.floor(showRange/2)
             beginPT = endPT - showRange
             if self._showtrend:
                 self._trendHeadPos = endPT
                 slider.min = beginPT
                 slider.max = endPT
-                slider.value = endPT            
+                needUpdateSlider = False
+                slider.value = endPT           
             showline()
 
         def on_zoomout(b):
-            nonlocal beginPT,endPT,showRange
+            nonlocal beginPT,endPT,showRange,needUpdateSlider
             showRange *= 2
             beginPT = endPT - showRange
             if beginPT < 0:
@@ -838,6 +844,7 @@ class Plote:
                 self._trendHeadPos = endPT
                 slider.min = beginPT
                 slider.max = endPT
+                needUpdateSlider = False
                 slider.value = endPT                
             showline()
 
@@ -850,26 +857,32 @@ class Plote:
             showline()
 
         def on_sliderChange(event):
+            nonlocal needUpdateSlider
             self._trendHeadPos = event['new']
             updateTrend()
-            showline()
+            if needUpdateSlider:
+                showline()
 
         def updateTrend():
             self._trend = trend.macdTrend(self._k[:self._trendHeadPos,:],self._macd[:self._trendHeadPos])
             #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):
+            nonlocal needUpdateSlider
             self._trendHeadPos -= 1
             if self._trendHeadPos<0:
                 self._trendHeadPos = 0
+            needUpdateSlider = False
             slider.value = self._trendHeadPos
             updateTrend()
             showline()
             
         def on_next(b):
+            nonlocal needUpdateSlider
             self._trendHeadPos += 1
             if self._trendHeadPos>len(self._k):
                 self._trendHeadPos = len(self._k)
+            needUpdateSlider = False
             slider.value = self._trendHeadPos
             updateTrend()
             showline()
@@ -924,6 +937,8 @@ class Plote:
         #如果是在开盘状态则15分钟更新一次数据
         def nextdt15():
             t = datetime.today()
+            if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
+                return (datetime(t.year,t.month,t.day,13,0,0)-t).second+15*60+5
             return (15-t.minute%15)*60-t.second+5
 
         def updatek15():
