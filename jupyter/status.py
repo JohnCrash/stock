@@ -508,8 +508,8 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
             prevCatButton = e
             preCatButtonStyle = e.button_style
             e.button_style = 'warning'
-            output.clear_output(wait=True)
             key = e.tooltip
+            output.clear_output(wait=True)
             with output:
                 display(box)
                 for c in cats[key]['ls']:

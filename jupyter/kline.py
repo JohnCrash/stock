@@ -614,17 +614,25 @@ class Plote:
         if 'cb' in self._config:
             self._config['cb'](self,axs,bi,ei)
         fig.autofmt_xdate()
+
+        if not self._isupdate:
+            self._output = widgets.Output()
+            display(self._output)
+            self._isupdate = True
+        self._output.clear_output(wait=True)
+        with self._output:
+            plt.show()
         #plt.show()
         """
         这里定制plt.show函数，参加backend_inline.py
         plt.show()调用backend_inline.show
         这里加入命名的display,这保证每次都更新相同的cell
         """
-        if self._isupdate:
-            plt_show(display_id=self._display_id,isupdate=True)
-        else:
-            plt_show(display_id=self._display_id,isupdate=False)
-            self._isupdate = True
+        #if self._isupdate:
+        #    plt_show(display_id=self._display_id,isupdate=True)
+        #else:
+        #    plt_show(display_id=self._display_id,isupdate=False)
+        #    self._isupdate = True
 
     #code2另一只股票，进行比较显示
     def show(self,bi=None,ei=None,code2=None,figsize=(30,14)):
@@ -765,14 +773,13 @@ class Plote:
         needUpdateSlider = True
         def showline():
             nonlocal needUpdateSlider
-
             self.showKline(beginPT,endPT,figsize=figsize)
             if figure2 is not None:
                 bi = figure2.date2index( self.index2date(beginPT) )
                 ei = figure2.date2index( self.index2date(endPT) )
                 if bi != ei:
                     figure2.showKline(bi,ei,figsize=figsize)
-            needUpdateSlider = True
+            needUpdateSlider = True                
 
         def on_nextbutton_clicked(b):
             nonlocal beginPT,endPT,showRange,needUpdateSlider
@@ -938,7 +945,7 @@ class Plote:
         def nextdt15():
             t = datetime.today()
             if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
-                return (datetime(t.year,t.month,t.day,13,0,0)-t).second+15*60+5
+                return (datetime(t.year,t.month,t.day,13,0,0)-t).seconds+15*60+5
             return (15-t.minute%15)*60-t.second+5
 
         def updatek15():

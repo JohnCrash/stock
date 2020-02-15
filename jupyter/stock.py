@@ -618,3 +618,86 @@ def alignK(date,k1,d1):
                 off = j+1
                 break
     return k 
+
+"""
+最小二乘法拟合直线
+y = k*x+b
+R 是拟合度
+"""
+def lastSequaresLine(p):
+    x = np.empty((len(p),2))
+    x[:,0] = np.arange(len(p))
+    x[:,1] = p
+    a = x.mean(axis=0)
+    k = ((x[:,0]-a[0])*(x[:,1]-a[1])).sum()/((x[:,0]-a[0])**2).sum()
+    b = a[1]-k*a[0]
+    #拟合优度,范围0-1,越靠近1拟合越好
+    R = 1-((x[:,1]-k*x[:,0]-b)**2).sum()/((x[:,1]-a[1])**2).sum()
+    return [k,b,R]
+
+"""
+量价关系
+[
+    (bi,ei,dvolume,dprice),dvolume (-1,1) ,dvolume(-1,1)
+]
+"""
+def volumeprices(k,d):
+    volumeJ = kdj(k[:,0])[:,2]
+    bi = -1
+    ei = -1
+    prevs = -1
+    pt = []
+    def add_max_volume(b,e):
+        pt.append(k[b:e+1,0].argmax()+b) 
+    def add_min_volume(b,e):
+        pt.append(k[b:e+1,0].argmin()+b)
+
+    for i in range(len(volumeJ)):
+        J = volumeJ[i]
+        if J>80:
+            if prevs==1:
+                add_min_volume(bi,ei)
+                bi = -1
+            if bi==-1:
+                bi = i
+            ei = i
+            prevs = 0
+        elif J<20:
+            if prevs==0:
+                add_max_volume(bi,ei)
+                bi = -1
+            if bi==-1:
+                bi = i
+            ei = i            
+            prevs = 1
+    if prevs==1 and bi!=-1:
+        add_min_volume(bi,ei)
+        add_max_volume(len(k)-1,len(k)-1) #最后一段假设趋势
+    elif prevs==0 and bi!=-1:
+        add_max_volume(bi,ei)
+        add_min_volume(len(k)-1,len(k)-1)
+    
+    r = []
+    for i in range(len(pt)-1):
+        bi = pt[i]
+        ei = pt[i+1]
+        if ei>bi:
+            v = lastSequaresLine(k[bi:ei+1,0]) #量
+            p = lastSequaresLine(k[bi:ei+1,4]) #价
+            r.append([bi,ei,v[0],p[0]])
+    R = np.array(r)
+    vmax = R[:,2].max()
+    vmin = R[:,2].min()
+    pmax = R[:,3].max()
+    pmin = R[:,3].min()
+    for i in range(len(R)):
+        a = R[i]
+        if a[2]>0:
+            a[2] = a[2]/vmax
+        else:
+            a[2] = -a[2]/vmin
+        if a[3]>0:
+            a[3] = a[3]/pmax
+        else:
+            a[3] = -a[3]/pmin
+    return R

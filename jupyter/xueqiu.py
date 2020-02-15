@@ -204,7 +204,7 @@ def xueqiuK15day(code):
         def nextdt15():
             t = datetime.today()
             if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
-                return (datetime(t.year,t.month,t.day,13,0,0)-t).second+15*60
+                return (datetime(t.year,t.month,t.day,13,0,0)-t).seconds+15*60
             return (15-t.minute%15)*60-t.second
         shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=nextdt15()) #到下一个15整点过期
         return True,k,dd
