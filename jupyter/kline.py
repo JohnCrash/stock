@@ -139,6 +139,7 @@ config {
         },
         ...
     ],...]
+    figure: callback figure(self,)返回figure
     cb : function(self,axs,bi,ei)
     lightweight: True or False 如果是True仅仅加载一年的数据
 }
@@ -165,7 +166,11 @@ class Plote:
             self._showma = True
         if 'figure' in self._config:
             self._figureInx = []
-            for f in self._config['figure']:
+            if type(self._config['figure'])==dict:
+                figures = self._config['figure']
+            elif callable(self._config['figure']):
+                figures = self._config['figure'](self)
+            for f in figures:
                 self._figureInx.append(self._axsInx+1)
                 self._axsInx += 1
             self._showfigure = True
@@ -244,7 +249,8 @@ class Plote:
             self._showbest = True
 
     def switchweek(self):
-        self.init(self._comarg,'w',self._config)
+        self._period = 'w'
+        self.reload()
         self.config()
     def switchday(self):
         self.init(self._comarg,'d',self._config)
@@ -593,7 +599,11 @@ class Plote:
         #绘制额外的图表
         if self._showfigure:
             i = 0
-            for f in self._config['figure']:
+            if type(self._config['figure'])==dict:
+                figures = self._config['figure']
+            elif callable(self._config['figure']):
+                figures = self._config['figure'](self)
+            for f in figures:
                 axsinx = self._figureInx[i]
                 for p in f:
                     if 'data' in p:
@@ -734,14 +744,7 @@ class Plote:
                 tooltip='FIGURE',
                 icon='check')    
         #加入周线和日线的切换
-        weektoggle = widgets.ToggleButton(
-            value=self._period=='w',
-            description='周线',
-            disabled=False,
-            button_style='',
-            tooltip='周线',
-            icon='check')
-        daytoggle = widgets.ToggleButton(
+        dayweektoggle = widgets.ToggleButton(
             value=self._period=='d',
             description='日线',
             disabled=False,
@@ -761,9 +764,9 @@ class Plote:
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
         if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,link]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,weektoggle,daytoggle,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,link]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -835,9 +838,9 @@ class Plote:
             beginPT = endPT - showRange
             if self._showtrend:
                 self._trendHeadPos = endPT
+                needUpdateSlider = False
                 slider.min = beginPT
                 slider.max = endPT
-                needUpdateSlider = False
                 slider.value = endPT           
             showline()
 
@@ -850,9 +853,9 @@ class Plote:
                 endPT = beginPT+showRange
             if self._showtrend:
                 self._trendHeadPos = endPT
+                needUpdateSlider = False
                 slider.min = beginPT
                 slider.max = endPT
-                needUpdateSlider = False
                 slider.value = endPT                
             showline()
 
@@ -876,21 +879,42 @@ class Plote:
             #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):
-            nonlocal needUpdateSlider
+            nonlocal needUpdateSlider,beginPT,endPT
             self._trendHeadPos -= 1
             if self._trendHeadPos<0:
                 self._trendHeadPos = 0
             needUpdateSlider = False
+            if self._trendHeadPos<beginPT-1:#向前移动移动视口
+                beginPT = self._trendHeadPos-math.floor(self._showcount/2)
+                if beginPT<0:
+                    beginPT = 0
+                endPT = beginPT+self._showcount
+                if endPT>len(self._k):
+                    endPT = len(self._k)
+                slider.min = beginPT
+                slider.max = endPT
+                slider.value = self._trendHeadPos 
+            
             slider.value = self._trendHeadPos
             updateTrend()
             showline()
             
         def on_next(b):
-            nonlocal needUpdateSlider
+            nonlocal needUpdateSlider,beginPT,endPT
             self._trendHeadPos += 1
+            needUpdateSlider = False
             if self._trendHeadPos>len(self._k):
                 self._trendHeadPos = len(self._k)
-            needUpdateSlider = False
+            if self._trendHeadPos>endPT+1:#向后移动移动视口
+                endPT = self._trendHeadPos+math.floor(self._showcount/2)
+                if endPT>len(self._k):
+                    endPT = len(self._k)
+                beginPT = endPT-self._showcount
+                if beginPT<0:
+                    beginPT=0
+                slider.min = beginPT
+                slider.max = endPT
+                slider.value = self._trendHeadPos  
             slider.value = self._trendHeadPos
             updateTrend()
             showline()
@@ -906,16 +930,16 @@ class Plote:
             beginPT = len(self._k)-self._showcount
             if beginPT<0:
                 beginPT = 0    
-        def on_week(event):
-            self.switchweek()
+        def on_dayweek(e):
+            if e['new']:
+                self.switchday()
+                e['owner'].description = '日线'
+            else:
+                self.switchweek()
+                e['owner'].description = '周线'
             recalcRange()
             showline()
-        def on_day(event):
-            self.switchday()
-            recalcRange()
-            showline()
-        weektoggle.observe(on_week,names='value')
-        daytoggle.observe(on_day,names='value')
+        dayweektoggle.observe(on_dayweek,names='value')
 
         if self._showtrend:
             backbutton.on_click(on_prev)
