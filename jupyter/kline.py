@@ -615,6 +615,7 @@ class Plote:
             self._config['cb'](self,axs,bi,ei)
         fig.autofmt_xdate()
 
+        #单独做一个显示层级
         if not self._isupdate:
             self._output = widgets.Output()
             display(self._output)
@@ -945,7 +946,7 @@ class Plote:
         def nextdt15():
             t = datetime.today()
             if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
-                return (datetime(t.year,t.month,t.day,13,0,0)-t).seconds+15*60+5
+                return (datetime(t.year,t.month,t.day,13,0,0)-t).seconds+15*60+2
             return (15-t.minute%15)*60-t.second+5
 
         def updatek15():

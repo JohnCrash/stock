@@ -10,7 +10,12 @@ import xueqiu
 import threading
 import queue
 import time
-
+from IPython.core.interactiveshell import InteractiveShell
+"""
+display_pub = InteractiveShell.instance().display_pub
+display_pub.publish(data='hell',metadata={})
 c,k,d = stock.loadKline('SH:000001')
 
 r = stock.volumeprices(k,d)
+"""
+b,k,d = xueqiu.xueqiuK15day('SZ399001')

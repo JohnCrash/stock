@@ -302,10 +302,11 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
     results = []
     lock = threading.Lock()
     count = 0
-    #t[0] = k,t[1] = c(0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw)
+    #t[0] = [(0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw),...]
+    #t[1] = (0 company_id,1 code,2 name,3 category,4 ttm,5 pb)
     def xueqiuK15(t):
         nonlocal count
-        b,k_,d_ = xueqiu.xueqiuK15day(t[1][1])
+        b,k_,d_ = xueqiu.xueqiuK15day(t[1][1],lastStatus=t[0][-1])
         lock.acquire()
         results.append({'arg':t,'result':(b,k_,d_)})
         count-=1
