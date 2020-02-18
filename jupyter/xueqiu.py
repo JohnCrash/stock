@@ -5,11 +5,42 @@ import numpy as np
 from datetime import date,datetime
 import shared
 import json
+import random
 import threading
 import mylog
+import asyncio
+
+class Timer:
+    def __init__(self, timeout, callback):
+        self._timeout = timeout
+        self._callback = callback
+        self._task = asyncio.ensure_future(self._job())
+
+    async def _job(self):
+        await asyncio.sleep(self._timeout) 
+        self._callback()
+
+    def cancel(self):
+        self._task.cancel()
 
 mylog.init('./download_stock.log')
 
+#如果是在开盘状态则15分钟更新一次数据
+def nextdt15():
+    t = datetime.today()
+    if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
+        return (datetime(t.year,t.month,t.day,13,15,0)-t).seconds+15*60
+    return (15-t.minute%15)*60-t.second
+
+#深交所数据分时
+#http://www.szse.cn/api/market/ssjjhq/getTimeData?random=0.9981093803414802&marketId=1&code=000004
+#日K
+#http://www.szse.cn/api/market/ssjjhq/getHistoryData?random=0.04502169743970663&cycleType=32&marketId=1&code=000004
+#上交所日K
+#上交所分时
+#http://yunhq.sse.com.cn:32041//v1/sh1/line/600651?callback=jQuery112406979082530694531_1581938826571&begin=0&end=-1&select=time%2Cprice%2Cvolume&_=1581938826575
+#腾讯证券分时，5分钟，30分钟，日
+#http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000001,m60,,320&_var=m60_today&r=0.16306752634257426
 def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
@@ -20,9 +51,95 @@ def xueqiuJson(url):
         return True,r.json()
     else:
         return False,r.reason
+#腾讯证券 5分钟数据
+def qqK5(code,n=96):
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'zh-CN,zh;q=0.9'}
+        
+        url = """http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=%s,m5,,%d&_var=m5_today&r=%f"""%(code.lower(),n,random.random())
+        r = s.get(url,headers=headers)
+        if r.status_code==200:
+            """
+            m5_today={
+                "code":0,
+                "msg":"",
+                "data":{
+                    "sh000001":{
+                        "qt":{
+                            "sh000001":{
+                                该股票信息
+                            }
+                            "market":["2020-02-17 19:42:01|HK_close_已收盘...."],
+                            "zhishu":[]
+                            "zjlx":[]
+                        }
+                        "m5":[
+                            ["date例如：202002071055","open","close","high","low","volume",{},""]
+                        ] 
+                        "prec":"2917.01"                    
+                    }
+                }
+            }
+            """
+            if len(r.text)>11 and r.text[:9]=="m5_today=":
+                m5today = json.loads(r.text[9:])
+                if 'data' in m5today and code.lower() in m5today['data'] and 'm5' in m5today['data'][code.lower()]:
+                    k = m5today['data'][code.lower()]['m5']
+                    K = []
+                    for v in k:
+                        #0 date , 1 open , 2 close , 3 high , 4 low , 5 volume , 6 ? , 7 ?
+                        t = datetime(year=int(v[0][0:4]),month=int(v[0][4:6]),day=int(v[0][6:8]),hour=int(v[0][8:10]),minute=int(v[0][10:12]))
+                        K.append((t,float(v[5]),float(v[1]),float(v[3]),float(v[4]),float(v[2])))
+                    assert(len(K)==n)
+                    return True,K
+                return False,"qqK5返回错误或者格式发生变化:"+str(r.text)
+            else:
+                return False,"qqK5返回错误，没有发现‘m5_today=’:"+str(r.text)
+        else:
+            return False,r.reason
+    except Exception as e:
+        mylog.err("qqK5:"+str(code)+"ERROR:"+str(e))
+        return False,str(e)
+
+#通过调用qqK5转换而来
+def qqK15(code,n=32):
+    b,K = qqK5(code,n=(n+1)*3)
+    if b:
+        if len(K)==(n+1)*3:
+            k = []
+            d = K[0]
+            volume = d[1]
+            openv = d[2]
+            high = d[3]
+            low = d[4]
+            a = 1
+            for i in range(len(K)):
+                d = K[i]
+                if d[0].minute%15==5:
+                    volume = d[1]
+                    openv = d[2]
+                    high = d[3]
+                    low = d[4]
+                    a = 1
+                else:
+                    volume += d[1]
+                    high = max(high,d[3])
+                    low = min(low,d[4])
+                    a += 1
+                if d[0].minute%15==0 and a==3:
+                    k.append([d[0],volume,openv,high,low,d[5]])
+            return b,k
+        else:
+            mylog.err("qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3))
+            return False,"qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3)
+    else:
+        return b,K
 
 #新浪财经数据
-# True , [(timesramp,volume,open,high,low,close),...]
+# True , [(0 timesramp,1 volume,2 open,3 high,4 low,5 close),...]
 # False, "Error infomation"
 def sinaK15(code,n=32):
     try:
@@ -52,7 +169,7 @@ def sinaK15(code,n=32):
         else:
             return False,r.reason
     except Exception as e:
-        print(str(e))
+        mylog.err("sinaK15:"+str(code)+"ERROR:"+str(e))
         return False,str(e)
 
 #雪球数据
@@ -111,6 +228,7 @@ def xueqiuK15(code,n=32):
         else:
             return b,d
     except Exception as e:
+        mylog.err("xueqiuK15:"+str(code)+"ERROR:"+str(e))
         return False,str(e)        
 
 #sina财经作为主下载站点，xueqiu作为备份站点
@@ -124,6 +242,12 @@ stockK15Service = [
     {
         "name":u"雪球k15",
         "k15":xueqiuK15,
+        "error":0,
+        "success":0
+    },
+    {
+        "name":u"腾讯k15",
+        "k15":qqK15,
         "error":0,
         "success":0
     }
@@ -238,11 +362,6 @@ def xueqiuK15day(code,lastDayK=None,lastStatus=None):
                     mylog.warn(u"    偏差:%s"%(str(dev)))
         #校验处理完成
         #=======================================================
-        def nextdt15():
-            t = datetime.today()
-            if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
-                return (datetime(t.year,t.month,t.day,13,0,0)-t).seconds+15*60
-            return (15-t.minute%15)*60-t.second
         shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=nextdt15()) #到下一个15整点过期
         return True,k,dd
     return False,0,0

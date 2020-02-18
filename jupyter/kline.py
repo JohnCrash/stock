@@ -11,25 +11,10 @@ import time
 import trend
 import  warnings
 import xueqiu
-import threading
 import uuid
 #定制show
 from matplotlib._pylab_helpers import Gcf
 from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show
-import asyncio
-
-class Timer:
-    def __init__(self, timeout, callback):
-        self._timeout = timeout
-        self._callback = callback
-        self._task = asyncio.ensure_future(self._job())
-
-    async def _job(self):
-        await asyncio.sleep(self._timeout) 
-        self._callback()
-
-    def cancel(self):
-        self._task.cancel()
 
 warnings.filterwarnings("ignore", module="matplotlib")
 
@@ -118,6 +103,7 @@ config {
     boll : n
     energy: True or False #能量线
     trend: True or False #趋势线
+    volumeprices:True #量价关系
     kdate : 日期表
     vlines : [{
         x : []
@@ -356,7 +342,7 @@ class Plote:
         self._after = None
         self._display_id = str(uuid.uuid1())
         self._isupdate = False
-        self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False} #"bollwidth":0.2,
+        self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False,"volumeprices":True} #"bollwidth":0.2,
         self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
         self._backup = self._config.copy()
@@ -751,7 +737,7 @@ class Plote:
             button_style='',
             tooltip='日线',
             icon='check')
-                                   
+        refreshbutton = widgets.Button(description="刷新")                           
         #output = widgets.Output()
 
         items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
@@ -764,9 +750,9 @@ class Plote:
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
         if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,refreshbutton,link]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,refreshbutton,link]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -940,7 +926,11 @@ class Plote:
             recalcRange()
             showline()
         dayweektoggle.observe(on_dayweek,names='value')
-
+        def refresh(b):
+            self.reload(all=False)
+            showline()
+            refreshbutton.button_style = ''
+        refreshbutton.on_click(refresh)
         if self._showtrend:
             backbutton.on_click(on_prev)
             frontbutton.on_click(on_next)
@@ -966,22 +956,13 @@ class Plote:
             if bi != ei:
                 figure2.showKline(bi,ei,figsize=figsize)
 
-        #如果是在开盘状态则15分钟更新一次数据
-        def nextdt15():
-            t = datetime.today()
-            if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
-                return (datetime(t.year,t.month,t.day,13,0,0)-t).seconds+15*60+2
-            return (15-t.minute%15)*60-t.second+5
-
         def updatek15():
             if xueqiu.isTransTime():
-                #print('update ',self._display_id)
-                #import random
-                #self._k[-1,4] = self._lastclose+200*random.random()
-                self.reload(all=False)
-                showline()
-                self._timer = Timer(nextdt15(),updatek15)
+                refreshbutton.button_style = 'success' #green button
+                #self.reload(all=False)
+                #showline()
+                self._timer = xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
             else:
                 self._timer = None
-        #self._lastclose = self._k[-1,4]
-        self._timer = Timer(nextdt15(),updatek15)
+
+        self._timer = xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)

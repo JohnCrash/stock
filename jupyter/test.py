@@ -18,4 +18,4 @@ c,k,d = stock.loadKline('SH:000001')
 
 r = stock.volumeprices(k,d)
 """
-b,k,d = xueqiu.xueqiuK15day('SZ399001')
+b,k,d = xueqiu.qqK15('SZ399001')

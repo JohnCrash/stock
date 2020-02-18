@@ -18,6 +18,7 @@ import shared
 import threading
 import time
 import copy
+
 PROD = 40
 
 def isPopularCategory(name):
@@ -410,6 +411,7 @@ def defaultFilter(a,c,istoday,period):
 按分类列出崛起的股票的数量与列表
 """
 def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
+    today_but = None
     output = widgets.Output()
     output2 = widgets.Output()
     box_layout = Layout(display='flex',
@@ -549,15 +551,16 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
     items = []
 
     today = date.today()
+    
     if period=='d' and dates[0][0] != today:
         #如果今天是一个交易日，并且不在数据库中，那么从雪球直接下载数据
-        but = widgets.Button(
+        today_but = widgets.Button(
             description=str(today),
             disabled=False,
             button_style='danger')
-        but.date = str(today)
-        but.on_click(onCatsList)
-        items.append(but)
+        today_but.date = str(today)
+        today_but.on_click(onCatsList)
+        items.append(today_but)
     
     for i in range(15):
         d = dates[i]
@@ -576,3 +579,13 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
 
     box = Box(children=items, layout=box_layout)
     display(box,output)
+
+    def updatek15():
+        nonlocal today_but
+        if xueqiu.isTransTime():
+            today_but.button_style = 'success' #green button
+            #self.reload(all=False)
+            #showline()
+            xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
+    if today_but is not None:
+        xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
