@@ -181,8 +181,14 @@ class Plote:
         if 'energy' in self._config and self._config['energy']:
             self._energyInx = self._axsInx+1
             self._axsInx += 1
-            self._volumeenergy = stock.kdj(stock.volumeEnergyK(self._k))[:,2]
-            self._volumekdj = stock.kdj(self._k[:,0])[:,2]
+            if self._period==5 or self._period==15 or self._period==30 or self._period==60 or self._period==120 or self._period==1:
+                volume = stock.correctionVolume(self._k,self._date,self._period)
+                self._volumeenergy = stock.kdj(stock.volumeEnergy(volume))[:,2]
+                self._volumekdj = stock.kdj(volume)[:,2]
+                self._k[:,0] = volume
+            else:
+                self._volumeenergy = stock.kdj(stock.volumeEnergyK(self._k))[:,2]
+                self._volumekdj = stock.kdj(self._k[:,0])[:,2]
             self._showenergy = True
         if 'bollwidth' in self._config and self._config['bollwidth']:
             self._bollwidthInx = self._axsInx+1
@@ -265,6 +271,8 @@ class Plote:
                     self._after = stock.dateString(date.today()-timedelta(days=5*365))
                 elif self._period == 'd':
                     self._after = stock.dateString(date.today()-timedelta(days=365))
+                else:
+                    self._after = stock.dateString(date.today()-timedelta(days=20))
             if self._period == 'w': #周线
                 self._company,k,d = stock.loadKline(company,'d',self._after)
                 self._k,self._date = stock.weekK(k,d)
@@ -278,7 +286,7 @@ class Plote:
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             if self._period=='w':
-                _,szk,szd = stock.loadKline('SZ:399001','d',expire=5*60) #缓存保持5分钟
+                _,szk,szd = stock.loadKline('SZ399001','d',expire=5*60) #缓存保持5分钟
                 K = stock.alignK(self._date,szk,szd)
                 WK,WD = stock.weekK(K,self._date)
                 self._szclose = WK[:,4]
@@ -296,8 +304,21 @@ class Plote:
                 self._szmacd = stock.macd(K)
         else:
             self._szclose = None
+    #刷新当日的新数据
+    def refresh(self):
+        pass
     #重新加载对象数据all=True加载全部数据,all=False更新数据
     def reload(self,all=True):
+        if self._period=='d' or self._period=='w':
+            self._showcount = 120
+        elif int(self._period)==5: #48
+            self._showcount = 144
+        elif int(self._period)==15: #16
+            self._showcount = 112
+        elif int(self._period)==60: #4
+            self._showcount = 120
+        else:
+            self._showcount = 120        
         if all:
             self._after = None
         if self._period == 'w': #周线
@@ -310,7 +331,7 @@ class Plote:
         if "index" in self._backup and self._backup["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             if self._period=='w':
-                _,szk,szd = stock.loadKline('SZ:399001','d',expire=3600) #缓存保持1小时
+                _,szk,szd = stock.loadKline('SZ399001','d',expire=5*60) #缓存保持1小时
                 K = stock.alignK(self._date,szk,szd)
                 WK,WD = stock.weekK(K,self._date)
                 self._szclose = WK[:,4]
@@ -318,7 +339,7 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
                 self._szmacd = stock.macd(WK)
             else:
-                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=3600) #缓存保持1小时
+                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=5*60) #缓存保持1小时
                 if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
                     _,szk,szd = xueqiu.appendTodayK('SZ399001',szk,szd)
                 K = stock.alignK(self._date,szk,szd)
@@ -362,6 +383,8 @@ class Plote:
                 self._config['boll'] = self._backup['boll']
             else:
                 self._config['boll'] = 20
+        elif k=='energy':
+            self._config['energy'] = True
         elif k=='bollwidth':
             if 'bollwidth' in self._backup:
                 self._config['bollwidth'] = self._backup['bollwidth']
@@ -384,11 +407,10 @@ class Plote:
         elif k=='figure':
             if 'figure' in self._backup:
                 self._config['figure'] = self._backup['figure']
-        self.config()
 
     def disable(self,k):
-        del self._config[k]
-        self.config()
+        if k in self._config:
+            del self._config[k]
 
     #给出时间返回索引
     def date2index(self,d):
@@ -443,7 +465,10 @@ class Plote:
                     for i in range(bi,ei):
                         if i>0 and self._date[i][0].month!=self._date[i-1][0].month:
                             xticks.append(i)
-                xticks = np.array(xticks)
+                if self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
+                    xticks.append(self._trendHeadPos)
+                    xticks.append(self._trendHeadPos)                               
+                xticks = np.array(xticks)             
             else:
                 xticks = np.arange(bi,ei,10)
         else:
@@ -531,6 +556,7 @@ class Plote:
                     b = line[3]
                     axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',alpha=0.8,linewidth=6,linestyle='-.')
             """
+        if self._trendHeadPos>=0 and self._trendHeadPos<=len(self._k):
             axsK.axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
             for i in range(self._axsInx+1):
                 axs[i].axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
@@ -644,14 +670,14 @@ class Plote:
             figure2 = Plote(code2,self._period)
         else:
             figure2 = None
-        nextbutton = widgets.Button(description="下一页")
-        prevbutton = widgets.Button(description="上一页")
-        zoominbutton = widgets.Button(description="+")
-        zoomoutbutton = widgets.Button(description="-")
+        nextbutton = widgets.Button(description="下一页",layout=Layout(width='96px'))
+        prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
+        zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
+        zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
         
         if self._showtrend:
-            backbutton = widgets.Button(description="<")
-            frontbutton = widgets.Button(description=">")
+            backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
+            frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
             slider = widgets.IntSlider(
                 value=ei,
                 min=bi,
@@ -661,66 +687,12 @@ class Plote:
                 disabled=False,
                 continuous_update=False,
                 orientation='horizontal',
-                readout=True,
-                readout_format='d'
+                readout=False,
+                layout=Layout(width='128px')
+                #readout=True,
+                #readout_format='d'
             )
 
-        bolltoggle = widgets.ToggleButton(
-            value=self._showboll,
-            description='BOLL',
-            disabled=False,
-            button_style='',
-            tooltip='BOLL线',
-            icon='check')
-        trendtoggle = widgets.ToggleButton(
-            value=self._showtrend,
-            description='trend',
-            disabled=False,
-            button_style='',
-            tooltip='趋势线',
-            icon='check')              
-        bollwidthtoggle = widgets.ToggleButton(
-            value=self._showbollwidth,
-            description='BOLLWIDTH',
-            disabled=False,
-            button_style='',
-            tooltip='BOLL宽度',
-            icon='check')            
-        matoggle = widgets.ToggleButton(
-            value=self._showma,
-            description='MA',
-            disabled=False,
-            button_style='',
-            tooltip='均线',
-            icon='check')
-        volumetoggle = widgets.ToggleButton(
-            value=self._showvolume,
-            description='VOLUME',
-            disabled=False,
-            button_style='',
-            tooltip='成交量',
-            icon='check')            
-        macdtoggle = widgets.ToggleButton(
-            value=self._showmacd,
-            description='MACD',
-            disabled=False,
-            button_style='',
-            tooltip='MACD',
-            icon='check')     
-        kdjtoggle = widgets.ToggleButton(
-            value=self._showkdj,
-            description='KDJ',
-            disabled=False,
-            button_style='',
-            tooltip='KDJ',
-            icon='check')
-        besttoggle = widgets.ToggleButton(
-            value=self._showbest,
-            description='BEST',
-            disabled=False,
-            button_style='',
-            tooltip='BEST',
-            icon='check')
         if self._showfigure:
             figuretoggle = widgets.ToggleButton(
                 value=self._showfigure,
@@ -728,19 +700,31 @@ class Plote:
                 disabled=False,
                 button_style='',
                 tooltip='FIGURE',
-                icon='check')    
-        #加入周线和日线的切换
-        dayweektoggle = widgets.ToggleButton(
-            value=self._period=='d',
-            description='日线',
-            disabled=False,
-            button_style='',
-            tooltip='日线',
-            icon='check')
-        refreshbutton = widgets.Button(description="刷新")                           
-        #output = widgets.Output()
+                icon='check')
 
-        items_layout = Layout( width='auto')     # override the default width of the button to 'auto' to let the button grow
+        mainDropdown = widgets.Dropdown(
+            options=['BOLL+','MA','BOLL','CLEAR'],
+            value='BOLL+',
+            description='',
+            disabled=False,
+            layout=Layout(width='96px')
+        )    
+        indexDropdown = widgets.Dropdown(
+            options=['MACD+','KDJ+','MACD+Best','MACD+BollWidth','CLEAR'],
+            value='MACD+',
+            description='',
+            disabled=False,
+            layout=Layout(width='96px')
+        )            
+        periodDropdown = widgets.Dropdown(
+            options=['日线', '周线', '15分钟','5分钟'],
+            value='日线',
+            description='',
+            disabled=False,
+            layout=Layout(width='96px')
+        )
+        refreshbutton = widgets.Button(description="刷新",layout=Layout(width='96px'))                           
+        #output = widgets.Output()
 
         box_layout = Layout(display='flex',
                             flex_flow='wrap',
@@ -750,9 +734,9 @@ class Plote:
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
         if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,refreshbutton,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,bolltoggle,bollwidthtoggle,trendtoggle,matoggle,volumetoggle,macdtoggle,kdjtoggle,besttoggle,dayweektoggle,refreshbutton,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link]
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -769,10 +753,21 @@ class Plote:
                 ei = figure2.date2index( self.index2date(endPT) )
                 if bi != ei:
                     figure2.showKline(bi,ei,figsize=figsize)
-            needUpdateSlider = True                
+            needUpdateSlider = True
+
+        def setSlider(minv,maxv,value):
+            nonlocal needUpdateSlider
+            needUpdateSlider = False
+            if minv>slider.max:
+                slider.max = maxv
+                slider.min = minv
+            else:
+                slider.min = minv
+                slider.max = maxv
+            slider.value = value
 
         def on_nextbutton_clicked(b):
-            nonlocal beginPT,endPT,showRange,needUpdateSlider
+            nonlocal beginPT,endPT,showRange
             beginPT += showRange
             endPT += showRange
             
@@ -780,16 +775,12 @@ class Plote:
                 endPT = len(self._k)
                 beginPT = endPT-showRange
             if self._showtrend:
-                needUpdateSlider = False
                 self._trendHeadPos = endPT
-                slider.min = beginPT
-                slider.max = endPT
-                slider.value = endPT
-
+                setSlider(beginPT,endPT,endPT)
             showline()
         
         def on_prevbutton_clicked(b):
-            nonlocal beginPT,endPT,showRange,needUpdateSlider
+            nonlocal beginPT,endPT,showRange
             #这里进行一个优化，在加载数据的时候正常只加载一年的数据，当向上翻页的时候出发加载全部数据
             if self._after is not None:
                 self._after = None
@@ -810,28 +801,21 @@ class Plote:
                 beginPT = 0
 
             if self._showtrend:
-                needUpdateSlider = False
                 self._trendHeadPos = endPT
-                slider.max = endPT
-                slider.min = beginPT
-                slider.value = endPT
-
+                setSlider(beginPT,endPT,endPT)
             showline()
 
         def on_zoomin(b):
-            nonlocal beginPT,endPT,showRange,needUpdateSlider
+            nonlocal beginPT,endPT,showRange
             showRange = math.floor(showRange/2)
             beginPT = endPT - showRange
             if self._showtrend:
                 self._trendHeadPos = endPT
-                needUpdateSlider = False
-                slider.min = beginPT
-                slider.max = endPT
-                slider.value = endPT           
+                setSlider(beginPT,endPT,endPT)
             showline()
 
         def on_zoomout(b):
-            nonlocal beginPT,endPT,showRange,needUpdateSlider
+            nonlocal beginPT,endPT,showRange
             showRange *= 2
             beginPT = endPT - showRange
             if beginPT < 0:
@@ -839,10 +823,8 @@ class Plote:
                 endPT = beginPT+showRange
             if self._showtrend:
                 self._trendHeadPos = endPT
-                needUpdateSlider = False
-                slider.min = beginPT
-                slider.max = endPT
-                slider.value = endPT                
+                setSlider(beginPT,endPT,endPT)
+              
             showline()
 
         def on_change(event):
@@ -877,9 +859,7 @@ class Plote:
                 endPT = beginPT+self._showcount
                 if endPT>len(self._k):
                     endPT = len(self._k)
-                slider.min = beginPT
-                slider.max = endPT
-                slider.value = self._trendHeadPos 
+                setSlider(beginPT,endPT,self._trendHeadPos)
             
             slider.value = self._trendHeadPos
             updateTrend()
@@ -898,9 +878,7 @@ class Plote:
                 beginPT = endPT-self._showcount
                 if beginPT<0:
                     beginPT=0
-                slider.min = beginPT
-                slider.max = endPT
-                slider.value = self._trendHeadPos  
+                setSlider(beginPT,endPT,self._trendHeadPos)
             slider.value = self._trendHeadPos
             updateTrend()
             showline()
@@ -910,22 +888,91 @@ class Plote:
 
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
+
+        def on_index(e):
+            sel = e['new']
+            if sel=='MACD+':
+                self.enable('macd')
+                self.enable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+            elif sel=='KDJ+':
+                self.disable('macd')
+                self.enable('energy')
+                self.enable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+            elif sel=='MACD+Best':
+                self.enable('macd')
+                self.enable('energy')
+                self.disable('kdj')
+                self.enable('best')
+                self.disable('bollwidth')
+            elif sel=='MACD+BollWidth':
+                self.enable('macd')
+                self.enable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.enable('bollwidth')
+            elif sel=='CLEAR':
+                self.disable('macd')
+                self.disable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+            self.config()
+            showline()            
+        indexDropdown.observe(on_index,names='value')
+
+        def on_main(e):
+            sel = e['new']
+            if sel=='BOLL+':
+                self.enable('boll')
+                self.enable('trend')
+                self.disable('ma')
+            elif sel=='MA':
+                self.enable('ma')
+                self.disable('boll')
+                self.disable('trend')
+            elif sel=='BOLL':
+                self.enable('boll')
+                self.disable('trend')
+                self.disable('ma')
+            elif sel=='CLEAR':
+                self.disable('boll')
+                self.disable('trend')
+                self.disable('ma')
+            self.config()
+            showline()
+
+        mainDropdown.observe(on_main,names='value')
+
         def recalcRange():
             nonlocal beginPT,endPT
             endPT = len(self._k)
             beginPT = len(self._k)-self._showcount
             if beginPT<0:
-                beginPT = 0    
-        def on_dayweek(e):
-            if e['new']:
-                self.switchday()
-                e['owner'].description = '日线'
-            else:
-                self.switchweek()
-                e['owner'].description = '周线'
+                beginPT = 0   
+            self._trendHeadPos = endPT-1
+            setSlider(beginPT,endPT,self._trendHeadPos)
+
+        def on_period(e):
+            name2peroid = {
+                '日线':'d',
+                '周线':'w',
+                '15分钟':15,
+                '5分钟':5
+            }
+            period = e['new']
+            self._period = name2peroid[period]
+            self.reload()
+            self.config()
             recalcRange()
             showline()
-        dayweektoggle.observe(on_dayweek,names='value')
+
+        periodDropdown.observe(on_period,names='value')
+
         def refresh(b):
             self.reload(all=False)
             showline()
@@ -936,14 +983,6 @@ class Plote:
             frontbutton.on_click(on_next)
             slider.observe(on_sliderChange,names='value')
             
-        trendtoggle.observe(on_change,names='value')
-        bolltoggle.observe(on_change,names='value')
-        bollwidthtoggle.observe(on_change,names='value')
-        matoggle.observe(on_change,names='value')
-        volumetoggle.observe(on_change,names='value')
-        macdtoggle.observe(on_change,names='value')
-        kdjtoggle.observe(on_change,names='value')
-        besttoggle.observe(on_change,names='value')
         if self._showfigure:
             figuretoggle.observe(on_change,names='value')
 

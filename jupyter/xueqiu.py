@@ -334,7 +334,8 @@ def xueqiuK15day(code,lastDayK=None,lastStatus=None):
                 K.append(k[i][1:])
         yesterday = np.array(K[lasti-15:lasti+1])
         today = np.array(K[lasti+1:])
-
+        if len(today)==0:
+            return False,0,0
         i = len(today)
         volume = yesterday[:,0].sum()*today[:,0].sum()/yesterday[0:i,0].sum()
         k = [volume,today[0][1],today[:,2].max(),today[:,3].min(),today[-1][4]]

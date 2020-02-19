@@ -376,11 +376,21 @@ def kdjPrediction(k,k_d,kdJ,i,N):
 """计算均线 n 表示多少日均线"""
 def ma(k,n):
     m = np.empty(len(k))
-    for i in range(len(k)):
-        if i-n+1>=0:
-            m[i] = k[i-n+1:i+1].sum()/n
-        else:
+    #for i in range(len(k)):
+    #    if i-n+1>=0:
+    #        m[i] = k[i-n+1:i+1].sum()/n
+    #    else:
+    #        m[i] = k[0:i+1].sum()/(i+1)
+    #下面是优化方法
+    if len(k)<=n:
+        for i in range(len(k)):
             m[i] = k[0:i+1].sum()/(i+1)
+    else:
+        for i in range(n):
+            m[i] = k[0:i+1].sum()/(i+1)
+        dk = (k[n:]-k[:-n])/n
+        for i in range(len(dk)):
+            m[i+n] = m[i+n-1]+dk[i]
     return m
 
 """计算均线 n 表示多少日均线"""
@@ -701,3 +711,38 @@ def volumeprices(k,d):
         else:
             a[3] = -a[3]/pmin
     return R
+
+"""
+因为一天中不同时段的成交量是个‘碗’型，使用这样的成交量计算出的energy没有参考意义
+这里对成交量进行修正使得不同时段的成交量看上去是一条‘直线’
+方法：使用n天的‘碗’型做平均作为校正的依据
+返回校正过的成交量，不具有绝对意义经有相对意义的量
+period = 1,5,15,...
+"""
+def correctionVolume(k,d,period,n=10):
+    periodN = {
+        1:16*3*5,
+        5:16*3,
+        15:16,
+        30:8,
+        60:4,
+        120:2
+    }
+    N = periodN[period]
+    if len(k)%N==0:
+        complete = 0
+    else:
+        complete = N-len(k)%N
+
+    volume = np.zeros(len(k)+complete)
+    volume[:len(k)] = k[:,0]
+    
+    volumed = volume.reshape(-1,N)
+    mad = np.empty((len(volumed),N))
+    for i in range(N):
+        mad[:,i] = ma(volumed[:,i],n)
+    for i in range(len(volumed)):
+        avg = mad[i,:].mean()
+        for j in range(N):
+            volumed[i,j] *= avg/mad[i,j]
+    return volume[:len(k)]

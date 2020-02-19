@@ -18,4 +18,7 @@ c,k,d = stock.loadKline('SH:000001')
 
 r = stock.volumeprices(k,d)
 """
-b,k,d = xueqiu.qqK15('SZ399001')
+#b,k,d = xueqiu.qqK15('SZ399001')
+#c,k,d = stock.loadKline('SZ399001',5)
+#stock.correctionVolume(k,d,5)
+xueqiu.xueqiuK15day('SZ399001')
