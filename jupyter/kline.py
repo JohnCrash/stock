@@ -181,7 +181,7 @@ class Plote:
         if 'energy' in self._config and self._config['energy']:
             self._energyInx = self._axsInx+1
             self._axsInx += 1
-            if self._period==5 or self._period==15 or self._period==30 or self._period==60 or self._period==120 or self._period==1:
+            if self._correcttionVolume and (self._period==5 or self._period==15 or self._period==30 or self._period==60 or self._period==120 or self._period==1):
                 volume = stock.correctionVolume(self._k,self._date,self._period)
                 self._volumeenergy = stock.kdj(stock.volumeEnergy(volume))[:,2]
                 self._volumekdj = stock.kdj(volume)[:,2]
@@ -356,6 +356,7 @@ class Plote:
     #company可以是kline数据，可以是code，也可以是公司名称
     def __init__(self,company,period='d',config={},date=None,companyInfo=None):
         self._timer = None
+        self._correcttionVolume = False
         self._configarg = config
         self._comarg = company
         self._datearg = date
@@ -363,7 +364,7 @@ class Plote:
         self._after = None
         self._display_id = str(uuid.uuid1())
         self._isupdate = False
-        self._config = {"boll":20,"macd":True,"energy":True,"volume":True,"trend":True,"debug":False,"volumeprices":True} #"bollwidth":0.2,
+        self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True} #"bollwidth":0.2,
         self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
         self._backup = self._config.copy()
@@ -526,13 +527,15 @@ class Plote:
 
         """绘制均线"""                
         if self._showma:
-            ct = {5:"orange",10:"cornflowerblue",20:"pink",30:"salmon",60:"violet",242:"lime"}
+            ct = {5:"orange",10:"pink",20:"cornflowerblue",30:"salmon",60:"violet",242:"lime"}
             for m in self._config['ma']:
                 xx,alv = stock.maRangeK(self._k,m,bi,ei)
                 if m in ct:
                     axsK.plot(xx,alv,label="MA"+str(m),color=ct[m])
                 else:
                     axsK.plot(xx,alv,label="MA"+str(m))
+            if len(self._config['ma'])>1:
+                axsK.legend()
         """绘制BOLL线"""
         if self._showboll:
             axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
@@ -703,8 +706,8 @@ class Plote:
                 icon='check')
 
         mainDropdown = widgets.Dropdown(
-            options=['BOLL+','MA','BOLL','CLEAR'],
-            value='BOLL+',
+            options=['BOLL+','MA','BOLL','TREND','CLEAR'],
+            value='TREND',
             description='',
             disabled=False,
             layout=Layout(width='96px')
@@ -717,7 +720,7 @@ class Plote:
             layout=Layout(width='96px')
         )            
         periodDropdown = widgets.Dropdown(
-            options=['日线', '周线', '15分钟','5分钟'],
+            options=['日线', '周线', '15分钟','5分钟','15分钟校','5分钟校'],
             value='日线',
             description='',
             disabled=False,
@@ -935,10 +938,16 @@ class Plote:
                 self.enable('ma')
                 self.disable('boll')
                 self.disable('trend')
+                self._config['ma'] = [5,10,20,30,60]
             elif sel=='BOLL':
                 self.enable('boll')
                 self.disable('trend')
                 self.disable('ma')
+            elif sel=='TREND':
+                self.disable('boll')
+                self.enable('trend')
+                self.enable('ma')
+                self._config['ma'] = [20]
             elif sel=='CLEAR':
                 self.disable('boll')
                 self.disable('trend')
@@ -959,13 +968,17 @@ class Plote:
 
         def on_period(e):
             name2peroid = {
-                '日线':'d',
-                '周线':'w',
-                '15分钟':15,
-                '5分钟':5
+                '日线':['d',False],
+                '周线':['w',False],
+                '15分钟':[15,False],
+                '5分钟':[5,False],
+                '15分钟校':[15,True],
+                '5分钟校':[5,True]
             }
             period = e['new']
-            self._period = name2peroid[period]
+            sel = name2peroid[period]
+            self._period = sel[0]
+            self._correcttionVolume = sel[1]
             self.reload()
             self.config()
             recalcRange()
