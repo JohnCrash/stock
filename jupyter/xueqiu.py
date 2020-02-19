@@ -2,7 +2,7 @@ import requests
 import time
 import math
 import numpy as np
-from datetime import date,datetime
+from datetime import date,datetime,timedelta
 import shared
 import json
 import random
@@ -32,15 +32,6 @@ def nextdt15():
         return (datetime(t.year,t.month,t.day,13,15,0)-t).seconds+15*60
     return (15-t.minute%15)*60-t.second
 
-#深交所数据分时
-#http://www.szse.cn/api/market/ssjjhq/getTimeData?random=0.9981093803414802&marketId=1&code=000004
-#日K
-#http://www.szse.cn/api/market/ssjjhq/getHistoryData?random=0.04502169743970663&cycleType=32&marketId=1&code=000004
-#上交所日K
-#上交所分时
-#http://yunhq.sse.com.cn:32041//v1/sh1/line/600651?callback=jQuery112406979082530694531_1581938826571&begin=0&end=-1&select=time%2Cprice%2Cvolume&_=1581938826575
-#腾讯证券分时，5分钟，30分钟，日
-#http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000001,m60,,320&_var=m60_today&r=0.16306752634257426
 def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
@@ -141,14 +132,15 @@ def qqK15(code,n=32):
 #新浪财经数据
 # True , [(0 timesramp,1 volume,2 open,3 high,4 low,5 close),...]
 # False, "Error infomation"
-def sinaK15(code,n=32):
+def sinaK(code,period,n):
     try:
         s = requests.session()
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
                 'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'zh-CN,zh;q=0.9'}
         timestramp = math.floor(time.time()*1000)
-        url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_15_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=15&ma=no&datalen=%d"""%(code.lower(),timestramp,code.lower(),n)
+        #https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20_sh000001_5_1582094915235=/CN_MarketDataService.getKLineData?symbol=sh000001&scale=5&ma=no&datalen=1023
+        url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_%d_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=%d&ma=no&datalen=%d"""%(code.lower(),period,timestramp,code.lower(),period,n)
         r = s.get(url,headers=headers)
         if r.status_code==200:
             """
@@ -172,14 +164,17 @@ def sinaK15(code,n=32):
         mylog.err("sinaK15:"+str(code)+"ERROR:"+str(e))
         return False,str(e)
 
+def sinaK15(code,n=32):
+    return sinaK(code,15,n)
+def sinaK5(code,n=96):
+    return sinaK(code,5,n)
 #雪球数据
-#返回标准格式
 # True , ((timesramp,volume,open,high,low,close),...)
 # False, "Error infomation"
-def xueqiuK15(code,n=32):
+def xueqiuK(code,period,n):
     try:
         timestamp = math.floor(time.time()*1000)
-        uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=15m&type=before&count=-%d&indicator=kline"""%(code,timestamp,n)
+        uri = """https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=%s&begin=%s&period=%sm&type=before&count=-%d&indicator=kline"""%(code,timestamp,str(period),n)
         b,dd = xueqiuJson(uri)
         if b:
             """
@@ -229,51 +224,122 @@ def xueqiuK15(code,n=32):
             return b,d
     except Exception as e:
         mylog.err("xueqiuK15:"+str(code)+"ERROR:"+str(e))
-        return False,str(e)        
+        return False,str(e) 
+#返回标准格式
+# True , ((timesramp,volume,open,high,low,close),...)
+# False, "Error infomation"
+def xueqiuK15(code,n=32):
+    return xueqiuK(code,15,n)
+def xueqiuK5(code,n=96):
+    return xueqiuK(code,5,n)
 
-#sina财经作为主下载站点，xueqiu作为备份站点
+stockK5Service = [
+    {
+        "name":u"新浪k5",
+        "cb":sinaK5,
+        "error":0,
+        "success":0,
+        "total":0,#总用时
+        "avg":0 #平均用时
+    },
+    {
+        "name":u"雪球k5",
+        "cb":xueqiuK5,
+        "error":0,
+        "success":0,
+        "total":0,
+        "avg":0    
+    },
+    {
+        "name":u"腾讯k5",
+        "cb":qqK5,
+        "error":0,
+        "success":0,
+        "total":0,
+        "avg":0         
+    }
+]
 stockK15Service = [
     {
         "name":u"新浪k15",
-        "k15":sinaK15,
+        "cb":sinaK15,
         "error":0,
-        "success":0
+        "success":0,
+        "total":0,
+        "avg":0         
     },
     {
         "name":u"雪球k15",
-        "k15":xueqiuK15,
+        "cb":xueqiuK15,
         "error":0,
-        "success":0
+        "success":0,
+        "total":0,
+        "avg":0         
     },
     {
         "name":u"腾讯k15",
-        "k15":qqK15,
+        "cb":qqK15,
         "error":0,
-        "success":0
+        "success":0,
+        "total":0,
+        "avg":0         
     }
 ]
-current = 0
-lock = threading.Lock()
-def k15(code,n=32):
-    global current
-    for i in range(10):
-        service = stockK15Service[current]
-        b,d = service["k15"](code,n)
-        if b:
-            service['success'] += 1
-            return b,d
-        else:
-            service['error'] += 1
-            lock.acquire()
-            if current<len(stockK15Service)-1:
-                current+=1
-            else:
-                current = 0
-            lock.release()
-    mylog.warn("k15多次尝试下载："+code+" 失败")
-    mylog.warn(str(stockK15Service))
-    return False,"k15多次尝试下载："+code+" 失败"
 
+#下载K数据，返回True/False,[(timesramp,volume,open,high,low,close)...],source
+def getK(code,period,n):
+    service = None
+    if period==5:
+        service = stockK5Service
+    elif period==15:
+        service = stockK15Service
+    if service is not None:
+        for i in range(10):
+            current = random.randint(0,len(service)-1)
+            t0 = time.time()
+            b,d = service[current]['cb'](code,n)
+            if b:
+                service[current]['success'] +=1
+                service[current]['total'] += time.time()-t0
+                service[current]['avg'] = service[current]['total']/service[current]['success']
+                return b,d,service[current]['name']
+            else:
+                service['error'] += 1
+    return False,0,0
+
+#返回下一个正确的时间k日期
+def nextKDate(t,period):
+    if t.hour<15:
+        if t.hour==11 and t.minute==30:
+            return datetime(nt.year,nt.month,nt.day,13,period)
+        else:
+            return t+timedelta(minutes=period)
+    #返回下一个交易日的第一k时间戳
+    nt = t+timedelta(days=1 if t.weekday()!=4 else 3)
+    return datetime(nt.year,nt.month,nt.day,9,35 if period==5 else 45)
+
+#返回指定代码的k线数据
+# True , np.array((timesramp,volume,open,high,low,close),...),[(timesramp,)...] 保持和loadKline相同的数据结构
+# False, "Error infomation"
+#缓存区保持两天的数据量
+def K(code,period,n):
+    cacheName = "k%s_%s"%(str(period).lower(),code.lower())
+    #cache = {'k':np.array((volume,open,high,low,close),...),'date':[(timesramp,)...],'base':} base是最初的数据来源
+    b,cache = shared.fromRedis(cacheName)
+    if b and len(cache['k'])>=n and nextKDate(cache['date'][-1][0],period)>datetime.today(): #存在缓存并且没有新的数据直接返回
+        return b,cache['k'][-n:],cache['date'][-n:]
+    if b: #如果有数据那么仅仅下载最新数据和部分校验用数据
+        dn = math.floor((datetime.today()-cache['date'][-1][0]).second/period)+2
+    elif n<15*16/period:
+        dn = int(15*16/period)
+    else:
+        dn = n
+    a,k,s = getK(code,period,dn)
+    if b and a: #校验重叠区域数据,合并数据
+        
+    else:
+        
+    return True,k,d
 #当前是交易时间
 def isTransTime():
     to = datetime.today()
