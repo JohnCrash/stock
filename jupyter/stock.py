@@ -106,14 +106,14 @@ def loadKline(code,period='d',after=None,expire=None):
         return (code,code,code),np.array([]).reshape(-1,5),()
     if period=='d':
         if after is None:
-            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(period,company[0][0]))
+            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
         else:
-            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(period,company[0][0],after))
+            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(str(period),company[0][0],after))
     else:
         if after is None:
             data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
         else:
-            data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(str(period),company[0][0],after))
+            data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and timestamp>='%s'"""%(str(period),company[0][0],after))
     kdate = []
     k = []
     for i in range(len(data)):

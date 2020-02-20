@@ -257,7 +257,7 @@ class Plote:
             elif period == 'd':
                 after = stock.dateString(date.today()-timedelta(days=5*365)) #5年数据
             else:
-                after = stock.dateString(date.today()-timedelta(days=20))
+                after = stock.dateString(date.today()-timedelta(days=60))
 
             c,k,d = stock.loadKline(code,period,after=after)
             self._cacheK[code] = {}
@@ -331,7 +331,6 @@ class Plote:
         self._comarg = company
         self._datearg = date
         self._companyInfoarg = companyInfo
-        self._after = None
         self._display_id = str(uuid.uuid1())
         self._isupdate = False
         self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True} #"bollwidth":0.2,
@@ -754,18 +753,6 @@ class Plote:
         
         def on_prevbutton_clicked(b):
             nonlocal beginPT,endPT,showRange
-            #这里进行一个优化，在加载数据的时候正常只加载一年的数据，当向上翻页的时候出发加载全部数据
-            if self._after is not None:
-                self._after = None
-                self.reload()
-                bi = len(self._k)-self._showcount
-                if bi<0:
-                    bi = 0
-                ei = len(self._k)
-                beginPT = bi
-                endPT = ei
-                showRange = ei-bi
-    
             beginPT -= showRange
             endPT -= showRange
 

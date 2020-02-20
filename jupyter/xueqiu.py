@@ -88,9 +88,9 @@ def qqK5(code,n=96):
                             K.append((t,float(v[5]),float(v[1]),float(v[3]),float(v[4]),float(v[2])))
                     
                     return True,K[-n:]
-                return False,"qqK5返回错误或者格式发生变化:"+str(r.text)
+                raise ValueError(str(r.text))
             else:
-                return False,"qqK5返回错误，没有发现‘m5_today=’:"+str(r.text)
+                raise ValueError(str(r.text))
         else:
             return False,r.reason
     except Exception as e:
@@ -157,7 +157,7 @@ def sinaK(code,period,n):
                         K.append((t,float(v['volume']),float(v['open']),float(v['high']),float(v['low']),float(v['close'])))
                 return True,K[-n:]
             else:
-                return False,"返回错误或者格式发生变化:"+str(r.text)
+                raise ValueError(str(r.text))
         else:
             return False,r.reason
     except Exception as e:
@@ -317,7 +317,7 @@ def getK(code,period,n,provider=None):
                 service[current]['avg'] = service[current]['total']/service[current]['success']
                 return b,d,service[current]['name']
             else:
-                service['error'] += 1
+                service[current]['error'] += 1
     return False,0,0
 
 #返回下一个正确的时间k日期,输入时间t必须是一个正确的时间戳
@@ -468,7 +468,7 @@ def appendK(code,period,k,d):
         #这里对昨天的k15数据计算得到的日线数据和雪球日线数据进行校验
         #问题来源：发现新浪的15分钟深圳成指数据全天求和雪球日线成交量不一致
         #=======================================================
-        if len(k)>0 and len(nk)>1:
+        if b and len(k)>0 and len(nk)>1:
             for i in range(len(d)-1,-1,-1):
                 if d[i][0]==nd[-2][0]:#找到校验位置
                     dev = nk[-2]/k[i] 
