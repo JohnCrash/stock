@@ -21,4 +21,10 @@ r = stock.volumeprices(k,d)
 #b,k,d = xueqiu.qqK15('SZ399001')
 #c,k,d = stock.loadKline('SZ399001',5)
 #stock.correctionVolume(k,d,5)
-xueqiu.xueqiuK15day('SZ399001')
+for i in range(5):
+    b,d,s = xueqiu.getK('SH000001',15,32)
+    if b:
+        print(s,d[0],d[-1],'\n')
+    else:
+        print('error\n')
+    #print(xueqiu.getK('SZ399001',5,96))

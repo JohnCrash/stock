@@ -50,7 +50,7 @@ def qqK5(code,n=96):
                 'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'zh-CN,zh;q=0.9'}
         
-        url = """http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=%s,m5,,%d&_var=m5_today&r=%f"""%(code.lower(),n,random.random())
+        url = """http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=%s,m5,,%d&_var=m5_today&r=%f"""%(code.lower(),n+1,random.random())
         r = s.get(url,headers=headers)
         if r.status_code==200:
             """
@@ -80,12 +80,14 @@ def qqK5(code,n=96):
                 if 'data' in m5today and code.lower() in m5today['data'] and 'm5' in m5today['data'][code.lower()]:
                     k = m5today['data'][code.lower()]['m5']
                     K = []
+                    today = datetime.today()
                     for v in k:
                         #0 date , 1 open , 2 close , 3 high , 4 low , 5 volume , 6 ? , 7 ?
                         t = datetime(year=int(v[0][0:4]),month=int(v[0][4:6]),day=int(v[0][6:8]),hour=int(v[0][8:10]),minute=int(v[0][10:12]))
-                        K.append((t,float(v[5]),float(v[1]),float(v[3]),float(v[4]),float(v[2])))
-                    assert(len(K)==n)
-                    return True,K
+                        if t<=today and t.minute%5==0:
+                            K.append((t,float(v[5]),float(v[1]),float(v[3]),float(v[4]),float(v[2])))
+                    
+                    return True,K[-n:]
                 return False,"qqK5返回错误或者格式发生变化:"+str(r.text)
             else:
                 return False,"qqK5返回错误，没有发现‘m5_today=’:"+str(r.text)
@@ -101,28 +103,24 @@ def qqK15(code,n=32):
     if b:
         if len(K)==(n+1)*3:
             k = []
-            d = K[0]
-            volume = d[1]
-            openv = d[2]
-            high = d[3]
-            low = d[4]
-            a = 1
-            for i in range(len(K)):
-                d = K[i]
-                if d[0].minute%15==5:
-                    volume = d[1]
-                    openv = d[2]
-                    high = d[3]
-                    low = d[4]
-                    a = 1
-                else:
-                    volume += d[1]
-                    high = max(high,d[3])
-                    low = min(low,d[4])
-                    a += 1
-                if d[0].minute%15==0 and a==3:
-                    k.append([d[0],volume,openv,high,low,d[5]])
-            return b,k
+            mod = K[0][0].minute%15
+            if mod==5:
+                bi = 0
+            elif mod==10:
+                bi = 3
+            else:
+                bi = 1
+
+            for i in range(bi,len(K),3):
+                if i+2<len(K):
+                    k0 = K[i]
+                    k1 = K[i+1]
+                    k2 = K[i+2]
+                    volume = k0[1]+k1[1]+k2[1]
+                    high = max(k0[3],k1[3],k2[3])
+                    low = min(k0[4],k1[4],k2[4])
+                    k.append([k2[0],volume,k0[2],high,low,k2[5]])
+            return b,k[-n:]
         else:
             mylog.err("qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3))
             return False,"qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3)
@@ -140,7 +138,7 @@ def sinaK(code,period,n):
                 'Accept-Language': 'zh-CN,zh;q=0.9'}
         timestramp = math.floor(time.time()*1000)
         #https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20_sh000001_5_1582094915235=/CN_MarketDataService.getKLineData?symbol=sh000001&scale=5&ma=no&datalen=1023
-        url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_%d_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=%d&ma=no&datalen=%d"""%(code.lower(),period,timestramp,code.lower(),period,n)
+        url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_%d_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=%d&ma=no&datalen=%d"""%(code.lower(),period,timestramp,code.lower(),period,n+1)
         r = s.get(url,headers=headers)
         if r.status_code==200:
             """
@@ -152,10 +150,12 @@ def sinaK(code,period,n):
             if bi>0 and ei>0 and ei>bi and ei+2<len(r.text):
                 k = json.loads(r.text[bi+2:ei+2])
                 K = []
+                today = datetime.today()
                 for v in k:
-                    K.append((datetime.fromisoformat(v['day']),float(v['volume']),float(v['open']),float(v['high']),float(v['low']),float(v['close'])))
-                assert(len(K)==n)
-                return True,K
+                    t = datetime.fromisoformat(v['day'])
+                    if t<=today:
+                        K.append((t,float(v['volume']),float(v['open']),float(v['high']),float(v['low']),float(v['close'])))
+                return True,K[-n:]
             else:
                 return False,"返回错误或者格式发生变化:"+str(r.text)
         else:
@@ -442,7 +442,22 @@ def appendK(code,period,k,d):
     if period==5 or period==15:
         b,nk,nd = K(code,period,32 if period==15 else 96)
     elif period=='d':
-        b,nk,nd = xueqiuK15day(code)
+        b,nk,nd = xueqiuKday(code,15)
+        #这里对昨天的k15数据计算得到的日线数据和雪球日线数据进行校验
+        #=======================================================
+        if len(k)>0:
+            dev = nk[-1]/k[-1]
+            if np.abs(dev-1).max()>0.02:
+                #如果仅仅是成交量偏差，做偏差纠正处理
+                if np.abs(dev[0]-1).max()>0.02:
+                    nk[0] = nk[0]/dev[0]
+                else:
+                    mylog.warn(u"'%s' '%s'数据和日线数据不一致"%(code))
+                    mylog.warn(u"    日线数据:%s,%s"%(str(k[-1]),str(d[-1])))
+                    mylog.warn(u"    k15计算数据:%s,%s"%(str(nk[-1]),str(nd[-1])))
+                    mylog.warn(u"    偏差:%s"%(str(dev)))
+        #校验处理完成
+        #=======================================================        
     else:
         return False,k,d
     if b:
@@ -453,7 +468,8 @@ def appendK(code,period,k,d):
         if bi!=-1:
             for i in range(bi+1,len(nd)):
                 d.append(nd[i])
-            return b,np.vstack((k,nk[bi+1:,:])),d
+            if len(d)>0:
+                return b,np.vstack((k,nk[bi+1:,:])),d
     return b,k,d
 
 #以k15为基础给出当日的k数据，成交量为预估
@@ -461,55 +477,27 @@ def appendK(code,period,k,d):
 #同时在这里做一个15分钟的缓存区
 #发现新浪的15分钟深圳成指数据全天求和日线成交量不一致
 #使用lastDayDate,lastDayK用于发现这种数据不一致性
-def xueqiuK15day(code):
-    b,k,d = K(code,15,32)
+def xueqiuKday(code,period):
+    b,k,d = K(code,period,32)
     if b:
-        dd = date(k[-1][0].year,k[-1][0].month,k[-1][0].day)
+        dd = date(d[-1][0].year,d[-1][0].month,d[-1][0].day)
         for i in range(len(k)-1,-1,-1):
-            it = k[i]
+            it = d[i][0]
             it_dd = date(it[0].year,it[0].month,it[0].day)
             if dd!=it_dd:
                 lasti = i
                 break
         #0 volume,1 open,2 high,3 low,4 close
-        K = []
-        to = datetime.today()
-        for i in range(len(k)):
-            if k[i][0]<to:
-                K.append(k[i][1:])
-        yesterday = np.array(K[lasti-15:lasti+1])
-        today = np.array(K[lasti+1:])
+        yesterday = k[lasti-period:lasti+1,:]
+        today = k[lasti+1:,:]
         if len(today)==0:
             return False,0,0
         i = len(today)
         volume = yesterday[:,0].sum()*today[:,0].sum()/yesterday[0:i,0].sum()
-        k = [volume,today[0][1],today[:,2].max(),today[:,3].min(),today[-1][4]]
-        #这里对昨天的k15数据计算得到的日线数据和雪球日线数据进行校验
-        #=======================================================
-        global current
-        if lastDayK is not None or lastStatus is not None:
-            if lastDayK is not None:
-                #下面是通过k15求出昨天的日线数据，然后进行比较
-                k15YesterdayK = np.array([yesterday[:,0].sum(),yesterday[0][1],yesterday[:,2].max(),yesterday[:,3].min(),yesterday[-1][4]])
-            elif lastStatus is not None:
-                #lastStatus =  (0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw)
-                k15YesterdayK = np.array([yesterday[:,0].sum(),yesterday[-1][4]])
-                lastDayK = np.array([lastStatus[2],lastStatus[1]])
-            dev=k15YesterdayK/lastDayK
-            if np.abs(dev-1).max()>0.02:
-                #如果仅仅是成交量偏差，做偏差纠正处理
-                if np.abs(dev[1:]-1).max()<0.02:
-                    k[0] = k[0]/dev[0]
-                else:
-                    mylog.warn(u"'%s' '%s'数据和日线数据不一致"%(stockK15Service[current]['name'],code))
-                    mylog.warn(u"    日线数据:%s"%(str(lastDayK)))
-                    mylog.warn(u"    k15计算数据:%s"%(str(k15YesterdayK)))
-                    mylog.warn(u"    k15原始数据:%s"%(str(yesterday)))
-                    mylog.warn(u"    偏差:%s"%(str(dev)))
-        #校验处理完成
-        #=======================================================
-        return True,k,dd
+
+        return True,np.array([volume,today[0][1],today[:,2].max(),today[:,3].min(),today[-1][4]]),(dd,)
     return False,0,0
+
 #自选全部
 def xueqiuList():
     uri = """https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1"""
