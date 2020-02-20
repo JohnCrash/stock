@@ -285,6 +285,13 @@ stockK15Service = [
         "avg":0         
     }
 ]
+def logServiceState():
+    mylog.warn("==============stockK15Service=============")
+    for it in stockK15Service:
+        mylog.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
+    mylog.warn("==============stockK5Service=============")
+    for it in stockK5Service:
+        mylog.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
 
 #下载K数据，返回True/False,[(timesramp,volume,open,high,low,close)...],source
 def getK(code,period,n):
@@ -311,12 +318,56 @@ def getK(code,period,n):
 def nextKDate(t,period):
     if t.hour<15:
         if t.hour==11 and t.minute==30:
-            return datetime(nt.year,nt.month,nt.day,13,period)
+            return datetime(t.year,t.month,t.day,13,period)
         else:
             return t+timedelta(minutes=period)
     #返回下一个交易日的第一k时间戳
     nt = t+timedelta(days=1 if t.weekday()!=4 else 3)
     return datetime(nt.year,nt.month,nt.day,9,35 if period==5 else 45)
+
+def isEqK(k0,k1):
+    for i in range(5):
+        if abs(k0[i]/k1[i]-1)>0.02:
+            return False
+    return True
+
+#产生一个日期表便于查找
+k5date = []
+for i in [9,10,11,13,14,15]:
+    if i in [10,13,14]:
+        for m in range(0,60,5):
+            k5date.append((i,m))
+    elif i==9:
+        for m in range(35,60,5):
+            k5date.append((i,m))
+    elif i==11:
+        for m in range(5,35,5):
+            k5date.append((i,m))
+    else:
+        k5date.append((i,0))
+k15date = []
+for i in [9,10,11,13,14,15]:
+    if i in [10,13,14]:
+        for m in range(0,60,15):
+            k15date.append((i,m))
+    elif i==9:
+        for m in range(35,60,15):
+            k15date.append((i,m))
+    elif i==11:
+        for m in range(5,35,15):
+            k15date.append((i,m))
+    else:
+        k15date.append((i,0))
+
+#计算从hour,minute到当前时间存在多少个k点
+def from2now(hour,minute,period):
+    n = 0
+    m = k15date if period==15 else k5date
+    today = datetime.today()
+    for d in m[period]:
+        if (d[0]>hour or (d[0]==hour and d[1]>minute)) and (today.hour>d[0] or (today.hour==d[0] and today.minute<=d[1])):
+            n += 1
+    return n
 
 #返回指定代码的k线数据
 # True , np.array((timesramp,volume,open,high,low,close),...),[(timesramp,)...] 保持和loadKline相同的数据结构
@@ -329,17 +380,54 @@ def K(code,period,n):
     if b and len(cache['k'])>=n and nextKDate(cache['date'][-1][0],period)>datetime.today(): #存在缓存并且没有新的数据直接返回
         return b,cache['k'][-n:],cache['date'][-n:]
     if b: #如果有数据那么仅仅下载最新数据和部分校验用数据
-        dn = math.floor((datetime.today()-cache['date'][-1][0]).second/period)+2
+        base = cache['base']
+        #还需要下载多少数据
+        if datetime.today().day!=cache['date'][-1][0].day: #缓存是昨天的数据
+            #从9:30到现在的全部数据
+            dn = from2now(9,30,period)+2
+        else: #缓存是今天数据
+            t = cache['date'][-1][0]
+            dn = from2now(t.hour,t.minute,period)+2
     elif n<15*16/period:
         dn = int(15*16/period)
     else:
         dn = n
     a,k,s = getK(code,period,dn)
-    if b and a: #校验重叠区域数据,合并数据
-        
+    K = []
+    if a and b:
+        #校验重叠区域数据,合并数据
+        oldK = cache['k']
+        d = cache['date']
+        bi = -1
+        for i in range(len(k)-1,-1,-1): #找到重叠部分
+            if k[i][0]==d[-1][0]:
+                bi = i
+        #校验接缝处的数据
+        if bi<0 or not isEqK(oldK[-1],k[bi]):
+            mylog.err("'%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
+            mylog.err("cacheK:"+str(oldK))
+            mylog.err("caheDate:"+str(d))
+            mylog.err("k:"+str(k))
+            return False,0,0
+        for i in range(bi+1,len(k)):
+            v = k[i]
+            K.append((v[1],v[2],v[3],v[4],v[5]))
+            d.append((v[0],))
+        k = np.vstack((oldK,np.array(K)))
+    elif a:
+        base = s
+        for v in range(len(k)):
+            K.append((v[1],v[2],v[3],v[4],v[5]))
+            d.append((v[0],))
+        k = np.array(K)
     else:
-        
-    return True,k,d
+        mylog.err("'%s' %s 下载时出错"%(code,str(period)))
+        logServiceState()
+        return False,0,0
+
+    shared.toRedis(cacheName,{'k':k,'date':d,'base':base},ex=24*3600)
+    return True,k[-n:],d[-n:]
+
 #当前是交易时间
 def isTransTime():
     to = datetime.today()
@@ -349,43 +437,34 @@ def isTransTime():
         return True
     return False
 
-#将今日数据写入到k,d中去，成功返回True
-def appendTodayK(code,k,d):
-    b,K,D = xueqiuK15day(code,lastDayK=k[-1])
+#将下载数据附加在k,d数据上
+def appendK(code,period,k,d):
+    if period==5 or period==15:
+        b,nk,nd = K(code,period,32 if period==15 else 96)
+    elif period=='d':
+        b,nk,nd = xueqiuK15day(code)
+    else:
+        return False,k,d
     if b:
-        if date.today()==D: #返回的日期就是今天
-            if type(d)==list:
-                rd = d+[(D,)]
-            elif type(d)==tuple:
-                rd = d+((D,),)
-            else:
-                mylog.warn('appendTodayK 错误的参数d = ',d,type(d))
-            return b,np.vstack((k,[K])),rd
-        else:
-            return b,k,d
+        bi = -1
+        for i in range(len(nd)-1,-1,-1):
+            if d[-1][0]==nd[i][0]:
+                bi = i
+        if bi!=-1:
+            for i in range(bi+1,len(nd)):
+                d.append(nd[i])
+            return b,np.vstack((k,nk[bi+1:,:])),d
     return b,k,d
 
 #以k15为基础给出当日的k数据，成交量为预估
-#返回b,[volume,open,high,low,close],date
+#返回b,np.array([volume,open,high,low,close]),[(date,)...]
 #同时在这里做一个15分钟的缓存区
 #发现新浪的15分钟深圳成指数据全天求和日线成交量不一致
 #使用lastDayDate,lastDayK用于发现这种数据不一致性
-def xueqiuK15day(code,lastDayK=None,lastStatus=None):
-    b,k15d = shared.fromRedis('TODAY_'+code)
-    if b:
-        tot = datetime.today()
-        cct = k15d['time']
-        if cct.hour==tot.hour and math.floor(cct.minute/15)==math.floor(tot.minute/15):
-            return True,k15d['data'][0],k15d['data'][1]
-    b,v = shared.fromRedis('ISEXPIRSE?')
-    if b and v:
-        return False,0,0
-    b,k = k15(code,32)
+def xueqiuK15day(code):
+    b,k,d = K(code,15,32)
     if b:
         dd = date(k[-1][0].year,k[-1][0].month,k[-1][0].day)
-        if dd!=date.today():
-            shared.toRedis(True,'ISEXPIRSE?',ex=60)
-            return False,0,0
         for i in range(len(k)-1,-1,-1):
             it = k[i]
             it_dd = date(it[0].year,it[0].month,it[0].day)
@@ -429,7 +508,6 @@ def xueqiuK15day(code,lastDayK=None,lastStatus=None):
                     mylog.warn(u"    偏差:%s"%(str(dev)))
         #校验处理完成
         #=======================================================
-        shared.toRedis({'time':datetime.today(),'data':(k,dd)},'TODAY_'+code,ex=nextdt15()) #到下一个15整点过期
         return True,k,dd
     return False,0,0
 #自选全部
