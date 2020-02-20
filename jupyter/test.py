@@ -10,6 +10,7 @@ import xueqiu
 import threading
 import queue
 import time
+from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
 """
 display_pub = InteractiveShell.instance().display_pub
@@ -21,10 +22,14 @@ r = stock.volumeprices(k,d)
 #b,k,d = xueqiu.qqK15('SZ399001')
 #c,k,d = stock.loadKline('SZ399001',5)
 #stock.correctionVolume(k,d,5)
-for i in range(5):
-    b,d,s = xueqiu.getK('SH000001',15,32)
+#print(xueqiu.from2now(11,30,5))
+c,k,d = stock.loadKline('SH000001')
+xueqiu.appendK('SH000001','d',k,d)
+"""
+for i in range(5):   
     if b:
         print(s,d[0],d[-1],'\n')
     else:
         print('error\n')
+"""        
     #print(xueqiu.getK('SZ399001',5,96))

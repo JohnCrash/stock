@@ -247,6 +247,25 @@ class Plote:
     def switchday(self):
         self.init(self._comarg,'d',self._config)
         self.config()
+    """
+    对不同基本的数据留有缓存
+    """
+    def getKlineData(self,code,period):
+        if not (code in self._cacheK and period in self._cacheK[code]):
+            if period == 'w':
+                after = None #全部数据
+            elif period == 'd':
+                after = stock.dateString(date.today()-timedelta(days=5*365)) #5年数据
+            else:
+                after = stock.dateString(date.today()-timedelta(days=20))
+
+            c,k,d = stock.loadKline(code,period,after=after)
+            self._cacheK[code] = {}
+            self._cacheK[code][period] = (c,k,d,after)
+        
+        cur = self._cacheK[code][period]
+        _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
+        return cur[0],k,d
 
     def init(self,company,period,config,date_ = None,companyInfo=None):
         self._period = period
@@ -266,27 +285,18 @@ class Plote:
             self._comarg = companyInfo[1] #code
             self._date = date_
         elif type(company)==str:
-            if self._after is None and 'figure' not in config and 'cb' not in config:
-                if self._period == 'w':
-                    self._after = stock.dateString(date.today()-timedelta(days=5*365))
-                elif self._period == 'd':
-                    self._after = stock.dateString(date.today()-timedelta(days=365))
-                else:
-                    self._after = stock.dateString(date.today()-timedelta(days=20))
             if self._period == 'w': #周线
-                self._company,k,d = stock.loadKline(company,'d',self._after)
+                self._company,k,d = self.getKlineData(company,'d')
                 self._k,self._date = stock.weekK(k,d)
             else:
-                self._company,self._k,self._date = stock.loadKline(company,self._period,self._after)
-                if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
-                    _,self._k,self._date = xueqiu.appendTodayK(self._company[1],self._k,self._date)
+                self._company,self._k,self._date = self.getKlineData(company,self._period)
         if len(self._k)==0: #完全没有数据不进行进一步处理
             return
         #将大盘指数画在图表中   
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
             if self._period=='w':
-                _,szk,szd = stock.loadKline('SZ399001','d',expire=5*60) #缓存保持5分钟
+                _,szk,szd = self.getKlineData('SZ399001','d')
                 K = stock.alignK(self._date,szk,szd)
                 WK,WD = stock.weekK(K,self._date)
                 self._szclose = WK[:,4]
@@ -294,9 +304,7 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
                 self._szmacd = stock.macd(WK)
             else:
-                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=5*60) #缓存保持5分钟
-                if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
-                    _,szk,szd = xueqiu.appendTodayK('SZ399001',szk,szd)
+                _,szk,szd = self.getKlineData('SZ399001',self._period)
                 K = stock.alignK(self._date,szk,szd)
                 self._szclose = K[:,4]
                 self._szvolumekdj = stock.kdj(K[:,0])[:,2]
@@ -304,49 +312,10 @@ class Plote:
                 self._szmacd = stock.macd(K)
         else:
             self._szclose = None
-    #刷新当日的新数据
-    def refresh(self):
-        pass
+
     #重新加载对象数据all=True加载全部数据,all=False更新数据
     def reload(self,all=True):
-        if self._period=='d' or self._period=='w':
-            self._showcount = 120
-        elif int(self._period)==5: #48
-            self._showcount = 144
-        elif int(self._period)==15: #16
-            self._showcount = 112
-        elif int(self._period)==60: #4
-            self._showcount = 120
-        else:
-            self._showcount = 120        
-        if all:
-            self._after = None
-        if self._period == 'w': #周线
-            self._company,k,d = stock.loadKline(self._comarg,'d',self._after)
-            self._k,self._date = stock.weekK(k,d)
-        else:
-            self._company,self._k,self._date = stock.loadKline(self._comarg,self._period,self._after)
-            if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
-                _,self._k,self._date = xueqiu.appendTodayK(self._company[1],self._k,self._date)
-        if "index" in self._backup and self._backup["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
-            #这里做日期对齐
-            if self._period=='w':
-                _,szk,szd = stock.loadKline('SZ399001','d',expire=5*60) #缓存保持1小时
-                K = stock.alignK(self._date,szk,szd)
-                WK,WD = stock.weekK(K,self._date)
-                self._szclose = WK[:,4]
-                self._szvolumekdj = stock.kdj(WK[:,0])[:,2]
-                self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
-                self._szmacd = stock.macd(WK)
-            else:
-                _,szk,szd = stock.loadKline('SZ399001',self._period,expire=5*60) #缓存保持1小时
-                if self._period == 'd' and xueqiu.isTransTime(): #将最新的数据更新到图表中去
-                    _,szk,szd = xueqiu.appendTodayK('SZ399001',szk,szd)
-                K = stock.alignK(self._date,szk,szd)
-                self._szclose = K[:,4]
-                self._szvolumekdj = stock.kdj(K[:,0])[:,2]
-                self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(K))[:,2]
-                self._szmacd = stock.macd(K)
+        self.init(self._comarg,self._period,self._config)
         self.config()
     
     def __del__(self):
@@ -357,6 +326,7 @@ class Plote:
     def __init__(self,company,period='d',config={},date=None,companyInfo=None):
         self._timer = None
         self._correcttionVolume = False
+        self._cacheK = {}
         self._configarg = config
         self._comarg = company
         self._datearg = date
