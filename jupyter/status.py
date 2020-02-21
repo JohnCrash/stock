@@ -333,13 +333,17 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
         c = t[1]
         if r[0]: #b
             k0 = r[1][0]
+            k1 = r[1][-1]
             #做一个校验，校验上一天的成交量和收盘
             if abs(k[-1][2]/k0[0]-1)>0.02 or abs(k[-1][1]/k0[4]-1)>0.02:
-                xueqiu.logCheckResult(c[1],15,k[-1],k0[0])
+                if abs(k[-1][2]/k0[0]-1)>0.02 and abs(k[-1][1]/k0[4]-1)>0.01:
+                    #做一个成交量校正
+                    k1[0] *= k[-1][2]/k0[0]
+                else:
+                    xueqiu.logCheckResult(c[1],15,k[-1],k0)
 
-            k_ = r[1][-1]
             idd = c[0]
-            A = np.vstack((k,[[idd,k_[4],k_[0],0,0,0,0,0,0,0,0]]))
+            A = np.vstack((k,[[idd,k1[4],k1[0],0,0,0,0,0,0,0,0]]))
             #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
             A[-1,4] = stock.macdV(A[:,1])[-1] #macd
             A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy

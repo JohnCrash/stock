@@ -82,9 +82,13 @@ def plotVline(axs,v,c,linestyle='-',linewidth=1):
         axs[i].axvline(v,color=c,linestyle=linestyle,linewidth=linewidth)
 
 class MyFormatter(Formatter):
-    def __init__(self, dates, fmt='%Y-%m-%d'):
+    def __init__(self, dates,period,fmt='%Y-%m-%d'):
         self.dates = dates
-        self.fmt = fmt
+        self.period = period
+        if type(period)==str:
+            self.fmt = fmt
+        else:
+            self.fmt = '%Y-%m-%d %h:%M'
 
     def __call__(self, x, pos=0):
         'Return the label for time x at position pos'
@@ -92,7 +96,10 @@ class MyFormatter(Formatter):
         if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
             return ''
         t = self.dates[ind][0]
-        return '%s-%s-%s'%(t.year,t.month,t.day)
+        if type(self.period)==str:
+            return '%s-%s-%s'%(t.year,t.month,t.day)
+        else:
+            return '%s-%s-%s %s:%s'%(t.year,t.month,t.day,t.hour,t.minute)
 """kline 图显示"""
 """
 config {
@@ -185,6 +192,7 @@ class Plote:
                 volume = stock.correctionVolume(self._k,self._date,self._period)
                 self._volumeenergy = stock.kdj(stock.volumeEnergy(volume))[:,2]
                 self._volumekdj = stock.kdj(volume)[:,2]
+                self._k = np.array(self._k,copy=True)
                 self._k[:,0] = volume
             else:
                 self._volumeenergy = stock.kdj(stock.volumeEnergyK(self._k))[:,2]
@@ -251,6 +259,8 @@ class Plote:
     对不同基本的数据留有缓存
     """
     def getKlineData(self,code,period):
+        if len(code)>3 and code[2]==':':
+            code = code.replace(':','')
         if not (code in self._cacheK and period in self._cacheK[code]):
             if period == 'w':
                 after = None #全部数据
@@ -396,7 +406,7 @@ class Plote:
             return self._date[i][0]
 
     #显示K线图
-    def showKline(self,bi=None,ei=None,figsize=(30,16)):        
+    def showKline(self,bi=None,ei=None,figsize=(30,16)):     
         if bi is None:
             bi = len(self._k)-self._showcount
         if ei is None:
@@ -409,7 +419,7 @@ class Plote:
                 bi = -len(self._k)+1
         if ei>0:
             if ei>len(self._k):
-                ei = len(self._k)-1
+                ei = len(self._k)
         else:
             if ei<=-len(self._k):
                 ei = -len(self._k)+1
@@ -418,7 +428,7 @@ class Plote:
         fig.subplots_adjust(hspace=0.02) #调整子图上下间距
         axsK = axs if self._axsInx==0 else axs[0]
         if self._date is not None:
-            axsK.xaxis.set_major_formatter(MyFormatter(self._date))
+            axsK.xaxis.set_major_formatter(MyFormatter(self._date,self._period))
         #时间坐标网格线，天的画在星期一，其他的以天为单位
         if self._period=='d' or self._period=='w':
             if self._date is not None:
@@ -437,18 +447,29 @@ class Plote:
                             xticks.append(i)
                 if self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
                     xticks.append(self._trendHeadPos)
-                    xticks.append(self._trendHeadPos)                               
+                    xticks.append(self._trendHeadPos)
                 xticks = np.array(xticks)             
             else:
                 xticks = np.arange(bi,ei,10)
         else:
+            xticks = []
+            for i in range(bi,ei):
+                if i>0 and i<len(self._date):
+                    if self._date[i][0].day!=self._date[i-1][0].day:
+                        xticks.append(i-1)
+
+            if self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
+                xticks.append(self._trendHeadPos)
+                xticks.append(self._trendHeadPos)                            
+            xticks = np.array(xticks)    
+            """  
             if int(self._period) == 15:
                 xticks = np.arange(bi,ei,16)
             elif int(self._period) == 5:
                 xticks = np.arange(bi,ei,48)
             elif int(self._period) == 60:
                 xticks = np.arange(bi,ei,4)
-
+            """
         if self._axsInx==0:
             axsK.set_xlim(bi,ei)
             axsK.set_xticks(xticks)
@@ -945,6 +966,7 @@ class Plote:
 
         def refresh(b):
             self.reload(all=False)
+            recalcRange()
             showline()
             refreshbutton.button_style = ''
         refreshbutton.on_click(refresh)

@@ -23,8 +23,11 @@ r = stock.volumeprices(k,d)
 #c,k,d = stock.loadKline('SZ399001',5)
 #stock.correctionVolume(k,d,5)
 #print(xueqiu.from2now(11,30,5))
-c,k,d = stock.loadKline('SH000001')
-xueqiu.appendK('SH000001','d',k,d)
+#c,k,d = stock.loadKline('SZ399001',15)
+#b,k,d = xueqiu.appendK('SZ399001',15,k,d)
+b,d = xueqiu.xueqiuK5('SZ399001',96)
+print(d)
+#xueqiu.K('SH000001',15,16)
 """
 for i in range(5):   
     if b:

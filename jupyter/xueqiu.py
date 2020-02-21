@@ -5,6 +5,7 @@ import numpy as np
 from datetime import date,datetime,timedelta
 import shared
 import json
+import copy
 import random
 import threading
 import mylog
@@ -85,7 +86,7 @@ def qqK5(code,n=96):
                         #0 date , 1 open , 2 close , 3 high , 4 low , 5 volume , 6 ? , 7 ?
                         t = datetime(year=int(v[0][0:4]),month=int(v[0][4:6]),day=int(v[0][6:8]),hour=int(v[0][8:10]),minute=int(v[0][10:12]))
                         if t<=today and t.minute%5==0:
-                            K.append((t,float(v[5]),float(v[1]),float(v[3]),float(v[4]),float(v[2])))
+                            K.append((t,float(v[5])*100,float(v[1]),float(v[3]),float(v[4]),float(v[2])))
                     
                     return True,K[-n:]
                 raise ValueError(str(r.text))
@@ -311,6 +312,7 @@ def getK(code,period,n,provider=None):
                         break
             t0 = time.time()
             b,d = service[current]['cb'](code,n)
+
             if b:
                 service[current]['success'] +=1
                 service[current]['total'] += time.time()-t0
@@ -384,8 +386,12 @@ def K(code,period,n):
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     #cache = {'k':np.array((volume,open,high,low,close),...),'date':[(timesramp,)...],'base':} base是最初的数据来源
     b,cache = shared.fromRedis(cacheName)
-    if b and len(cache['k'])>=n and nextKDate(cache['date'][-1][0],period)>datetime.today(): #存在缓存并且没有新的数据直接返回
-        return b,cache['k'][-n:],cache['date'][-n:]
+    if 'ver' in cache and cache['ver']==2:
+        if b and len(cache['k'])>=n and nextKDate(cache['date'][-1][0],period)>datetime.today(): #存在缓存并且没有新的数据直接返回
+            return b,cache['k'][-n:],cache['date'][-n:]
+    else:
+        b = False
+        cache = None
     
     if b: #如果有数据那么仅仅下载最新数据和部分校验用数据
         base = cache['base']
@@ -420,13 +426,15 @@ def K(code,period,n):
             mylog.err("cacheK:"+str(oldK))
             mylog.err("caheDate:"+str(d))
             mylog.err("k:"+str(k))
-            return False,0,0
+            return False,oldK,d
         for i in range(bi+1,len(k)):
             v = k[i]
             K.append((v[1],v[2],v[3],v[4],v[5]))
             d.append((v[0],))
         if len(K)>0:
             k = np.vstack((oldK,K))
+        else:
+            return True,oldK,d
     elif a:
         base = s
         d = []
@@ -439,7 +447,7 @@ def K(code,period,n):
         logServiceState()
         return False,0,0
 
-    shared.toRedis({'k':k,'date':d,'base':base},cacheName,ex=24*3600)
+    shared.toRedis({'k':k,'date':d,'base':base,"ver":2},cacheName,ex=24*3600)
     return True,k[-n:],d[-n:]
 
 #当前是交易时间
@@ -453,11 +461,11 @@ def isTransTime():
 
 def logCheckResult(code,period,source,checkdata):
     mylog.warn(u"'%s' '%s' 数据和日线数据不一致"%(code,str(period)))
-    mylog.warn(u"source:%s\nnew:%s"%(str(source),str(checkdata)))
+    mylog.warn(u"\nsource:%s\nnew:%s"%(str(source),str(checkdata)))
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     b,cache = shared.fromRedis(cacheName)
     if b:
-        mylog.warn(str(cache))
+        mylog.warn("错误数据来源于:%s"%(str(cache['base'])))
 
 #将下载数据附加在k,d数据上
 def appendK(code,period,k,d):
@@ -475,7 +483,7 @@ def appendK(code,period,k,d):
                     if np.abs(dev-1).max()>0.02:
                         #如果仅仅是成交量偏差，做偏差纠正处理
                         if np.abs(dev[0]-1).max()>0.02:
-                            nk[0] = nk[0]/dev[0]
+                            nk[-1][0] = nk[-1][0]/dev[0]
                         else:
                             logCheckResult(code,period,k[-1],d[-1])
                     break
@@ -489,10 +497,11 @@ def appendK(code,period,k,d):
             if d[-1][0]==nd[i][0]:
                 bi = i
         if bi!=-1:
+            D = copy.copy(d)
             for i in range(bi+1,len(nd)):
-                d.append(nd[i])
+                D.append(nd[i])
             if len(nd)-bi-1>0:
-                return b,np.vstack((k,nk[bi+1:])),d
+                return b,np.vstack((k,nk[bi+1:])),D
     return b,k,d
 
 #以k15为基础给出当日的k数据，成交量为预估
@@ -503,6 +512,7 @@ def xueqiuKday(code,period):
     b,k,d = K(code,period,2*N)
     if b:
         dd = date(d[-1][0].year,d[-1][0].month,d[-1][0].day)
+        lasti = None
         for i in range(len(k)-1,-1,-1):
             it = d[i][0]
             it_dd = date(it.year,it.month,it.day)
@@ -510,6 +520,9 @@ def xueqiuKday(code,period):
                 yesterday_dd = it_dd
                 lasti = i
                 break
+        if lasti is None:
+            mylog.err("xueqiuKday lasti=None,%s,%s \nk=%s\nd=%s"%(code,period,str(k),str(d)))
+            return False,0,0
         #0 volume,1 open,2 high,3 low,4 close
         yesterday = k[lasti-N+1:lasti+1,:]
         today = k[lasti+1:,:]
