@@ -632,10 +632,13 @@ def StrongSorted(days):
     return result
 
 def PlotCategory(r,top=None,focus=None):
-    fig,axs = plt.subplots(figsize=(30,16))
+    fig,axs = plt.subplots(figsize=(30,14))
     dd = r[3] #date
     axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
-
+    if top is None:
+        axs.set_title("%s 周期%s"%(r[1],r[0]))
+    else:
+        axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
     if top is None:
         for i in range(len(r[2])):
             dk = r[2][i] #
@@ -697,17 +700,18 @@ def StrongCategoryList():
             if r[0]==day and r[1]==category:
                 return r
         return None
-
+    prevButton = None
     def onCatsList(E):
+        nonlocal prevButton
         period = 10
         top = 10
         com = None
         result = getResult(period,E.description)
-        idd = result[4] #(0 id , 1 code , 2 name , 3 category)
-        coms = [None]
-        
-        for c in idd:
-            coms.append(c[2])
+        if prevButton is not None:
+            prevButton.button_style = ''
+        E.button_style = 'warning'
+        prevButton = E
+        idd = result[4]
         def getCodeByName(name):
             for it in idd:
                 if it[2]==name:
@@ -725,13 +729,30 @@ def StrongCategoryList():
             disabled=False)
 
         comDropdown = widgets.Dropdown(
-            options=coms,
-            value=com,
+            options=[],
+            value=None,
             description='公司',
             disabled=False)
 
         out = widgets.Output()
         box = Box(children=[periodDropdown,topDropdown,comDropdown,out],layout=box_layout)
+
+        def sortCompanyList():
+            nonlocal result,periodDropdown
+            idd = result[4] #(0 id , 1 code , 2 name , 3 category)
+            sorti = [] #[(i,dk),...]
+            for i in range(len(result[2])):
+                dk = result[2][i] #
+                sorti.append((i,dk[-1]))
+            sorti = sorted(sorti,key=lambda it:it[1],reverse=True)
+            coms = [None]
+            for it in sorti:
+                coms.append(idd[it[0]][2])
+            sel = comDropdown.value
+            comDropdown.options = coms
+            comDropdown.value = sel
+
+        sortCompanyList()
 
         def showPlot():
             output2.clear_output(wait=True)
@@ -739,10 +760,11 @@ def StrongCategoryList():
                 PlotCategory(result,top=top,focus=com)
 
         def on_period(e):
-            nonlocal result,E
+            nonlocal result,E,comDropdown
             period = e['new']
             #print(period,E.description)
             result = getResult(period,E.description)
+            sortCompanyList()
             showPlot()
 
         periodDropdown.observe(on_period,names='value')
