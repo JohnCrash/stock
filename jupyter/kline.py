@@ -95,6 +95,7 @@ class MyFormatter(Formatter):
         ind = int(np.round(x))
         if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
             return ''
+
         t = self.dates[ind][0]
         if type(self.period)==str:
             return '%s-%s-%s'%(t.year,t.month,t.day)

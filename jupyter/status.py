@@ -21,14 +21,16 @@ import copy
 
 PROD = 40
 
-def isPopularCategory(name):
-#    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+def popularCategory():
+    #    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
 #          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
 #          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易']
     ls = ['白色家电','半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
           '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程','采掘服务','化学制品','化学纤维',
           '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','林业',' 畜禽养殖','农产品加工','种植业']
-    return name in ls
+    return ls
+def isPopularCategory(name):
+    return name in popularCategory()
 
 #见数据插入到company_status表
 def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd):
@@ -279,19 +281,25 @@ def redisStatusCache50(db):
         r = stock.query("""select count(*) from company""")
         n = r[0][0] #公司数量
         dn = len(d)
-        a = np.zeros((n,dn,11))
+        a = np.ones((n,dn,11))
         lastid = -1
-        i = 0
         nc = -1
+        temp = []
         for c in cs:
             if c[0]!=lastid:
-                i = 0
+                if len(temp)>0:
+                    offset = dn-len(temp)
+                    for i in range(dn):
+                        if i<offset:
+                            a[nc,i,:] = temp[0]
+                        else:
+                            a[nc,i,:] = temp[i-offset]
                 nc += 1
                 lastid = c[0]
+                temp = []
                 if nc>=n:
                     break
-            a[nc,i,:] = c
-            i+=1
+            temp.append(c)
         shared.numpyToRedis(a,"%s_last50"%(db))
         shared.toRedis(d,"%s_date50"%(db))
     #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
@@ -598,3 +606,184 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
             xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
     if today_but is not None:
         xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
+
+def StrongSorted(days):
+    result = []
+    #categorys = stock.query("""select id,name from category""")
+    companys = stock.query("""select company_id,code,name,category from company_select""")
+    id2com = {}
+    for com in companys:
+        id2com[com[0]] = com
+    D,K = redisStatusCache50('company_status')
+    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+    idd[:,0] = K[:,0,0]
+    for i in idd:
+        k = int(i[0])
+        if k in id2com:
+            i[1] = id2com[k][1]
+            i[2] = id2com[k][2]
+            i[3] = id2com[k][3]
+    
+    for day in days:
+        dk = (K[:,day:,1]-K[:,:-day,1])/K[:,:-day,1]
+        for category in popularCategory():
+            r = idd[:,3]==category
+            result.append((day,category,dk[r],D[day:],idd[r]))
+    return result
+
+def PlotCategory(r,top=None,focus=None):
+    fig,axs = plt.subplots(figsize=(30,16))
+    dd = r[3] #date
+    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
+
+    if top is None:
+        for i in range(len(r[2])):
+            dk = r[2][i] #
+            idd = r[4][i]
+            if focus is not None:
+                if idd[2]==focus:
+                    axs.plot(np.arange(len(dd)),dk,linewidth=2,label = idd[2])
+                else:
+                    axs.plot(np.arange(len(dd)),dk,alpha=0.2,label = idd[2])
+            else:        
+                axs.plot(np.arange(len(dd)),dk,label = idd[2])
+    else:
+        sorti = [] #[(i,dk),...]
+        for i in range(len(r[2])):
+            dk = r[2][i] #
+            sorti.append((i,dk[-1]))
+        sorti = sorted(sorti,key=lambda it:it[1],reverse=True)
+        isplot = False
+        for d in sorti[:top+1]:
+            i = d[0]
+            dk = r[2][i] #
+            idd = r[4][i]
+            if focus is not None:
+                if idd[2]==focus:
+                    axs.plot(np.arange(len(dd)),dk,linewidth=2,label = idd[2])
+                    isplot = True
+                else:
+                    axs.plot(np.arange(len(dd)),dk,alpha=0.2,label = idd[2])
+            else:        
+                axs.plot(np.arange(len(dd)),dk,label = idd[2])
+        if not isplot:
+            for i in range(len(r[2])):
+                dk = r[2][i] #
+                idd = r[4][i]
+                if focus is not None:
+                    if idd[2]==focus:
+                        axs.plot(np.arange(len(dd)),dk,linewidth=2,linestyle='--',label = idd[2])
+
+    xticks=[]
+    for i in range(len(dd)):
+        xticks.append(i)
+    axs.set_xticks(xticks)
+    axs.grid(True)
+    axs.axhline(0,color='black',linewidth=1,linestyle='--')
+    axs.set_xlim(0,len(dd)+2)
+    plt.legend()
+    fig.autofmt_xdate()
+    plt.show()
+"""
+按分类列出强势股
+"""
+def StrongCategoryList():
+    result = StrongSorted([3,5,10,20])
+    items = []
+    output = widgets.Output()
+    output2= widgets.Output()
+    def getResult(day,category):
+        for r in result:
+            if r[0]==day and r[1]==category:
+                return r
+        return None
+
+    def onCatsList(E):
+        period = 10
+        top = 10
+        com = None
+        result = getResult(period,E.description)
+        idd = result[4] #(0 id , 1 code , 2 name , 3 category)
+        coms = [None]
+        
+        for c in idd:
+            coms.append(c[2])
+        def getCodeByName(name):
+            for it in idd:
+                if it[2]==name:
+                    return it[1]
+            return 'None'
+        periodDropdown = widgets.Dropdown(
+            options=[3,5,10,20],
+            value=period,
+            description='周期',
+            disabled=False)
+        topDropdown = widgets.Dropdown(
+            options=[3,5,10,20,30,100],
+            value=top,
+            description='TOP',
+            disabled=False)
+
+        comDropdown = widgets.Dropdown(
+            options=coms,
+            value=com,
+            description='公司',
+            disabled=False)
+
+        out = widgets.Output()
+        box = Box(children=[periodDropdown,topDropdown,comDropdown,out],layout=box_layout)
+
+        def showPlot():
+            output2.clear_output(wait=True)
+            with output2:
+                PlotCategory(result,top=top,focus=com)
+
+        def on_period(e):
+            nonlocal result,E
+            period = e['new']
+            #print(period,E.description)
+            result = getResult(period,E.description)
+            showPlot()
+
+        periodDropdown.observe(on_period,names='value')
+
+        def on_top(e):
+            nonlocal top
+            top = e['new']
+            showPlot()
+
+        topDropdown.observe(on_top,names='value')
+
+        def on_com(e):
+            nonlocal com,box
+            com = e['new']
+            if com is None:
+                out.clear_output()
+            else:
+                out.clear_output(wait=True)
+                with out:
+                    display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))
+            
+            showPlot()
+
+        comDropdown.observe(on_com,names='value')
+
+        output.clear_output(wait=True)
+        with output:
+            display(box)           
+        showPlot()
+
+    for category in popularCategory():
+        but = widgets.Button(
+            description=category,
+            disabled=False,
+            button_style='')
+        but.on_click(onCatsList)
+        items.append(but)
+    box_layout = Layout(display='flex',
+                        flex_flow='wrap',
+                        align_items='stretch',
+                        border='solid',
+                        width='100%')        
+    box = Box(children=items, layout=box_layout)
+    display(box,output,output2)

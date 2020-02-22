@@ -386,7 +386,7 @@ def K(code,period,n):
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     #cache = {'k':np.array((volume,open,high,low,close),...),'date':[(timesramp,)...],'base':} base是最初的数据来源
     b,cache = shared.fromRedis(cacheName)
-    if 'ver' in cache and cache['ver']==2:
+    if b and 'ver' in cache and cache['ver']==2:
         if b and len(cache['k'])>=n and nextKDate(cache['date'][-1][0],period)>datetime.today(): #存在缓存并且没有新的数据直接返回
             return b,cache['k'][-n:],cache['date'][-n:]
     else:

@@ -25,8 +25,8 @@ r = stock.volumeprices(k,d)
 #print(xueqiu.from2now(11,30,5))
 #c,k,d = stock.loadKline('SZ399001',15)
 #b,k,d = xueqiu.appendK('SZ399001',15,k,d)
-b,d = xueqiu.xueqiuK5('SZ399001',96)
-print(d)
+#b,d = xueqiu.xueqiuK5('SZ399001',96)
+#print(d)
 #xueqiu.K('SH000001',15,16)
 """
 for i in range(5):   
@@ -36,3 +36,7 @@ for i in range(5):
         print('error\n')
 """        
     #print(xueqiu.getK('SZ399001',5,96))
+#r = status.StrongSorted([5])
+#print(r)
+shared.delKey("company_status_last50")
+shared.delKey("company_status_date50")
