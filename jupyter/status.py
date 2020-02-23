@@ -27,7 +27,7 @@ def popularCategory():
 #          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易']
     ls = ['白色家电','半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
           '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程','采掘服务','化学制品','化学纤维',
-          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','林业',' 畜禽养殖','农产品加工','种植业']
+          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','林业','畜禽养殖','农产品加工','种植业']
     return ls
 def isPopularCategory(name):
     return name in popularCategory()
@@ -607,6 +607,15 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
     if today_but is not None:
         xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
 
+"""
+返回
+[
+    (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
+     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[(index,dk)],
+     6 该分类的前十名平均盈利),
+    ...
+]
+"""
 def StrongSorted(days):
     result = []
     #categorys = stock.query("""select id,name from category""")
@@ -628,7 +637,26 @@ def StrongSorted(days):
         dk = (K[:,day:,1]-K[:,:-day,1])/K[:,:-day,1]
         for category in popularCategory():
             r = idd[:,3]==category
-            result.append((day,category,dk[r],D[day:],idd[r]))
+            dK = dk[r]
+
+            sorti = [] #[(i,dk),...]
+            for i in range(len(dK)):
+                sorti.append((i,dK[i][-1]))
+            if len(sorti)>0:
+                sorti = sorted(sorti,key=lambda it:it[1],reverse=True)
+                top10 = np.zeros((dK.shape[0],),dtype=np.dtype('bool'))
+                for i in range(10):
+                    if i < len(sorti):
+                        inx = sorti[i][0]
+                        top10[inx] = True
+
+                top10dK = dK[top10]
+                top10mean = np.zeros((top10dK.shape[1]))
+                for i in range(top10dK.shape[1]):
+                    top10mean[i] = top10dK[:,i].mean()
+                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean))
+            else:
+                print("'%s' 分类里面没有公司"%category)
     return result
 
 def PlotCategory(r,top=None,focus=None):
@@ -651,13 +679,8 @@ def PlotCategory(r,top=None,focus=None):
             else:        
                 axs.plot(np.arange(len(dd)),dk,label = idd[2])
     else:
-        sorti = [] #[(i,dk),...]
-        for i in range(len(r[2])):
-            dk = r[2][i] #
-            sorti.append((i,dk[-1]))
-        sorti = sorted(sorti,key=lambda it:it[1],reverse=True)
         isplot = False
-        for d in sorti[:top+1]:
+        for d in r[5][:top+1]:
             i = d[0]
             dk = r[2][i] #
             idd = r[4][i]
@@ -687,125 +710,247 @@ def PlotCategory(r,top=None,focus=None):
     plt.legend()
     fig.autofmt_xdate()
     plt.show()
+
 """
 按分类列出强势股
 """
-def StrongCategoryList():
-    result = StrongSorted([3,5,10,20])
-    items = []
-    output = widgets.Output()
-    output2= widgets.Output()
-    def getResult(day,category):
-        for r in result:
-            if r[0]==day and r[1]==category:
+def StrongCategoryCompanyList(category,name):
+    def getResult(day,categoryName):
+        nonlocal category
+        for r in category:
+            if r[0]==day and r[1]==categoryName:
                 return r
         return None
-    prevButton = None
-    def onCatsList(E):
-        nonlocal prevButton
-        period = 10
-        top = 10
-        com = None
-        result = getResult(period,E.description)
-        if prevButton is not None:
-            prevButton.button_style = ''
-        E.button_style = 'warning'
-        prevButton = E
-        idd = result[4]
-        def getCodeByName(name):
-            for it in idd:
-                if it[2]==name:
-                    return it[1]
-            return 'None'
-        periodDropdown = widgets.Dropdown(
-            options=[3,5,10,20],
-            value=period,
-            description='周期',
-            disabled=False)
-        topDropdown = widgets.Dropdown(
-            options=[3,5,10,20,30,100],
-            value=top,
-            description='TOP',
-            disabled=False)
 
-        comDropdown = widgets.Dropdown(
-            options=[],
-            value=None,
-            description='公司',
-            disabled=False)
+    period = 20
+    top = 10
+    com = None
+    result = getResult(period,name)
+    output = widgets.Output()
+    output2 = widgets.Output()
+    idd = result[4]
+    def getCodeByName(name):
+        for it in idd:
+            if it[2]==name:
+                return it[1]
+        return 'None'
+    periodDropdown = widgets.Dropdown(
+        options=[3,5,10,20],
+        value=period,
+        description='周期',
+        disabled=False)
+    topDropdown = widgets.Dropdown(
+        options=[3,5,10,20,30,100],
+        value=top,
+        description='TOP',
+        disabled=False)
 
-        out = widgets.Output()
-        box = Box(children=[periodDropdown,topDropdown,comDropdown,out],layout=box_layout)
+    comDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='公司',
+        disabled=False)
+    butList = widgets.Button(
+        description='列表',
+        disabled=False,
+        button_style='',
+        tooltip='列出股票的图表')
+    def onListClick(e):
+        nonlocal top,result
+        output2.clear_output(wait=True)
+        with output2:
+            for i in range(top):
+                if i < len(result[5]):
+                    inx = result[5][i][0]
+                    r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
+                    kline.Plote(r[1],'d',config={'index':True}).show()
 
-        def sortCompanyList():
-            nonlocal result,periodDropdown
-            idd = result[4] #(0 id , 1 code , 2 name , 3 category)
-            sorti = [] #[(i,dk),...]
-            for i in range(len(result[2])):
-                dk = result[2][i] #
-                sorti.append((i,dk[-1]))
-            sorti = sorted(sorti,key=lambda it:it[1],reverse=True)
-            coms = [None]
-            for it in sorti:
-                coms.append(idd[it[0]][2])
-            sel = comDropdown.value
-            comDropdown.options = coms
-            comDropdown.value = sel
+    butList.on_click(onListClick)
+    out = widgets.Output()
+    box_layout = Layout(display='flex',
+                    flex_flow='wrap',
+                    align_items='stretch',
+                    border='solid',
+                    width='100%')    
+    box = Box(children=[periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
 
-        sortCompanyList()
+    def sortCompanyList():
+        nonlocal result,periodDropdown
+        idd = result[4] #(0 id , 1 code , 2 name , 3 category)
+        coms = [None]
+        for it in result[5]:
+            coms.append(idd[it[0]][2])
+        sel = comDropdown.value
+        comDropdown.options = coms
+        comDropdown.value = sel
 
-        def showPlot():
-            output2.clear_output(wait=True)
-            with output2:
-                PlotCategory(result,top=top,focus=com)
+    sortCompanyList()
 
-        def on_period(e):
-            nonlocal result,E,comDropdown
-            period = e['new']
-            #print(period,E.description)
-            result = getResult(period,E.description)
-            sortCompanyList()
-            showPlot()
-
-        periodDropdown.observe(on_period,names='value')
-
-        def on_top(e):
-            nonlocal top
-            top = e['new']
-            showPlot()
-
-        topDropdown.observe(on_top,names='value')
-
-        def on_com(e):
-            nonlocal com,box
-            com = e['new']
-            if com is None:
-                out.clear_output()
-            else:
-                out.clear_output(wait=True)
-                with out:
-                    display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))
-            
-            showPlot()
-
-        comDropdown.observe(on_com,names='value')
-
+    def showPlot():
+        output2.clear_output()
         output.clear_output(wait=True)
         with output:
-            display(box)           
+            PlotCategory(result,top=top,focus=com)
+
+    def on_period(e):
+        nonlocal result,comDropdown,period
+        period = e['new']
+        sortCompanyList()
         showPlot()
 
-    for category in popularCategory():
-        but = widgets.Button(
-            description=category,
-            disabled=False,
-            button_style='')
-        but.on_click(onCatsList)
-        items.append(but)
-    box_layout = Layout(display='flex',
-                        flex_flow='wrap',
-                        align_items='stretch',
-                        border='solid',
-                        width='100%')        
-    box = Box(children=items, layout=box_layout)
+    periodDropdown.observe(on_period,names='value')
+
+    def on_top(e):
+        nonlocal top
+        top = e['new']
+        showPlot()
+
+    topDropdown.observe(on_top,names='value')
+
+    def on_com(e):
+        nonlocal com,box
+        com = e['new']
+        if com is None:
+            out.clear_output()
+        else:
+            out.clear_output(wait=True)
+            with out:
+                display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))
+        
+        showPlot()
+
+    comDropdown.observe(on_com,names='value')
+
     display(box,output,output2)
+    showPlot()
+
+
+def PlotAllCategory(sortedCategory,top,focus=None):
+    fig,axs = plt.subplots(figsize=(30,14))
+    r = sortedCategory[0]
+    dd = r[3] #date
+    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
+    if top is None:
+        axs.set_title("%s 周期%s"%(r[1],r[0]))
+    else:
+        axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
+    
+    i = 0
+    for r in sortedCategory:
+        dk = r[6] #
+        if top is not None and i<top:
+            if focus is not None:
+                if r[1]==focus:
+                    axs.plot(np.arange(len(dd)),dk,linewidth=2,label = r[1])
+                else:
+                    axs.plot(np.arange(len(dd)),dk,alpha=0.2,label = r[1])
+            else:        
+                axs.plot(np.arange(len(dd)),dk,label = r[1])
+        i+=1
+
+    xticks=[]
+    for i in range(len(dd)):
+        xticks.append(i)
+    axs.set_xticks(xticks)
+    axs.grid(True)
+    axs.axhline(0,color='black',linewidth=1,linestyle='--')
+    axs.set_xlim(0,len(dd)+2)
+    plt.legend()
+    fig.autofmt_xdate()
+    plt.show()
+
+def StrongCategoryList():
+    result = StrongSorted([3,5,10,20])
+    output = widgets.Output()
+    def getSortedCategory(day):
+        categorys = []
+        for r in result:
+            if r[0]==day:
+                categorys.append(r)
+        return sorted(categorys,key=lambda it:it[6][-1],reverse=True)
+
+    period = 20
+    top = 10
+    mark = None
+    category = None
+    sortedCategory = getSortedCategory(period)
+    sortedCategoryNames = [None]
+    for it in sortedCategory:
+        sortedCategoryNames.append(it[1])
+    periodDropdown = widgets.Dropdown(
+        options=[3,5,10,20],
+        value=period,
+        description='周期',
+        disabled=False)
+    topDropdown = widgets.Dropdown(
+        options=[3,5,10,20,30,100],
+        value=top,
+        description='TOP',
+        disabled=False)
+    markDropdown = widgets.Dropdown(
+        options=sortedCategoryNames,
+        value=mark,
+        description='高亮',
+        disabled=False)        
+    categoryDropdown = widgets.Dropdown(
+        options=sortedCategoryNames,
+        value=category,
+        description='分类',
+        disabled=False)
+
+    def showPlot():
+        nonlocal output,category,mark,period,top,sortedCategory,result
+        if category is None:
+            output.clear_output(wait=True)
+            with output:
+                PlotAllCategory(sortedCategory,top,mark)
+        else:
+            output.clear_output()
+            with output:
+                StrongCategoryCompanyList(result,category)
+
+    def on_period(e):
+        nonlocal period,category,sortedCategory
+        period = e['new']
+        sortedCategory = getSortedCategory(period)
+        sortedCategoryNames = [None]
+        for it in sortedCategory:
+            sortedCategoryNames.append(it[1])
+
+        category = categoryDropdown.value
+        categoryDropdown.options = sortedCategoryNames
+        categoryDropdown.value = category
+        showPlot()
+
+    periodDropdown.observe(on_period,names='value')  
+    
+    def on_top(e):
+        nonlocal top
+        top = e['new']
+        showPlot()
+
+    topDropdown.observe(on_top,names='value')
+
+    def on_mark(e):
+        nonlocal mark
+        mark = e['new']
+        showPlot()
+
+    markDropdown.observe(on_mark,names='value')
+
+    def on_category(e):
+        nonlocal category
+        category = e['new']
+        showPlot()
+
+    categoryDropdown.observe(on_category,names='value')
+
+    box_layout = Layout(display='flex',
+                    flex_flow='wrap',
+                    align_items='stretch',
+                    border='solid',
+                    width='100%')
+    box = Box(children=[periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+
+    display(box,output)
+    showPlot()
