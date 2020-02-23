@@ -607,6 +607,39 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
     if today_but is not None:
         xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
 
+#最近N天的status数据
+#同时返回N天的日期数组和数据
+def getStatusN(N,db):
+    #缓存中没有准备数据
+    d = stock.query("""select date from %s where id=8828 order by date desc limit %d"""%(db,N))
+    d = list(d)
+    d.reverse()
+    cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
+    r = stock.query("""select count(*) from company""")
+    n = r[0][0] #公司数量
+    dn = len(d)
+    a = np.ones((n,dn,11))
+    lastid = -1
+    nc = -1
+    temp = []
+    for c in cs:
+        if c[0]!=lastid:
+            if len(temp)>0:
+                offset = dn-len(temp)
+                for i in range(dn):
+                    if i<offset:
+                        a[nc,i,:] = temp[0]
+                    else:
+                        a[nc,i,:] = temp[i-offset]
+            nc += 1
+            lastid = c[0]
+            temp = []
+            if nc>=n:
+                break
+        temp.append(c)
+    #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
+    #数据a的时间序列和d相同,shape = (公司数,日期,数据)
+    return d,a
 """
 返回
 [
@@ -616,14 +649,17 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
     ...
 ]
 """
-def StrongSorted(days):
+def StrongSorted(days,N=50):
     result = []
     #categorys = stock.query("""select id,name from category""")
     companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
     for com in companys:
         id2com[com[0]] = com
-    D,K = redisStatusCache50('company_status')
+    if N>50:
+        D,K = getStatusN('company_status',N)
+    else:
+        D,K = redisStatusCache50('company_status')
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
     idd[:,0] = K[:,0,0]
     for i in idd:
@@ -859,8 +895,8 @@ def PlotAllCategory(sortedCategory,top,focus=None):
     fig.autofmt_xdate()
     plt.show()
 
-def StrongCategoryList():
-    result = StrongSorted([3,5,10,20])
+def StrongCategoryList(N=50):
+    result = StrongSorted([3,5,10,20],N)
     output = widgets.Output()
     def getSortedCategory(day):
         categorys = []
