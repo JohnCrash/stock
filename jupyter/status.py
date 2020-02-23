@@ -609,7 +609,7 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
 
 #最近N天的status数据
 #同时返回N天的日期数组和数据
-def getStatusN(N,db):
+def getStatusN(db,N):
     #缓存中没有准备数据
     d = stock.query("""select date from %s where id=8828 order by date desc limit %d"""%(db,N))
     d = list(d)
@@ -822,8 +822,8 @@ def StrongCategoryCompanyList(category,name):
 
     sortCompanyList()
 
-    def showPlot():
-        output2.clear_output()
+    def showPlot(wait=False):
+        output2.clear_output(wait=wait)
         output.clear_output(wait=True)
         with output:
             PlotCategory(result,top=top,focus=com)
@@ -852,8 +852,13 @@ def StrongCategoryCompanyList(category,name):
             out.clear_output(wait=True)
             with out:
                 display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))
-        
-        showPlot()
+        if com is None:                
+            showPlot()
+        else:
+            showPlot(wait=True)
+            with output2:
+                kline.Plote(getCodeByName(com),'d',config={'index':True}).show()
+
 
     comDropdown.observe(on_com,names='value')
 
@@ -931,7 +936,7 @@ def StrongCategoryList(N=50):
     categoryDropdown = widgets.Dropdown(
         options=sortedCategoryNames,
         value=category,
-        description='分类',
+        description='选择分类',
         disabled=False)
 
     def showPlot():
