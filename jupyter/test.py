@@ -38,5 +38,8 @@ for i in range(5):
     #print(xueqiu.getK('SZ399001',5,96))
 #r = status.StrongSorted([5])
 #print(r)
-shared.delKey("company_status_last50")
-shared.delKey("company_status_date50")
+#shared.delKey("company_status_last50")
+#shared.delKey("company_status_date50")
+def progress(e):
+    pass
+status.update_status_begin(date(2020,2,21),False,progress)

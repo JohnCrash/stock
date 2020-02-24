@@ -92,7 +92,10 @@ def update_company_status_delta_data(idk,idd):
     volumeJ = stock.kdj(k[:,1])[:,2]
     boll = stock.boll(k[:,2])
     bollw = stock.bollWidth(boll)
-    insert_company_status(k[PROD+1:],vma20[PROD+1:],energy[PROD+1:],volumeJ[PROD+1:],boll[PROD+1:],bollw[PROD+1:],idd[PROD+1:])
+    if len(k)>PROD:
+        insert_company_status(k[PROD+1:],vma20[PROD+1:],energy[PROD+1:],volumeJ[PROD+1:],boll[PROD+1:],bollw[PROD+1:],idd[PROD+1:])
+    else:
+        insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd)
 
 #可以从一个起点日期使用增量进行更新，或者更新全部数据
 def update_status_begin(beginday,isall,progress):
@@ -344,7 +347,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             k1 = r[1][-1]
             #做一个校验，校验上一天的成交量和收盘
             if abs(k[-1][2]/k0[0]-1)>0.02 or abs(k[-1][1]/k0[4]-1)>0.02:
-                if abs(k[-1][2]/k0[0]-1)>0.02 and abs(k[-1][1]/k0[4]-1)>0.01:
+                if abs(k[-1][2]/k0[0]-1)>0.02 and abs(k[-1][1]/k0[4]-1)<0.02:
                     #做一个成交量校正
                     k1[0] *= k[-1][2]/k0[0]
                 else:
@@ -695,7 +698,7 @@ def StrongSorted(days,N=50):
                 print("'%s' 分类里面没有公司"%category)
     return result
 
-def PlotCategory(r,top=None,focus=None):
+def PlotCategory(bi,ei,r,top=None,focus=None):
     fig,axs = plt.subplots(figsize=(30,14))
     dd = r[3] #date
     axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
@@ -703,17 +706,18 @@ def PlotCategory(r,top=None,focus=None):
         axs.set_title("%s 周期%s"%(r[1],r[0]))
     else:
         axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
+    xdd = np.arange(len(dd))
     if top is None:
         for i in range(len(r[2])):
             dk = r[2][i] #
             idd = r[4][i]
             if focus is not None:
                 if idd[2]==focus:
-                    axs.plot(np.arange(len(dd)),dk,linewidth=2,label = idd[2])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=2,label = idd[2])
                 else:
-                    axs.plot(np.arange(len(dd)),dk,alpha=0.2,label = idd[2])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = idd[2])
             else:        
-                axs.plot(np.arange(len(dd)),dk,label = idd[2])
+                axs.plot(xdd[bi:ei],dk[bi:ei],label = idd[2])
     else:
         isplot = False
         for d in r[5][:top+1]:
@@ -722,27 +726,27 @@ def PlotCategory(r,top=None,focus=None):
             idd = r[4][i]
             if focus is not None:
                 if idd[2]==focus:
-                    axs.plot(np.arange(len(dd)),dk,linewidth=2,label = idd[2])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = idd[2])
                     isplot = True
                 else:
-                    axs.plot(np.arange(len(dd)),dk,alpha=0.2,label = idd[2])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = idd[2])
             else:        
-                axs.plot(np.arange(len(dd)),dk,label = idd[2])
+                axs.plot(xdd[bi:ei],dk[bi:ei],label = idd[2])
         if not isplot:
             for i in range(len(r[2])):
                 dk = r[2][i] #
                 idd = r[4][i]
                 if focus is not None:
                     if idd[2]==focus:
-                        axs.plot(np.arange(len(dd)),dk,linewidth=2,linestyle='--',label = idd[2])
+                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=2,linestyle='--',label = idd[2])
 
     xticks=[]
-    for i in range(len(dd)):
+    for i in range(bi,ei):
         xticks.append(i)
     axs.set_xticks(xticks)
     axs.grid(True)
     axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    axs.set_xlim(0,len(dd)+2)
+    axs.set_xlim(bi,ei)
     plt.legend()
     fig.autofmt_xdate()
     plt.show()
@@ -762,14 +766,27 @@ def StrongCategoryCompanyList(category,name):
     top = 10
     com = None
     result = getResult(period,name)
+    pagecount = 80
+    LEN = len(result[3])
+    bi = LEN-pagecount
+    ei = LEN    
+    if bi < 0:
+        bi = 0
     output = widgets.Output()
     output2 = widgets.Output()
+    
     idd = result[4]
     def getCodeByName(name):
         for it in idd:
             if it[2]==name:
                 return it[1]
         return 'None'
+
+    nextbutton = widgets.Button(description="下一页",layout=Layout(width='96px'))
+    prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
+    zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
+    zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
+
     periodDropdown = widgets.Dropdown(
         options=[3,5,10,20],
         value=period,
@@ -808,10 +825,10 @@ def StrongCategoryCompanyList(category,name):
                     align_items='stretch',
                     border='solid',
                     width='100%')    
-    box = Box(children=[periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
-
+    stopUpdate = False
     def sortCompanyList():
-        nonlocal result,periodDropdown
+        nonlocal result,periodDropdown,stopUpdate
+        stopUpdate = True
         idd = result[4] #(0 id , 1 code , 2 name , 3 category)
         coms = [None]
         for it in result[5]:
@@ -819,18 +836,27 @@ def StrongCategoryCompanyList(category,name):
         sel = comDropdown.value
         comDropdown.options = coms
         comDropdown.value = sel
+        stopUpdate = False
 
     sortCompanyList()
 
-    def showPlot(wait=False):
-        output2.clear_output(wait=wait)
+    def showPlot():
+        nonlocal bi,ei,stopUpdate
+        if stopUpdate:
+            return
         output.clear_output(wait=True)
         with output:
-            PlotCategory(result,top=top,focus=com)
+            PlotCategory(bi,ei,result,top=top,focus=com)
 
     def on_period(e):
-        nonlocal result,comDropdown,period
+        nonlocal result,comDropdown,period,name,bi,ei,LEN,com
         period = e['new']
+        result = getResult(period,name)
+        LEN = len(result[3])
+        bi = LEN-pagecount
+        ei = LEN      
+        if bi < 0:
+            bi = 0  
         sortCompanyList()
         showPlot()
 
@@ -844,32 +870,86 @@ def StrongCategoryCompanyList(category,name):
     topDropdown.observe(on_top,names='value')
 
     def on_com(e):
-        nonlocal com,box
+        nonlocal com,box,stopUpdate
         com = e['new']
+        if stopUpdate:
+            return
         if com is None:
             out.clear_output()
         else:
             out.clear_output(wait=True)
             with out:
-                display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))
+                display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))             
+        
         if com is None:                
             showPlot()
         else:
-            showPlot(wait=True)
+            showPlot()
+            output2.clear_output(wait=True)
             with output2:
                 kline.Plote(getCodeByName(com),'d',config={'index':True}).show()
 
 
     comDropdown.observe(on_com,names='value')
 
+    def on_prev(e):
+        nonlocal bi,ei,pagecount,LEN
+        bi -= pagecount
+        if bi<0:
+            bi = 0
+        ei = bi+pagecount
+        if ei>LEN:
+            ei = LEN
+        showPlot()
+    def on_next(e):
+        nonlocal bi,ei,pagecount,LEN
+        ei += pagecount
+        if ei>LEN:
+            ei = LEN
+        bi = ei-pagecount
+        if bi<0:
+            bi = 0
+        showPlot()
+    def on_zoomin(e):
+        nonlocal bi,ei,pagecount,LEN
+        if pagecount > 30:
+            pagecount -= 10
+            bi = ei-pagecount
+            if bi<0:
+                bi = 0
+                ei = bi+pagecount
+                if ei>LEN:
+                    ei = LEN
+            showPlot()
+    def on_zoomout(e):
+        nonlocal bi,ei,pagecount,LEN
+        if pagecount < 190:
+            pagecount += 10
+            bi = ei-pagecount
+            if bi<0:
+                bi = 0
+                ei = bi+pagecount
+                if ei>LEN:
+                    ei = LEN
+            showPlot()
+    prevbutton.on_click(on_prev)
+    nextbutton.on_click(on_next)
+    zoominbutton.on_click(on_zoomin)
+    zoomoutbutton.on_click(on_zoomout)
+
+    if LEN <= pagecount:
+        box = Box(children=[periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
+    else:
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
     display(box,output,output2)
     showPlot()
 
 
-def PlotAllCategory(sortedCategory,top,focus=None):
+def PlotAllCategory(bi,ei,sortedCategory,top,focus=None):
     fig,axs = plt.subplots(figsize=(30,14))
     r = sortedCategory[0]
     dd = r[3] #date
+
     axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
     if top is None:
         axs.set_title("%s 周期%s"%(r[1],r[0]))
@@ -877,25 +957,30 @@ def PlotAllCategory(sortedCategory,top,focus=None):
         axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
     
     i = 0
+    xdd = np.arange(len(dd))
     for r in sortedCategory:
         dk = r[6] #
-        if top is not None and i<top:
-            if focus is not None:
-                if r[1]==focus:
-                    axs.plot(np.arange(len(dd)),dk,linewidth=2,label = r[1])
-                else:
-                    axs.plot(np.arange(len(dd)),dk,alpha=0.2,label = r[1])
-            else:        
-                axs.plot(np.arange(len(dd)),dk,label = r[1])
+        if top is not None:
+            if i<top:
+                if focus is not None:
+                    if r[1]==focus:
+                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = r[1])
+                    else:
+                        axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = r[1])
+                else:        
+                    axs.plot(xdd[bi:ei],dk[bi:ei],label = r[1])
+            else:
+                if focus is not None and r[1]==focus:
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = r[1])
         i+=1
 
     xticks=[]
-    for i in range(len(dd)):
+    for i in range(bi,ei):
         xticks.append(i)
     axs.set_xticks(xticks)
     axs.grid(True)
     axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    axs.set_xlim(0,len(dd)+2)
+    axs.set_xlim(bi,ei)
     plt.legend()
     fig.autofmt_xdate()
     plt.show()
@@ -911,13 +996,26 @@ def StrongCategoryList(N=50):
         return sorted(categorys,key=lambda it:it[6][-1],reverse=True)
 
     period = 20
+    sortedCategory = getSortedCategory(period)
     top = 10
     mark = None
     category = None
-    sortedCategory = getSortedCategory(period)
+    pagecount = 80
+    LEN = len(sortedCategory[0][3])
+    bi = LEN-pagecount
+    ei = LEN
+
+    if bi < 0:
+        bi = 0
     sortedCategoryNames = [None]
     for it in sortedCategory:
         sortedCategoryNames.append(it[1])
+        
+    nextbutton = widgets.Button(description="下一页",layout=Layout(width='96px'))
+    prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
+    zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
+    zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
+
     periodDropdown = widgets.Dropdown(
         options=[3,5,10,20],
         value=period,
@@ -940,20 +1038,21 @@ def StrongCategoryList(N=50):
         disabled=False)
 
     def showPlot():
-        nonlocal output,category,mark,period,top,sortedCategory,result
+        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,N
         if category is None:
             output.clear_output(wait=True)
             with output:
-                PlotAllCategory(sortedCategory,top,mark)
+                PlotAllCategory(bi,ei,sortedCategory,top,mark)
         else:
             output.clear_output()
             with output:
                 StrongCategoryCompanyList(result,category)
 
     def on_period(e):
-        nonlocal period,category,sortedCategory
+        nonlocal period,category,sortedCategory,LEN
         period = e['new']
         sortedCategory = getSortedCategory(period)
+        LEN = len(sortedCategory[0][3])
         sortedCategoryNames = [None]
         for it in sortedCategory:
             sortedCategoryNames.append(it[1])
@@ -986,12 +1085,59 @@ def StrongCategoryList(N=50):
 
     categoryDropdown.observe(on_category,names='value')
 
+    def on_prev(e):
+        nonlocal bi,ei,pagecount,LEN
+        bi -= pagecount
+        if bi<0:
+            bi = 0
+        ei = bi+pagecount
+        if ei>LEN:
+            ei = LEN
+        showPlot()
+    def on_next(e):
+        nonlocal bi,ei,pagecount,LEN
+        ei += pagecount
+        if ei>LEN:
+            ei = LEN
+        bi = ei-pagecount
+        if bi<0:
+            bi = 0
+        showPlot()
+    def on_zoomin(e):
+        nonlocal bi,ei,pagecount,LEN
+        if pagecount > 30:
+            pagecount -= 10
+            bi = ei-pagecount
+            if bi<0:
+                bi = 0
+                ei = bi+pagecount
+                if ei>LEN:
+                    ei = LEN
+            showPlot()
+    def on_zoomout(e):
+        nonlocal bi,ei,pagecount,LEN
+        if pagecount < 190:
+            pagecount += 10
+            bi = ei-pagecount
+            if bi<0:
+                bi = 0
+                ei = bi+pagecount
+                if ei>LEN:
+                    ei = LEN
+            showPlot()
+    prevbutton.on_click(on_prev)
+    nextbutton.on_click(on_next)
+    zoominbutton.on_click(on_zoomin)
+    zoomoutbutton.on_click(on_zoomout)
     box_layout = Layout(display='flex',
                     flex_flow='wrap',
                     align_items='stretch',
                     border='solid',
                     width='100%')
-    box = Box(children=[periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+    if LEN <= pagecount:
+        box = Box(children=[periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+    else:
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
 
     display(box,output)
     showPlot()
