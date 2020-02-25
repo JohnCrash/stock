@@ -698,7 +698,7 @@ def StrongSorted(days,N=50):
                 print("'%s' 分类里面没有公司"%category)
     return result
 
-def PlotCategory(bi,ei,r,top=None,focus=None):
+def PlotCategory(bi,ei,pos,r,top=None,focus=None):
     fig,axs = plt.subplots(figsize=(30,14))
     dd = r[3] #date
     axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
@@ -720,26 +720,31 @@ def PlotCategory(bi,ei,r,top=None,focus=None):
                 axs.plot(xdd[bi:ei],dk[bi:ei],label = idd[2])
     else:
         isplot = False
+        rank = 1
         for d in r[5][:top+1]:
             i = d[0]
             dk = r[2][i] #
             idd = r[4][i]
+            title = "%d %s"%(rank,idd[2])
             if focus is not None:
                 if idd[2]==focus:
-                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = idd[2])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title)
                     isplot = True
                 else:
-                    axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = idd[2])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title)
             else:        
-                axs.plot(xdd[bi:ei],dk[bi:ei],label = idd[2])
+                axs.plot(xdd[bi:ei],dk[bi:ei],label = title)
+            rank+=1
         if not isplot:
             for i in range(len(r[2])):
                 dk = r[2][i] #
                 idd = r[4][i]
+                title = "%d %s"%(rank,idd[2])
                 if focus is not None:
                     if idd[2]==focus:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=2,linestyle='--',label = idd[2])
-
+                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=2,linestyle='--',label = title)
+                rank+=1
+    axs.axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
@@ -770,6 +775,7 @@ def StrongCategoryCompanyList(category,name):
     LEN = len(result[3])
     bi = LEN-pagecount
     ei = LEN    
+    pos = LEN-1
     if bi < 0:
         bi = 0
     output = widgets.Output()
@@ -786,16 +792,39 @@ def StrongCategoryCompanyList(category,name):
     prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
     zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
     zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
+    nextbutton = widgets.Button(description="下一页",layout=Layout(width='96px'))
+    prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
+    zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
+    zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
+
+    backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
+    frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+    slider = widgets.IntSlider(
+        value=ei,
+        min=bi,
+        max=ei,
+        step=1,
+        description='',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=False,
+        layout=Layout(width='128px')
+        #readout=True,
+        #readout_format='d'
+    )
 
     periodDropdown = widgets.Dropdown(
         options=[3,5,10,20],
         value=period,
         description='周期',
+        layout=Layout(width='148px'),
         disabled=False)
     topDropdown = widgets.Dropdown(
         options=[3,5,10,20,30,100],
         value=top,
         description='TOP',
+        layout=Layout(width='148px'),
         disabled=False)
 
     comDropdown = widgets.Dropdown(
@@ -839,14 +868,26 @@ def StrongCategoryCompanyList(category,name):
         stopUpdate = False
 
     sortCompanyList()
-
+    needUpdateSlider = True
     def showPlot():
-        nonlocal bi,ei,stopUpdate
+        nonlocal bi,ei,pos,stopUpdate,needUpdateSlider
         if stopUpdate:
             return
         output.clear_output(wait=True)
         with output:
-            PlotCategory(bi,ei,result,top=top,focus=com)
+            PlotCategory(bi,ei,pos,result,top=top,focus=com)
+        needUpdateSlider = True
+
+    def setSlider(minv,maxv,value):
+        nonlocal slider,needUpdateSlider
+        needUpdateSlider = False
+        if minv>slider.max:
+            slider.max = maxv
+            slider.min = minv
+        else:
+            slider.min = minv
+            slider.max = maxv
+        slider.value = value
 
     def on_period(e):
         nonlocal result,comDropdown,period,name,bi,ei,LEN,com
@@ -889,29 +930,32 @@ def StrongCategoryCompanyList(category,name):
             with output2:
                 kline.Plote(getCodeByName(com),'d',config={'index':True}).show()
 
-
     comDropdown.observe(on_com,names='value')
 
     def on_prev(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         bi -= pagecount
         if bi<0:
             bi = 0
         ei = bi+pagecount
         if ei>LEN:
             ei = LEN
+        pos = ei
+        setSlider(bi,ei,pos)            
         showPlot()
     def on_next(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         ei += pagecount
         if ei>LEN:
             ei = LEN
         bi = ei-pagecount
         if bi<0:
             bi = 0
+        pos = ei
+        setSlider(bi,ei,pos)            
         showPlot()
     def on_zoomin(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         if pagecount > 30:
             pagecount -= 10
             bi = ei-pagecount
@@ -920,9 +964,11 @@ def StrongCategoryCompanyList(category,name):
                 ei = bi+pagecount
                 if ei>LEN:
                     ei = LEN
+                pos = ei
+                setSlider(bi,ei,pos)
             showPlot()
     def on_zoomout(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         if pagecount < 190:
             pagecount += 10
             bi = ei-pagecount
@@ -931,21 +977,48 @@ def StrongCategoryCompanyList(category,name):
                 ei = bi+pagecount
                 if ei>LEN:
                     ei = LEN
+                pos = ei
+                setSlider(bi,ei,pos)
             showPlot()
+
+    def on_prevpos(e):
+        nonlocal pos,bi,ei,slider,needUpdateSlider
+        pos -= 1
+        if pos<0:
+            pos=0
+        needUpdateSlider = False
+        slider.value = pos
+        showPlot()
+    def on_nextpos(e):
+        nonlocal pos,bi,ei,LEN,slider,needUpdateSlider
+        pos += 1
+        if pos>LEN-1:
+            pos=LEN-1
+        needUpdateSlider = False
+        slider.value = pos
+        showPlot()
+    def on_sliderChange(e):
+        nonlocal pos,needUpdateSlider
+        pos = e['new']
+        if needUpdateSlider:
+            showPlot()
+
     prevbutton.on_click(on_prev)
     nextbutton.on_click(on_next)
     zoominbutton.on_click(on_zoomin)
     zoomoutbutton.on_click(on_zoomout)
-
+    backbutton.on_click(on_prevpos)
+    frontbutton.on_click(on_nextpos) 
+    slider.observe(on_sliderChange,names='value') 
     if LEN <= pagecount:
-        box = Box(children=[periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
+        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
     else:
-        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,butList,comDropdown,out],layout=box_layout)
     display(box,output,output2)
     showPlot()
 
 
-def PlotAllCategory(bi,ei,sortedCategory,top,focus=None):
+def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     fig,axs = plt.subplots(figsize=(30,14))
     r = sortedCategory[0]
     dd = r[3] #date
@@ -960,20 +1033,21 @@ def PlotAllCategory(bi,ei,sortedCategory,top,focus=None):
     xdd = np.arange(len(dd))
     for r in sortedCategory:
         dk = r[6] #
+        title = "%d %s"%(i+1,r[1])
         if top is not None:
             if i<top:
                 if focus is not None:
                     if r[1]==focus:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = r[1])
+                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title)
                     else:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = r[1])
+                        axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title)
                 else:        
-                    axs.plot(xdd[bi:ei],dk[bi:ei],label = r[1])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],label = title)
             else:
                 if focus is not None and r[1]==focus:
-                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = r[1])
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = title)
         i+=1
-
+    axs.axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
@@ -1004,7 +1078,7 @@ def StrongCategoryList(N=50):
     LEN = len(sortedCategory[0][3])
     bi = LEN-pagecount
     ei = LEN
-
+    pos = LEN-1
     if bi < 0:
         bi = 0
     sortedCategoryNames = [None]
@@ -1015,16 +1089,33 @@ def StrongCategoryList(N=50):
     prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
     zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
     zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
-
+    backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
+    frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+    slider = widgets.IntSlider(
+        value=pos,
+        min=bi,
+        max=ei,
+        step=1,
+        description='',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=False,
+        layout=Layout(width='128px')
+        #readout=True,
+        #readout_format='d'
+    )
     periodDropdown = widgets.Dropdown(
         options=[3,5,10,20],
         value=period,
         description='周期',
+        layout=Layout(width='148px'),
         disabled=False)
     topDropdown = widgets.Dropdown(
         options=[3,5,10,20,30,100],
         value=top,
         description='TOP',
+        layout=Layout(width='148px'),
         disabled=False)
     markDropdown = widgets.Dropdown(
         options=sortedCategoryNames,
@@ -1037,16 +1128,29 @@ def StrongCategoryList(N=50):
         description='选择分类',
         disabled=False)
 
+    needUpdateSlider = True
     def showPlot():
-        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,N
+        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider
         if category is None:
             output.clear_output(wait=True)
             with output:
-                PlotAllCategory(bi,ei,sortedCategory,top,mark)
+                PlotAllCategory(bi,ei,pos,sortedCategory,top,mark)
         else:
             output.clear_output()
             with output:
                 StrongCategoryCompanyList(result,category)
+        needUpdateSlider = True
+
+    def setSlider(minv,maxv,value):
+        nonlocal slider,needUpdateSlider
+        needUpdateSlider = False
+        if minv>slider.max:
+            slider.max = maxv
+            slider.min = minv
+        else:
+            slider.min = minv
+            slider.max = maxv
+        slider.value = value
 
     def on_period(e):
         nonlocal period,category,sortedCategory,LEN
@@ -1086,22 +1190,26 @@ def StrongCategoryList(N=50):
     categoryDropdown.observe(on_category,names='value')
 
     def on_prev(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         bi -= pagecount
         if bi<0:
             bi = 0
         ei = bi+pagecount
         if ei>LEN:
             ei = LEN
+        pos = ei
+        setSlider(bi,ei,pos)
         showPlot()
     def on_next(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         ei += pagecount
         if ei>LEN:
             ei = LEN
         bi = ei-pagecount
         if bi<0:
             bi = 0
+        pos = ei
+        setSlider(bi,ei,pos)
         showPlot()
     def on_zoomin(e):
         nonlocal bi,ei,pagecount,LEN
@@ -1113,9 +1221,11 @@ def StrongCategoryList(N=50):
                 ei = bi+pagecount
                 if ei>LEN:
                     ei = LEN
+            pos = ei
+            setSlider(bi,ei,pos)                    
             showPlot()
     def on_zoomout(e):
-        nonlocal bi,ei,pagecount,LEN
+        nonlocal bi,ei,pos,pagecount,LEN
         if pagecount < 190:
             pagecount += 10
             bi = ei-pagecount
@@ -1124,20 +1234,49 @@ def StrongCategoryList(N=50):
                 ei = bi+pagecount
                 if ei>LEN:
                     ei = LEN
+            pos = ei
+            setSlider(bi,ei,pos)                    
             showPlot()
+    def on_prevpos(e):
+        nonlocal pos,bi,ei,slider,needUpdateSlider,category
+        pos -= 1
+        if pos<0:
+            pos=0
+        needUpdateSlider = False
+        slider.value = pos
+        if category is None:
+            showPlot()
+    def on_nextpos(e):
+        nonlocal pos,bi,ei,LEN,slider,needUpdateSlider,category
+        pos += 1
+        if pos>LEN-1:
+            pos=LEN-1
+        needUpdateSlider = False
+        slider.value = pos
+        if category is None:
+            showPlot()
+    def on_sliderChange(e):
+        nonlocal pos,needUpdateSlider,category
+        pos = e['new']
+        if needUpdateSlider and category is None:
+            showPlot()
+
     prevbutton.on_click(on_prev)
     nextbutton.on_click(on_next)
     zoominbutton.on_click(on_zoomin)
     zoomoutbutton.on_click(on_zoomout)
+    backbutton.on_click(on_prevpos)
+    frontbutton.on_click(on_nextpos) 
+    slider.observe(on_sliderChange,names='value')   
     box_layout = Layout(display='flex',
                     flex_flow='wrap',
                     align_items='stretch',
                     border='solid',
                     width='100%')
     if LEN <= pagecount:
-        box = Box(children=[periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
     else:
-        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
 
     display(box,output)
     showPlot()
