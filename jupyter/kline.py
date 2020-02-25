@@ -168,7 +168,7 @@ class Plote:
                 self._figureInx.append(self._axsInx+1)
                 self._axsInx += 1
             self._showfigure = True
-        if 'boll' in self._config:            
+        if 'boll' in self._config:
             self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
         if 'trend' in self._config and self._config['trend']:
@@ -199,6 +199,11 @@ class Plote:
                 self._volumeenergy = stock.kdj(stock.volumeEnergyK(self._k))[:,2]
                 self._volumekdj = stock.kdj(self._k[:,0])[:,2]
             self._showenergy = True
+        else:
+            if self._correcttionVolume:
+                volume = stock.correctionVolume(self._k,self._date,self._period)
+                self._k = np.array(self._k,copy=True)
+                self._k[:,0] = volume
         if 'bollwidth' in self._config and self._config['bollwidth']:
             self._bollwidthInx = self._axsInx+1
             self._axsInx += 1
@@ -708,7 +713,7 @@ class Plote:
             layout=Layout(width='96px')
         )    
         indexDropdown = widgets.Dropdown(
-            options=['MACD+','KDJ+','MACD+Best','MACD+BollWidth','CLEAR'],
+            options=['MACD+','KDJ+','MACD+Best','MACD+BollWidth','MACD','CLEAR'],
             value='MACD+',
             description='',
             disabled=False,
@@ -875,6 +880,15 @@ class Plote:
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
 
+        def recalcRange():
+            nonlocal beginPT,endPT
+            endPT = len(self._k)
+            beginPT = len(self._k)-self._showcount
+            if beginPT<0:
+                beginPT = 0   
+            self._trendHeadPos = endPT-1
+            setSlider(beginPT,endPT,self._trendHeadPos)
+        needRecalcRange = False
         def on_index(e):
             sel = e['new']
             if sel=='MACD+':
@@ -901,6 +915,12 @@ class Plote:
                 self.disable('kdj')
                 self.disable('best')
                 self.enable('bollwidth')
+            elif sel=='MACD':
+                self.enable('macd')
+                self.disable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')                
             elif sel=='CLEAR':
                 self.disable('macd')
                 self.disable('energy')
@@ -908,6 +928,10 @@ class Plote:
                 self.disable('best')
                 self.disable('bollwidth')
             self.config()
+            nonlocal needRecalcRange
+            if needRecalcRange:
+                recalcRange()
+                needRecalcRange = False
             showline()            
         indexDropdown.observe(on_index,names='value')
 
@@ -940,29 +964,32 @@ class Plote:
 
         mainDropdown.observe(on_main,names='value')
 
-        def recalcRange():
-            nonlocal beginPT,endPT
-            endPT = len(self._k)
-            beginPT = len(self._k)-self._showcount
-            if beginPT<0:
-                beginPT = 0   
-            self._trendHeadPos = endPT-1
-            setSlider(beginPT,endPT,self._trendHeadPos)
-
         def on_period(e):
             name2peroid = {
-                '日线':['d',False],
-                '周线':['w',False],
-                '15分钟':[15,False],
-                '5分钟':[5,False],
-                '15分钟校':[15,True],
-                '5分钟校':[5,True]
+                '日线':['d',False,False],
+                '周线':['w',False,False],
+                '15分钟':[15,False,True],
+                '5分钟':[5,False,True],
+                '15分钟校':[15,True,True],
+                '5分钟校':[5,True,True]
             }
             period = e['new']
             sel = name2peroid[period]
             self._period = sel[0]
             self._correcttionVolume = sel[1]
             self.reload()
+            #日线和周线切换为MACD+,其他切换为MACD
+            nonlocal needRecalcRange
+            if sel[2]:
+                if indexDropdown.value!="MACD":
+                    needRecalcRange = True
+                    indexDropdown.value = "MACD"
+                    return
+            else:
+                if indexDropdown.value != "MACD+":
+                    needRecalcRange = True
+                    indexDropdown.value = "MACD+"
+                    return
             self.config()
             recalcRange()
             showline()
