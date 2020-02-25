@@ -886,7 +886,8 @@ def StrongCategoryCompanyList(category,name):
                 if i < len(result[5]):
                     inx = int(result[5][i,pos,0])
                     r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
-                    kline.Plote(r[1],'d',config={'index':True}).show()
+                    dd = result[3][pos][0]
+                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd}).show()
 
     butList.on_click(onListClick)
     out = widgets.Output()
@@ -954,7 +955,7 @@ def StrongCategoryCompanyList(category,name):
     topDropdown.observe(on_top,names='value')
 
     def on_com(e):
-        nonlocal com,box,stopUpdate
+        nonlocal com,box,stopUpdate,pos,result
         com = e['new']
         if stopUpdate:
             return
@@ -971,7 +972,8 @@ def StrongCategoryCompanyList(category,name):
             showPlot()
             output2.clear_output(wait=True)
             with output2:
-                kline.Plote(getCodeByName(com),'d',config={'index':True}).show()
+                dd = result[3][pos][0]
+                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd}).show()
 
     comDropdown.observe(on_com,names='value')
 
@@ -1258,10 +1260,11 @@ def StrongCategoryList(N=50):
                         display(Markdown("### %s"%(r[1])))
                         sorti = r[5][:,pos,:]
                         idds = r[4]
+                        dd = r[3][pos][0]
                         for j in range(count):
                             if j < len(sorti):
                                 inx = int(sorti[j,0])
-                                kline.Plote(idds[inx,1],'d',config={'index':True},prefix="%s%d "%(r[1],j+1)).show()
+                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},prefix="%s%d "%(r[1],j+1)).show()
 
         else:
             showPlot()
