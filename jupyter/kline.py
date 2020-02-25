@@ -334,8 +334,9 @@ class Plote:
             self._timer.cancel()
 
     #company可以是kline数据，可以是code，也可以是公司名称
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None):
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None):
         self._timer = None
+        self._prefix = prefix
         self._correcttionVolume = False
         self._cacheK = {}
         self._configarg = config
@@ -562,7 +563,10 @@ class Plote:
                 p = '日线'
             else:
                 p = '%d分钟线'%(self._period)
-            axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
+            if self._prefix is None:
+                axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
+            else:
+                axsK.set_title('%s%s %s %s'%(self._prefix,self._company[2],self._company[1],p))
         #绘制k线图
         plotK(axsK,self._k,bi,ei)
         #将大盘数据绘制在K线图上

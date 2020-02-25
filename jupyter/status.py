@@ -8,7 +8,7 @@ import stock
 import xueqiu
 import kline
 from datetime import date
-from IPython.display import display
+from IPython.display import display,Markdown
 import ipywidgets as widgets
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
@@ -693,6 +693,44 @@ def StrongSorted(days,N=50):
                 print("'%s' 分类里面没有公司"%category)
     return result
 
+mycolors=[
+    "red",
+    "purple",
+    "gold",
+    "blue",
+    "green",
+    "orange",
+    "cyan",
+    "cornflowerblue",
+    "pink",
+    "dimgray",
+    "yellowgreen",
+    "skyblue",
+    "limegreen",
+    "fuchsia",
+    "lightsteelblue",
+    "lightcoral",
+    "olivedrab",
+    "cadetblue",
+    "deeppink",
+    "darkblue",
+    "black",
+    "forestgreen",
+    "teal",
+    "tan",
+    "silver",
+    "peachpuff",
+    "lawngreen",
+    "slateblue",
+    "orchid",
+    "mediumspringgreen",
+    "khaki",
+    "sienna"
+]
+
+def getmycolor(i):
+    return mycolors[i%len(mycolors)]
+
 def PlotCategory(bi,ei,pos,r,top=None,focus=None):
     fig,axs = plt.subplots(figsize=(30,14))
     dd = r[3] #date
@@ -718,26 +756,28 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
         rank = 1
         for d in r[5][:top+1,pos,:]:
             i = int(d[0])
+            color = getmycolor(i)
             dk = r[2][i] #
             idd = r[4][i]
             title = "%d %s"%(rank,idd[2])
             if focus is not None:
                 if idd[2]==focus:
-                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title)
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title,color=color)
                     isplot = True
                 else:
-                    axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title)
+                    axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title,color=color)
             else:        
-                axs.plot(xdd[bi:ei],dk[bi:ei],label = title)
+                axs.plot(xdd[bi:ei],dk[bi:ei],label = title,color=color)
             rank+=1
         if not isplot:
             for i in range(len(r[2])):
+                color = getmycolor(i)
                 dk = r[2][i] #
                 idd = r[4][i]
                 title = "%d %s"%(rank,idd[2])
                 if focus is not None:
                     if idd[2]==focus:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=2,linestyle='--',label = title)
+                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=2,linestyle='--',label = title,color=color)
                 rank+=1
     axs.axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
@@ -843,8 +883,8 @@ def StrongCategoryCompanyList(category,name):
         output2.clear_output(wait=True)
         with output2:
             for i in range(top):
-                if i < len(result[5][:,pos]):
-                    inx = int(result[5][pos][i,0])
+                if i < len(result[5]):
+                    inx = int(result[5][i,pos,0])
                     r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
                     kline.Plote(r[1],'d',config={'index':True}).show()
 
@@ -1035,20 +1075,21 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     i = 0
     xdd = np.arange(len(dd))
     for r in sortedCategory:
+        color = getmycolor(i)
         dk = r[6] #
         title = "%d %s"%(i+1,r[1])
         if top is not None:
             if i<top:
                 if focus is not None:
                     if r[1]==focus:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title)
+                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title,color=color)
                     else:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title)
+                        axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title,color=color)
                 else:        
-                    axs.plot(xdd[bi:ei],dk[bi:ei],label = title)
+                    axs.plot(xdd[bi:ei],dk[bi:ei],label = title,color=color)
             else:
                 if focus is not None and r[1]==focus:
-                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = title)
+                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = title,color=color)
         i+=1
     axs.axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
@@ -1130,6 +1171,12 @@ def StrongCategoryList(N=50):
         description='TOP',
         layout=Layout(width='148px'),
         disabled=False)
+    listDropdown = widgets.Dropdown(
+        options=[None,3,5,10,20,30],
+        value=None,
+        description='列表',
+        layout=Layout(width='148px'),
+        disabled=False)
     markDropdown = widgets.Dropdown(
         options=sortedCategoryNames,
         value=mark,
@@ -1164,6 +1211,7 @@ def StrongCategoryList(N=50):
             slider.min = minv
             slider.max = maxv
         slider.value = value
+        listDropdown.value = None
 
     def on_period(e):
         nonlocal bi,ei,pos,period,category,sortedCategory,LEN
@@ -1180,6 +1228,7 @@ def StrongCategoryList(N=50):
         for it in sortedCategory:
             sortedCategoryNames.append(it[1])
 
+        listDropdown.value = None
         category = categoryDropdown.value
         categoryDropdown.options = sortedCategoryNames
         categoryDropdown.value = category
@@ -1190,9 +1239,34 @@ def StrongCategoryList(N=50):
     def on_top(e):
         nonlocal top
         top = e['new']
+        listDropdown.value = None
         showPlot()
 
     topDropdown.observe(on_top,names='value')
+    
+    def on_list(e):
+        nonlocal top,pos,category,sortedCategory
+        count = e['new']
+        """
+        显示TOP分类中的前count只股票
+        """
+        if count is not None and category is None:
+            with output:
+                for i in range(top):
+                    if i<len(sortedCategory):
+                        r = sortedCategory[i]
+                        display(Markdown("### %s"%(r[1])))
+                        sorti = r[5][:,pos,:]
+                        idds = r[4]
+                        for j in range(count):
+                            if j < len(sorti):
+                                inx = int(sorti[j,0])
+                                kline.Plote(idds[inx,1],'d',config={'index':True},prefix="%s%d "%(r[1],j+1)).show()
+
+        else:
+            showPlot()
+
+    listDropdown.observe(on_list,names='value')
 
     def on_mark(e):
         nonlocal mark
@@ -1204,6 +1278,7 @@ def StrongCategoryList(N=50):
     def on_category(e):
         nonlocal category
         category = e['new']
+        listDropdown.value = None
         showPlot()
 
     categoryDropdown.observe(on_category,names='value')
@@ -1263,6 +1338,7 @@ def StrongCategoryList(N=50):
             pos=0
         needUpdateSlider = False
         slider.value = pos
+        listDropdown.value = None
         if category is None:
             showPlot()
     def on_nextpos(e):
@@ -1272,6 +1348,7 @@ def StrongCategoryList(N=50):
             pos=LEN-1
         needUpdateSlider = False
         slider.value = pos
+        listDropdown.value = None
         if category is None:
             showPlot()
     def on_sliderChange(e):
@@ -1294,9 +1371,9 @@ def StrongCategoryList(N=50):
                     border='solid',
                     width='100%')
     if LEN <= pagecount:
-        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown],layout=box_layout)
     else:
-        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,markDropdown,categoryDropdown],layout=box_layout)
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown],layout=box_layout)
 
     display(box,output)
     showPlot()
