@@ -35,11 +35,15 @@ for i in range(5):
     else:
         print('error\n')
 """        
-    #print(xueqiu.getK('SZ399001',5,96))
+#print(xueqiu.K('SZ399001',5,96))
+print(xueqiu.nextKDate(datetime(2020,2,25,10,55),5))
+print(xueqiu.from2now(10,55,5))
+print(xueqiu.k5date)
+print(xueqiu.k15date)
 #r = status.StrongSorted([5])
 #print(r)
 #shared.delKey("company_status_last50")
 #shared.delKey("company_status_date50")
-def progress(e):
-    pass
-status.update_status_begin(date(2020,2,21),False,progress)
+#def progress(e):
+#    pass
+#status.update_status_begin(date(2020,2,21),False,progress)

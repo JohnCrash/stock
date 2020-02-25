@@ -342,27 +342,33 @@ def isEqK(k0,k1):
 #产生一个日期表便于查找
 k5date = []
 for i in [9,10,11,13,14,15]:
-    if i in [10,13,14]:
+    if i in [10,14]:
         for m in range(0,60,5):
             k5date.append((i,m))
     elif i==9:
         for m in range(35,60,5):
             k5date.append((i,m))
     elif i==11:
-        for m in range(5,35,5):
+        for m in range(0,35,5):
+            k5date.append((i,m))
+    elif i==13:
+        for m in range(5,60,5):
             k5date.append((i,m))
     else:
         k5date.append((i,0))
 k15date = []
 for i in [9,10,11,13,14,15]:
-    if i in [10,13,14]:
+    if i in [10,14]:
         for m in range(0,60,15):
             k15date.append((i,m))
     elif i==9:
-        for m in range(35,60,15):
+        for m in range(45,60,15):
             k15date.append((i,m))
     elif i==11:
-        for m in range(5,35,15):
+        for m in range(0,35,15):
+            k15date.append((i,m))
+    elif i==13:
+        for m in range(15,60,15):
             k15date.append((i,m))
     else:
         k15date.append((i,0))
@@ -422,10 +428,10 @@ def K(code,period,n):
                 break
         #如果有接缝，校验接缝处的数据
         if bi>=0 and not isEqK(oldK[-1],k[bi][1:]):
-            mylog.err("'%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
-            mylog.err("cacheK:"+str(oldK))
-            mylog.err("caheDate:"+str(d))
-            mylog.err("k:"+str(k))
+            mylog.err("K '%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
+            mylog.err("oldK[-1]="+str(oldK[-1]))
+            mylog.err("k[bi][1:]="+str(k[bi][1:]))
+            mylog.err("d[-1]:"+str(d[-1]))
             return False,oldK,d
         for i in range(bi+1,len(k)):
             v = k[i]
@@ -460,7 +466,7 @@ def isTransTime():
     return False
 
 def logCheckResult(code,period,source,checkdata):
-    mylog.warn(u"'%s' '%s' 数据和日线数据不一致"%(code,str(period)))
+    mylog.warn(u"logCheckResult '%s' '%s' 数据和日线数据不一致"%(code,str(period)))
     mylog.warn(u"\nsource:%s\nnew:%s"%(str(source),str(checkdata)))
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     b,cache = shared.fromRedis(cacheName)

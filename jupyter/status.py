@@ -647,8 +647,8 @@ def getStatusN(db,N):
 返回
 [
     (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
-     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[(index,dk)],
-     6 该分类的前十名平均盈利),
+     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
+     6 该分类的前十名平均盈利[date],
     ...
 ]
 """
@@ -677,22 +677,17 @@ def StrongSorted(days,N=50):
         for category in popularCategory():
             r = idd[:,3]==category
             dK = dk[r]
+            if len(dK)>0:
+                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
+                ia = np.zeros((dK.shape[0],2))
+                ia[:,0] = np.arange(dK.shape[0])
+                for i in range(dK.shape[1]):
+                    ia[:,1] = dK[:,i]
+                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
 
-            sorti = [] #[(i,dk),...]
-            for i in range(len(dK)):
-                sorti.append((i,dK[i][-1]))
-            if len(sorti)>0:
-                sorti = sorted(sorti,key=lambda it:it[1],reverse=True)
-                top10 = np.zeros((dK.shape[0],),dtype=np.dtype('bool'))
-                for i in range(10):
-                    if i < len(sorti):
-                        inx = sorti[i][0]
-                        top10[inx] = True
-
-                top10dK = dK[top10]
-                top10mean = np.zeros((top10dK.shape[1]))
-                for i in range(top10dK.shape[1]):
-                    top10mean[i] = top10dK[:,i].mean()
+                top10mean = np.zeros((dK.shape[1]))
+                for i in range(dK.shape[1]):
+                    top10mean[i] = sorti[:10,i,1].mean()
                 result.append((day,category,dK,D[day:],idd[r],sorti,top10mean))
             else:
                 print("'%s' 分类里面没有公司"%category)
@@ -721,8 +716,8 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
     else:
         isplot = False
         rank = 1
-        for d in r[5][:top+1]:
-            i = d[0]
+        for d in r[5][:top+1,pos,:]:
+            i = int(d[0])
             dk = r[2][i] #
             idd = r[4][i]
             title = "%d %s"%(rank,idd[2])
@@ -751,8 +746,14 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
     axs.set_xticks(xticks)
     axs.grid(True)
     axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    axs.set_xlim(bi,ei)
-    plt.legend()
+    if r[0]==20:
+        legendW = 2
+    elif r[0]==10 or r[0]==5:
+        legendW = 3
+    else:
+        legendW = 4    
+    axs.set_xlim(bi,ei+legendW)
+    plt.legend(loc='upper right',fontsize='large')
     fig.autofmt_xdate()
     plt.show()
 
@@ -838,12 +839,12 @@ def StrongCategoryCompanyList(category,name):
         button_style='',
         tooltip='列出股票的图表')
     def onListClick(e):
-        nonlocal top,result
+        nonlocal top,pos,result
         output2.clear_output(wait=True)
         with output2:
             for i in range(top):
-                if i < len(result[5]):
-                    inx = result[5][i][0]
+                if i < len(result[5][:,pos]):
+                    inx = int(result[5][pos][i,0])
                     r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
                     kline.Plote(r[1],'d',config={'index':True}).show()
 
@@ -856,12 +857,12 @@ def StrongCategoryCompanyList(category,name):
                     width='100%')    
     stopUpdate = False
     def sortCompanyList():
-        nonlocal result,periodDropdown,stopUpdate
+        nonlocal pos,result,periodDropdown,stopUpdate
         stopUpdate = True
         idd = result[4] #(0 id , 1 code , 2 name , 3 category)
         coms = [None]
-        for it in result[5]:
-            coms.append(idd[it[0]][2])
+        for it in result[5][:,pos]:
+            coms.append(idd[int(it[0])][2])
         sel = comDropdown.value
         comDropdown.options = coms
         comDropdown.value = sel
@@ -890,14 +891,16 @@ def StrongCategoryCompanyList(category,name):
         slider.value = value
 
     def on_period(e):
-        nonlocal result,comDropdown,period,name,bi,ei,LEN,com
+        nonlocal result,comDropdown,period,name,bi,ei,pos,LEN,com
         period = e['new']
         result = getResult(period,name)
         LEN = len(result[3])
         bi = LEN-pagecount
         ei = LEN      
+        pos = LEN-1
         if bi < 0:
-            bi = 0  
+            bi = 0
+        setSlider(bi,ei,pos)
         sortCompanyList()
         showPlot()
 
@@ -1054,23 +1057,33 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     axs.set_xticks(xticks)
     axs.grid(True)
     axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    axs.set_xlim(bi,ei)
-    plt.legend()
+    if r[0]==20:
+        legendW = 2
+    elif r[0]==10 or r[0]==5:
+        legendW = 3
+    else:
+        legendW = 4
+    axs.set_xlim(bi,ei+legendW)
+    plt.legend(loc='upper right',fontsize='large')
     fig.autofmt_xdate()
     plt.show()
 
 def StrongCategoryList(N=50):
     result = StrongSorted([3,5,10,20],N)
     output = widgets.Output()
-    def getSortedCategory(day):
+    def getSortedCategory(day,pos):
         categorys = []
         for r in result:
             if r[0]==day:
                 categorys.append(r)
-        return sorted(categorys,key=lambda it:it[6][-1],reverse=True)
+        if pos > len(categorys[0][6])-1:
+            pos = len(categorys[0][6])-1
+        if pos < -len(categorys[0][6]):
+            pos = -len(categorys[0][6])
+        return sorted(categorys,key=lambda it:it[6][pos],reverse=True)
 
     period = 20
-    sortedCategory = getSortedCategory(period)
+    sortedCategory = getSortedCategory(period,-1)
     top = 10
     mark = None
     category = None
@@ -1153,10 +1166,16 @@ def StrongCategoryList(N=50):
         slider.value = value
 
     def on_period(e):
-        nonlocal period,category,sortedCategory,LEN
+        nonlocal bi,ei,pos,period,category,sortedCategory,LEN
         period = e['new']
-        sortedCategory = getSortedCategory(period)
+        sortedCategory = getSortedCategory(period,pos)
         LEN = len(sortedCategory[0][3])
+        bi = LEN-pagecount
+        ei = LEN
+        pos = LEN-1
+        if bi < 0:
+            bi = 0
+        setSlider(bi,ei,pos)
         sortedCategoryNames = [None]
         for it in sortedCategory:
             sortedCategoryNames.append(it[1])
@@ -1256,8 +1275,9 @@ def StrongCategoryList(N=50):
         if category is None:
             showPlot()
     def on_sliderChange(e):
-        nonlocal pos,needUpdateSlider,category
+        nonlocal period,pos,needUpdateSlider,category,sortedCategory
         pos = e['new']
+        sortedCategory = getSortedCategory(period,pos)       
         if needUpdateSlider and category is None:
             showPlot()
 
