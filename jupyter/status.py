@@ -22,10 +22,10 @@ import copy
 PROD = 40
 
 def popularCategory():
-    #    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+    #    ls = ['半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融',
 #          '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程',
 #          '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易']
-    ls = ['白色家电','半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融','生物制品',
+    ls = ['白色家电','半导体','光学光电子','计算机应用','电子制造','生物制品','通信设备','医药商业','饮料制造','多元金融',
           '证券','互联网传媒','化学制药','医疗器械','文化传媒','元件','高低压设备','环保工程及服务','地面兵装','专业工程','采掘服务','化学制品','化学纤维',
           '其他电子','营销传播','视听器材','电气自动化设备','医疗服务','专用设备','计算机设备','电源设备','贸易','林业','畜禽养殖','农产品加工','种植业']
     return ls
@@ -732,7 +732,7 @@ def getmycolor(i):
     return mycolors[i%len(mycolors)]
 
 def PlotCategory(bi,ei,pos,r,top=None,focus=None):
-    fig,axs = plt.subplots(figsize=(30,14))
+    fig,axs = plt.subplots(figsize=(28,14))
     dd = r[3] #date
     axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
     if top is None:
@@ -783,17 +783,12 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
+    xticks.append(pos)
     axs.set_xticks(xticks)
     axs.grid(True)
     axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    if r[0]==20:
-        legendW = 2
-    elif r[0]==10 or r[0]==5:
-        legendW = 3
-    else:
-        legendW = 4    
-    axs.set_xlim(bi,ei+legendW)
-    plt.legend(loc='upper right',fontsize='large')
+    axs.set_xlim(bi,ei-1)
+    plt.legend(bbox_to_anchor=(1, 1),loc='upper left',fontsize='large')
     fig.autofmt_xdate()
     plt.show()
 
@@ -812,7 +807,7 @@ def StrongCategoryCompanyList(category,name):
     top = 10
     com = None
     result = getResult(period,name)
-    pagecount = 80
+    pagecount = 50
     LEN = len(result[3])
     bi = LEN-pagecount
     ei = LEN    
@@ -1064,7 +1059,7 @@ def StrongCategoryCompanyList(category,name):
 
 
 def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
-    fig,axs = plt.subplots(figsize=(30,14))
+    fig,axs = plt.subplots(figsize=(28,14))
     r = sortedCategory[0]
     dd = r[3] #date
 
@@ -1097,17 +1092,12 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
+    xticks.append(pos)
     axs.set_xticks(xticks)
     axs.grid(True)
     axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    if r[0]==20:
-        legendW = 2
-    elif r[0]==10 or r[0]==5:
-        legendW = 3
-    else:
-        legendW = 4
-    axs.set_xlim(bi,ei+legendW)
-    plt.legend(loc='upper right',fontsize='large')
+    axs.set_xlim(bi,ei-1)
+    plt.legend(bbox_to_anchor=(1, 1),loc='upper left',fontsize='large')
     fig.autofmt_xdate()
     plt.show()
 
@@ -1130,7 +1120,7 @@ def StrongCategoryList(N=50):
     top = 10
     mark = None
     category = None
-    pagecount = 80
+    pagecount = 50
     LEN = len(sortedCategory[0][3])
     bi = LEN-pagecount
     ei = LEN
