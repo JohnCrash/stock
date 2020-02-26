@@ -859,7 +859,7 @@ def StrongCategoryCompanyList(category,name):
     topDropdown = widgets.Dropdown(
         options=[3,5,10,20,30,100],
         value=top,
-        description='TOP',
+        description='排名',
         layout=Layout(width='148px'),
         disabled=False)
 
@@ -1160,7 +1160,7 @@ def StrongCategoryList(N=50):
     topDropdown = widgets.Dropdown(
         options=[3,5,10,20,30,100],
         value=top,
-        description='TOP',
+        description='排名',
         layout=Layout(width='148px'),
         disabled=False)
     listDropdown = widgets.Dropdown(

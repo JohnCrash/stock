@@ -228,7 +228,8 @@ class Plote:
         if 'volume' in self._config and self._config['volume']:
             self._volInx =self._axsInx+1
             self._axsInx += 1
-            self._volumeboll = stock.boll(self._k[:,0],20)
+            self._volumema20 = stock.ma(self._k[:,0],20)
+            #self._volumema5 = stock.ma(self._k[:,0],3)
             self._showvolume = True
         #将大盘指数的收盘价显示在图表中
         
@@ -585,9 +586,8 @@ class Plote:
         if self._showvolume:
             axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
             axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
-            axs[self._volInx].plot(x,self._volumeboll[bi:ei,0],label='low',color='magenta') #low
-            axs[self._volInx].plot(x,self._volumeboll[bi:ei,1],label='low',color='red') #mid
-            axs[self._volInx].plot(x,self._volumeboll[bi:ei,2],label='upper',color='orange') #upper 
+            axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
+            #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
             axs[self._volInx].axhline(color='black')           
             axs[self._volInx].grid(True)
         #绘制交易点
