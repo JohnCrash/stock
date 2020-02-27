@@ -5,6 +5,8 @@ from matplotlib.ticker import Formatter
 import math
 import ipywidgets as widgets
 from IPython.display import display,update_display,clear_output
+from ipykernel.jsonutil import json_clean,encode_images
+from IPython.core.interactiveshell import InteractiveShell
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
 import time
@@ -33,6 +35,23 @@ def plt_show(display_id,isupdate):
                     metadata=_fetch_figure_metadata(figure_manager.canvas.figure),
                     display_id=display_id
                 )
+    finally:
+        show._to_draw = []
+        # only call close('all') if any to close
+        # close triggers gc.collect, which can be slow
+        if Gcf.get_all_fig_managers():
+            plt.close('all')
+
+def output_show(output):
+    try:
+        for figure_manager in Gcf.get_all_fig_managers():
+            format = InteractiveShell.instance().display_formatter.format
+            format_dict, md_dict = format(figure_manager.canvas.figure)  
+            output.outputs = ({
+                'output_type': 'display_data',
+                'data':json_clean(encode_images(format_dict)),
+                'metadata': {'needs_background': 'light'}
+            },)
     finally:
         show._to_draw = []
         # only call close('all') if any to close
@@ -646,8 +665,9 @@ class Plote:
             display(self._output)
             self._isupdate = True
         self._output.clear_output(wait=True)
-        with self._output:
-            plt.show()
+        #with self._output:
+        #    plt.show()
+        output_show(self._output)
         #plt.show()
         """
         这里定制plt.show函数，参加backend_inline.py
@@ -880,13 +900,14 @@ class Plote:
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
 
-        def recalcRange():
+        def recalcRange(resetpos=True):
             nonlocal beginPT,endPT
             endPT = len(self._k)
             beginPT = len(self._k)-self._showcount
             if beginPT<0:
-                beginPT = 0   
-            self._trendHeadPos = endPT-1
+                beginPT = 0
+            if resetpos:
+                self._trendHeadPos = endPT-1
             setSlider(beginPT,endPT,self._trendHeadPos)
         needRecalcRange = False
         def on_index(e):
@@ -977,6 +998,12 @@ class Plote:
             sel = name2peroid[period]
             self._period = sel[0]
             self._correcttionVolume = sel[1]
+            if e['old']:
+                old = name2peroid[e['old']]
+                if sel[2] != old[2] and self._timer is not None:
+                    self._timer.cancel()
+                    startTimer()
+
             self.reload()
             #日线和周线切换为MACD+,其他切换为MACD
             nonlocal needRecalcRange
@@ -1019,13 +1046,18 @@ class Plote:
             if bi != ei:
                 figure2.showKline(bi,ei,figsize=figsize)
 
-        def updatek15():
-            if xueqiu.isTransTime():
-                refreshbutton.button_style = 'success' #green button
-                #self.reload(all=False)
-                #showline()
-                self._timer = xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
+        def update():
+            refreshbutton.button_style = 'success' #green button
+            self.reload(all=False)
+            recalcRange(False)
+            showline()
+            refreshbutton.button_style = ''
+            startTimer()
+
+        def startTimer():
+            nt = xueqiu.next_k_date(self._period)
+            if nt>0:
+                self._timer = xueqiu.Timer(nt+1,update)
             else:
                 self._timer = None
-
-        self._timer = xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
+        startTimer()

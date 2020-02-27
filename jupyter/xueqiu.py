@@ -26,13 +26,6 @@ class Timer:
 
 mylog.init('./download_stock.log')
 
-#如果是在开盘状态则15分钟更新一次数据
-def nextdt15():
-    t = datetime.today()
-    if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
-        return (datetime(t.year,t.month,t.day,13,15,0)-t).seconds+15*60
-    return (15-t.minute%15)*60-t.second
-
 def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
@@ -332,7 +325,7 @@ def nextKDate(t,period):
     #返回下一个交易日的第一k时间戳
     nt = t+timedelta(days=1 if t.weekday()!=4 else 3)
     return datetime(nt.year,nt.month,nt.day,9,35 if period==5 else 45)
-
+    
 def isEqK(k0,k1):
     for i in range(5):
         if abs(k0[i]/k1[i]-1)>0.02:
@@ -382,6 +375,24 @@ def from2now(hour,minute,period):
         if (d[0]>hour or (d[0]==hour and d[1]>minute)) and (today.hour>d[0] or (today.hour==d[0] and today.minute>=d[1])):
             n += 1
     return n
+
+def next_k_date(period):
+    if period==5:
+        m = k5date
+    else:
+        m = k15date
+    today = datetime.today()
+    for d in m:
+        if today.hour<d[0] or (today.hour==d[0] and today.minute<d[1]):
+            return (datetime(today.year,today.month,today.day,d[0],d[1])-today).seconds
+    return 0
+
+#如果是在开盘状态则15分钟更新一次数据
+def nextdt15():
+    t = datetime.today()
+    if (t.hour==11 and t.minute>=30) or t.hour==12:#中午休息需要跳过
+        return (datetime(t.year,t.month,t.day,13,15,0)-t).seconds+15*60
+    return (15-t.minute%15)*60-t.second
 
 #返回指定代码的k线数据
 # True , np.array((timesramp,volume,open,high,low,close),...),[(timesramp,)...] 保持和loadKline相同的数据结构
