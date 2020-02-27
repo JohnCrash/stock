@@ -12,6 +12,7 @@ from datetime import date,datetime,timedelta
 import time
 import trend
 import  warnings
+import shared
 import xueqiu
 import uuid
 #定制show
@@ -359,9 +360,10 @@ class Plote:
             self._timer.cancel()
 
     #company可以是kline数据，可以是code，也可以是公司名称
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None):
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None):
         self._timer = None
         self._prefix = prefix
+        self._context = context
         self._correcttionVolume = False
         self._cacheK = {}
         self._configarg = config
@@ -432,6 +434,13 @@ class Plote:
         else:
             return self._date[i][0]
 
+    def code(self):
+        code = self._company[1]
+        if len(code)>3 and code[2]==':':
+            code = code.replace(':','')
+        return code.lower()
+    def name(self):
+        return self._company[2]
     #显示K线图
     def showKline(self,bi=None,ei=None,figsize=(30,16)):     
         if bi is None:
@@ -589,9 +598,15 @@ class Plote:
             else:
                 p = '%d分钟线'%(self._period)
             if self._prefix is None:
-                axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
+                if self._context is not None and len(self._context)>0:
+                    axsK.set_title('%s %s %s (%s)'%(self._company[2],self._company[1],p,self._context))
+                else:
+                    axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
             else:
-                axsK.set_title('%s%s %s %s'%(self._prefix,self._company[2],self._company[1],p))
+                if self._context is not None and len(self._context)>0:
+                    axsK.set_title('%s%s %s %s (%s)'%(self._prefix,self._company[2],self._company[1],p,self._context))
+                else:
+                    axsK.set_title('%s%s %s %s'%(self._prefix,self._company[2],self._company[1],p))
         #绘制k线图
         plotK(axsK,self._k,bi,ei)
         #将大盘数据绘制在K线图上
@@ -664,7 +679,7 @@ class Plote:
             self._output = widgets.Output()
             display(self._output)
             self._isupdate = True
-        self._output.clear_output(wait=True)
+        #self._output.clear_output(wait=True)
         #with self._output:
         #    plt.show()
         output_show(self._output)
@@ -738,17 +753,36 @@ class Plote:
             description='',
             disabled=False,
             layout=Layout(width='96px')
-        )            
+        )
+        if self._period=='d':
+            periodValue = '日线'
+        elif self._period==15:
+            periodValue = '15分钟校'
+        elif self._period==5:
+            periodValue = '5分钟校'
+        else:
+            periodValue = '周线'
         periodDropdown = widgets.Dropdown(
             options=['日线', '周线', '15分钟','5分钟','15分钟校','5分钟校'],
-            value='日线',
+            value=periodValue,
             description='',
             disabled=False,
             layout=Layout(width='96px')
         )
-        refreshbutton = widgets.Button(description="刷新",layout=Layout(width='96px'))                           
+        refreshbutton = widgets.Button(description="刷新",layout=Layout(width='96px'))
         #output = widgets.Output()
-
+        b,favorites = shared.fromRedis('favorite_'+str(date.today()))
+        isfavorite = False
+        favoriteNode = ''
+        favoriteContext = ''
+        if b:
+            for fav in favorites:
+                if fav['code']==self.code():
+                    isfavorite = True
+                    favoriteNode = fav['node']
+                    favoriteContext = fav['context']
+                    break
+        favoritecheckbox = widgets.Checkbox(value=isfavorite,description='关注',disabled=False,layout=Layout(display='block',width='72px'))
         box_layout = Layout(display='flex',
                             flex_flow='wrap',
                             align_items='stretch',
@@ -757,9 +791,17 @@ class Plote:
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
         if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link]
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
+
+        fafavoriteNodeWidget = widgets.Text(
+            value=favoriteNode,
+            placeholder='输入备注',
+            disabled=False
+        )
+        if isfavorite:
+            items.append(fafavoriteNodeWidget)
         if self._showfigure:
             items.append(figuretoggle)
         box = Box(children=items, layout=box_layout)
@@ -1046,6 +1088,54 @@ class Plote:
             if bi != ei:
                 figure2.showKline(bi,ei,figsize=figsize)
 
+        def on_favorite(e):
+            today = date.today()
+            name = 'favorite_'+str(today)
+            b,favorites = shared.fromRedis(name)
+            if not b:
+                favorites = []
+            code = self.code()
+            if e['new']:
+                favorites.append({
+                    'date':today,
+                    'code':code,
+                    'name':self.name(),
+                    'node':fafavoriteNodeWidget.value,
+                    'context':self._context
+                })
+                stock.execute("insert into notebook (date,code,name,context,note) values ('%s','%s','%s','%s','%s')"%(stock.dateString(today),code,self.name(),self._context if self._context is not None else '',fafavoriteNodeWidget.value))
+                box.children = list(box.children)+[fafavoriteNodeWidget]
+            else:
+                for fav in favorites[:]:
+                    if fav['code']==code:
+                        favorites.remove(fav)
+                        break
+                stock.execute("delete from notebook where date='%s' and code='%s'"%(stock.dateString(today),code))
+                box.children = box.children[:-1]
+            shared.toRedis(favorites,name,ex=24*3600)
+
+        favoritecheckbox.observe(on_favorite,names='value')
+        
+        updateFavoriteTimer = None
+        def on_favoriteText(e):
+            nonlocal updateFavoriteTimer
+            if updateFavoriteTimer is not None:
+                updateFavoriteTimer.cancel()
+            def updateFavoriteText():
+                today = date.today()
+                code = self.code()
+                stock.execute("update notebook set note='%s' where date='%s' and code='%s'"%(fafavoriteNodeWidget.value,stock.dateString(today),code))
+                name = 'favorite_'+str(today)
+                b,favorites = shared.fromRedis(name)
+                if b:
+                    for fav in favorites[:]:
+                        if fav['code']==code:
+                            fav['node']=fafavoriteNodeWidget.value
+                            break
+                    shared.toRedis(favorites,name,ex=24*3600)
+            updateFavoriteTimer = xueqiu.Timer(3,updateFavoriteText)
+
+        fafavoriteNodeWidget.observe(on_favoriteText,names='value')
         def update():
             refreshbutton.button_style = 'success' #green button
             self.reload(all=False)

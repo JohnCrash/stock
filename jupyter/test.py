@@ -35,11 +35,14 @@ for i in range(5):
     else:
         print('error\n')
 """        
-#print(xueqiu.K('SZ399001',5,96))
-print(xueqiu.nextKDate(datetime(2020,2,25,10,55),5))
-print(xueqiu.from2now(10,55,5))
-print(xueqiu.k5date)
-print(xueqiu.k15date)
+#print(xueqiu.K('SZ000158',5,96))
+#c,k,d = stock.loadKline('SZ000158',5)
+#b,k,d = xueqiu.appendK('SZ000158',5,k,d)
+
+#print(xueqiu.nextKDate(datetime(2020,2,25,10,55),5))
+#print(xueqiu.from2now(10,55,5))
+#print(xueqiu.k5date)
+#print(xueqiu.k15date)
 #r = status.StrongSorted([5])
 #print(r)
 #shared.delKey("company_status_last50")
@@ -47,3 +50,9 @@ print(xueqiu.k15date)
 #def progress(e):
 #    pass
 #status.update_status_begin(date(2020,2,21),False,progress)
+
+#shared.delKey("k5_sz000158")
+#shared.delKey("k5_sz002796")
+#shared.delKey("k5_sz002837")
+#shared.delKey("k5_sh603825")
+print(xueqiu.from2now(datetime(2020,2,26,15,40),5))

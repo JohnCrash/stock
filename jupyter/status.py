@@ -1102,6 +1102,9 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     plt.show()
 
 def StrongCategoryList(N=50):
+    def progressCallback(i):
+        pass
+    update_status(progressCallback) #更新公司日状态
     result = StrongSorted([3,5,10,20],N)
     output = widgets.Output()
     def getSortedCategory(day,pos):

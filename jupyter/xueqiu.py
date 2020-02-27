@@ -366,14 +366,28 @@ for i in [9,10,11,13,14,15]:
     else:
         k15date.append((i,0))
 
-#计算从hour,minute到当前时间存在多少个k点
-def from2now(hour,minute,period):
+#计算从t到当前时间存在多少个k点
+def from2now(t,period):
     n = 0
     m = k15date if period==15 else k5date
     today = datetime.today()
-    for d in m:
-        if (d[0]>hour or (d[0]==hour and d[1]>minute)) and (today.hour>d[0] or (today.hour==d[0] and today.minute>=d[1])):
-            n += 1
+    if today.day!=t.day:
+        hour = t.hour
+        minute = t.minute
+        for d in m:
+            if d[0]>hour or (d[0]==hour and d[1]>=minute):
+                n += 1
+        hour = 9
+        minute = 30            
+        for d in m:
+            if (d[0]>hour or (d[0]==hour and d[1]>minute)) and (today.hour>d[0] or (today.hour==d[0] and today.minute>=d[1])):
+                n += 1
+    else:
+        hour = t.hour
+        minute = t.minute
+        for d in m:
+            if (d[0]>hour or (d[0]==hour and d[1]>minute)) and (today.hour>d[0] or (today.hour==d[0] and today.minute>=d[1])):
+                n += 1
     return n
 
 def next_k_date(period):
@@ -413,12 +427,8 @@ def K(code,period,n):
     if b: #如果有数据那么仅仅下载最新数据和部分校验用数据
         base = cache['base']
         #还需要下载多少数据
-        if datetime.today().day!=cache['date'][-1][0].day: #缓存是昨天的数据
-            #从9:30到现在的全部数据
-            dn = from2now(9,30,period)
-        else: #缓存是今天数据
-            t = cache['date'][-1][0]
-            dn = from2now(t.hour,t.minute,period)
+        t = cache['date'][-1][0]
+        dn = from2now(t,period)
         if dn==0:
             return b,cache['k'][-n:],cache['date'][-n:]
     elif n<15*16/period:
