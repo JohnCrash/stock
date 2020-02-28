@@ -15,6 +15,7 @@ from datetime import date,datetime,timedelta
 import matplotlib.pyplot as plt
 import math
 import shared
+import random
 import threading
 import time
 import copy
@@ -694,40 +695,52 @@ def StrongSorted(days,N=50):
     return result
 
 mycolors=[
-    "red",
-    "purple",
-    "gold",
-    "blue",
-    "green",
-    "orange",
-    "cyan",
-    "cornflowerblue",
-    "pink",
-    "dimgray",
-    "yellowgreen",
-    "skyblue",
-    "limegreen",
-    "fuchsia",
-    "lightsteelblue",
-    "lightcoral",
-    "olivedrab",
-    "cadetblue",
-    "deeppink",
-    "darkblue",
+    "aqua",
+    "azure",
     "black",
-    "forestgreen",
-    "teal",
-    "tan",
-    "silver",
-    "peachpuff",
-    "lawngreen",
-    "slateblue",
+    "blue",
+    "brown",
+    "chartreuse",
+    "chocolate",
+    "coral",
+    "crimson",
+    "cyan",
+    "darkblue",
+    "darkgreen",
+    "fuchsia",
+    "gold",
+    "green",
+    "grey",
+    "indigo",
+    "lime",
+    "magenta",
+    "maroon",
+    "navy",
+    "olive",
+    "orange",
+    "orangered",
     "orchid",
-    "mediumspringgreen",
-    "khaki",
-    "sienna"
+    "pink",
+    "plum",
+    "purple",
+    "red",
+    "darkred",
+    "darkslategrey",
+    "darkmagenta",
+    "salmon",
+    "sienna",
+    "tan",
+    "teal",
+    "tomato",
+    "violet",
+    "yellow"
 ]
 
+for i in range(len(mycolors)):
+    temp = mycolors[i]
+    j = random.randint(0,len(mycolors)-1)
+    mycolors[i] = mycolors[j]
+    mycolors[j] = temp
 def getmycolor(i):
     return mycolors[i%len(mycolors)]
 

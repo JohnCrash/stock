@@ -326,11 +326,40 @@ class Plote:
             self._comarg = companyInfo[1] #code
             self._date = date_
         elif type(company)==str:
+            self._rate = None
+            self._maxrate = None
+            self._minrate = None            
             if self._period == 'w': #周线
                 self._company,k,d = self.getKlineData(company,'d')
                 self._k,self._date = stock.weekK(k,d)
             else:
                 self._company,self._k,self._date = self.getKlineData(company,self._period)
+                k = self._k
+                d = self._date
+                #这里计算相对于昨天的涨跌率
+                if period=='d':
+                    self._rate = round((k[-1][4]/k[-2][4]-1)*100,2)
+                elif period==15 or period==5:
+                    dd = d[-1][0]
+                    self._maxk = k[-1][2]
+                    self._maxx = len(k)-1
+                    self._mink = k[-1][3]
+                    self._minx = len(k)-1
+                    for i in range(len(d)-2,-1,-1):
+                        if d[i][0].day!=dd.day:
+                            yk = k[i]
+                            self._todaybi = i
+                            self._rate = round((k[-1][4]/yk[4]-1)*100,2)
+                            self._maxrate = round((self._maxk/yk[4]-1)*100,2)
+                            self._minrate = round((self._mink/yk[4]-1)*100,2)
+                            break
+                        else:
+                            if self._maxk < k[i][2]:
+                                self._maxk = k[i][2]
+                                self._maxx = i
+                            if self._mink > k[i][3]:
+                                self._mink = k[i][3]
+                                self._minx = i
         if len(self._k)==0: #完全没有数据不进行进一步处理
             return
         #将大盘指数画在图表中   
@@ -376,6 +405,7 @@ class Plote:
         self._companyInfoarg = companyInfo
         self._display_id = str(uuid.uuid1())
         self._isupdate = False
+        self._rate = None
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
         elif period==15:
@@ -642,6 +672,14 @@ class Plote:
             plotTransPt(axs,self._axsInx,self._config['trans'],bi,ei) 
       
         axsK.grid(True)
+        #这里显示涨跌比率
+        if self._rate is not None:
+            axsK.text(len(self._k),self._k[-1][4],str(self._rate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='top',color='darkred' if self._rate>=0 else 'darkgreen') #,transform=axsK.transAxes
+            if self._maxrate is not None: #绘制今天范围线
+                axsK.hlines(y=self._maxk,xmin=self._todaybi,xmax=len(self._k),color='red' if self._maxrate>0 else 'green',linestyle='--') #
+                axsK.hlines(y=self._mink,xmin=self._todaybi,xmax=len(self._k),color='red' if self._minrate>0 else 'green',linestyle='--')
+                axsK.text(self._maxx,self._maxk,str(self._maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='darkred' if self._maxrate>=0 else 'darkgreen')
+                axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='darkred' if self._minrate>=0 else 'darkgreen')
         #绘制macd
         if self._showmacd:
             axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
