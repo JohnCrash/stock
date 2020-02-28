@@ -854,27 +854,29 @@ def StrongCategoryCompanyList(category,name):
         options=[3,5,10,20],
         value=period,
         description='周期',
-        layout=Layout(width='148px'),
+        layout=Layout(display='block',width='96px'),
         disabled=False)
     topDropdown = widgets.Dropdown(
         options=[3,5,10,20,30,100],
         value=top,
         description='排名',
-        layout=Layout(width='148px'),
+        layout=Layout(display='block',width='96px'),
         disabled=False)
 
     comDropdown = widgets.Dropdown(
         options=[],
         value=None,
         description='公司',
+        layout=Layout(display='block',width='196px'),
         disabled=False)
     butList = widgets.Button(
         description='列表',
         disabled=False,
         button_style='',
+        layout=Layout(width='64px'),
         tooltip='列出股票的图表')
     def onListClick(e):
-        nonlocal top,pos,result
+        nonlocal top,pos,result,name
         output2.clear_output(wait=True)
         with output2:
             for i in range(top):
@@ -882,7 +884,7 @@ def StrongCategoryCompanyList(category,name):
                     inx = int(result[5][i,pos,0])
                     r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
                     dd = result[3][pos][0]
-                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd}).show()
+                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(name,i+1)).show()
 
     butList.on_click(onListClick)
     out = widgets.Output()
@@ -956,6 +958,7 @@ def StrongCategoryCompanyList(category,name):
             return
         if com is None:
             out.clear_output()
+            output2.clear_output()
         else:
             out.clear_output(wait=True)
             with out:
@@ -968,7 +971,7 @@ def StrongCategoryCompanyList(category,name):
             output2.clear_output(wait=True)
             with output2:
                 dd = result[3][pos][0]
-                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd}).show()
+                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd},context="强势分类 %s"%(name)).show()
 
     comDropdown.observe(on_com,names='value')
 
@@ -1071,6 +1074,20 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     
     i = 0
     xdd = np.arange(len(dd))
+    def isFocusIt(focus,categoryName,i,top):
+        v = (i+1)/top
+        if focus=='1/5':
+            return v<=1/5
+        elif focus=='2/5':
+            return v<=2/5 and v>1/5
+        elif focus=='3/5':
+            return v<=3/5 and v>2/5
+        elif focus=='4/5':
+            return v<=4/5 and v>2/5
+        elif focus=='5/5':
+            return v<=5/5 and v>4/5
+        else:
+            return focus==categoryName
     for r in sortedCategory:
         color = getmycolor(i)
         dk = r[6] #
@@ -1078,14 +1095,14 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
         if top is not None:
             if i<top:
                 if focus is not None:
-                    if r[1]==focus:
+                    if isFocusIt(focus,r[1],i,top):
                         axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title,color=color)
                     else:
                         axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title,color=color)
                 else:        
                     axs.plot(xdd[bi:ei],dk[bi:ei],label = title,color=color)
             else:
-                if focus is not None and r[1]==focus:
+                if focus is not None and isFocusIt(focus,r[1],i,top):
                     axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = title,color=color)
         i+=1
     axs.axvline(pos,color="red",linewidth=2,linestyle='--')
@@ -1130,10 +1147,18 @@ def StrongCategoryList(N=50):
     pos = LEN-1
     if bi < 0:
         bi = 0
-    sortedCategoryNames = [None]
-    for it in sortedCategory:
-        sortedCategoryNames.append(it[1])
-        
+    def markListItem():
+        nonlocal sortedCategory
+        sortedCategoryNames = [None]
+        for it in sortedCategory:
+            sortedCategoryNames.append(it[1])
+        return sortedCategoryNames+['1/5','2/5','3/5','4/5','5/5']
+    def categoryListItem():
+        nonlocal sortedCategory
+        sortedCategoryNames = [None]
+        for it in sortedCategory:
+            sortedCategoryNames.append(it[1])
+        return sortedCategoryNames
     nextbutton = widgets.Button(description="下一页",layout=Layout(width='96px'))
     prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
     zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
@@ -1158,29 +1183,31 @@ def StrongCategoryList(N=50):
         options=[3,5,10,20],
         value=period,
         description='周期',
-        layout=Layout(width='148px'),
+        layout=Layout(display='block',width='96px'),
         disabled=False)
     topDropdown = widgets.Dropdown(
         options=[3,5,10,20,30,100],
         value=top,
         description='排名',
-        layout=Layout(width='148px'),
+        layout=Layout(display='block',width='96px'),
         disabled=False)
     listDropdown = widgets.Dropdown(
         options=[None,3,5,10,20,30],
         value=None,
         description='列表',
-        layout=Layout(width='148px'),
+        layout=Layout(display='block',width='100px'),
         disabled=False)
     markDropdown = widgets.Dropdown(
-        options=sortedCategoryNames,
+        options=markListItem(),
         value=mark,
         description='高亮',
+        layout=Layout(display='block',width='196px'),
         disabled=False)        
     categoryDropdown = widgets.Dropdown(
-        options=sortedCategoryNames,
+        options=categoryListItem(),
         value=category,
         description='选择分类',
+        layout=Layout(display='block',width='196px'),
         disabled=False)
 
     needUpdateSlider = True
@@ -1219,13 +1246,9 @@ def StrongCategoryList(N=50):
         if bi < 0:
             bi = 0
         setSlider(bi,ei,pos)
-        sortedCategoryNames = [None]
-        for it in sortedCategory:
-            sortedCategoryNames.append(it[1])
-
         listDropdown.value = None
         category = categoryDropdown.value
-        categoryDropdown.options = sortedCategoryNames
+        categoryDropdown.options = categoryListItem()
         categoryDropdown.value = category
         showPlot()
 
@@ -1257,7 +1280,7 @@ def StrongCategoryList(N=50):
                         for j in range(count):
                             if j < len(sorti):
                                 inx = int(sorti[j,0])
-                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},prefix="%s%d "%(r[1],j+1)).show()
+                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(r[1],j+1)).show()
 
         else:
             showPlot()
