@@ -36,8 +36,8 @@ for i in range(5):
         print('error\n')
 """        
 #print(xueqiu.K('SZ000158',5,96))
-#c,k,d = stock.loadKline('SZ000158',5)
-#b,k,d = xueqiu.appendK('SZ000158',5,k,d)
+c,k,d = stock.loadKline('SZ399001',5)
+b,k,d = xueqiu.appendK('SZ399001',5,k,d)
 
 #print(xueqiu.nextKDate(datetime(2020,2,25,10,55),5))
 #print(xueqiu.from2now(10,55,5))

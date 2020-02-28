@@ -346,8 +346,8 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             k0 = r[1][0]
             k1 = r[1][-1]
             #做一个校验，校验上一天的成交量和收盘
-            if abs(k[-1][2]/k0[0]-1)>0.02 or abs(k[-1][1]/k0[4]-1)>0.02:
-                if abs(k[-1][2]/k0[0]-1)>0.02 and abs(k[-1][1]/k0[4]-1)<0.02:
+            if abs(k[-1][2]/k0[0]-1)>0.05 or abs(k[-1][1]/k0[4]-1)>0.05:
+                if abs(k[-1][2]/k0[0]-1)>0.05 and abs(k[-1][1]/k0[4]-1)<0.05:
                     #做一个成交量校正
                     k1[0] *= k[-1][2]/k0[0]
                 else:

@@ -8,6 +8,7 @@ import json
 import copy
 import random
 import threading
+import stock
 import mylog
 import asyncio
 
@@ -24,7 +25,7 @@ class Timer:
     def cancel(self):
         self._task.cancel()
 
-mylog.init('./download_stock.log')
+mylog.init('./download_stock.log',name='xueqiu')
 
 def xueqiuJson(url):
     s = requests.session()
@@ -328,7 +329,7 @@ def nextKDate(t,period):
     
 def isEqK(k0,k1):
     for i in range(5):
-        if abs(k0[i]/k1[i]-1)>0.02:
+        if abs(k0[i]/k1[i]-1)>0.05:
             return False
     return True
 
@@ -408,6 +409,18 @@ def nextdt15():
         return (datetime(t.year,t.month,t.day,13,15,0)-t).seconds+15*60
     return (15-t.minute%15)*60-t.second
 
+def datetimeString(t):
+    return '%s-%s-%s %s:%s:%s'%(t.year,t.month,t.day,t.hour,t.minute,t.second)
+#将数据和数据库中的对应数据进行比较
+def checkK(code,period,k,d,base,n):
+    today = date.today()
+    if d[0][0].day!=today.day: #存在不在一天的数据就可以进行检查
+        c,K,D = stock.loadKline(code,period,after=datetimeString(d[0][0]))
+        mylog.warn("checkK %s,%s,%s,%d"%(code,period,base,n))
+        for i in range(len(k)):
+            if d[i][0]!=today.day and i<len(K) and isEqK(k[i],K[i]):
+                mylog.warn("%d\t%s\t%s"%(i,d[i][0],k[i]))
+                mylog.warn("%d\t%s\t%s"%(i,D[i][0],K[i]))
 #返回指定代码的k线数据
 # True , np.array((timesramp,volume,open,high,low,close),...),[(timesramp,)...] 保持和loadKline相同的数据结构
 # False, "Error infomation"
@@ -417,7 +430,7 @@ def K(code,period,n):
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     #cache = {'k':np.array((volume,open,high,low,close),...),'date':[(timesramp,)...],'base':} base是最初的数据来源
     b,cache = shared.fromRedis(cacheName)
-    if b and 'ver' in cache and cache['ver']==2:
+    if b and 'ver' in cache and cache['ver']==3:
         if b and len(cache['k'])>=n and nextKDate(cache['date'][-1][0],period)>datetime.today(): #存在缓存并且没有新的数据直接返回
             return b,cache['k'][-n:],cache['date'][-n:]
     else:
@@ -450,10 +463,10 @@ def K(code,period,n):
         #如果有接缝，校验接缝处的数据
         if bi>=0 and not isEqK(oldK[-1],k[bi][1:]):
             mylog.err("K '%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
-            mylog.err("oldK[-1]="+str(oldK[-1]))
-            mylog.err("k[bi][1:]="+str(k[bi][1:]))
-            mylog.err("d[-1]:"+str(d[-1]))
-            return False,oldK,d
+            mylog.err("oldK=%s,%s"%(str(d[-1]),str(oldK[-1])))
+            mylog.err("k[bi]=%s"%(str(k[bi])))
+            checkK(code,period,k,d,base,n)
+
         for i in range(bi+1,len(k)):
             v = k[i]
             K.append((v[1],v[2],v[3],v[4],v[5]))
@@ -473,8 +486,8 @@ def K(code,period,n):
         mylog.err("'%s' %s 下载时出错"%(code,str(period)))
         logServiceState()
         return False,0,0
-
-    shared.toRedis({'k':k,'date':d,'base':base,"ver":2},cacheName,ex=24*3600)
+    
+    shared.toRedis({'k':k,'date':d,'base':base,"ver":3},cacheName,ex=24*3600)
     return True,k[-n:],d[-n:]
 
 #当前是交易时间
@@ -486,13 +499,16 @@ def isTransTime():
         return True
     return False
 
-def logCheckResult(code,period,source,checkdata):
-    mylog.warn(u"logCheckResult '%s' '%s' 数据和日线数据不一致"%(code,str(period)))
+def logCheckResult(code,period,source,checkdata,date=None):
+    mylog.warn(u"logCheckResult '%s' '%s' %s 数据和日线数据不一致"%(code,period,str(date)))
     mylog.warn(u"\nsource:%s\nnew:%s"%(str(source),str(checkdata)))
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     b,cache = shared.fromRedis(cacheName)
     if b:
-        mylog.warn("错误数据来源于:%s"%(str(cache['base'])))
+        k = cache['k']
+        d = cache['date']
+        base = cache['base']
+        checkK(code,period,k,d,base,0)
 
 #将下载数据附加在k,d数据上
 def appendK(code,period,k,d):
@@ -507,12 +523,13 @@ def appendK(code,period,k,d):
             for i in range(len(d)-1,-1,-1):
                 if d[i][0]==nd[-2][0]:#找到校验位置
                     dev = nk[-2]/k[i] 
-                    if np.abs(dev-1).max()>0.02:
+                    if np.abs(dev-1).max()>0.05:
                         #如果仅仅是成交量偏差，做偏差纠正处理
-                        if np.abs(dev[0]-1).max()>0.02:
+                        if np.abs(dev[0]-1).max()>0.05:
                             nk[-1][0] = nk[-1][0]/dev[0]
                         else:
-                            logCheckResult(code,period,k[-1],d[-1])
+                            logCheckResult(code,period,k[i],nk[-2],d[i][0])
+                            mylog.err("差异：%s"%dev)
                     break
         #校验处理完成
         #=======================================================        

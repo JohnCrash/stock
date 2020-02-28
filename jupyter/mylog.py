@@ -1,7 +1,9 @@
 import logging
 
-def init(filename):
-    log = logging.getLogger('mylog')
+logname = 'mylog'
+def init(filename,name='mylog'):
+    logname = name
+    log = logging.getLogger(logname)
     log.setLevel(level = logging.INFO)
     hd = logging.FileHandler(filename)
     hd.setLevel(logging.INFO)
@@ -10,13 +12,16 @@ def init(filename):
     log.addHandler(hd)
 
 def warn(*args):
-    log = logging.getLogger('mylog')
+    global logname
+    log = logging.getLogger(logname)
     log.warning(*args)
 
 def err(*args):
-    log = logging.getLogger('mylog')
+    global logname
+    log = logging.getLogger(logname)
     log.error(*args)
 
 def info(*args):
-    log = logging.getLogger('mylog')
+    global logname
+    log = logging.getLogger(logname)
     log.info(*args)

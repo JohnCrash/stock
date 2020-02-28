@@ -15,10 +15,12 @@ import  warnings
 import shared
 import xueqiu
 import uuid
+import mylog
 #定制show
 from matplotlib._pylab_helpers import Gcf
 from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show
 
+mylog.init('./kline.log',name='kline')
 warnings.filterwarnings("ignore", module="matplotlib")
 
 def plt_show(display_id,isupdate):
@@ -206,6 +208,8 @@ class Plote:
             else:
                 self._trendHeadPos = len(self._k)-1
             self._showtrend = True
+        else:
+            self._trendHeadPos = len(self._k)-1
         if 'energy' in self._config and self._config['energy']:
             self._energyInx = self._axsInx+1
             self._axsInx += 1
@@ -372,7 +376,17 @@ class Plote:
         self._companyInfoarg = companyInfo
         self._display_id = str(uuid.uuid1())
         self._isupdate = False
-        self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True} #"bollwidth":0.2,
+        if period=='d':
+            self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
+        elif period==15:
+            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[20],"debug":False,"volumeprices":True}
+            self._correcttionVolume = True
+        elif period==5:
+            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[20],"debug":False,"volumeprices":True}           
+            self._correcttionVolume = True
+        else:
+            self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}       
+        
         self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
         self._backup = self._config.copy()
@@ -493,7 +507,6 @@ class Plote:
                 if i>0 and i<len(self._date):
                     if self._date[i][0].day!=self._date[i-1][0].day:
                         xticks.append(i-1)
-
             if self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
                 xticks.append(self._trendHeadPos)
                 xticks.append(self._trendHeadPos)                            
@@ -713,23 +726,22 @@ class Plote:
         zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
         zoomoutbutton = widgets.Button(description="-",layout=Layout(width='48px'))
         
-        if self._showtrend:
-            backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
-            frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
-            slider = widgets.IntSlider(
-                value=ei,
-                min=bi,
-                max=ei,
-                step=1,
-                description='',
-                disabled=False,
-                continuous_update=False,
-                orientation='horizontal',
-                readout=False,
-                layout=Layout(width='128px')
-                #readout=True,
-                #readout_format='d'
-            )
+        backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
+        frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+        slider = widgets.IntSlider(
+            value=ei,
+            min=bi,
+            max=ei,
+            step=1,
+            description='',
+            disabled=False,
+            continuous_update=False,
+            orientation='horizontal',
+            readout=False,
+            layout=Layout(width='128px')
+            #readout=True,
+            #readout_format='d'
+        )
 
         if self._showfigure:
             figuretoggle = widgets.ToggleButton(
@@ -740,36 +752,47 @@ class Plote:
                 tooltip='FIGURE',
                 icon='check')
 
+        if self._period=='d':
+            periodDropdownvalue = '日线'
+            indexDropdownvalue = 'MACD+'
+            mainDropdownvalue = 'BOLL+'
+        elif self._period==15:
+            periodDropdownvalue = '15分钟校'
+            indexDropdownvalue = 'MACD'
+            mainDropdownvalue = 'TREND'
+            self._correcttionVolume = True
+        elif self._period==5:
+            periodDropdownvalue = '5分钟校'
+            indexDropdownvalue = 'CLEAR'
+            mainDropdownvalue = 'CLEAR'            
+            self._correcttionVolume = True
+        else:
+            periodDropdownvalue = '周线'
+            indexDropdownvalue = 'MACD+'
+            mainDropdownvalue = 'BOLL+' 
+
         mainDropdown = widgets.Dropdown(
             options=['BOLL+','MA','BOLL','TREND','CLEAR'],
-            value='TREND',
+            value=mainDropdownvalue,
             description='',
             disabled=False,
             layout=Layout(width='96px')
         )    
         indexDropdown = widgets.Dropdown(
             options=['MACD+','KDJ+','MACD+Best','MACD+BollWidth','MACD','CLEAR'],
-            value='MACD+',
+            value=indexDropdownvalue,
             description='',
             disabled=False,
             layout=Layout(width='96px')
-        )
-        if self._period=='d':
-            periodValue = '日线'
-        elif self._period==15:
-            periodValue = '15分钟校'
-        elif self._period==5:
-            periodValue = '5分钟校'
-        else:
-            periodValue = '周线'
+        )           
         periodDropdown = widgets.Dropdown(
             options=['日线', '周线', '15分钟','5分钟','15分钟校','5分钟校'],
-            value=periodValue,
+            value=periodDropdownvalue,
             description='',
             disabled=False,
             layout=Layout(width='96px')
         )
-        refreshbutton = widgets.Button(description="刷新",layout=Layout(width='96px'))
+        refreshbutton = widgets.Button(description="刷新",layout=Layout(width='64px'))
         #output = widgets.Output()
         b,favorites = shared.fromRedis('favorite_'+str(date.today()))
         isfavorite = False
@@ -790,10 +813,7 @@ class Plote:
                             width='100%')
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
-        if self._showtrend:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
-        else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
+        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
 
         fafavoriteNodeWidget = widgets.Text(
             value=favoriteNode,
@@ -1025,8 +1045,7 @@ class Plote:
             self.config()
             showline()
 
-        mainDropdown.observe(on_main,names='value')
-
+        mainDropdown.observe(on_main,names='value')           
         def on_period(e):
             name2peroid = {
                 '日线':['d',False,False],
@@ -1137,12 +1156,19 @@ class Plote:
 
         fafavoriteNodeWidget.observe(on_favoriteText,names='value')
         def update():
-            refreshbutton.button_style = 'success' #green button
-            self.reload(all=False)
-            recalcRange(False)
-            showline()
-            refreshbutton.button_style = ''
-            startTimer()
+            for i in range(10):
+                try:
+                    refreshbutton.button_style = 'success' #green button
+                    self.reload(all=False)
+                    recalcRange(False)
+                    showline()
+                    refreshbutton.button_style = ''
+                    startTimer()
+                    break
+                except Exception as e:
+                    import traceback
+                    mylog.info(traceback.format_stack())
+                    mylog.err(str(e))
 
         def startTimer():
             nt = xueqiu.next_k_date(self._period)
