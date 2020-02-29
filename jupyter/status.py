@@ -7,7 +7,6 @@ import numpy as np
 import stock
 import xueqiu
 import kline
-from datetime import date
 from IPython.display import display,Markdown
 import ipywidgets as widgets
 from ipywidgets import Layout, Button, Box
@@ -1131,6 +1130,9 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
     fig.autofmt_xdate()
     plt.show()
 
+"""
+强势分类于强势股
+"""
 def StrongCategoryList(N=50):
     def progressCallback(i):
         pass
@@ -1409,3 +1411,44 @@ def StrongCategoryList(N=50):
 
     display(box,output)
     showPlot()
+"""
+关注
+"""
+def favoriteList():
+    today = date.today()  
+    after = today-timedelta(days=20)
+    result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
+    colles = {}
+    out = widgets.Output()
+    for it in result:
+        if it[1] not in colles:
+            colles[it[1]] = []
+        colles[it[1]].append(it)
+    items = []
+    prevButton = None
+    for it in colles:
+        but = widgets.Button(
+                    description=str(it),
+                    disabled=False,
+                    button_style='')
+        but.it = it
+        def on_click(e):
+            nonlocal prevButton,colles
+            if prevButton is not None:
+                prevButton.button_style=''
+            e.button_style='warning'
+            prevButton = e
+            f = colles[e.it]
+            out.clear_output(wait=True)
+            with out:
+                for i in f:
+                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注').show()
+                    
+        but.on_click(on_click)
+        items.append(but)
+    box = Box(children=items,layout=Layout(display='flex',
+            flex_flow='wrap',
+            align_items='stretch',
+            border='solid',
+            width='100%'))    
+    display(box,out)
