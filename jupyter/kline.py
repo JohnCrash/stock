@@ -176,6 +176,7 @@ class Plote:
         self._showbollwidth = False
         self._showtrend = False
         self._showenergy = False
+        
         if len(self._k)==0: #完全没有数据
             return
         if 'ma' in self._config:
@@ -406,6 +407,7 @@ class Plote:
         self._display_id = str(uuid.uuid1())
         self._isupdate = False
         self._rate = None
+        self._macd = None
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
         elif period==15:
@@ -525,7 +527,7 @@ class Plote:
                     for i in range(bi,ei):
                         if i>0 and self._date[i][0].month!=self._date[i-1][0].month:
                             xticks.append(i)
-                if self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
+                if self._trendHeadPos>=bi and self._trendHeadPos<ei and self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
                     xticks.append(self._trendHeadPos)
                     xticks.append(self._trendHeadPos)
                 xticks = np.array(xticks)             
@@ -536,10 +538,10 @@ class Plote:
             for i in range(bi,ei):
                 if i>0 and i<len(self._date):
                     if self._date[i][0].day!=self._date[i-1][0].day:
-                        xticks.append(i-1)
-            if self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
+                        xticks.append(i)
+            if self._trendHeadPos>=bi and self._trendHeadPos<ei and self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
                 xticks.append(self._trendHeadPos)
-                xticks.append(self._trendHeadPos)                            
+                xticks.append(self._trendHeadPos)
             xticks = np.array(xticks)    
             """  
             if int(self._period) == 15:
@@ -661,25 +663,24 @@ class Plote:
             axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',linewidth=2,linestyle='--')
         #绘制成交量
         if self._showvolume:
-            axs[self._volInx].step(x, self._k[bi:ei,0],where='mid',label='volume')
+            axs[self._volInx].step(x,self._k[bi:ei,0],where='mid',label='volume')
             axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
             axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
             #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
-            axs[self._volInx].axhline(color='black')           
-            axs[self._volInx].grid(True)
+            axs[self._volInx].axhline(color='black')
         #绘制交易点
         if 'trans' in self._config:
             plotTransPt(axs,self._axsInx,self._config['trans'],bi,ei) 
       
         axsK.grid(True)
         #这里显示涨跌比率
-        if self._rate is not None:
-            axsK.text(len(self._k),self._k[-1][4],str(self._rate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='top',color='darkred' if self._rate>=0 else 'darkgreen') #,transform=axsK.transAxes
+        if self._rate is not None and ei==len(self._k):
+            axsK.text(len(self._k),self._k[-1][4],str(self._rate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='top',color='red' if self._rate>=0 else 'darkgreen') #,transform=axsK.transAxes
             if self._maxrate is not None: #绘制今天范围线
                 axsK.hlines(y=self._maxk,xmin=self._todaybi,xmax=len(self._k),color='red' if self._maxrate>0 else 'green',linestyle='--') #
                 axsK.hlines(y=self._mink,xmin=self._todaybi,xmax=len(self._k),color='red' if self._minrate>0 else 'green',linestyle='--')
-                axsK.text(self._maxx,self._maxk,str(self._maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='darkred' if self._maxrate>=0 else 'darkgreen')
-                axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='darkred' if self._minrate>=0 else 'darkgreen')
+                axsK.text(self._maxx,self._maxk,str(self._maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if self._maxrate>=0 else 'darkgreen')
+                axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if self._minrate>=0 else 'darkgreen')
         #绘制macd
         if self._showmacd:
             axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
@@ -897,9 +898,9 @@ class Plote:
             if endPT >= len(self._k):
                 endPT = len(self._k)
                 beginPT = endPT-showRange
-            if self._showtrend:
-                self._trendHeadPos = endPT
-                setSlider(beginPT,endPT,endPT)
+
+            self._trendHeadPos = endPT
+            setSlider(beginPT,endPT,endPT)
             showline()
         
         def on_prevbutton_clicked(b):
@@ -911,18 +912,16 @@ class Plote:
                 endPT = showRange
                 beginPT = 0
 
-            if self._showtrend:
-                self._trendHeadPos = endPT
-                setSlider(beginPT,endPT,endPT)
+            self._trendHeadPos = endPT
+            setSlider(beginPT,endPT,endPT)
             showline()
 
         def on_zoomin(b):
             nonlocal beginPT,endPT,showRange
             showRange = math.floor(showRange/2)
             beginPT = endPT - showRange
-            if self._showtrend:
-                self._trendHeadPos = endPT
-                setSlider(beginPT,endPT,endPT)
+            self._trendHeadPos = endPT
+            setSlider(beginPT,endPT,endPT)
             showline()
 
         def on_zoomout(b):
@@ -932,9 +931,8 @@ class Plote:
             if beginPT < 0:
                 beginPT = 0
                 endPT = beginPT+showRange
-            if self._showtrend:
-                self._trendHeadPos = endPT
-                setSlider(beginPT,endPT,endPT)
+            self._trendHeadPos = endPT
+            setSlider(beginPT,endPT,endPT)
               
             showline()
 
@@ -954,7 +952,8 @@ class Plote:
                 showline()
 
         def updateTrend():
-            self._trend = trend.macdTrend(self._k[:self._trendHeadPos,:],self._macd[:self._trendHeadPos])
+            if self._macd is not None:
+                self._trend = trend.macdTrend(self._k[:self._trendHeadPos,:],self._macd[:self._trendHeadPos])
             #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):
@@ -1128,10 +1127,10 @@ class Plote:
             showline()
             refreshbutton.button_style = ''
         refreshbutton.on_click(refresh)
-        if self._showtrend:
-            backbutton.on_click(on_prev)
-            frontbutton.on_click(on_next)
-            slider.observe(on_sliderChange,names='value')
+
+        backbutton.on_click(on_prev)
+        frontbutton.on_click(on_next)
+        slider.observe(on_sliderChange,names='value')
             
         if self._showfigure:
             figuretoggle.observe(on_change,names='value')
