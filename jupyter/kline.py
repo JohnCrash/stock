@@ -411,10 +411,10 @@ class Plote:
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
         elif period==15:
-            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[20],"debug":False,"volumeprices":True}
+            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}
             self._correcttionVolume = True
         elif period==5:
-            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[20],"debug":False,"volumeprices":True}           
+            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}           
             self._correcttionVolume = True
         else:
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}       
