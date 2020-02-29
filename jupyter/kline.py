@@ -677,8 +677,8 @@ class Plote:
         if self._rate is not None and ei==len(self._k):
             axsK.text(len(self._k),self._k[-1][4],str(self._rate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='top',color='red' if self._rate>=0 else 'darkgreen') #,transform=axsK.transAxes
             if self._maxrate is not None: #绘制今天范围线
-                axsK.hlines(y=self._maxk,xmin=self._todaybi,xmax=len(self._k),color='red' if self._maxrate>0 else 'green',linestyle='--') #
-                axsK.hlines(y=self._mink,xmin=self._todaybi,xmax=len(self._k),color='red' if self._minrate>0 else 'green',linestyle='--')
+                axsK.hlines(y=self._maxk,xmin=self._todaybi+1,xmax=len(self._k),color='red' if self._maxrate>0 else 'green',linestyle='--') #
+                axsK.hlines(y=self._mink,xmin=self._todaybi+1,xmax=len(self._k),color='red' if self._minrate>0 else 'green',linestyle='--')
                 axsK.text(self._maxx,self._maxk,str(self._maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if self._maxrate>=0 else 'darkgreen')
                 axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if self._minrate>=0 else 'darkgreen')
         #绘制macd
@@ -1106,16 +1106,15 @@ class Plote:
             #日线和周线切换为MACD+,其他切换为MACD
             nonlocal needRecalcRange
             if sel[2]:
-                if indexDropdown.value!="MACD":
+                if indexDropdown.value!="CLEAR":
                     needRecalcRange = True
-                    indexDropdown.value = "MACD"
+                    indexDropdown.value = "CLEAR"
                     return
             else:
                 if indexDropdown.value != "MACD+":
                     needRecalcRange = True
                     indexDropdown.value = "MACD+"
                     return
-            self.config()
             recalcRange()
             showline()
 

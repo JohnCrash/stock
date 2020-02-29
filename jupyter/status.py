@@ -695,16 +695,19 @@ def StrongSorted(days,N=50):
     return result
 
 mycolors=[
-    "aqua",
-    "azure",
+    "red",
+    "purple",    
     "black",
     "blue",
     "brown",
+    "tomato",    
+    "darkslategrey",
+    "aqua",    
+    "darkmagenta",    
     "chartreuse",
     "chocolate",
     "coral",
     "crimson",
-    "cyan",
     "darkblue",
     "darkgreen",
     "fuchsia",
@@ -722,27 +725,24 @@ mycolors=[
     "orchid",
     "pink",
     "plum",
-    "purple",
-    "red",
     "darkred",
-    "darkslategrey",
-    "darkmagenta",
     "salmon",
     "sienna",
     "tan",
     "teal",
-    "tomato",
     "violet",
     "yellow"
 ]
-
-for i in range(len(mycolors)):
-    temp = mycolors[i]
-    j = random.randint(0,len(mycolors)-1)
-    mycolors[i] = mycolors[j]
-    mycolors[j] = temp
-def getmycolor(i):
-    return mycolors[i%len(mycolors)]
+name2int = {}
+namecount = 0
+def getmycolor(name):
+    global mycolors,name2int,namecount
+    if name in name2int:
+        return mycolors[name2int[name]]
+    
+    name2int[name] = namecount%len(mycolors)
+    namecount += 1
+    return mycolors[name2int[name]]
 
 def PlotCategory(bi,ei,pos,r,top=None,focus=None):
     fig,axs = plt.subplots(figsize=(28,14))
@@ -769,10 +769,10 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
         rank = 1
         for d in r[5][:top+1,pos,:]:
             i = int(d[0])
-            color = getmycolor(i)
             dk = r[2][i] #
             idd = r[4][i]
             title = "%d %s"%(rank,idd[2])
+            color = getmycolor(idd[2])
             if focus is not None:
                 if idd[2]==focus:
                     axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title,color=color)
@@ -784,9 +784,9 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
             rank+=1
         if not isplot:
             for i in range(len(r[2])):
-                color = getmycolor(i)
                 dk = r[2][i] #
                 idd = r[4][i]
+                color = getmycolor(idd[2])
                 title = "%d %s"%(rank,idd[2])
                 if focus is not None:
                     if idd[2]==focus:
@@ -1102,7 +1102,7 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
         else:
             return focus==categoryName
     for r in sortedCategory:
-        color = getmycolor(i)
+        color = getmycolor(r[1])
         dk = r[6] #
         title = "%d %s"%(i+1,r[1])
         if top is not None:
