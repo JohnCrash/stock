@@ -103,6 +103,31 @@ def plotVline(axs,v,c,linestyle='-',linewidth=1):
     for i in range(len(axs)):
         axs[i].axvline(v,color=c,linestyle=linestyle,linewidth=linewidth)
 
+class MyFormatterK5(Formatter):
+    def __init__(self,times,fmt='%m:%s'):
+        self.fmt = fmt
+        self._times = times
+        self.k5d = ((9,35),(9,40),(9,45),(9,50),(9,55),(10,0),(10,5),(10,10),(10,15),(10,20),(10,25),(10,30),
+                    (10,35),(10,40),(10,45),(10,50),(10,55),(11,00),(11,5),(11,10),(11,15),(11,20),(11,25),(11,30),
+                    (13,5),(13,10),(13,15),(13,20),(13,25),(13,30),(13,35),(13,40),(13,45),(13,50),(13,55),(14,00),
+                    (14,5),(14,10),(14,15),(14,20),(14,25),(14,30),(14,35),(14,40),(14,45),(14,50),(14,55),(15,00))
+
+    def __call__(self, x, pos=0):
+        'Return the label for time x at position pos'
+        x = int(x)
+        if x>=0 and x<len(self._times):
+            t = self._times[x][0]
+            return "%d:%02d"%(t.hour,t.minute)
+        elif x>=len(self._times):
+            t = self._times[-1][0]
+            offset = x-len(self._times)
+            for i in range(len(self.k5d)):
+                d = self.k5d[i]
+                if t.hour==d[0] and t.minute==d[1]:
+                    t = self.k5d[(i+offset)%len(self.k5d)]
+                    return "%d:%02d"%(t[0],t[1])
+        return ''
+
 class MyFormatter(Formatter):
     def __init__(self, dates,period,fmt='%Y-%m-%d'):
         self.dates = dates
@@ -312,7 +337,7 @@ class Plote:
     def init(self,company,period,config,date_ = None,companyInfo=None):
         self._period = period
         if self._period=='d' or self._period=='w':
-            self._showcount = 120
+            self._showcount = 120 if self._mode=='normal' else 80
         elif int(self._period)==5: #48
             self._showcount = 144
         elif int(self._period)==15: #16
@@ -394,7 +419,7 @@ class Plote:
             self._timer.cancel()
 
     #company可以是kline数据，可以是code，也可以是公司名称
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None):
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal'):
         self._timer = None
         self._prefix = prefix
         self._context = context
@@ -408,6 +433,7 @@ class Plote:
         self._isupdate = False
         self._rate = None
         self._macd = None
+        self._mode = mode
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
         elif period==15:
@@ -505,9 +531,86 @@ class Plote:
         else:
             if ei<=-len(self._k):
                 ei = -len(self._k)+1
-        gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
-        fig, axs = plt.subplots(self._axsInx+1, 1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
-        fig.subplots_adjust(hspace=0.02) #调整子图上下间距
+        if self._mode=='normal':
+            gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
+            fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
+        else:
+            gs_kw = dict(width_ratios=[2,1], height_ratios=self._heights)
+            fig, ax = plt.subplots(self._axsInx+1,2,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
+            axs = ax[:,0]
+            gs = axs[0].get_gridspec()
+            for it in ax[:,1]:
+                it.remove()
+            axk5 = fig.add_subplot(gs[:-2,-1])
+            axb5 = fig.add_subplot(gs[-2,-1])
+            axv5 = fig.add_subplot(gs[-1,-1])
+            axk5.set_title('5分钟K')
+            _,k5s,d5s = self.getKlineData(self._comarg,5)
+            k5 = k5s[-48*20:]
+            d5 = d5s[-48*20:]
+            axv5.xaxis.set_major_formatter(MyFormatterK5(d5))
+            todayei = len(k5)
+            maxk5close = k5[todayei-1][2]
+            maxk5x = todayei-1
+            mink5close = k5[todayei-1][3]
+            mink5x = todayei-1
+            for i in range(todayei-1,-1,-1):
+                if d5[i][0].day != d5[-1][0].day:
+                    todaybi = i+1
+                    k5yc = k5[i][4]
+                    k5currate = round((k5[-1][4]/k5[i][4]-1)*100,2)
+                    k5maxrate = round((maxk5close/k5[i][4]-1)*100,2)
+                    k5minrate = round((mink5close/k5[i][4]-1)*100,2)
+                    break
+                else:
+                    if k5[i][2]>maxk5close:
+                        maxk5close = k5[i][2]
+                        maxk5x = i
+                    if k5[i][3]<mink5close:
+                        mink5close = k5[i][3]
+                        mink5x = i
+            tb = np.zeros((len(k5),))
+            yb = np.zeros((len(k5),))
+            for i in range(todaybi,len(k5)):
+                tb[i] = k5[i,0]+tb[i-1]
+            for i in range(todaybi-48,todaybi):
+                yb[i] = k5[i,0]+yb[i-1]
+            axk5.set_xlim(todaybi-1,todaybi+48)
+            axb5.set_xlim(todaybi-1,todaybi+48)
+            axv5.set_xlim(todaybi-1,todaybi+48)
+            xticks = []
+            for i in [0,5,11,17,23,29,35,41,47]:
+                xticks.append(todaybi+i)
+            xticks.append(todayei-1)
+            xticks.append(todayei-1)
+            axk5.set_xticks(xticks)
+            axv5.set_xticks(xticks)
+            axb5.set_xticks(xticks)
+            axk5.axhline(y=k5yc,color='darkgray',linestyle='--')
+            axv5.set_yscale('log')
+            axk5.grid(True)
+            axv5.grid(True)
+            axb5.grid(True)
+            plotK(axk5,k5,todaybi,todayei)
+            if maxk5x<todayei-3:
+                axk5.text(maxk5x,maxk5close,str(k5maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if k5maxrate>=0 else 'darkgreen')
+            if mink5x<todayei-3:
+                axk5.text(mink5x,mink5close,str(k5minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if k5minrate>=0 else 'darkgreen')
+            if k5[todayei-1,4]>k5[todayei-2,4]:
+                k5cury = max(k5[todayei-1,2],k5[todayei-2,2])
+                k5curyb = True
+            else:
+                k5cury = min(k5[todayei-1,3],k5[todayei-2,3])
+                k5curyb = False
+            axk5.text(todayei-1,k5cury,str(k5currate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not k5curyb else 'bottom',color='red' if k5currate>=0 else 'darkgreen')
+            k5x = np.linspace(todaybi,todayei-1,todayei-todaybi)
+            ck5v = stock.correctionVolume(k5,d5,5)
+            axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
+            axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
+            axb5.plot(k5x,yb[todaybi-48:todayei-48],color='darkorange',label='yesterday')
+            axv5.axhline(color='black')
+
+        fig.subplots_adjust(hspace=0.02,wspace=0.05) #调整子图上下间距
         axsK = axs if self._axsInx==0 else axs[0]
         if self._date is not None:
             axsK.xaxis.set_major_formatter(MyFormatter(self._date,self._period))
@@ -675,12 +778,20 @@ class Plote:
         axsK.grid(True)
         #这里显示涨跌比率
         if self._rate is not None and ei==len(self._k):
-            axsK.text(len(self._k),self._k[-1][4],str(self._rate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='top',color='red' if self._rate>=0 else 'darkgreen') #,transform=axsK.transAxes
+            if self._k[-1][4]>self._k[-2][4]:
+                kcury = max(self._k[-1][2],self._k[-2][2])
+                kcurb = True
+            else:
+                kcury = min(self._k[-1][3],self._k[-2][3])
+                kcurb = False
+            axsK.text(len(self._k)-1,kcury,str(self._rate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not kcurb else 'bottom',color='red' if self._rate>=0 else 'darkgreen') #,transform=axsK.transAxes
             if self._maxrate is not None: #绘制今天范围线
-                axsK.hlines(y=self._maxk,xmin=self._todaybi+1,xmax=len(self._k),color='red' if self._maxrate>0 else 'green',linestyle='--') #
-                axsK.hlines(y=self._mink,xmin=self._todaybi+1,xmax=len(self._k),color='red' if self._minrate>0 else 'green',linestyle='--')
-                axsK.text(self._maxx,self._maxk,str(self._maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if self._maxrate>=0 else 'darkgreen')
-                axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if self._minrate>=0 else 'darkgreen')
+                #axsK.hlines(y=self._maxk,xmin=self._todaybi+1,xmax=len(self._k),color='red' if self._maxrate>0 else 'green',linestyle='--') #
+                #axsK.hlines(y=self._mink,xmin=self._todaybi+1,xmax=len(self._k),color='red' if self._minrate>0 else 'green',linestyle='--')
+                if self._maxx<len(self._k)-3:
+                    axsK.text(self._maxx,self._maxk,str(self._maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if self._maxrate>=0 else 'darkgreen')
+                if self._minx<len(self._k)-3:
+                    axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if self._minrate>=0 else 'darkgreen')
         #绘制macd
         if self._showmacd:
             axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
