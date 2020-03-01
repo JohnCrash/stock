@@ -258,6 +258,8 @@ class Plote:
             self._bollwidthInx = self._axsInx+1
             self._axsInx += 1
             self._showbollwidth = True
+            if not self._showboll:
+                self._boll = stock.bollLineK(self._k)
             self._bollwidth = stock.bollWidth(self._boll)
 
         if 'macd' in self._config and self._config['macd']:
@@ -534,15 +536,21 @@ class Plote:
         if self._mode=='normal':
             gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
             fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
-        else:
+        else: #下面的代码在右侧开辟一个区域绘制5分钟时k图
             gs_kw = dict(width_ratios=[2,1], height_ratios=self._heights)
             fig, ax = plt.subplots(self._axsInx+1,2,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
             axs = ax[:,0]
             gs = axs[0].get_gridspec()
             for it in ax[:,1]:
                 it.remove()
-            axk5 = fig.add_subplot(gs[:-2,-1])
-            axb5 = fig.add_subplot(gs[-2,-1])
+            if self._axsInx<3:
+                axk5 = fig.add_subplot(gs[:-1,-1])
+            else:
+                axk5 = fig.add_subplot(gs[:-2,-1])
+            if self._axsInx>2:
+                axb5 = fig.add_subplot(gs[-2,-1])
+            else:
+                axb5 = None
             axv5 = fig.add_subplot(gs[-1,-1])
             axk5.set_title('5分钟K')
             _,k5s,d5s = self.getKlineData(self._comarg,5)
@@ -576,7 +584,6 @@ class Plote:
             for i in range(todaybi-48,todaybi):
                 yb[i] = k5[i,0]+yb[i-1]
             axk5.set_xlim(todaybi-1,todaybi+48)
-            axb5.set_xlim(todaybi-1,todaybi+48)
             axv5.set_xlim(todaybi-1,todaybi+48)
             xticks = []
             for i in [0,5,11,17,23,29,35,41,47]:
@@ -585,13 +592,19 @@ class Plote:
             xticks.append(todayei-1)
             axk5.set_xticks(xticks)
             axv5.set_xticks(xticks)
-            axb5.set_xticks(xticks)
-            axk5.axhline(y=k5yc,color='darkgray',linestyle='--')
+            axk5.axhline(y=k5yc,color='black',linestyle='--')
             axv5.set_yscale('log')
             axk5.grid(True)
             axv5.grid(True)
-            axb5.grid(True)
+            k5x = np.linspace(todaybi,todayei-1,todayei-todaybi)
             plotK(axk5,k5,todaybi,todayei)
+            #如果不是大盘，将大盘绘制在图表的对应位置
+            if self._comarg.lower()!='sz399001' and self._comarg.lower()!='sh000001':
+                b,szk,szd = xueqiu.K('SZ399001',5,todayei-todaybi)
+                if b:
+                    szkmax = szk[:,4].max()
+                    szkmin = szk[:,4].min()  
+                    axk5.plot(k5x,(szk[:,4]-szkmin)*(maxk5close-mink5close)/(szkmax-szkmin)+mink5close,color='black',linewidth=2,linestyle='--',label='szk5')
             if maxk5x<todayei-3:
                 axk5.text(maxk5x,maxk5close,str(k5maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if k5maxrate>=0 else 'darkgreen')
             if mink5x<todayei-3:
@@ -603,11 +616,14 @@ class Plote:
                 k5cury = min(k5[todayei-1,3],k5[todayei-2,3])
                 k5curyb = False
             axk5.text(todayei-1,k5cury,str(k5currate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not k5curyb else 'bottom',color='red' if k5currate>=0 else 'darkgreen')
-            k5x = np.linspace(todaybi,todayei-1,todayei-todaybi)
             ck5v = stock.correctionVolume(k5,d5,5)
             axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
-            axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
-            axb5.plot(k5x,yb[todaybi-48:todayei-48],color='darkorange',label='yesterday')
+            if axb5 is not None:
+                axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
+                axb5.plot(np.linspace(todaybi,todaybi+47,48),yb[todaybi-48:todaybi],color='darkorange',label='yesterday')
+                axb5.set_xticks(xticks)
+                axb5.set_xlim(todaybi-1,todaybi+48)
+                axb5.grid(True)            
             axv5.axhline(color='black')
 
         fig.subplots_adjust(hspace=0.02,wspace=0.05) #调整子图上下间距
@@ -1318,7 +1334,10 @@ class Plote:
                     mylog.err(str(e))
 
         def startTimer():
-            nt = xueqiu.next_k_date(self._period)
+            if self._mode=='normal':
+                nt = xueqiu.next_k_date(self._period)
+            else:
+                nt = xueqiu.next_k_date(5)
             if nt>0:
                 self._timer = xueqiu.Timer(nt+1,update)
             else:

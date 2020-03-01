@@ -1442,7 +1442,7 @@ def favoriteList():
             out.clear_output(wait=True)
             with out:
                 for i in f:
-                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注').show()
+                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='runtime').show()
                     
         but.on_click(on_click)
         items.append(but)
