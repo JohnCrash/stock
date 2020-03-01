@@ -631,9 +631,9 @@ class Plote:
         if self._date is not None:
             axsK.xaxis.set_major_formatter(MyFormatter(self._date,self._period))
         #时间坐标网格线，天的画在星期一，其他的以天为单位
+        xticks = []
         if self._period=='d' or self._period=='w':
             if self._date is not None:
-                xticks = []
                 if self._period=='d':
                     last = bi
                     for i in range(bi,ei):
@@ -648,38 +648,17 @@ class Plote:
                             xticks.append(i)
                 if self._trendHeadPos>=bi and self._trendHeadPos<ei and self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
                     xticks.append(self._trendHeadPos)
-                    xticks.append(self._trendHeadPos)
-                xticks = np.array(xticks)             
+                    xticks.append(self._trendHeadPos)           
             else:
                 xticks = np.arange(bi,ei,10)
         else:
-            xticks = []
             for i in range(bi,ei):
                 if i>0 and i<len(self._date):
                     if self._date[i][0].day!=self._date[i-1][0].day:
                         xticks.append(i)
             if self._trendHeadPos>=bi and self._trendHeadPos<ei and self._trendHeadPos>=0 and self._trendHeadPos<len(self._k):
                 xticks.append(self._trendHeadPos)
-                xticks.append(self._trendHeadPos)
-            xticks = np.array(xticks)    
-            """  
-            if int(self._period) == 15:
-                xticks = np.arange(bi,ei,16)
-            elif int(self._period) == 5:
-                xticks = np.arange(bi,ei,48)
-            elif int(self._period) == 60:
-                xticks = np.arange(bi,ei,4)
-            """
-        if self._axsInx==0:
-            axsK.set_xlim(bi,ei)
-            axsK.set_xticks(xticks)
-            axsK.grid(True)
-        else:
-            for i in range(self._axsInx+1):
-                axs[i].set_xlim(bi,ei)
-                axs[i].set_xticks(xticks)
-                axs[i].grid(True)
-
+                xticks.append(self._trendHeadPos)  
         x = np.linspace(bi,ei-1,ei-bi)
         #绘制一系列的竖线贯彻整个图例
         if self._showvlines:
@@ -689,9 +668,21 @@ class Plote:
                     if v<0:
                         v = len(self._k)+v
                     if v>=bi and v<=ei:
+                        xticks.append(v)
+                        xticks.append(v)
                         plotVline(axs,v,lines['color'] if 'color' in lines else 'blue',
                         linewidth=lines['linewidth'] if 'linewidth' in lines else 1,
                         linestyle=lines['linestyle'] if 'linestyle' in lines else '-',)
+        xticks = np.array(xticks) 
+        if self._axsInx==0:
+            axsK.set_xlim(bi,ei)
+            axsK.set_xticks(xticks)
+            axsK.grid(True)
+        else:
+            for i in range(self._axsInx+1):
+                axs[i].set_xlim(bi,ei)
+                axs[i].set_xticks(xticks)
+                axs[i].grid(True)                        
         #绘制能量线
         if self._showenergy:
             axs[self._energyInx].plot(x,self._volumeenergy[bi:ei],color='red',linewidth=2)
@@ -978,7 +969,7 @@ class Plote:
                             border='solid',
                             width='100%')
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
-        link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(stockcode,stockcode))
+        link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
         items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
 
         fafavoriteNodeWidget = widgets.Text(

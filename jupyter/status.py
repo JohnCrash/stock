@@ -544,7 +544,7 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
                             for i in vline['x']:
                                 vline['dates'].append(index2date(i)) #将负索引转换为日期
                     #kline.Plote(c[1],period,config={"index":True,"markpos":current_date,"vlines":vls}).show(figsize=(32,15))
-                    kline.Plote(c[1],period,config={"index":True,"vlines":vls}).show(figsize=(32,15))
+                    kline.Plote(c[1],period,config={"index":True,"vlines":vls},mode="runtime").show(figsize=(32,15))
         
         sortedKeys = sorted(cats,key=lambda it:cats[it]['count'],reverse=True)
         count = 0
@@ -896,7 +896,7 @@ def StrongCategoryCompanyList(category,name):
                     inx = int(result[5][i,pos,0])
                     r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
                     dd = result[3][pos][0]
-                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(name,i+1)).show()
+                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(name,i+1),mode="runtime").show()
 
     butList.on_click(onListClick)
     out = widgets.Output()
@@ -983,7 +983,7 @@ def StrongCategoryCompanyList(category,name):
             output2.clear_output(wait=True)
             with output2:
                 dd = result[3][pos][0]
-                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd},context="强势分类 %s"%(name)).show()
+                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd},context="强势分类 %s"%(name),mode="runtime").show()
 
     comDropdown.observe(on_com,names='value')
 
@@ -1295,7 +1295,7 @@ def StrongCategoryList(N=50):
                         for j in range(count):
                             if j < len(sorti):
                                 inx = int(sorti[j,0])
-                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(r[1],j+1)).show()
+                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(r[1],j+1),mode="runtime").show()
 
         else:
             showPlot()
