@@ -430,7 +430,7 @@ def defaultFilter(a,c,istoday,period):
 """
 按分类列出崛起的股票的数量与列表
 """
-def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
+def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=None,ei=None):
     today_but = None
     output = widgets.Output()
     output2 = widgets.Output()
@@ -466,7 +466,10 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
     #可以提前准备的数据
     categorys = stock.query("""select id,name from category""")
     companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
-    dates = stock.query('select date from %s where id=8828 order by date desc limit 50'%('company_status' if period=='d' else 'company_status_week'))
+    if bi is not None:
+        dates = stock.query("select date from %s where id=8828 and date>='%s' and date<='%s' order by date desc"%('company_status' if period=='d' else 'company_status_week',bi,ei))
+    else:
+        dates = stock.query('select date from %s where id=8828 order by date desc limit 50'%('company_status' if period=='d' else 'company_status_week'))
 
     id2companys = {}
     for c in companys:
@@ -544,7 +547,7 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
                             for i in vline['x']:
                                 vline['dates'].append(index2date(i)) #将负索引转换为日期
                     #kline.Plote(c[1],period,config={"index":True,"markpos":current_date,"vlines":vls}).show(figsize=(32,15))
-                    kline.Plote(c[1],period,config={"index":True,"vlines":vls},mode="runtime").show(figsize=(32,15))
+                    kline.Plote(c[1],period,config={"index":True,"vlines":vls},mode="auto").show(figsize=(32,15))
         
         sortedKeys = sorted(cats,key=lambda it:cats[it]['count'],reverse=True)
         count = 0
@@ -582,7 +585,11 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
         today_but.on_click(onCatsList)
         items.append(today_but)
     
-    for i in range(15):
+    if bi is not None:
+        N = len(dates)
+    else:
+        N = 15
+    for i in range(N):
         d = dates[i]
         desc = str(d[0])
         if name is not None:
@@ -612,9 +619,12 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None):
 
 #最近N天的status数据
 #同时返回N天的日期数组和数据
-def getStatusN(db,N):
+def getStatusN(db='company_status',N=50,bi=None,ei=None):
     #缓存中没有准备数据
-    d = stock.query("""select date from %s where id=8828 order by date desc limit %d"""%(db,N))
+    if bi is not None:
+        d = stock.query("""select date from %s where id=8828 and date>='%s' and date<='%s' order by date desc"""%(db,bi,ei))
+    else:
+        d = stock.query("""select date from %s where id=8828 order by date desc limit %d"""%(db,N))
     d = list(d)
     d.reverse()
     cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
@@ -652,17 +662,23 @@ def getStatusN(db,N):
     ...
 ]
 """
-def StrongSorted(days,N=50):
+def StrongSorted(days,N=50,bi=None,ei=None):
     result = []
     #categorys = stock.query("""select id,name from category""")
     companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
     for com in companys:
         id2com[com[0]] = com
-    if N>50:
-        D,K = getStatusN('company_status',N)
+    if bi is not None:
+        if ei is not None:
+            D,K = getStatusN(bi=bi,ei=ei)
+        else:
+            D,K = getStatusN(bi=bi,ei=stock.dateString(date.today()))
     else:
-        D,K = redisStatusCache50('company_status')
+        if N>50:
+            D,K = getStatusN(N=N)
+        else:
+            D,K = redisStatusCache50('company_status')
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
     idd[:,0] = K[:,0,0]
     for i in idd:
@@ -807,7 +823,7 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
 """
 按分类列出强势股
 """
-def StrongCategoryCompanyList(category,name):
+def StrongCategoryCompanyList(category,name,toplevelpos=None):
     def getResult(day,categoryName):
         nonlocal category
         for r in category:
@@ -822,8 +838,11 @@ def StrongCategoryCompanyList(category,name):
     pagecount = 50
     LEN = len(result[3])
     bi = LEN-pagecount
-    ei = LEN    
-    pos = LEN-1
+    ei = LEN   
+    if toplevelpos is not None:
+        pos = toplevelpos
+    else:
+        pos = LEN-1
     if bi < 0:
         bi = 0
     output = widgets.Output()
@@ -896,7 +915,7 @@ def StrongCategoryCompanyList(category,name):
                     inx = int(result[5][i,pos,0])
                     r = result[4][inx] #(0 id , 1 code , 2 name , 3 category)
                     dd = result[3][pos][0]
-                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(name,i+1),mode="runtime").show()
+                    kline.Plote(r[1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(name,i+1),mode="auto").show()
 
     butList.on_click(onListClick)
     out = widgets.Output()
@@ -983,7 +1002,7 @@ def StrongCategoryCompanyList(category,name):
             output2.clear_output(wait=True)
             with output2:
                 dd = result[3][pos][0]
-                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd},context="强势分类 %s"%(name),mode="runtime").show()
+                kline.Plote(getCodeByName(com),'d',config={'index':True,'markpos':dd},context="强势分类 %s"%(name),mode="auto").show()
 
     comDropdown.observe(on_com,names='value')
 
@@ -1132,12 +1151,16 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
 
 """
 强势分类于强势股
+N 最近多少天的数据,50天的话可以使用redis速度较快
+bi 开始时间
+ei 结束时间
+N 和 bi,ei只能选择一种
 """
-def StrongCategoryList(N=50):
+def StrongCategoryList(N=50,bi=None,ei=None):
     def progressCallback(i):
         pass
     update_status(progressCallback) #更新公司日状态
-    result = StrongSorted([3,5,10,20],N)
+    result = StrongSorted([3,5,10,20],N,bi=bi,ei=ei)
     output = widgets.Output()
     def getSortedCategory(day,pos):
         categorys = []
@@ -1235,7 +1258,7 @@ def StrongCategoryList(N=50):
         else:
             output.clear_output()
             with output:
-                StrongCategoryCompanyList(result,category)
+                StrongCategoryCompanyList(result,category,toplevelpos=pos)
         needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
@@ -1295,7 +1318,7 @@ def StrongCategoryList(N=50):
                         for j in range(count):
                             if j < len(sorti):
                                 inx = int(sorti[j,0])
-                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(r[1],j+1),mode="runtime").show()
+                                kline.Plote(idds[inx,1],'d',config={'index':True,'markpos':dd},context="强势分类 %s %d"%(r[1],j+1),mode="auto").show(pos=dd)
 
         else:
             showPlot()
@@ -1442,7 +1465,7 @@ def favoriteList():
             out.clear_output(wait=True)
             with out:
                 for i in f:
-                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='runtime').show()
+                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='auto').show()
                     
         but.on_click(on_click)
         items.append(but)

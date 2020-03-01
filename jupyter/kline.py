@@ -339,7 +339,10 @@ class Plote:
     def init(self,company,period,config,date_ = None,companyInfo=None):
         self._period = period
         if self._period=='d' or self._period=='w':
-            self._showcount = 120 if self._mode=='normal' else 80
+            if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
+                self._showcount = 80
+            else:
+                self._showcount = 120
         elif int(self._period)==5: #48
             self._showcount = 144
         elif int(self._period)==15: #16
@@ -421,6 +424,7 @@ class Plote:
             self._timer.cancel()
 
     #company可以是kline数据，可以是code，也可以是公司名称
+    #mode = 'normal','runtime','auto'
     def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal'):
         self._timer = None
         self._prefix = prefix
@@ -515,6 +519,10 @@ class Plote:
         return code.lower()
     def name(self):
         return self._company[2]
+    #当前时间,周1~周5 9:00-15:00返回True
+    def isWatchTime(self):
+        t = datetime.today()
+        return t.weekday()>=0 and t.weekday()<5 and t.hour>=9 and t.hour<=15
     #显示K线图
     def showKline(self,bi=None,ei=None,figsize=(30,16)):     
         if bi is None:
@@ -533,10 +541,7 @@ class Plote:
         else:
             if ei<=-len(self._k):
                 ei = -len(self._k)+1
-        if self._mode=='normal':
-            gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
-            fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
-        else: #下面的代码在右侧开辟一个区域绘制5分钟时k图
+        if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()): #下面的代码在右侧开辟一个区域绘制5分钟时k图
             gs_kw = dict(width_ratios=[2,1], height_ratios=self._heights)
             fig, ax = plt.subplots(self._axsInx+1,2,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
             axs = ax[:,0]
@@ -625,6 +630,9 @@ class Plote:
                 axb5.set_xlim(todaybi-1,todaybi+48)
                 axb5.grid(True)            
             axv5.axhline(color='black')
+        else:
+            gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
+            fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
 
         fig.subplots_adjust(hspace=0.02,wspace=0.05) #调整子图上下间距
         axsK = axs if self._axsInx==0 else axs[0]
@@ -866,7 +874,8 @@ class Plote:
         #    self._isupdate = True
 
     #code2另一只股票，进行比较显示
-    def show(self,bi=None,ei=None,code2=None,figsize=(30,14)):
+    #pos = '2019-1-1' 直接跳转到该日期
+    def show(self,bi=None,ei=None,code2=None,figsize=(30,14),pos=None):
         if bi is None:
             bi = len(self._k)-self._showcount
             if bi<0:
@@ -878,6 +887,25 @@ class Plote:
             figure2 = Plote(code2,self._period)
         else:
             figure2 = None
+        if pos is not None:
+            if type(pos)==str:
+                post = date.fromisoformat(pos)
+            else:
+                post = pos
+            for i in range(len(self._date)):
+                if self._date[i][0]>=post:
+                    bi = math.floor(i-self._showcount/2)
+                    if bi<=0:
+                        bi = 0
+                    ei = bi+self._showcount
+                    if ei>len(self._date):
+                        ei = len(self._date)
+                        bi = len(self._date)-self._showcount
+                        if bi<0:
+                            bi=0
+                    self._trendHeadPos = i
+                    break
+
         nextbutton = widgets.Button(description="下一页",layout=Layout(width='96px'))
         prevbutton = widgets.Button(description="上一页",layout=Layout(width='96px'))
         zoominbutton = widgets.Button(description="+",layout=Layout(width='48px'))
@@ -1325,10 +1353,10 @@ class Plote:
                     mylog.err(str(e))
 
         def startTimer():
-            if self._mode=='normal':
-                nt = xueqiu.next_k_date(self._period)
-            else:
+            if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
                 nt = xueqiu.next_k_date(5)
+            else:
+                nt = xueqiu.next_k_date(self._period)
             if nt>0:
                 self._timer = xueqiu.Timer(nt+1,update)
             else:
