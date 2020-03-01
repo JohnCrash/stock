@@ -611,8 +611,6 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=
         nonlocal today_but
         if xueqiu.isTransTime():
             today_but.button_style = 'success' #green button
-            #self.reload(all=False)
-            #showline()
             xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
     if today_but is not None:
         xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
