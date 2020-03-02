@@ -541,13 +541,15 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=
                 for c in cats[key]['ls']:
                     #对vlines的位置是相对于当前日期，因此需要做偏移调整
                     vls = copy.deepcopy(vlines[c[0]])
+                    lastdd = None
                     for vline in vls:
                         if 'x' in vline:
                             vline['dates'] = []
                             for i in vline['x']:
+                                lastdd = index2date(i)
                                 vline['dates'].append(index2date(i)) #将负索引转换为日期
                     #kline.Plote(c[1],period,config={"index":True,"markpos":current_date,"vlines":vls}).show(figsize=(32,15))
-                    kline.Plote(c[1],period,config={"index":True,"vlines":vls},mode="auto").show(figsize=(32,15))
+                    kline.Plote(c[1],period,config={"index":True,"vlines":vls},mode="auto").show(figsize=(32,15),pos=lastdd)
         
         sortedKeys = sorted(cats,key=lambda it:cats[it]['count'],reverse=True)
         count = 0
@@ -839,6 +841,8 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
     ei = LEN   
     if toplevelpos is not None:
         pos = toplevelpos
+        if pos>LEN:
+            pos = LEN-1
     else:
         pos = LEN-1
     if bi < 0:

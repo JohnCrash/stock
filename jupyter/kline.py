@@ -201,7 +201,7 @@ class Plote:
         self._showbollwidth = False
         self._showtrend = False
         self._showenergy = False
-        
+        self._mad = None
         if len(self._k)==0: #完全没有数据
             return
         if 'ma' in self._config:
@@ -240,7 +240,7 @@ class Plote:
             self._energyInx = self._axsInx+1
             self._axsInx += 1
             if self._correcttionVolume and (self._period==5 or self._period==15 or self._period==30 or self._period==60 or self._period==120 or self._period==1):
-                volume = stock.correctionVolume(self._k,self._date,self._period)
+                volume,mad = stock.correctionVolume(self._k,self._date,self._period)
                 self._volumeenergy = stock.kdj(stock.volumeEnergy(volume))[:,2]
                 self._volumekdj = stock.kdj(volume)[:,2]
                 self._k = np.array(self._k,copy=True)
@@ -250,10 +250,13 @@ class Plote:
                 self._volumekdj = stock.kdj(self._k[:,0])[:,2]
             self._showenergy = True
         else:
-            if self._correcttionVolume:
-                volume = stock.correctionVolume(self._k,self._date,self._period)
-                self._k = np.array(self._k,copy=True)
-                self._k[:,0] = volume
+            if self._period==5 or self._period==15:
+                volume,mad = stock.correctionVolume(self._k,self._date,self._period)
+                if self._correcttionVolume:
+                    self._k = np.array(self._k,copy=True)
+                    self._k[:,0] = volume
+                else:
+                    self._mad = mad.reshape(-1)
         if 'bollwidth' in self._config and self._config['bollwidth']:
             self._bollwidthInx = self._axsInx+1
             self._axsInx += 1
@@ -621,8 +624,10 @@ class Plote:
                 k5cury = min(k5[todayei-1,3],k5[todayei-2,3])
                 k5curyb = False
             axk5.text(todayei-1,k5cury,str(k5currate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not k5curyb else 'bottom',color='red' if k5currate>=0 else 'darkgreen')
-            ck5v = stock.correctionVolume(k5,d5,5)
+            ck5v,mad = stock.correctionVolume(k5,d5,5)
             axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
+            axv5.axhline(y=mad[-1,:].mean(),color='darkorange',linestyle='--')
+            axv5.axhline(y=ck5v[todaybi:todayei].mean(),color='dodgerblue',linestyle='--')
             if axb5 is not None:
                 axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
                 axb5.plot(np.linspace(todaybi,todaybi+47,48),yb[todaybi-48:todaybi],color='darkorange',label='yesterday')
@@ -782,9 +787,12 @@ class Plote:
         #绘制成交量
         if self._showvolume:
             axs[self._volInx].step(x,self._k[bi:ei,0],where='mid',label='volume')
-            axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
-            axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
-            #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
+            if self._mad is not None: #绘制5分钟或者15分钟的碗型
+                axs[self._volInx].step(x,self._mad[bi:ei],label='mad',color='orangered') #low
+            else:
+                axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
+                axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
+                #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
             axs[self._volInx].axhline(color='black')
         #绘制交易点
         if 'trans' in self._config:

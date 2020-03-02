@@ -750,4 +750,4 @@ def correctionVolume(k,d,period,n=10):
         avg = mad[i,:].mean()
         for j in range(N):
             volumed[i,j] *= avg/mad[i,j]
-    return volume[:len(k)]
+    return volume[:len(k)],mad
