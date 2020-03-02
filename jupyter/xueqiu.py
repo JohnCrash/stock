@@ -416,11 +416,12 @@ def checkK(code,period,k,d,base,n):
     today = date.today()
     if d[0][0].day!=today.day: #存在不在一天的数据就可以进行检查
         c,K,D = stock.loadKline(code,period,after=datetimeString(d[0][0]))
-        mylog.warn("checkK %s,%s,%s,%d"%(code,period,base,n))
+        mylog.warn("checkK %s,%s,%s,%d"%(code,period,base,n))        
         for i in range(len(k)):
             if d[i][0]!=today.day and i<len(K) and not isEqK(k[i],K[i]):
                 mylog.warn("%d\t%s\t%s"%(i,str(d[i][0]),str(k[i])))
                 mylog.warn("%d\t%s\t%s"%(i,str(D[i][0]),str(K[i])))
+                break
 #返回指定代码的k线数据
 # True , np.array((timesramp,volume,open,high,low,close),...),[(timesramp,)...] 保持和loadKline相同的数据结构
 # False, "Error infomation"

@@ -1347,18 +1347,22 @@ class Plote:
         fafavoriteNodeWidget.observe(on_favoriteText,names='value')
         def update():
             for i in range(10):
+                refreshbutton.button_style = 'success' #green button
                 try:
-                    refreshbutton.button_style = 'success' #green button
                     self.reload(all=False)
-                    recalcRange(False)
-                    showline()
-                    refreshbutton.button_style = ''
-                    startTimer()
-                    break
                 except Exception as e:
-                    import traceback
-                    mylog.info(traceback.format_stack())
-                    mylog.err(str(e))
+                    mylog.err("reload %s"%str(e))
+                recalcRange(False)
+                try:    
+                    showline()
+                except Exception as e:
+                    mylog.err("showline %s"%str(e))                
+                refreshbutton.button_style = ''
+                try:
+                    startTimer()
+                except Exception as e:
+                    mylog.err("startTimer %s"%str(e))                        
+                break
 
         def startTimer():
             if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
