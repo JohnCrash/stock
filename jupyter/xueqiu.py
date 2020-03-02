@@ -99,11 +99,11 @@ def qqK15(code,n=32):
         if len(K)==(n+1)*3:
             k = []
             mod = K[0][0].minute%15
-            if mod==5:
+            if mod==5: #5-2,20-2,35-2,50-2
                 bi = 0
-            elif mod==10:
-                bi = 3
-            else:
+            elif mod==10: #10-1,25-1,40-1,55-1
+                bi = 2
+            else: #15,30,45,00
                 bi = 1
 
             for i in range(bi,len(K),3):

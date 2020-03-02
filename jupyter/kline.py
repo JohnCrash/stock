@@ -124,7 +124,7 @@ class MyFormatterK5(Formatter):
             for i in range(len(self.k5d)):
                 d = self.k5d[i]
                 if t.hour==d[0] and t.minute==d[1]:
-                    t = self.k5d[(i+offset)%len(self.k5d)]
+                    t = self.k5d[(i+offset+1)%len(self.k5d)]
                     return "%d:%02d"%(t[0],t[1])
         return ''
 
@@ -428,7 +428,7 @@ class Plote:
 
     #company可以是kline数据，可以是code，也可以是公司名称
     #mode = 'normal','runtime','auto'
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal'):
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',temp=0):
         self._timer = None
         self._prefix = prefix
         self._context = context
@@ -443,6 +443,7 @@ class Plote:
         self._rate = None
         self._macd = None
         self._mode = mode
+        self._temp = temp
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
         elif period==15:
@@ -868,8 +869,8 @@ class Plote:
         #self._output.clear_output(wait=True)
         #with self._output:
         #    plt.show()
-        output_show(self._output)
-        #plt.show()
+        #output_show(self._output)
+        plt.show()
         """
         这里定制plt.show函数，参加backend_inline.py
         plt.show()调用backend_inline.show

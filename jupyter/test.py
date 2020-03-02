@@ -12,6 +12,7 @@ import queue
 import time
 from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
+import kline
 """
 display_pub = InteractiveShell.instance().display_pub
 display_pub.publish(data='hell',metadata={})
@@ -36,9 +37,12 @@ for i in range(5):
         print('error\n')
 """        
 #print(xueqiu.K('SZ000158',5,96))
-c,k,d = stock.loadKline('SZ399001',5)
-b,k,d = xueqiu.appendK('SZ399001',5,k,d)
-
+#c,k,d = stock.loadKline('SZ399001',5)
+#b,k,d = xueqiu.appendK('SZ399001',5,k,d)
+#code = 'SH603369'
+#cacheName = "k%s_%s"%(str(15).lower(),code.lower())
+#shared.delKey(cacheName)
+#b,k,d = xueqiu.xueqiuKday(code,15)
 #print(xueqiu.nextKDate(datetime(2020,2,25,10,55),5))
 #print(xueqiu.from2now(10,55,5))
 #print(xueqiu.k5date)
@@ -55,4 +59,8 @@ b,k,d = xueqiu.appendK('SZ399001',5,k,d)
 #shared.delKey("k5_sz002796")
 #shared.delKey("k5_sz002837")
 #shared.delKey("k5_sh603825")
-print(xueqiu.from2now(datetime(2020,2,26,15,40),5))
+#print(xueqiu.from2now(datetime(2020,2,26,15,40),5))
+
+def K(code):
+    kline.Plote(code,'d',config={'index':True},mode='runtime',temp=-43).showKline()
+K('SH000001')
