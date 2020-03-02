@@ -414,6 +414,77 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     progress(100)
     return rasing,vlines
 
+historyRasingCache = [0,0,0,0]
+#主要用于观察过去的数据
+def searchRasingCompanyStatusByRedisRange(bi,ei,dd,period,cb,filter,id2companys,progress):
+    global historyRasingCache
+    if historyRasingCache[0]==bi and historyRasingCache[1]==ei:
+        d = historyRasingCache[2]
+        a = historyRasingCache[3]
+    else:
+        if period=='d':
+            db = 'company_status'
+        else:
+            db = 'company_status_week'
+        #往前延续20天
+        bi20 = stock.dateString(date.fromisoformat(bi)-timedelta(days=20))
+        d = stock.query("""select date from %s where id=8828 and date>='%s' and date<='%s' order by date desc"""%(db,bi20,ei))
+        d = list(d)
+        d.reverse()
+        cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
+        r = stock.query("""select count(*) from company""")
+        n = r[0][0] #公司数量
+        dn = len(d)
+        a = np.ones((n,dn,11))
+        lastid = -1
+        nc = -1
+        temp = []
+        for c in cs:
+            if c[0]!=lastid:
+                if len(temp)>0:
+                    offset = dn-len(temp)
+                    for i in range(dn):
+                        if i<offset:
+                            a[nc,i,:] = temp[0]
+                        else:
+                            a[nc,i,:] = temp[i-offset]
+                nc += 1
+                lastid = c[0]
+                temp = []
+                if nc>=n:
+                    break
+            temp.append(c)
+        historyRasingCache[0] = bi
+        historyRasingCache[1] = ei
+        historyRasingCache[2] = d
+        historyRasingCache[3] = a              
+        #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
+        #数据a的时间序列和d相同,shape = (公司数,日期,数据)
+        #return d,a   
+   
+    progress(30)
+    bii = len(d)-1
+    for i in range(len(d)):
+        if str(d[i][0])==dd:
+            bii = i  
+    rasing = []
+    vlines = {}
+    results = []
+    for i in range(len(a)):      
+        c = a[i]
+        idd = int(c[-1][0])
+        #反转数组的前后顺序，反转后-1代表最近的数据
+        k = c[:bii+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
+        if idd in id2companys and filter(k,id2companys[idd],False,period):
+            results.append((k,id2companys[idd]))
+    for it in results:
+        b,vline = cb(it[0],it[1],False)
+        if b:
+            idd = it[1][0]
+            rasing.append(idd)
+            vlines[idd] = vline
+    progress(100)  
+    return rasing,vlines
 """
 前置过滤器，用于初选。这样在处理当日数据下载时可以少下载很多数据
 """
@@ -494,7 +565,10 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=
         with output2:
             display(progress)            
         progressCallback(0)
-        rasing,vlines = searchRasingCompanyStatusByRedis(E.date,period,cb,filter,id2companys,progressCallback)
+        if bi is None:
+            rasing,vlines = searchRasingCompanyStatusByRedis(E.date,period,cb,filter,id2companys,progressCallback)
+        else:
+            rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,cb,filter,id2companys,progressCallback)
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -689,7 +763,12 @@ def StrongSorted(days,N=50,bi=None,ei=None):
             i[3] = id2com[k][3]
     
     for day in days:
-        dk = (K[:,day:,1]-K[:,:-day,1])/K[:,:-day,1]
+        #dk = (K[:,day:,1]-K[:,:-day,1])/K[:,:-day,1] #使用n天前的收盘价和现在的收盘价进行比较，问题是如果n天前正好是一个跌幅比较大的天，和今天比将反向衬托今天好像大涨
+        #这里和n天前的5日均线比较这样结果比较平滑
+        ma5 = np.empty((K.shape[0],K.shape[1]))
+        for i in range(len(K)):
+            ma5[i,:] = stock.ma(K[i,:,1],5)
+        dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]
         for category in popularCategory():
             r = idd[:,3]==category
             dK = dk[r]
@@ -767,6 +846,7 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
         axs.set_title("%s 周期%s"%(r[1],r[0]))
     else:
         axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
+
     xdd = np.arange(len(dd))
     if top is None:
         for i in range(len(r[2])):
@@ -843,10 +923,18 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
         pos = toplevelpos
         if pos>LEN:
             pos = LEN-1
+        bi = pos-math.floor(pagecount/2)
+        if bi<0:
+            bi = 0
+        ei = bi+pagecount
+        if ei>=LEN:
+            ei = LEN-1
+            bi = ei-pagecount
     else:
         pos = LEN-1
     if bi < 0:
         bi = 0
+
     output = widgets.Output()
     output2 = widgets.Output()
     
@@ -994,8 +1082,8 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
             output2.clear_output()
         else:
             out.clear_output(wait=True)
-            with out:
-                display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))             
+            #with out:
+            #    display(widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s</a>"""%(getCodeByName(com),com)))             
         
         if com is None:                
             showPlot()

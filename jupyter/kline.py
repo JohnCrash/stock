@@ -224,16 +224,16 @@ class Plote:
             self._macd = macd
             self._trend = trend.macdTrend(self._k,self._macd)
             #self._trend2 = trend.large(self._k,self._trend,0.15)
-            if self._date and 'markpos' in self._config:
-                dd = self._config['markpos']
-                self._trendHeadPos = len(self._k)-1
-                for i in range(len(self._date)):
-                    if self._date[i][0] == dd:
-                        self._trendHeadPos = i
-                        break
-            else:
-                self._trendHeadPos = len(self._k)-1
             self._showtrend = True
+        self._gotoTrendHeandPos = False
+        if self._date and 'markpos' in self._config:
+            dd = self._config['markpos']
+            self._trendHeadPos = len(self._k)-1
+            for i in range(len(self._date)):
+                if self._date[i][0] == dd:
+                    self._trendHeadPos = i
+                    self._gotoTrendHeandPos = True
+                    break
         else:
             self._trendHeadPos = len(self._k)-1
         if 'energy' in self._config and self._config['energy']:
@@ -869,8 +869,8 @@ class Plote:
         #self._output.clear_output(wait=True)
         #with self._output:
         #    plt.show()
-        #output_show(self._output)
-        plt.show()
+        output_show(self._output)
+        #plt.show()
         """
         这里定制plt.show函数，参加backend_inline.py
         plt.show()调用backend_inline.show
@@ -885,12 +885,17 @@ class Plote:
     #code2另一只股票，进行比较显示
     #pos = '2019-1-1' 直接跳转到该日期
     def show(self,bi=None,ei=None,code2=None,figsize=(30,14),pos=None):
+        if self._gotoTrendHeandPos:
+            bi = self._trendHeadPos-math.floor(self._showcount/2)
+            ei = bi+self._showcount
         if bi is None:
             bi = len(self._k)-self._showcount
-            if bi<0:
-                bi = 0
         if ei is None:
             ei = len(self._k)
+        if bi<0:
+            bi = 0
+        if ei>len(self._k):
+            ei=len(self._k)
         if code2 is not None:
             figsize = (30,8)
             figure2 = Plote(code2,self._period)
