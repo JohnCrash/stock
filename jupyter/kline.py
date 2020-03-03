@@ -327,9 +327,9 @@ class Plote:
             if period == 'w':
                 after = None #全部数据
             elif period == 'd':
-                after = stock.dateString(date.today()-timedelta(days=5*365)) #5年数据
+                after = stock.dateString(date.today()-timedelta(days=5*365 if self._lastday is None else self._lastday)) #5年数据
             else:
-                after = stock.dateString(date.today()-timedelta(days=60))
+                after = stock.dateString(date.today()-timedelta(days=60 if self._lastday is None else self._lastday))
 
             c,k,d = stock.loadKline(code,period,after=after)
             self._cacheK[code] = {}
@@ -428,7 +428,7 @@ class Plote:
 
     #company可以是kline数据，可以是code，也可以是公司名称
     #mode = 'normal','runtime','auto'
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',temp=0):
+    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',lastday=None):
         self._timer = None
         self._prefix = prefix
         self._context = context
@@ -443,7 +443,7 @@ class Plote:
         self._rate = None
         self._macd = None
         self._mode = mode
-        self._temp = temp
+        self._lastday = lastday
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
         elif period==15:
@@ -1078,7 +1078,7 @@ class Plote:
 
         def on_zoomin(b):
             nonlocal beginPT,endPT,showRange
-            showRange = math.floor(showRange/2)
+            showRange = math.floor(showRange*3/4)
             beginPT = endPT - showRange
             self._trendHeadPos = endPT
             setSlider(beginPT,endPT,endPT)
@@ -1086,7 +1086,7 @@ class Plote:
 
         def on_zoomout(b):
             nonlocal beginPT,endPT,showRange
-            showRange *= 2
+            showRange = math.floor(showRange*4/3)
             beginPT = endPT - showRange
             if beginPT < 0:
                 beginPT = 0
