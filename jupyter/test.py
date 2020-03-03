@@ -78,3 +78,6 @@ for i in range(5):
 #def K(code):
 #    kline.Plote(code,'d',config={'index':True},mode='runtime',temp=-43).showKline()
 #K('SH000001')
+c,k,d = stock.loadKline('SZ399001','d')
+m = stock.macd(k)
+stock.MacdBestPt(k,m)

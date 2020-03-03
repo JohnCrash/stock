@@ -739,7 +739,7 @@ class Plote:
         #绘制趋势线
         if self._showtrend:
             for line in self._trend:
-                if line[1]>bi and line[0]<ei:
+                if (line[1]>=bi and line[1]<=ei) or (line[0]>=bi and line[0]<=ei):
                     x0 = line[0]
                     x1 = line[1]
                     k = line[2]
@@ -1113,7 +1113,8 @@ class Plote:
 
         def updateTrend():
             if self._macd is not None:
-                self._trend = trend.macdTrend(self._k[:self._trendHeadPos,:],self._macd[:self._trendHeadPos])
+                if self._trendHeadPos<len(self._k):
+                    self._trend = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
             #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):

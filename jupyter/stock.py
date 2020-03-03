@@ -495,9 +495,9 @@ def MacdBestPt(k,m):
             else:
                 maxpts.append(maxi)
                 pts.append(maxi)
-            minx = k[i,3]
+            minx = 10*k[i,2]
             mini = i
-            maxx = k[i,2]
+            maxx = -minx
             maxi = i
         prev = m[i]
     if mini!=maxi:
