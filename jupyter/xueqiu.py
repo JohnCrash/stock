@@ -295,6 +295,11 @@ def getK(code,period,n,provider=None):
         service = stockK5Service
     elif period==15:
         service = stockK15Service
+    if code.upper()=='SZ399001': #新浪的的深成指和雪球有较大差异
+        if period == 15:
+            provider = '雪球k15'
+        else:
+            provider = '雪球k5'
     if service is not None:
         for i in range(10):
             if provider is None:
@@ -466,7 +471,6 @@ def K(code,period,n):
             mylog.err("K '%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
             mylog.err("oldK=%s,%s"%(str(d[-1]),str(oldK[-1])))
             mylog.err("k[bi]=%s"%(str(k[bi])))
-            checkK(code,period,k,d,base,n)
 
         for i in range(bi+1,len(k)):
             v = k[i]

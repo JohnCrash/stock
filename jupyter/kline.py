@@ -627,7 +627,7 @@ class Plote:
             axk5.text(todayei-1,k5cury,str(k5currate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not k5curyb else 'bottom',color='red' if k5currate>=0 else 'darkgreen')
             ck5v,mad = stock.correctionVolume(k5,d5,5)
             axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
-            axv5.axhline(y=mad[-1,:].mean(),color='darkorange',linestyle='--')
+            axv5.axhline(y=ck5v[todaybi-48:todaybi].mean(),color='darkorange',linestyle='--')
             axv5.axhline(y=ck5v[todaybi:todayei].mean(),color='dodgerblue',linestyle='--')
             if axb5 is not None:
                 axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
