@@ -31,7 +31,7 @@ def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
-            'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; cookiesu=611580616600184; Hm_lvt_1db88642e346389874251b5a1eded6e3=1580196127,1580197850,1580447002,1580630322; remember=1; xq_a_token=0e0638737a1c6fc314110dbcfaca3650f71fce4b; xqat=0e0638737a1c6fc314110dbcfaca3650f71fce4b; xq_r_token=b2004307cb6bd998b245347262380833b61ce0f4; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1580630785'}
+            'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; Hm_lvt_1db88642e346389874251b5a1eded6e3=1583209427,1583211614,1583214605,1583214738; xq_a_token=a664afb60c7036c7947578ac1a5860c4cfb6b3b5; xqat=a664afb60c7036c7947578ac1a5860c4cfb6b3b5; xq_r_token=01d9e7361ed17caf0fa5eff6465d1c90dbde9ae2; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOi0xLCJpc3MiOiJ1YyIsImV4cCI6MTU4NTM2MjYwNywiY3RtIjoxNTgzMjI2MDI4NTUyLCJjaWQiOiJkOWQwbjRBWnVwIn0.lVcKYgvg9WJzqgZupKkRGfROQf7bwmP7H57_2yFOH9E91nzT_qbwCmjv5aqdHEgd-j5ufLHsyDTUWwds1M4Vu2XCD6G286CqDZLxMDPScXqWiOwMSa8T6ppiRbPNDj70wJqin7QFY175COevpiUs_7S6V8oR-ur_F3sfjGbbOCFIFPcMusM8PF7DBqs3QK5G4PyzTCjWIvGRvgTVgrQOWrEe2yhV3nEiNqhFF9hq97usTUxxP4VTS35wY_u_kNHo4XjFgsPRixB3cEWb-m7TsLPYng5aZopaTpX0BZe4uxxgwDICU7TFI_SndzvPM_51cYk5A6RvVyAYDFyhVTni-Q; u=601583226070297; cookiesu=841583226412354; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1583226412'}
     r = s.get(url,headers=headers)
     if r.status_code==200:
         return True,r.json()
@@ -216,7 +216,7 @@ def xueqiuK(code,period,n):
             assert(len(K)==n)
             return True,K
         else:
-            return b,d
+            return b,dd
     except Exception as e:
         mylog.err("xueqiuK15:"+str(code)+"ERROR:"+str(e))
         return False,str(e) 
@@ -284,9 +284,15 @@ def logServiceState():
     mylog.warn("==============stockK15Service=============")
     for it in stockK15Service:
         mylog.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
+        if 'errmsg' in it:
+            mylog.warn(str(it['errmsg']))
+            it['errmsg'].clear()
     mylog.warn("==============stockK5Service=============")
     for it in stockK5Service:
         mylog.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
+        if 'errmsg' in it:
+            mylog.warn(str(it['errmsg']))        
+            it['errmsg'].clear()
 
 #下载K数据，返回True/False,[(timesramp,volume,open,high,low,close)...],source
 def getK(code,period,n,provider=None):
@@ -319,6 +325,10 @@ def getK(code,period,n,provider=None):
                 return b,d,service[current]['name']
             else:
                 service[current]['error'] += 1
+                if not 'errmsg' in service[current]:
+                    service[current]['errmsg'] = []
+                service[current]['errmsg'].append(d)
+    logServiceState()
     return False,0,0
 
 #返回下一个正确的时间k日期,输入时间t必须是一个正确的时间戳
@@ -488,8 +498,7 @@ def K(code,period,n):
             d.append((v[0],))
         k = np.array(K)
     else:
-        mylog.err("'%s' %s 下载时出错"%(code,str(period)))
-        logServiceState()
+        mylog.err("'%s' %s %s 下载时出错"%(code,str(period),base))
         return False,0,0
     
     shared.toRedis({'k':k,'date':d,'base':base,"ver":3},cacheName,ex=24*3600)

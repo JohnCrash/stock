@@ -954,7 +954,7 @@ class Plote:
         if self._period=='d':
             periodDropdownvalue = '日线'
             indexDropdownvalue = 'MACD+'
-            mainDropdownvalue = 'BOLL+'
+            mainDropdownvalue = 'TREND'
         elif self._period==15:
             periodDropdownvalue = '15分钟校'
             indexDropdownvalue = 'MACD'
