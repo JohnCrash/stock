@@ -20,9 +20,9 @@ c,k,d = stock.loadKline('SH:000001')
 
 r = stock.volumeprices(k,d)
 """
-b,k = xueqiu.sinaK5('SH000001',96)
-for i in range(len(k)):
-    print(i,k[i])
+#b,k = xueqiu.sinaK5('SH000001',96)
+#for i in range(len(k)):
+#    print(i,k[i])
 """
 period = 5
 code = 'SH000001'
@@ -78,6 +78,20 @@ for i in range(5):
 #def K(code):
 #    kline.Plote(code,'d',config={'index':True},mode='runtime',temp=-43).showKline()
 #K('SH000001')
-c,k,d = stock.loadKline('SZ399001','d')
-m = stock.macd(k)
-stock.MacdBestPt(k,m)
+#c,k,d = stock.loadKline('SZ399001','d')
+#m = stock.macd(k)
+#stock.MacdBestPt(k,m)
+#def progress(i):
+#    print(i)
+#r = status.StrongSorted5k([3,6,12],N=96,progress=progress)
+#print(len(r))
+
+"""
+ls = stock.query("select id,name from category")
+for it in ls:
+    r = stock.query("select id,name from company where category=%d"%(it[0]))
+    if len(r)==0:
+        s = "delete from category where id=%d"%(it[0])
+        print(s)
+        stock.execute(s)
+"""

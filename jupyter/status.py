@@ -32,6 +32,13 @@ def popularCategory():
 def isPopularCategory(name):
     return name in popularCategory()
 
+def allCategory():
+    ls = stock.query("select name from category")
+    r = []
+    for l in ls:
+        r.append(l[0])
+    return r
+
 #见数据插入到company_status表
 def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd):
     if len(k)>0:
@@ -308,7 +315,49 @@ def redisStatusCache50(db):
     #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
     #数据a的时间序列和d相同,shape = (公司数,日期,数据)
     return d,a
-
+#companys = [(company_id,code,name,category),....]
+#返回
+#(datetime,...),K[company,date,(id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw)]
+#除了id,close,volume其他都是0
+def downloadAllK(companys,period,N,progress,ThreadCount=10):
+    results = []
+    lock = threading.Lock()
+    count = 0
+    tatoal = len(companys)
+    def getk(com):
+        nonlocal count,period,N
+        b,k_,d_ = xueqiu.K(com[1],period,n=N)
+        lock.acquire()
+        results.append((b,com,k_,d_))
+        count-=1
+        lock.release()
+    for com in companys:
+        threading.Thread(target=getk,args=(com,)).start()
+        lock.acquire()
+        count+=1
+        lock.release()
+        if progress is not None:
+            progress(math.floor(100*len(results)/tatoal))         
+        while count>=ThreadCount:
+            time.sleep(.1)
+    #等等全部处理结束
+    while count>0:
+        if progress is not None:
+            progress(math.floor(100*len(results)/tatoal))   
+        time.sleep(.1)
+    D = None
+    K = np.zeros((tatoal,N,11))
+    i = 0
+    for it in results:
+        com = it[1]
+        K[i,:,0] = com[0] #id
+        if it[0]: #时间上有可能错开，但是短期来说影响不大
+            K[i,:,1] = it[2][:,4] #close
+            K[i,:,2] = it[2][:,0] #valume
+            if D is None:
+                D = it[3]
+        i+=1
+    return D,K             
 #多线程下载加快速度
 def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
     results = []
@@ -318,7 +367,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
     #t[1] = (0 company_id,1 code,2 name,3 category,4 ttm,5 pb)
     def xueqiuK15(t):
         nonlocal count
-        b,k_,d_ = xueqiu.xueqiuKday(t[1][1],15)
+        b,k_,d_ = xueqiu.xueqiuKday(t[1][1],5)
         lock.acquire()
         results.append({'arg':t,'result':(b,k_,d_)})
         count-=1
@@ -524,7 +573,8 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=
             p = 0
         if p > 100:
             p = 100
-        progress.value = p
+        if math.floor(p)%5==0:
+            progress.value = p
         if p == 100:
             progress.close()
     display(progress,output2)
@@ -736,7 +786,7 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
     ...
 ]
 """
-def StrongSorted(days,N=50,bi=None,ei=None):
+def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
     result = []
     #categorys = stock.query("""select id,name from category""")
     companys = stock.query("""select company_id,code,name,category from company_select""")
@@ -763,13 +813,68 @@ def StrongSorted(days,N=50,bi=None,ei=None):
             i[3] = id2com[k][3]
     
     for day in days:
+        ma5 = np.empty((K.shape[0],K.shape[1]))
+        for i in range(len(K)):
+            ma5[i,:] = stock.ma(K[i,:,1],5)
+        dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]
+        for category in popularCategory():
+            r = idd[:,3]==category
+            dK = dk[r]
+            if len(dK)>0:
+                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
+                ia = np.zeros((dK.shape[0],2))
+                ia[:,0] = np.arange(dK.shape[0])
+                for i in range(dK.shape[1]):
+                    ia[:,1] = dK[:,i]
+                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
+
+                top10mean = np.zeros((dK.shape[1]))
+                for i in range(dK.shape[1]):
+                    top10mean[i] = sorti[:10,i,1].mean()
+                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean))
+            else:
+                print("'%s' 分类里面没有公司"%category)
+    return result
+"""
+返回
+[
+    (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
+     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
+     6 该分类的前十名平均盈利[date],
+    ...
+]
+本函数返回的是5分钟级别的短线情况
+days = 5仅仅代表5*5=25分钟,10代表10*5=50分钟
+"""    
+def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None):
+    result = []
+    progress(0)
+    #categorys = stock.query("""select id,name from category""")
+    companys = stock.query("""select company_id,code,name,category from company_select""")
+    id2com = {}
+    for com in companys:
+        id2com[com[0]] = com
+    
+    D,K = downloadAllK(companys,5,96,progress)
+    progress(100)
+
+    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+    idd[:,0] = K[:,0,0]
+    for i in idd:
+        k = int(i[0])
+        if k in id2com:
+            i[1] = id2com[k][1]
+            i[2] = id2com[k][2]
+            i[3] = id2com[k][3]
+    categorys = allCategory()
+    for day in days:
         #dk = (K[:,day:,1]-K[:,:-day,1])/K[:,:-day,1] #使用n天前的收盘价和现在的收盘价进行比较，问题是如果n天前正好是一个跌幅比较大的天，和今天比将反向衬托今天好像大涨
         #这里和n天前的5日均线比较这样结果比较平滑
         ma5 = np.empty((K.shape[0],K.shape[1]))
         for i in range(len(K)):
             ma5[i,:] = stock.ma(K[i,:,1],5)
         dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]
-        for category in popularCategory():
+        for category in categorys:
             r = idd[:,3]==category
             dK = dk[r]
             if len(dK)>0:
@@ -838,10 +943,10 @@ def getmycolor(name):
     namecount += 1
     return mycolors[name2int[name]]
 
-def PlotCategory(bi,ei,pos,r,top=None,focus=None):
+def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d'):
     fig,axs = plt.subplots(figsize=(28,14))
     dd = r[3] #date
-    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
+    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
     if top is None:
         axs.set_title("%s 周期%s"%(r[1],r[0]))
     else:
@@ -903,7 +1008,7 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None):
 """
 按分类列出强势股
 """
-def StrongCategoryCompanyList(category,name,toplevelpos=None):
+def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[3,5,10,20],cycle='d'):
     def getResult(day,categoryName):
         nonlocal category
         for r in category:
@@ -911,7 +1016,6 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
                 return r
         return None
 
-    period = 20
     top = 10
     com = None
     result = getResult(period,name)
@@ -972,7 +1076,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
     )
 
     periodDropdown = widgets.Dropdown(
-        options=[3,5,10,20],
+        options=periods,
         value=period,
         description='周期',
         layout=Layout(display='block',width='96px'),
@@ -997,7 +1101,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
         layout=Layout(width='64px'),
         tooltip='列出股票的图表')
     def onListClick(e):
-        nonlocal top,pos,result,name
+        nonlocal top,pos,result,name,cycle
         output2.clear_output(wait=True)
         with output2:
             for i in range(top):
@@ -1030,12 +1134,12 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
     sortCompanyList()
     needUpdateSlider = True
     def showPlot():
-        nonlocal bi,ei,pos,stopUpdate,needUpdateSlider
+        nonlocal bi,ei,pos,stopUpdate,needUpdateSlider,cycle
         if stopUpdate:
             return
         output.clear_output(wait=True)
         with output:
-            PlotCategory(bi,ei,pos,result,top=top,focus=com)
+            PlotCategory(bi,ei,pos,result,top=top,focus=com,cycle=cycle)
         needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
@@ -1073,7 +1177,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
     topDropdown.observe(on_top,names='value')
 
     def on_com(e):
-        nonlocal com,box,stopUpdate,pos,result
+        nonlocal com,box,stopUpdate,pos,result,cycle
         com = e['new']
         if stopUpdate:
             return
@@ -1182,12 +1286,12 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None):
     showPlot()
 
 
-def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None):
+def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None,cycle='d'):
     fig,axs = plt.subplots(figsize=(28,14))
     r = sortedCategory[0]
     dd = r[3] #date
 
-    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,'d'))
+    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
     if top is None:
         axs.set_title("%s 周期%s"%(r[1],r[0]))
     else:
@@ -1246,11 +1350,37 @@ bi 开始时间
 ei 结束时间
 N 和 bi,ei只能选择一种
 """
-def StrongCategoryList(N=50,bi=None,ei=None):
-    def progressCallback(i):
-        pass
+def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
+    progress = widgets.IntProgress(value=0,
+    min=0,max=100,step=1,
+    description='下载5K',
+    bar_style='',
+    orientation='horizontal',layout=Layout(display='flex',
+                        flex_flow='wrap',
+                        width='100%'))
+    done = False
+    def progressCallback(p):
+        nonlocal progress,done
+        if p < 0:
+            p = 0
+        if p > 100:
+            p = 100
+        if math.floor(p)%5==0:
+            progress.value = p
+        if done:
+            progress.close()
+    display(progress)
     update_status(progressCallback) #更新公司日状态
-    result = StrongSorted([3,5,10,20],N,bi=bi,ei=ei)
+    if cycle=='d':
+        periods = [3,5,10,20]
+        period = 20
+        result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
+    else:
+        periods = [3,6,12]
+        period = 3
+        result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
+    done = True
+    progressCallback(100)
     output = widgets.Output()
     def getSortedCategory(day,pos):
         categorys = []
@@ -1263,7 +1393,7 @@ def StrongCategoryList(N=50,bi=None,ei=None):
             pos = -len(categorys[0][6])
         return sorted(categorys,key=lambda it:it[6][pos],reverse=True)
 
-    period = 20
+    
     sortedCategory = getSortedCategory(period,-1)
     top = 10
     mark = None
@@ -1308,7 +1438,7 @@ def StrongCategoryList(N=50,bi=None,ei=None):
         #readout_format='d'
     )
     periodDropdown = widgets.Dropdown(
-        options=[3,5,10,20],
+        options=periods,
         value=period,
         description='周期',
         layout=Layout(display='block',width='96px'),
@@ -1329,26 +1459,26 @@ def StrongCategoryList(N=50,bi=None,ei=None):
         options=markListItem(),
         value=mark,
         description='高亮',
-        layout=Layout(display='block',width='196px'),
+        layout=Layout(display='block',width='215px'),
         disabled=False)        
     categoryDropdown = widgets.Dropdown(
         options=categoryListItem(),
         value=category,
         description='选择分类',
-        layout=Layout(display='block',width='196px'),
+        layout=Layout(display='block',width='215px'),
         disabled=False)
 
     needUpdateSlider = True
     def showPlot():
-        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider
+        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle
         if category is None:
             output.clear_output(wait=True)
             with output:
-                PlotAllCategory(bi,ei,pos,sortedCategory,top,mark)
+                PlotAllCategory(bi,ei,pos,sortedCategory,top,mark,cycle=cycle)
         else:
             output.clear_output()
             with output:
-                StrongCategoryCompanyList(result,category,toplevelpos=pos)
+                StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle)
         needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
@@ -1391,7 +1521,7 @@ def StrongCategoryList(N=50,bi=None,ei=None):
     topDropdown.observe(on_top,names='value')
     
     def on_list(e):
-        nonlocal top,pos,category,sortedCategory
+        nonlocal top,pos,category,sortedCategory,cycle
         count = e['new']
         """
         显示TOP分类中的前count只股票

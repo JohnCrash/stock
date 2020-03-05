@@ -343,7 +343,7 @@ def nextKDate(t,period):
     return datetime(nt.year,nt.month,nt.day,9,35 if period==5 else 45)
     
 def isEqK(k0,k1):
-    for i in range(5):
+    for i in range(len(k0)):
         if abs(k0[i]/k1[i]-1)>0.05:
             return False
     return True
@@ -529,7 +529,7 @@ def appendK(code,period,k,d):
     if period==5 or period==15:
         b,nk,nd = K(code,period,32 if period==15 else 96)
     elif period=='d':
-        b,nk,nd = xueqiuKday(code,15)
+        b,nk,nd = xueqiuKday(code,5)
         #这里对昨天的k15数据计算得到的日线数据和雪球日线数据进行校验
         #问题来源：发现新浪的15分钟深圳成指数据全天求和雪球日线成交量不一致
         #=======================================================
