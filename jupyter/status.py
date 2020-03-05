@@ -351,7 +351,7 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
     for it in results:
         com = it[1]
         K[i,:,0] = com[0] #id
-        if it[0]: #时间上有可能错开，但是短期来说影响不大
+        if it[0] and len(it[2])==N: #时间上有可能错开，但是短期来说影响不大
             K[i,:,1] = it[2][:,4] #close
             K[i,:,2] = it[2][:,0] #valume
             if D is None:
@@ -855,7 +855,7 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None):
     for com in companys:
         id2com[com[0]] = com
     
-    D,K = downloadAllK(companys,5,96,progress)
+    D,K = downloadAllK(companys,5,N,progress)
     progress(100)
 
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
@@ -1444,7 +1444,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         layout=Layout(display='block',width='96px'),
         disabled=False)
     topDropdown = widgets.Dropdown(
-        options=[3,5,10,20,30,100],
+        options=[3,5,10,20,30,50,100],
         value=top,
         description='排名',
         layout=Layout(display='block',width='96px'),

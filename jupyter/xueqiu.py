@@ -501,7 +501,16 @@ def K(code,period,n):
         mylog.err("'%s' %s %s 下载时出错"%(code,str(period),base))
         return False,0,0
     
-    shared.toRedis({'k':k,'date':d,'base':base,"ver":3},cacheName,ex=24*3600)
+    #太长就进行截取,保留5天的数据
+    if period==5:
+        if len(k)>48*5:
+            k = k[-48*5:]
+            d = d[-48*5:]
+    else:
+        if len(k)>16*5:
+            k = k[-16*5:]
+            d = d[-16*5:]
+    shared.toRedis({'k':k,'date':d,'base':base,"ver":3},cacheName,ex=5*24*3600)
     return True,k[-n:],d[-n:]
 
 #当前是交易时间
