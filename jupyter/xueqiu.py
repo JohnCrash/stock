@@ -31,7 +31,7 @@ def xueqiuJson(url):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
-            'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; Hm_lvt_1db88642e346389874251b5a1eded6e3=1583209427,1583211614,1583214605,1583214738; xq_a_token=a664afb60c7036c7947578ac1a5860c4cfb6b3b5; xqat=a664afb60c7036c7947578ac1a5860c4cfb6b3b5; xq_r_token=01d9e7361ed17caf0fa5eff6465d1c90dbde9ae2; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOi0xLCJpc3MiOiJ1YyIsImV4cCI6MTU4NTM2MjYwNywiY3RtIjoxNTgzMjI2MDI4NTUyLCJjaWQiOiJkOWQwbjRBWnVwIn0.lVcKYgvg9WJzqgZupKkRGfROQf7bwmP7H57_2yFOH9E91nzT_qbwCmjv5aqdHEgd-j5ufLHsyDTUWwds1M4Vu2XCD6G286CqDZLxMDPScXqWiOwMSa8T6ppiRbPNDj70wJqin7QFY175COevpiUs_7S6V8oR-ur_F3sfjGbbOCFIFPcMusM8PF7DBqs3QK5G4PyzTCjWIvGRvgTVgrQOWrEe2yhV3nEiNqhFF9hq97usTUxxP4VTS35wY_u_kNHo4XjFgsPRixB3cEWb-m7TsLPYng5aZopaTpX0BZe4uxxgwDICU7TFI_SndzvPM_51cYk5A6RvVyAYDFyhVTni-Q; u=601583226070297; cookiesu=841583226412354; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1583226412'}
+            'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; Hm_lvt_1db88642e346389874251b5a1eded6e3=1583211614,1583214605,1583214738,1583227469; cookiesu=841583283988633; remember=1; xq_a_token=171db880453165ae48c6ef0787e8c1ebedb2329f; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOjY2MjU1ODA1MzMsImlzcyI6InVjIiwiZXhwIjoxNTg1ODc2MDEwLCJjdG0iOjE1ODMyODQwMTAyNTksImNpZCI6ImQ5ZDBuNEFadXAifQ.LxU7UsEexLjnPBQMLYFv9fY_t6nrVfo7O5I9WZJpJKWclifOflvky8ylZe1qsthHWVRdAmPddvL_-XzI8z-iAZEwg9fgpeTaH_6eUilbl-V39ZkCAN3_vQB_SDNW3qCiOo3PX6OgkPS54Q_MAfF5Mf2KAchA7kRliv56nWZwIGa15SFy-wsFoIQ8N3GmmiMOxxZNOAV9Kj_M0y7G4h97S7O-y1SLoCjBt-32dJKtUlgAIb115qpE4RZw5huZ9kdBGDAtqpE-VQkZhP9s7DO_pQByfvBDOUrhk4SHnSuby6xgsdBg-a5VtDONFF1ooNP-m1kp1_J7EhjcEQH9ZPu79g; xqat=171db880453165ae48c6ef0787e8c1ebedb2329f; xq_r_token=8e611dfd4d16ede5bc3d4fd79da4fe5ae44d3a87; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1583284043'}
     r = s.get(url,headers=headers)
     if r.status_code==200:
         return True,r.json()
@@ -477,7 +477,7 @@ def K(code,period,n):
                 bi = i
                 break
         #如果有接缝，校验接缝处的数据
-        if bi>=0 and not isEqK(oldK[-1],k[bi][1:]):
+        if bi>=0 and not isEqK(oldK[-1,1:],k[bi][2:]): #不做成交量校验了
             mylog.err("K '%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
             mylog.err("oldK=%s,%s"%(str(d[-1]),str(oldK[-1])))
             mylog.err("k[bi]=%s"%(str(k[bi])))
@@ -587,8 +587,7 @@ def xueqiuKday(code,period):
         if len(today)==0:
             return False,0,0
         i = len(today)
-        volume = yesterday[:,0].sum()*today[:,0].sum()/yesterday[0:i,0].sum()
-
+        volume = yesterday[:,0].sum()*today[:,0].sum()/yesterday[0:i,0].sum() #简单的按比例算
         return True,np.array([
             [yesterday[:,0].sum(),yesterday[0,1],yesterday[:,2].max(),yesterday[:,3].min(),yesterday[-1,4]],
             [volume,today[0][1],today[:,2].max(),today[:,3].min(),today[-1][4]]

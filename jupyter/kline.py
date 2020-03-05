@@ -445,7 +445,7 @@ class Plote:
         self._mode = mode
         self._lastday = lastday
         if period=='d':
-            self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}            
+            self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[5,10,20],"debug":False,"volumeprices":True}            
         elif period==15:
             self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}
             self._correcttionVolume = True
@@ -613,7 +613,8 @@ class Plote:
                 if b:
                     szkmax = szk[:,4].max()
                     szkmin = szk[:,4].min()  
-                    axk5.plot(k5x,(szk[:,4]-szkmin)*(maxk5close-mink5close)/(szkmax-szkmin)+mink5close,color='black',linewidth=2,linestyle='--',label='szk5')
+                    if szkmax-szkmin!=0:
+                        axk5.plot(k5x,(szk[:,4]-szkmin)*(maxk5close-mink5close)/(szkmax-szkmin)+mink5close,color='black',linewidth=2,linestyle='--',label='szk5')
             if maxk5x<todayei-3:
                 axk5.text(maxk5x,maxk5close,str(k5maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if k5maxrate>=0 else 'darkgreen')
             if mink5x<todayei-3:
@@ -722,7 +723,7 @@ class Plote:
 
         """绘制均线"""                
         if self._showma:
-            ct = {5:"orange",10:"pink",20:"cornflowerblue",30:"salmon",60:"violet",242:"lime"}
+            ct = {5:"orange",10:"springgreen",20:"cornflowerblue",30:"salmon",60:"violet",242:"lime"}
             for m in self._config['ma']:
                 xx,alv = stock.maRangeK(self._k,m,bi,ei)
                 if m in ct:
@@ -1235,7 +1236,7 @@ class Plote:
                 self.disable('boll')
                 self.enable('trend')
                 self.enable('ma')
-                self._config['ma'] = [20]
+                self._config['ma'] = [5,10,20]
             elif sel=='CLEAR':
                 self.disable('boll')
                 self.disable('trend')
@@ -1340,7 +1341,7 @@ class Plote:
             def updateFavoriteText():
                 today = date.today()
                 code = self.code()
-                stock.execute("update notebook set note='%s' where date='%s' and code='%s'"%(fafavoriteNodeWidget.value,stock.dateString(today),code))
+                stock.execute("update notebook set note=N'%s' where date='%s' and code='%s'"%(fafavoriteNodeWidget.value,stock.dateString(today),code))
                 name = 'favorite_'+str(today)
                 b,favorites = shared.fromRedis(name)
                 if b:

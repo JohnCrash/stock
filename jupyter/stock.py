@@ -751,3 +751,21 @@ def correctionVolume(k,d,period,n=10):
         for j in range(N):
             volumed[i,j] *= avg/mad[i,j]
     return volume[:len(k)],mad
+
+"""
+计算支撑位和压力位置 ,还在测试
+"""
+def spp(k,n=60):
+    ei = len(k)-1
+    bi = ei-n
+    if bi<0:
+        bi = 0
+    pp = [] #压力位置
+    sp = [] #支持文章
+    for i in range(bi,ei):
+        if i-1>=bi and i+1<ei:
+            if k[i,2]>k[i+1,2] and k[i,2]>k[i-1,2]:
+                pp.append((i,k[i,2]))
+            if k[i,3]<k[i+1,3] and k[i,3]<k[i-1,3]:
+                sp.append((i,k[i,3]))
+    return sp,pp
