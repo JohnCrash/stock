@@ -67,9 +67,10 @@ kdate {
 code 可以是代码或名称
 period = 'd','30','15','5'
 after 载入该日期之后的数据
+ei 之前的
 expire 缓存过期时间（秒）
 """
-def loadKline(code,period='d',after=None,expire=None):
+def loadKline(code,period='d',after=None,ei=None,expire=None):
     #if len(code)>3 and code[0]=='S' and (code[1]=='H' or code[1]=='Z'):
     #    if code[2]==':':
     #        company = query("""select * from company where code='%s'"""%code.replace(':',''))
@@ -108,12 +109,18 @@ def loadKline(code,period='d',after=None,expire=None):
         if after is None:
             data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
         else:
-            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(str(period),company[0][0],after))
+            if ei is None:
+                data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(str(period),company[0][0],after))
+            else:
+                data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s' and date<='%s"""%(str(period),company[0][0],after,ei))
     else:
         if after is None:
             data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
         else:
-            data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and timestamp>='%s'"""%(str(period),company[0][0],after))
+            if ei is None:
+                data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and timestamp>='%s'"""%(str(period),company[0][0],after))
+            else:
+                data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and timestamp>='%s' and timestamp<='%s'"""%(str(period),company[0][0],after,ei))
     kdate = []
     k = []
     for i in range(len(data)):

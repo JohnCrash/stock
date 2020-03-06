@@ -346,7 +346,7 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
             progress(math.floor(100*len(results)/tatoal))   
         time.sleep(.1)
     D = None
-    K = np.zeros((tatoal,N,11))
+    K = np.ones((tatoal,N,11))
     i = 0
     for it in results:
         com = it[1]
@@ -357,7 +357,37 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
             if D is None:
                 D = it[3]
         i+=1
-    return D,K             
+    return D,K  
+
+#companys = [(company_id,code,name,category),....]
+#返回
+#(datetime,...),K[company,date,(id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw)]
+#除了id,close,volume其他都是0
+def loadAllK(companys,bi,ei,period,N,progress,ThreadCount=10):
+    results = []
+    count = 0
+    tatoal = len(companys)
+    D = None
+    for com in companys:
+        _,k_,d_ = stock.loadKline(com[1],period,after=bi,ei=ei)
+        if d_ is not None and (com[1]=='SH000001' or com[1]=='SZ399001'):
+            D = d_
+        results.append((True,com,k_,d_))
+        count+=1
+        if progress is not None:
+            progress(math.floor(100*len(results)/tatoal))
+    N = len(D)
+    K = np.ones((tatoal,N,11))
+    i = 0
+    for it in results:
+        com = it[1]
+        K[i,:,0] = com[0] #id
+        if it[0] and len(it[2])==N: #时间上有可能错开，但是短期来说影响不大
+            K[i,:,1] = it[2][:,4] #close
+            K[i,:,2] = it[2][:,0] #valume
+        i+=1
+    return D,K 
+
 #多线程下载加快速度
 def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
     results = []
@@ -417,6 +447,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             k = A
             final_results.append((k,c))
     return final_results  
+
 #这是使用Redis进行优化的版本    
 def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     if period=='d':
@@ -813,10 +844,10 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
             i[3] = id2com[k][3]
     
     for day in days:
-        ma5 = np.empty((K.shape[0],K.shape[1]))
+        ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
         for i in range(len(K)):
             ma5[i,:] = stock.ma(K[i,:,1],5)
-        dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]
+        dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]#收盘相对day前的增长率
         for category in popularCategory():
             r = idd[:,3]==category
             dK = dk[r]
@@ -854,8 +885,10 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None):
     id2com = {}
     for com in companys:
         id2com[com[0]] = com
-    
-    D,K = downloadAllK(companys,5,N,progress)
+    if bi is None:
+        D,K = downloadAllK(companys,5,N,progress)
+    else:
+        D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
 
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
@@ -1351,9 +1384,10 @@ ei 结束时间
 N 和 bi,ei只能选择一种
 """
 def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
+    out2 = widgets.Output()
     progress = widgets.IntProgress(value=0,
     min=0,max=100,step=1,
-    description='下载5K',
+    description='download',
     bar_style='',
     orientation='horizontal',layout=Layout(display='flex',
                         flex_flow='wrap',
@@ -1369,7 +1403,10 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             progress.value = p
         if done:
             progress.close()
-    display(progress)
+            out2.clear_output()
+    display(out2)
+    with out2:
+        display(progress)
     update_status(progressCallback) #更新公司日状态
     if cycle=='d':
         periods = [3,5,10,20]
@@ -1444,7 +1481,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         layout=Layout(display='block',width='96px'),
         disabled=False)
     topDropdown = widgets.Dropdown(
-        options=[3,5,10,20,30,50,100],
+        options=[3,5,10,20,30,50,108],
         value=top,
         description='排名',
         layout=Layout(display='block',width='96px'),
@@ -1467,7 +1504,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         description='选择分类',
         layout=Layout(display='block',width='215px'),
         disabled=False)
-
+    refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
     needUpdateSlider = True
     def showPlot():
         nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle
@@ -1635,6 +1672,38 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if needUpdateSlider and category is None:
             showPlot()
 
+    def on_refresh(e):
+        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress
+        progress = widgets.IntProgress(value=0,
+        min=0,max=100,step=1,
+        description='download',
+        bar_style='',
+        orientation='horizontal',layout=Layout(display='flex',
+                            flex_flow='wrap',
+                            width='100%'))
+        with out2:
+            display(progress)
+        done = False
+        progressCallback(0)
+        if cycle=='d':
+            result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
+        else:
+            result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
+        done = True
+        progressCallback(100)
+        sortedCategory = getSortedCategory(period,-1)
+        markDropdown.options = markListItem()
+        categoryDropdown.options = categoryListItem()
+        LEN = len(sortedCategory[0][3])
+        bi = LEN-pagecount
+        ei = LEN
+        pos = LEN-1
+        if bi < 0:
+            bi = 0
+        setSlider(bi,ei,pos)
+        showPlot()
+
+    refreshbutton.on_click(on_refresh)
     prevbutton.on_click(on_prev)
     nextbutton.on_click(on_next)
     zoominbutton.on_click(on_zoomin)
@@ -1648,9 +1717,9 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
                     border='solid',
                     width='100%')
     if LEN <= pagecount:
-        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown],layout=box_layout)
+        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
     else:
-        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown],layout=box_layout)
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
 
     display(box,output)
     showPlot()

@@ -904,9 +904,16 @@ class Plote:
             figure2 = None
         if pos is not None:
             if type(pos)==str:
-                post = date.fromisoformat(pos)
+                if type(self._date[-1][0])==date:
+                    post = date.fromisoformat(pos)
+                else:
+                    post = datetime.fromisoformat(pos)
             else:
                 post = pos
+                if type(post)==date and type(self._date[-1][0])==datetime:
+                    post = datetime(post.year,post.month,post.day)
+                elif type(post)==datetime and type(self._date[-1][0])==date:
+                    post = date(post.year,post.month,post.day)
             for i in range(len(self._date)):
                 if self._date[i][0]>=post:
                     bi = math.floor(i-self._showcount/2)
