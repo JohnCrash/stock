@@ -228,6 +228,15 @@ class Plote:
         self._gotoTrendHeandPos = False
         if self._date and 'markpos' in self._config:
             dd = self._config['markpos']
+            if type(self._date[-1][0])!=type(dd):
+                if type(dd)==str and type(self._date[-1][0])==date:
+                    dd = date.fromisoformat(dd)
+                elif type(dd)==str and type(self._date[-1][0])==datetime:
+                    dd = datetime.fromisoformat(dd)
+                elif type(dd)==date and type(self._date[-1][0])==datetime:
+                    dd = datetime(dd.year,dd.month,dd.day)
+                elif type(dd)==datetime and type(self._date[-1][0])==date:
+                    dd = date(dd.year,dd.month,dd.day)
             self._trendHeadPos = len(self._k)-1
             for i in range(len(self._date)):
                 if self._date[i][0] == dd:
