@@ -814,6 +814,7 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
     (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
      4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
      6 该分类的前十名平均盈利[date],
+     7 该分类的跌幅前十的平均跌幅[date],
     ...
 ]
 """
@@ -860,9 +861,11 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
                     sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
 
                 top10mean = np.zeros((dK.shape[1]))
+                low10mean = np.zeros((dK.shape[1]))
                 for i in range(dK.shape[1]):
                     top10mean[i] = sorti[:10,i,1].mean()
-                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean))
+                    low10mean[i] = sorti[-10:,i,1].mean()
+                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
             else:
                 print("'%s' 分类里面没有公司"%category)
     return result
@@ -872,6 +875,7 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
     (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
      4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
      6 该分类的前十名平均盈利[date],
+     7 该分类的跌幅前十的平均跌幅[date],
     ...
 ]
 本函数返回的是5分钟级别的短线情况
@@ -919,9 +923,11 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None):
                     sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
 
                 top10mean = np.zeros((dK.shape[1]))
+                low10mean = np.zeros((dK.shape[1]))
                 for i in range(dK.shape[1]):
                     top10mean[i] = sorti[:10,i,1].mean()
-                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean))
+                    low10mean[i] = sorti[-10:,i,1].mean()
+                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
             else:
                 print("'%s' 分类里面没有公司"%category)
     return result
@@ -1301,6 +1307,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     def on_sliderChange(e):
         nonlocal pos,needUpdateSlider
         pos = e['new']
+        sortCompanyList()
         if needUpdateSlider:
             showPlot()
 
@@ -1417,9 +1424,11 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         period = 3
         result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
     done = True
+    sortType = 'TOP10'
     progressCallback(100)
     output = widgets.Output()
     def getSortedCategory(day,pos):
+        nonlocal sortType
         categorys = []
         for r in result:
             if r[0]==day:
@@ -1427,8 +1436,15 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if pos > len(categorys[0][6])-1:
             pos = len(categorys[0][6])-1
         if pos < -len(categorys[0][6]):
-            pos = -len(categorys[0][6])
-        return sorted(categorys,key=lambda it:it[6][pos],reverse=True)
+            pos = -len(categorys[0][6])                
+        if sortType=='TOP10':
+            return sorted(categorys,key=lambda it:it[6][pos],reverse=True)
+        elif sortType=='TOP10倒序':
+            return sorted(categorys,key=lambda it:it[6][pos])
+        elif sortType=='LOW10':
+            return sorted(categorys,key=lambda it:it[7][pos])
+        else: #'弱势跌幅榜':
+            return sorted(categorys,key=lambda it:it[7][pos],reverse=True)
 
     
     sortedCategory = getSortedCategory(period,-1)
@@ -1504,19 +1520,27 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         description='选择分类',
         layout=Layout(display='block',width='215px'),
         disabled=False)
+    resverdDropdown = widgets.Dropdown(
+        options=['TOP10','TOP10倒序','LOW10','LOW10倒序'],
+        value='TOP10',
+        description='排序模式',
+        layout=Layout(display='block',width='196px'),
+        )    
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
     needUpdateSlider = True
+    needUpdate = True
     def showPlot():
-        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle
-        if category is None:
-            output.clear_output(wait=True)
-            with output:
-                PlotAllCategory(bi,ei,pos,sortedCategory,top,mark,cycle=cycle)
-        else:
-            output.clear_output()
-            with output:
-                StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle)
-        needUpdateSlider = True
+        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle,needUpdate
+        if needUpdate:
+            if category is None:
+                output.clear_output(wait=True)
+                with output:
+                    PlotAllCategory(bi,ei,pos,sortedCategory,top,mark,cycle=cycle)
+            else:
+                output.clear_output()
+                with output:
+                    StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle)
+            needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
         nonlocal slider,needUpdateSlider
@@ -1549,6 +1573,23 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
 
     periodDropdown.observe(on_period,names='value')  
     
+    def on_resverd(e):
+        nonlocal sortType,needUpdate,sortedCategory,resverdDropdown,mark,category
+
+        needUpdate = False
+        sortType = resverdDropdown.value
+        sortedCategory = getSortedCategory(period,-1)
+        oldmark = mark
+        oldcategory = category
+        markDropdown.options = markListItem()
+        categoryDropdown.options = categoryListItem()
+        markDropdown.value = oldmark
+        categoryDropdown.value = oldcategory
+        needUpdate = True
+        showPlot()        
+        
+
+    resverdDropdown.observe(on_resverd)
     def on_top(e):
         nonlocal top
         top = e['new']
@@ -1666,14 +1707,22 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if category is None:
             showPlot()
     def on_sliderChange(e):
-        nonlocal period,pos,needUpdateSlider,category,sortedCategory
+        nonlocal period,pos,needUpdateSlider,category,sortedCategory,mark,category,needUpdate
         pos = e['new']
-        sortedCategory = getSortedCategory(period,pos)       
+        sortedCategory = getSortedCategory(period,pos)    
+        needUpdate = False
+        oldMark = mark
+        oldCategory = category
+        markDropdown.options = markListItem()
+        categoryDropdown.options = categoryListItem()
+        markDropdown.value = oldMark
+        categoryDropdown.value = oldCategory
+        needUpdate = True
         if needUpdateSlider and category is None:
             showPlot()
 
     def on_refresh(e):
-        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress
+        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate
         progress = widgets.IntProgress(value=0,
         min=0,max=100,step=1,
         description='download',
@@ -1691,9 +1740,13 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
         done = True
         progressCallback(100)
+        needUpdate = False
         sortedCategory = getSortedCategory(period,-1)
         markDropdown.options = markListItem()
         categoryDropdown.options = categoryListItem()
+        markDropdown.value = mark
+        categoryDropdown.value = category
+
         LEN = len(sortedCategory[0][3])
         bi = LEN-pagecount
         ei = LEN
@@ -1701,6 +1754,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if bi < 0:
             bi = 0
         setSlider(bi,ei,pos)
+        needUpdate = True
         showPlot()
 
     refreshbutton.on_click(on_refresh)
@@ -1717,9 +1771,9 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
                     border='solid',
                     width='100%')
     if LEN <= pagecount:
-        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
+        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
     else:
-        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
 
     display(box,output)
     showPlot()

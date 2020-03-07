@@ -922,7 +922,7 @@ class Plote:
                 if type(post)==date and type(self._date[-1][0])==datetime:
                     post = datetime(post.year,post.month,post.day)
                 elif type(post)==datetime and type(self._date[-1][0])==date:
-                    post = date(post.year,post.month,post.day)
+                    post = date(post.year,post.month,post.day)               
             for i in range(len(self._date)):
                 if self._date[i][0]>=post:
                     bi = math.floor(i-self._showcount/2)
@@ -1184,7 +1184,8 @@ class Plote:
             if beginPT<0:
                 beginPT = 0
             if resetpos:
-                self._trendHeadPos = endPT-1
+                if self._trendHeadPos<0 or self._trendHeadPos>len(self._k):
+                    self._trendHeadPos = endPT-1
             setSlider(beginPT,endPT,self._trendHeadPos)
         needRecalcRange = False
         def on_index(e):
