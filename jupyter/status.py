@@ -1047,7 +1047,7 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d'):
 """
 按分类列出强势股
 """
-def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[3,5,10,20],cycle='d'):
+def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[3,5,10,20],cycle='d',sortType='TOP10'):
     def getResult(day,categoryName):
         nonlocal category
         for r in category:
@@ -1159,7 +1159,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
                     width='100%')    
     stopUpdate = False
     def sortCompanyList():
-        nonlocal pos,result,periodDropdown,stopUpdate
+        nonlocal pos,result,periodDropdown,stopUpdate,sortType
         stopUpdate = True
         idd = result[4] #(0 id , 1 code , 2 name , 3 category)
         coms = [None]
@@ -1525,12 +1525,13 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         value='TOP10',
         description='排序模式',
         layout=Layout(display='block',width='196px'),
+        disabled=False
         )    
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
     needUpdateSlider = True
     needUpdate = True
     def showPlot():
-        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle,needUpdate
+        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle,needUpdate,sortType
         if needUpdate:
             if category is None:
                 output.clear_output(wait=True)
@@ -1539,7 +1540,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             else:
                 output.clear_output()
                 with output:
-                    StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle)
+                    StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle,sortType=sortType)
             needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
@@ -1574,19 +1575,19 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     periodDropdown.observe(on_period,names='value')  
     
     def on_resverd(e):
-        nonlocal sortType,needUpdate,sortedCategory,resverdDropdown,mark,category
-
-        needUpdate = False
-        sortType = resverdDropdown.value
-        sortedCategory = getSortedCategory(period,-1)
-        oldmark = mark
-        oldcategory = category
-        markDropdown.options = markListItem()
-        categoryDropdown.options = categoryListItem()
-        markDropdown.value = oldmark
-        categoryDropdown.value = oldcategory
-        needUpdate = True
-        showPlot()        
+        if e['name']=='value':
+            nonlocal sortType,needUpdate,sortedCategory,resverdDropdown,mark,category
+            needUpdate = False
+            sortType = resverdDropdown.value
+            sortedCategory = getSortedCategory(period,-1)
+            oldmark = mark
+            oldcategory = category
+            markDropdown.options = markListItem()
+            categoryDropdown.options = categoryListItem()
+            markDropdown.value = oldmark
+            categoryDropdown.value = oldcategory
+            needUpdate = True
+            showPlot()        
         
 
     resverdDropdown.observe(on_resverd)
@@ -1632,9 +1633,10 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
 
     def on_category(e):
         nonlocal category
-        category = e['new']
-        listDropdown.value = None
-        showPlot()
+        if e['name']=='value':
+            category = e['new']
+            listDropdown.value = None
+            showPlot()
 
     categoryDropdown.observe(on_category,names='value')
 

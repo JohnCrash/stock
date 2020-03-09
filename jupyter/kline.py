@@ -363,6 +363,7 @@ class Plote:
             self._showcount = 120
         else:
             self._showcount = 120
+
         if type(company)==np.ndarray:
             self._k = company
             self._company = companyInfo
@@ -896,7 +897,10 @@ class Plote:
     #pos = '2019-1-1' 直接跳转到该日期
     def show(self,bi=None,ei=None,code2=None,figsize=(30,14),pos=None):
         if self._gotoTrendHeandPos:
-            bi = self._trendHeadPos-math.floor(self._showcount/2)
+            if len(self._k)-self._trendHeadPos>math.floor(self._showcount/2):
+                bi = self._trendHeadPos-math.floor(self._showcount/2)
+            elif bi is not None:
+                bi = len(self._k)-self._showcount
             ei = bi+self._showcount
         if bi is None:
             bi = len(self._k)-self._showcount
