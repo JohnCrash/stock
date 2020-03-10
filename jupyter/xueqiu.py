@@ -163,6 +163,70 @@ def sinaK15(code,n=32):
     return sinaK(code,15,n)
 def sinaK5(code,n=96):
     return sinaK(code,5,n)
+
+#雪球实时https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=SH000001,SZ399001,SZ399006&_=1583718246079
+#codes = [code,...]
+#返回b,[(timesramp,volume,open,high,low,close),...]
+"""
+{
+    "data": [
+        {
+            "symbol": "SZ002418",
+            "current": 2.68,
+            "percent": 0.75,
+            "chg": 0.02,
+            "timestamp": 1583719068000,
+            "volume": 9168078,
+            "amount": 24406681,
+            "market_capital": 3045552000,
+            "float_market_capital": 2688409910,
+            "turnover_rate": 0.91,
+            "amplitude": 4.14,
+            "open": 2.61,
+            "last_close": 2.66,
+            "high": 2.71,
+            "low": 2.6,
+            "avg_price": 2.662,
+            "trade_volume": 0,
+            "side": -1,
+            "is_trade": false,
+            "level": 1,
+            "trade_session": null,
+            "trade_type": null,
+            "current_year_percent": -6.29,
+            "trade_unique_id": "9168078",
+            "type": 11,
+            "bid_appl_seq_num": null,
+            "offer_appl_seq_num": null
+        },
+        ....]
+}
+"""
+def xueqiuRT(codes):
+    timestramp = math.floor(time.time()*1000)
+    cs = ""
+    for c in codes:
+        cs += "%s,"%(c.upper())
+    uri = "https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=%s&_=%d"%(cs[:-1],timestramp)
+    b,js = xueqiuJson(uri)
+    if b:
+        if 'data' in js:
+            data = js['data']
+            for i in range(len(data)):
+                d = data[i]
+                name = "%s_RT"%d['symbol']
+                b,rt = shared.fromRedis(name)
+                if not b:
+                    rt = []
+                rt.append((d['timestamp'],d['volume'],d['open'],d['high'],d['low'],d['current']))
+            shared.toRedis(rt,name,ex=8*3600)
+            return True
+    mylog.err(uri)
+    mylog.err(str(js))
+    return False       
+#http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
+#var hq_str_sh600278="东方创业,11.680,11.170,11.680,11.680,11.680,11.670,11.680,1740300,20326704.000,14800,11.670,200,11.660,800,11.610,140100,11.560,50800,11.550,54100,11.680,300,11.690,23700,11.700,1200,11.710,1400,11.720,2020-03-09,09:29:35,00,";
+#var hq_str_code="name,today_open,last_close,open,high,low,close,current,成交量,成交额,(v,p),...10个,timestamp"
 #雪球数据
 # True , ((timesramp,volume,open,high,low,close),...)
 # False, "Error infomation"
@@ -593,7 +657,7 @@ def xueqiuKday(code,period):
         #0 volume,1 open,2 high,3 low,4 close
         yesterday = k[lasti-N+1:lasti+1,:]
         today = k[lasti+1:,:]
-        if len(today)==0:
+        if len(today)==0 or len(yesterday)==0:
             return False,0,0
         i = len(today)
         volume = yesterday[:,0].sum()*today[:,0].sum()/yesterday[0:i,0].sum() #简单的按比例算

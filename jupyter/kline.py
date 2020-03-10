@@ -899,7 +899,7 @@ class Plote:
         if self._gotoTrendHeandPos:
             if len(self._k)-self._trendHeadPos>math.floor(self._showcount/2):
                 bi = self._trendHeadPos-math.floor(self._showcount/2)
-            elif bi is not None:
+            else:
                 bi = len(self._k)-self._showcount
             ei = bi+self._showcount
         if bi is None:

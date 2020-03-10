@@ -573,10 +573,13 @@ def defaultFilter(a,c,istoday,period):
     #c [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]
     #a 0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
     #a[0] a[1] a[2]... a[0]是最近一天的数据
+    return True
+    """
     if istoday and period=='d':
         return isPopularCategory(c[3])
     else:
         return isPopularCategory(c[3])
+    """
 
 """
 按分类列出崛起的股票的数量与列表
@@ -849,7 +852,7 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
         for i in range(len(K)):
             ma5[i,:] = stock.ma(K[i,:,1],5)
         dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]#收盘相对day前的增长率
-        for category in popularCategory():
+        for category in allCategory():
             r = idd[:,3]==category
             dK = dk[r]
             if len(dK)>0:
@@ -1198,7 +1201,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
         result = getResult(period,name)
         LEN = len(result[3])
         bi = LEN-pagecount
-        ei = LEN      
+        ei = LEN-1
         pos = LEN-1
         if bi < 0:
             bi = 0
@@ -1246,7 +1249,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
             bi = 0
         ei = bi+pagecount
         if ei>LEN:
-            ei = LEN
+            ei = LEN-1
         pos = ei
         setSlider(bi,ei,pos)            
         showPlot()
@@ -1254,7 +1257,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
         nonlocal bi,ei,pos,pagecount,LEN
         ei += pagecount
         if ei>LEN:
-            ei = LEN
+            ei = LEN-1
         bi = ei-pagecount
         if bi<0:
             bi = 0
@@ -1270,7 +1273,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
                 bi = 0
                 ei = bi+pagecount
                 if ei>LEN:
-                    ei = LEN
+                    ei = LEN-1
                 pos = ei
                 setSlider(bi,ei,pos)
             showPlot()
@@ -1283,7 +1286,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
                 bi = 0
                 ei = bi+pagecount
                 if ei>LEN:
-                    ei = LEN
+                    ei = LEN-1
                 pos = ei
                 setSlider(bi,ei,pos)
             showPlot()
@@ -1420,7 +1423,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         period = 20
         result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
     else:
-        periods = [3,6,12]
+        periods = [1,3,6]
         period = 3
         result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
     done = True
