@@ -6,6 +6,7 @@ from datetime import date,datetime,timedelta
 import shared
 import json
 import copy
+import uuid
 import random
 import threading
 import stock
@@ -164,6 +165,13 @@ def sinaK15(code,n=32):
 def sinaK5(code,n=96):
     return sinaK(code,5,n)
 
+#(0 code,1 timesramp,2 volume,3 open,4 high,5 low,6 close)
+def appendRedisRT(code,timesramp,volume,open,high,low,close):
+    name = "%s_RT"%code
+    b,rt = shared.fromRedis(name)
+    if not b:
+        rt = []
+    shared.toRedis(rt,name,ex=8*3600)
 #雪球实时https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=SH000001,SZ399001,SZ399006&_=1583718246079
 #codes = [code,...]
 #返回b,[(timesramp,volume,open,high,low,close),...]
@@ -208,25 +216,61 @@ def xueqiuRT(codes):
     for c in codes:
         cs += "%s,"%(c.upper())
     uri = "https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=%s&_=%d"%(cs[:-1],timestramp)
-    b,js = xueqiuJson(uri)
-    if b:
-        if 'data' in js:
-            data = js['data']
-            for i in range(len(data)):
-                d = data[i]
-                name = "%s_RT"%d['symbol']
-                b,rt = shared.fromRedis(name)
-                if not b:
-                    rt = []
-                rt.append((d['timestamp'],d['volume'],d['open'],d['high'],d['low'],d['current']))
-            shared.toRedis(rt,name,ex=8*3600)
-            return True
-    mylog.err(uri)
-    mylog.err(str(js))
-    return False       
+    try:
+        b,js = xueqiuJson(uri)
+        if b:
+            if 'data' in js:
+                data = js['data']
+                for i in range(len(data)):
+                    d = data[i]
+                    appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']),d['volume'],d['open'],d['high'],d['low'],d['current'])
+                return True
+        mylog.err('xueqiuRT:'+uri)
+        mylog.err(str(js))
+        return False
+    except Exception as e:
+        mylog.err("xueqiuRT:"+uri)
+        mylog.err(str(e))
+        return False            
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
 #var hq_str_sh600278="东方创业,11.680,11.170,11.680,11.680,11.680,11.670,11.680,1740300,20326704.000,14800,11.670,200,11.660,800,11.610,140100,11.560,50800,11.550,54100,11.680,300,11.690,23700,11.700,1200,11.710,1400,11.720,2020-03-09,09:29:35,00,";
-#var hq_str_code="name,today_open,last_close,open,high,low,close,current,成交量,成交额,(v,p),...10个,timestamp"
+#var hq_str_code="0 name,1 today_open,2 last_close,3 open,4 high,5 low,6 close,7 current,8 成交量,9 成交额,(v,p),...10个,timestamp"
+def sinaRT(codes):
+    cs = ""
+    for c in codes:
+        cs += "%s,"%(c.lower())    
+    uri = "http://hq.sinajs.cn/rn=%s&list=%s"%(str(uuid.uuid4())[:5],cs[:-1])
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'zh-CN,zh;q=0.9'}
+        r = s.get(uri,headers=headers)
+        if r.status_code==200:
+            bi = 0
+            i = 0
+            while i!=-1:
+                i = r.text.find('\n',bi)
+                ln = r.text[bi:i]
+                if len(ln)>16 and ln[:11]=='var hq_str_':
+                    bii = ln.find('="')
+                    eii = ln.find('";')
+                    if bii!=-1 and eii!=-1:
+                        code = ln[11:19].upper()
+                        a = ln[bii+2:eii].split(',')
+                        if len(a)>31:
+                            timestamp = datetime.fromisoformat(a[30]+' '+a[31])
+                            appendRedisRT(code,timestamp,float(a[8]),float(a[3]),float(a[4]),float(a[5]),float(a[6]))
+                bi = i+1
+        else:
+            mylog.err('sinaRT:'+uri)
+            mylog.err(str(r.reason))
+            return False
+    except Exception as e:
+        mylog.err("sinaRT:"+uri)
+        mylog.err(str(e))
+        return False
+
 #雪球数据
 # True , ((timesramp,volume,open,high,low,close),...)
 # False, "Error infomation"

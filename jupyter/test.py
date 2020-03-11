@@ -95,3 +95,11 @@ for it in ls:
         print(s)
         stock.execute(s)
 """
+"""
+companys = stock.query("select code,name from company")
+coms = []
+for com in companys:
+    coms.append(com[0])
+xueqiu.sinaRT(coms[:100])
+"""
+print(xueqiu.nextKDate(datetime.today(),5))
