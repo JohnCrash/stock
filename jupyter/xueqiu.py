@@ -165,16 +165,113 @@ def sinaK15(code,n=32):
 def sinaK5(code,n=96):
     return sinaK(code,5,n)
 
+#更新全部数据
+def updateAllRT(ThreadCount=10):
+    b,_ = shared.fromRedis('runtime_update')
+    if b:
+        return
+    companys = stock.query("select code from company")
+    coms = []
+    for c in companys:
+        coms.append(c[0])
+    t = datetime.today()
+    lock = threading.Lock()
+    count = 0    
+    def updateRT(cs,inx):
+        nonlocal count
+        for i in range(5):
+            try:
+                if inx%2==0:
+                    xueqiuRT(cs)
+                else:
+                    sinaRT(cs)
+                break
+            except Exception as e:
+                mylog.err("updateAllRT updateRT:"+e)
+        lock.acquire()
+        count-=1
+        lock.release()
+    while t.hour>=9 and t.hour<15:
+        if (t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15):
+            for i in range(0,len(coms),100):
+                l = i+100
+                if l>len(coms):
+                    l = len(coms)
+                threading.Thread(target=updateRT,args=((coms[i:l],math.floor(i/100)))).start()
+                lock.acquire()
+                count+=1
+                lock.release()
+                while count>=ThreadCount:
+                    time.sleep(.1)
+            while count>0:
+                time.sleep(.1)
+            print('updateAllRT :',datetime.today(),datetime.today()-t)
+        shared.toRedis(datetime.today(),'runtime_update',ex=60)
+        dt = 20-(datetime.today()-t).seconds #20秒更新一次
+        if dt>0:
+            time.sleep(dt)
+        t = datetime.today()
+
 #(0 code,1 timesramp,2 volume,3 open,4 high,5 low,6 close)
-def appendRedisRT(code,timesramp,volume,open,high,low,close):
+def appendRedisRT(code,timestamp,volume,open1,high,low,close1):
     name = "%s_RT"%code
     b,rt = shared.fromRedis(name)
-    if not b:
-        rt = []
+    if not b or rt['v']!=1:
+        rt = {'kk':{},'k':[],'r':[],'l':0,'v':1}
+    rt['r'].append((timestamp,volume,open1,high,low,close1))
+    rt['r'] = rt['r'][-180:]
+    t = next_k_timestamp(timestamp)
+    if t is not None:
+        ts = "%02d:%02d"%(t.hour,t.minute)
+        if ts not in rt['kk']:
+            if volume>0 and rt['l']>0:
+                rt['kk'][ts] = [t,volume-rt['l'],open1,high,low,close1,0]
+            else:
+                rt['kk'][ts] = [t,0,open1,high,low,close1,0]
+            rt['k'].append(rt['kk'][ts])
+            rt['kk'][ts][6] = len(rt['k'])-1 #将索引放入到5中，便于查找
+        else:
+            k = rt['kk'][ts]
+            if volume>0:
+                k[1] += volume-rt['l']
+                rt['l'] = volume
+            k[3] = max(k[3],high)
+            k[4] = min(k[4],low)
+            k[5] = close1
+            
     shared.toRedis(rt,name,ex=8*3600)
+
+#返回
+def K2(code,n=48):
+    cacheName = "k5_%s"%(code.lower())
+    b,cache = shared.fromRedis(cacheName)
+    if b: 
+        rtname = "%s_RT"%code
+        b1,rt = shared.fromRedis(rtname)
+        if b1:
+            k_ = cache['k']
+            d_ = cache['date']
+            dd = cache['date'][-1][0]
+            nd = next_k_timestamp(dd)
+            ts = "%02d:%02d"%(nd.hour,nd.minute)
+            if ts in rt['kk']:
+                bi = rt['kk'][ts][6]
+                k = rt['k']
+                for i in range(bi,len(k)):
+                    p = k[i]
+                    k_.append(p[1:6])
+                    d_.append((p[0],))
+                    #if True: #是否连续
+                    #    return K(code,5,n)
+                return True,k_,d_
+    return K(code,5,n)
+#读取实时k数据
+#返回b,(timestamp,volume,open,high,low,close) 5k
+def readRedisRT(code):
+    pass
 #雪球实时https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=SH000001,SZ399001,SZ399006&_=1583718246079
 #codes = [code,...]
-#返回b,[(timesramp,volume,open,high,low,close),...]
+#返回b,[(timestamp,volume,open,high,low,close),...]
 """
 {
     "data": [
@@ -223,7 +320,19 @@ def xueqiuRT(codes):
                 data = js['data']
                 for i in range(len(data)):
                     d = data[i]
-                    appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']),d['volume'],d['open'],d['high'],d['low'],d['current'])
+                    try:
+                        if 'current' in d and d['current'] is not None:
+                            current = float(d['current'])
+                        else:
+                            return False
+                        if d['volume'] is not None:
+                            vol = float(d['volume'])
+                        else:
+                            vol = 0                          
+                        appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current)
+                    except Exception as e:
+                        mylog.err("xueqiuRT:"+str(d))
+                        mylog.err("xueqiuRT:"+str(e))
                 return True
         mylog.err('xueqiuRT:'+uri)
         mylog.err(str(js))
@@ -260,7 +369,22 @@ def sinaRT(codes):
                         a = ln[bii+2:eii].split(',')
                         if len(a)>31:
                             timestamp = datetime.fromisoformat(a[30]+' '+a[31])
-                            appendRedisRT(code,timestamp,float(a[8]),float(a[3]),float(a[4]),float(a[5]),float(a[6]))
+                            open1=float(a[3])
+                            high = float(a[4])
+                            low = float(a[5])
+                            close1=float(a[6])
+                            lastp = 0
+                            for i in range(10,30,2):
+                                p = float(a[i+1])
+                                if p>1:
+                                    high = max(high,p)
+                                    low = min(low,p)
+                                    lastp = p
+                            if open1==0:
+                                open1 = float(a[11])
+                            if close1==0:
+                                close1 = lastp
+                            appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
                 bi = i+1
         else:
             mylog.err('sinaRT:'+uri)
@@ -525,6 +649,30 @@ def next_k_date(period):
             return (datetime(today.year,today.month,today.day,d[0],d[1])-today).seconds
     return 0
 
+#下一个k时间戳
+def next_k_timestamp(t,period=5):
+    if period==5:
+        m = k5date
+    else:
+        m = k15date
+    for i in range(len(m)):
+        d = m[i]
+        if t.hour<d[0] or t.hour==d[0] and t.minute<d[1]:
+            return datetime(t.year,t.month,t.day,d[0],d[1])
+    return None
+def prev_k_timestamp(t,period=5):
+    if period==5:
+        m = k5date
+    else:
+        m = k15date
+    for i in range(len(m)):
+        d = m[i]
+        if t.hour<d[0] or t.hour==d[0] and t.minute<d[1]:
+            if i > 0:
+                return datetime(t.year,t.month,t.day,m[i-1][0],m[i-1][1])
+            else:
+                break
+    return None
 #如果是在开盘状态则15分钟更新一次数据
 def nextdt15():
     t = datetime.today()

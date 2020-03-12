@@ -102,4 +102,9 @@ for com in companys:
     coms.append(com[0])
 xueqiu.sinaRT(coms[:100])
 """
-print(xueqiu.nextKDate(datetime.today(),5))
+#print(xueqiu.nextKDate(datetime.today(),5))
+#print("next:",xueqiu.next_k_timestamp(datetime(2020,3,11,9,1),5))
+#print("prev:",xueqiu.prev_k_timestamp(datetime(2020,3,11,9,1),5))
+#c = stock.query("select code from company")
+#print(c[0])
+xueqiu.updateAllRT()
