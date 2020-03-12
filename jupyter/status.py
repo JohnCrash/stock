@@ -326,7 +326,7 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
     tatoal = len(companys)
     def getk(com):
         nonlocal count,period,N
-        b,k_,d_ = xueqiu.K(com[1],period,n=N)
+        b,k_,d_ = xueqiu.K2(com[1],n=N)
         lock.acquire()
         results.append((b,com,k_,d_))
         count-=1
@@ -884,11 +884,12 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
 本函数返回的是5分钟级别的短线情况
 days = 5仅仅代表5*5=25分钟,10代表10*5=50分钟
 """    
-def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None):
+def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
     result = []
     progress(0)
     #categorys = stock.query("""select id,name from category""")
-    companys = stock.query("""select company_id,code,name,category from company_select""")
+    if companys is None:
+        companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
     for com in companys:
         id2com[com[0]] = com
@@ -899,6 +900,7 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None):
     progress(100)
 
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+
     idd[:,0] = K[:,0,0]
     for i in idd:
         k = int(i[0])
@@ -1394,6 +1396,7 @@ ei 结束时间
 N 和 bi,ei只能选择一种
 """
 def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
+    companys = stock.query("""select company_id,code,name,category from company_select""")
     out2 = widgets.Output()
     progress = widgets.IntProgress(value=0,
     min=0,max=100,step=1,
@@ -1425,7 +1428,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     else:
         periods = [1,3,6]
         period = 3
-        result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
+        result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
     done = True
     sortType = 'TOP10'
     progressCallback(100)
@@ -1742,7 +1745,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if cycle=='d':
             result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
         else:
-            result = StrongSorted5k(periods,N,bi=bi,ei=ei,progress=progressCallback)
+            result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
         done = True
         progressCallback(100)
         needUpdate = False

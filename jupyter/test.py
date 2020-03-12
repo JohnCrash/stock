@@ -95,16 +95,20 @@ for it in ls:
         print(s)
         stock.execute(s)
 """
-"""
 companys = stock.query("select code,name from company")
 coms = []
 for com in companys:
     coms.append(com[0])
-xueqiu.sinaRT(coms[:100])
-"""
+def progress(i):
+    print(i)
+status.downloadAllK(coms,5,96,progress)
+#xueqiu.sinaRT(coms[:100])
 #print(xueqiu.nextKDate(datetime.today(),5))
 #print("next:",xueqiu.next_k_timestamp(datetime(2020,3,11,9,1),5))
 #print("prev:",xueqiu.prev_k_timestamp(datetime(2020,3,11,9,1),5))
 #c = stock.query("select code from company")
 #print(c[0])
-xueqiu.updateAllRT()
+
+#b,k,d = xueqiu.K2('SH603499')
+#print(k[-1],len(k))
+#print(d[-1],len(d))

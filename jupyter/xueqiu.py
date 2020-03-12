@@ -209,6 +209,7 @@ def updateAllRT(ThreadCount=10):
         shared.toRedis(datetime.today(),'runtime_update',ex=60)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
+            print('delay',dt)
             time.sleep(dt)
         t = datetime.today()
 
@@ -245,25 +246,33 @@ def appendRedisRT(code,timestamp,volume,open1,high,low,close1):
 def K2(code,n=48):
     cacheName = "k5_%s"%(code.lower())
     b,cache = shared.fromRedis(cacheName)
-    if b: 
+    if b:
         rtname = "%s_RT"%code
         b1,rt = shared.fromRedis(rtname)
         if b1:
             k_ = cache['k']
             d_ = cache['date']
+            if len(k_)<n:
+                return K(code,5,n)
             dd = cache['date'][-1][0]
             nd = next_k_timestamp(dd)
-            ts = "%02d:%02d"%(nd.hour,nd.minute)
-            if ts in rt['kk']:
-                bi = rt['kk'][ts][6]
-                k = rt['k']
-                for i in range(bi,len(k)):
-                    p = k[i]
-                    k_.append(p[1:6])
-                    d_.append((p[0],))
-                    #if True: #是否连续
-                    #    return K(code,5,n)
-                return True,k_,d_
+            if nd is not None:
+                ts = "%02d:%02d"%(nd.hour,nd.minute)
+                if ts in rt['kk']:
+                    bi = rt['kk'][ts][6]
+                    k = rt['k']
+                    ad = []
+                    ak = []
+                    for i in range(bi,len(k)):
+                        p = k[i]
+                        ak.append(p[1:6])
+                        ad.append((p[0],))
+                        #if True: #是否连续
+                        #    return K(code,5,n)
+                    if len(ad)>0:
+                        return True,np.vstack((k_,ak))[-n:],(d_+ad)[-n:]
+                    else:
+                        return True,k_,d_
     return K(code,5,n)
 #读取实时k数据
 #返回b,(timestamp,volume,open,high,low,close) 5k
@@ -357,10 +366,10 @@ def sinaRT(codes):
         r = s.get(uri,headers=headers)
         if r.status_code==200:
             bi = 0
-            i = 0
-            while i!=-1:
-                i = r.text.find('\n',bi)
-                ln = r.text[bi:i]
+            ei = 0
+            while ei!=-1:
+                ei = r.text.find('\n',bi)
+                ln = r.text[bi:ei]
                 if len(ln)>16 and ln[:11]=='var hq_str_':
                     bii = ln.find('="')
                     eii = ln.find('";')
@@ -385,7 +394,7 @@ def sinaRT(codes):
                             if close1==0:
                                 close1 = lastp
                             appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
-                bi = i+1
+                bi = ei+1
         else:
             mylog.err('sinaRT:'+uri)
             mylog.err(str(r.reason))
