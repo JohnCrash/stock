@@ -176,7 +176,8 @@ def updateAllRT(ThreadCount=10):
         coms.append(c[0])
     t = datetime.today()
     lock = threading.Lock()
-    count = 0    
+    count = 0
+    print('开始实时更新全部数据...')
     def updateRT(cs,inx):
         nonlocal count
         for i in range(5):
@@ -191,7 +192,7 @@ def updateAllRT(ThreadCount=10):
         lock.acquire()
         count-=1
         lock.release()
-    while t.hour>=9 and t.hour<15:
+    while t.hour>=6 and t.hour<15:
         if (t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15):
             for i in range(0,len(coms),100):
                 l = i+100
@@ -205,11 +206,10 @@ def updateAllRT(ThreadCount=10):
                     time.sleep(.1)
             while count>0:
                 time.sleep(.1)
-            print('updateAllRT :',datetime.today(),datetime.today()-t)
+            print('updateAllRT:',datetime.today(),(datetime.today()-t).seconds)
         shared.toRedis(datetime.today(),'runtime_update',ex=60)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
-            print('delay',dt)
             time.sleep(dt)
         t = datetime.today()
 

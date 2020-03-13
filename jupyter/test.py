@@ -95,6 +95,7 @@ for it in ls:
         print(s)
         stock.execute(s)
 """
+"""
 companys = stock.query("select code,name from company")
 coms = []
 for com in companys:
@@ -102,6 +103,7 @@ for com in companys:
 def progress(i):
     print(i)
 status.downloadAllK(coms,5,96,progress)
+"""
 #xueqiu.sinaRT(coms[:100])
 #print(xueqiu.nextKDate(datetime.today(),5))
 #print("next:",xueqiu.next_k_timestamp(datetime(2020,3,11,9,1),5))
@@ -112,3 +114,20 @@ status.downloadAllK(coms,5,96,progress)
 #b,k,d = xueqiu.K2('SH603499')
 #print(k[-1],len(k))
 #print(d[-1],len(d))
+import asyncio
+
+class Timer:
+    def __init__(self, timeout, callback):
+        self._timeout = timeout
+        self._callback = callback
+        self._task = asyncio.ensure_future(self._job())
+
+    async def _job(self):
+        await asyncio.sleep(self._timeout) 
+        self._callback()
+
+    def cancel(self):
+        self._task.cancel()
+def a():
+    print('a')
+Timer(1.2,a)

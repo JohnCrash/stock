@@ -987,7 +987,7 @@ def getmycolor(name):
     namecount += 1
     return mycolors[name2int[name]]
 
-def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d'):
+def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d',output=None):
     fig,axs = plt.subplots(figsize=(28,14))
     dd = r[3] #date
     axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
@@ -996,6 +996,8 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d'):
     else:
         axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
 
+    def getCompanyRank(name,j,rank):
+        return ''
     xdd = np.arange(len(dd))
     if top is None:
         for i in range(len(r[2])):
@@ -1015,7 +1017,10 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d'):
             i = int(d[0])
             dk = r[2][i] #
             idd = r[4][i]
-            title = "%d %s"%(rank,idd[2])
+            if pos-1>=0:
+                title = "%d %s %s"%(rank,idd[2],getCompanyRank(idd[2],pos-1,rank))
+            else:
+                title = "%d %s"%(rank,idd[2])
             color = getmycolor(idd[2])
             if focus is not None:
                 if idd[2]==focus:
@@ -1047,7 +1052,10 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d'):
     axs.set_xlim(bi,ei-1)
     plt.legend(bbox_to_anchor=(1, 1),loc='upper left',fontsize='large')
     fig.autofmt_xdate()
-    plt.show()
+    if output is None:
+        plt.show()
+    else:
+        kline.output_show(output)
 
 """
 按分类列出强势股
@@ -1181,9 +1189,9 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
         nonlocal bi,ei,pos,stopUpdate,needUpdateSlider,cycle
         if stopUpdate:
             return
-        output.clear_output(wait=True)
-        with output:
-            PlotCategory(bi,ei,pos,result,top=top,focus=com,cycle=cycle)
+        #output.clear_output(wait=True)
+        #with output:
+        PlotCategory(bi,ei,pos,result,top=top,focus=com,cycle=cycle,output=output)
         needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
@@ -1331,7 +1339,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     showPlot()
 
 
-def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None,cycle='d'):
+def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,cycle='d',output=None):
     fig,axs = plt.subplots(figsize=(28,14))
     r = sortedCategory[0]
     dd = r[3] #date
@@ -1358,10 +1366,24 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None,cycle='d'):
             return v<=5/5 and v>4/5
         else:
             return focus==categoryName
+    def getPrevRank(name,j):
+        for i in range(len(pervSortedCategory)):
+            r = pervSortedCategory[i]
+            if r[1]==name:
+                if i-j>0:
+                    return '+%d'%(i-j)
+                elif i-j<0:
+                    return str(i-j)
+                else:
+                    return ''
+        return ''
     for r in sortedCategory:
         color = getmycolor(r[1])
         dk = r[6] #
-        title = "%d %s"%(i+1,r[1])
+        if pervSortedCategory is None:
+            title = "%d %s"%(i+1,r[1])
+        else:
+            title = "%d %s %s"%(i+1,r[1],getPrevRank(r[1],i))
         if top is not None:
             if i<top:
                 if focus is not None:
@@ -1386,7 +1408,10 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,top,focus=None,cycle='d'):
     axs.set_xlim(bi,ei-1)
     plt.legend(bbox_to_anchor=(1, 1),loc='upper left',fontsize='large')
     fig.autofmt_xdate()
-    plt.show()
+    if output is None:
+        plt.show()
+    else:
+        kline.output_show(output)
 
 """
 强势分类于强势股
@@ -1540,9 +1565,12 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle,needUpdate,sortType
         if needUpdate:
             if category is None:
-                output.clear_output(wait=True)
-                with output:
-                    PlotAllCategory(bi,ei,pos,sortedCategory,top,mark,cycle=cycle)
+                #output.clear_output(wait=True)
+                if pos-1>=0:
+                    pervSortedCategory = getSortedCategory(period,pos-1)
+                else:
+                    pervSortedCategory = None
+                PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,mark,cycle=cycle,output=output)
             else:
                 output.clear_output()
                 with output:
@@ -1728,8 +1756,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         needUpdate = True
         if needUpdateSlider and category is None:
             showPlot()
-
-    def on_refresh(e):
+    def update():
         nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate
         progress = widgets.IntProgress(value=0,
         min=0,max=100,step=1,
@@ -1765,6 +1792,9 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         needUpdate = True
         showPlot()
 
+    def on_refresh(e):
+        update()
+
     refreshbutton.on_click(on_refresh)
     prevbutton.on_click(on_prev)
     nextbutton.on_click(on_next)
@@ -1784,7 +1814,18 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
 
     display(box,output)
-    showPlot()
+    showPlot() 
+    lastT = None
+    def checkUpdate2():
+        nonlocal lastT
+        b,t = shared.fromRedis('runtime_update')
+        if b and t!=lastT:
+            lastT = t
+            update()
+        if datetime.today().hour<15:
+            xueqiu.Timer(1,checkUpdate2)
+    #监视实时数据
+    xueqiu.Timer(1,checkUpdate2)
 """
 关注
 """
