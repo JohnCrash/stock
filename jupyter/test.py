@@ -114,20 +114,23 @@ status.downloadAllK(coms,5,96,progress)
 #b,k,d = xueqiu.K2('SH603499')
 #print(k[-1],len(k))
 #print(d[-1],len(d))
-import asyncio
-
-class Timer:
-    def __init__(self, timeout, callback):
-        self._timeout = timeout
-        self._callback = callback
-        self._task = asyncio.ensure_future(self._job())
-
-    async def _job(self):
-        await asyncio.sleep(self._timeout) 
-        self._callback()
-
-    def cancel(self):
-        self._task.cancel()
-def a():
-    print('a')
-Timer(1.2,a)
+import redis
+import pickle
+pool = redis.ConnectionPool(host='localhost', port=6379)
+companys = stock.query("select company_id,code,name,category from company_select")
+def progress(i):
+    pass
+t = datetime.today()
+#status.downloadAllK(companys,5,48,progress)
+status.downloadAllKFast(companys,5,48,progress)
+#r = redis.Redis(connection_pool=pool)
+#for c in companys:
+#    code = c[1]
+#    cacheName = "k5_%s"%(code.lower())
+#    encoded = r.get(cacheName)
+#    if encoded is not None:
+#        cache = pickle.loads(encoded)
+    #b,cache = shared.fromRedis(cacheName)
+   # rtname = "%s_RT"%code
+   # b1,rt = shared.fromRedis(rtname)
+print(datetime.today()-t)

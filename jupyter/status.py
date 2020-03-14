@@ -357,8 +357,22 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
             if D is None:
                 D = it[3]
         i+=1
-    return D,K  
-
+    return D,K
+#加速版本
+def downloadAllKFast(companys,period,N,progress,ThreadCount=10):
+    D = None
+    K = np.ones((len(companys),N,11))    
+    i = 0
+    for com in companys:
+        b,k,d = xueqiu.K2(com[1],N)
+        K[i,:,0] = com[0]
+        if b and len(d)==N:
+            K[i,:,1] = k[:,4] #close
+            K[i,:,2] = k[:,0] #valume
+            if D is None:
+                D = d
+        i+=1
+    return D,K 
 #companys = [(company_id,code,name,category),....]
 #返回
 #(datetime,...),K[company,date,(id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw)]
@@ -1756,18 +1770,21 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         needUpdate = True
         if needUpdateSlider and category is None:
             showPlot()
-    def update():
+    def update(b):
         nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate
-        progress = widgets.IntProgress(value=0,
-        min=0,max=100,step=1,
-        description='download',
-        bar_style='',
-        orientation='horizontal',layout=Layout(display='flex',
-                            flex_flow='wrap',
-                            width='100%'))
-        with out2:
-            display(progress)
-        done = False
+        if b:
+            progress = widgets.IntProgress(value=0,
+            min=0,max=100,step=1,
+            description='download',
+            bar_style='',
+            orientation='horizontal',layout=Layout(display='flex',
+                                flex_flow='wrap',
+                                width='100%'))
+            with out2:
+                display(progress)
+            done = False
+        else:
+            refreshbutton.button_style = 'success'
         progressCallback(0)
         if cycle=='d':
             result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
@@ -1790,10 +1807,12 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             bi = 0
         setSlider(bi,ei,pos)
         needUpdate = True
+        if not b:
+            refreshbutton.button_style = ''
         showPlot()
 
     def on_refresh(e):
-        update()
+        update(True)
 
     refreshbutton.on_click(on_refresh)
     prevbutton.on_click(on_prev)
@@ -1821,7 +1840,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         b,t = shared.fromRedis('runtime_update')
         if b and t!=lastT:
             lastT = t
-            update()
+            update(False)
         if datetime.today().hour<15:
             xueqiu.Timer(1,checkUpdate2)
     #监视实时数据

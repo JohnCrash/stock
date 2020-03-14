@@ -1397,7 +1397,7 @@ class Plote:
             if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
                 nt = xueqiu.next_k_date(5)
             else:
-                nt = xueqiu.next_k_date(self._period)
+                nt = 0 #xueqiu.next_k_date(self._period)
             if nt>0:
                 self._timer = xueqiu.Timer(nt+1,update)
             else:
