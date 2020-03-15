@@ -384,7 +384,7 @@ def updateRT(companys):
             ps = [_K]
         for ts in seqs:
             if ba:
-                b,p = shared.fromRedis("rt%d"%ts)
+                b,p = shared.numpyFromRedis("rt%d"%ts)
                 if b:
                     if len(p)==C:
                         ps.append(p)
@@ -398,7 +398,16 @@ def updateRT(companys):
             elif _lastp == ts:
                 ba = True
         if len(ps)>1:
-            _K = np.hstack(ps)
+            _K = np.empty((C,len(_D),7))
+            bi = 0
+            for col in ps:
+                if col.shape[0]==C and col.shape[1]==7:
+                    ei = bi+1
+                    _K[:,bi,:] = col
+                else:
+                    ei = bi+col.shape[1]
+                    _K[:,bi:ei,:] = col
+                bi = ei
             _lastp = seqs[-1]
     return _K,_D
 
@@ -951,7 +960,8 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
     else:
         D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
-
+    if D is None or K is None:
+        return []
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
 
     idd[:,0] = K[:,0,0]
@@ -1514,6 +1524,8 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     def getSortedCategory(day,pos):
         nonlocal sortType
         categorys = []
+        if len(result)==0:
+            return []
         for r in result:
             if r[0]==day:
                 categorys.append(r)

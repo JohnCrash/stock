@@ -114,23 +114,25 @@ status.downloadAllK(coms,5,96,progress)
 #b,k,d = xueqiu.K2('SH603499')
 #print(k[-1],len(k))
 #print(d[-1],len(d))
-import redis
-import pickle
-pool = redis.ConnectionPool(host='localhost', port=6379)
+"""
 companys = stock.query("select company_id,code,name,category from company_select")
+
 def progress(i):
     pass
-t = datetime.today()
-#status.downloadAllK(companys,5,48,progress)
-status.downloadAllKFast(companys,5,48,progress)
-#r = redis.Redis(connection_pool=pool)
-#for c in companys:
-#    code = c[1]
-#    cacheName = "k5_%s"%(code.lower())
-#    encoded = r.get(cacheName)
-#    if encoded is not None:
-#        cache = pickle.loads(encoded)
-    #b,cache = shared.fromRedis(cacheName)
-   # rtname = "%s_RT"%code
-   # b1,rt = shared.fromRedis(rtname)
-print(datetime.today()-t)
+
+lastT = None
+def checkUpdate2():
+    global lastT
+    while True:
+        b,t = shared.fromRedis('runtime_update')
+        if b and t!=lastT:
+            lastT = t
+            status.downloadAllKFast(companys,5,48,progress)
+        if datetime.today().hour>15:
+            break
+        else:
+            time.sleep(1)
+threading.Thread(target=checkUpdate2).start()
+"""
+#status.downloadAllKFast(companys,5,48,progress)
+xueqiu.clearAllRT()

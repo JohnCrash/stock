@@ -165,6 +165,14 @@ def sinaK15(code,n=32):
 def sinaK5(code,n=96):
     return sinaK(code,5,n)
 
+#清除全部实时数据
+def clearAllRT():
+    b,seqs = shared.fromRedis('runtime_sequence')
+    if b:
+        for ts in seqs:
+            shared.delKey("rt%d"%ts)
+        shared.delKey('runtime_sequence')
+        shared.delKey('runtime_update')
 #更新全部数据
 def updateAllRT(ThreadCount=10):
     b,_ = shared.fromRedis('runtime_update')
@@ -199,7 +207,7 @@ def updateAllRT(ThreadCount=10):
     if not b:
         seqs = []
     while t.hour>=6 and t.hour<15:
-        if (t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15):
+        if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
             #[companys_id,timestamp,volume,open,high,low,close]
             plane = np.zeros((len(companys),7),dtype=float)
             for i in range(0,len(coms),100):
