@@ -1,3 +1,5 @@
+console.log("Hello world!")
+/*
 const Crawler = require("crawler");
 uri = 'https://xueqiu.com';
 
@@ -15,3 +17,4 @@ let c = new Crawler({
 c.queue({
     uri
 });
+*/
