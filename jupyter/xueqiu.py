@@ -169,36 +169,45 @@ def sinaK5(code,n=96):
 def updateAllRT(ThreadCount=10):
     b,_ = shared.fromRedis('runtime_update')
     if b:
+        print('更新程序已经在运行了')
         return
-    companys = stock.query("select code from company")
+    companys = stock.query("""select company_id,code,name,category from company_select""")
     coms = []
+    idds = []
     for c in companys:
-        coms.append(c[0])
+        idds.append(c[0])
+        coms.append(c[1])
     t = datetime.today()
     lock = threading.Lock()
     count = 0
     print('开始实时更新全部数据...')
-    def updateRT(cs,inx):
+    def updateRT(cs,r,batch):
         nonlocal count
         for i in range(5):
             try:
-                if inx%2==0:
-                    xueqiuRT(cs)
+                if batch%2==0:
+                    xueqiuRT(cs,r)
                 else:
-                    sinaRT(cs)
+                    sinaRT(cs,r)
                 break
             except Exception as e:
                 mylog.err("updateAllRT updateRT:"+e)
         lock.acquire()
         count-=1
         lock.release()
+    b,seqs = shared.fromRedis('runtime_sequence')
+    if not b:
+        seqs = []
     while t.hour>=6 and t.hour<15:
         if (t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15):
+            #[companys_id,timestamp,volume,open,high,low,close]
+            plane = np.zeros((len(companys),7),dtype=float)
             for i in range(0,len(coms),100):
                 l = i+100
                 if l>len(coms):
                     l = len(coms)
-                threading.Thread(target=updateRT,args=((coms[i:l],math.floor(i/100)))).start()
+                plane[i:l,1] = idds[i:l]
+                threading.Thread(target=updateRT,args=((coms[i:l],plane[i:l,1:],math.floor(i/100)))).start()
                 lock.acquire()
                 count+=1
                 lock.release()
@@ -206,6 +215,11 @@ def updateAllRT(ThreadCount=10):
                     time.sleep(.1)
             while count>0:
                 time.sleep(.1)
+
+            seqs.append(math.floor(time.time()*1000*1000))
+            shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=10*3600)
+            seqs = seqs[-3*60*4*10:] #3*60*4*10 每秒3的，保存10天的
+            shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:',datetime.today(),(datetime.today()-t).seconds)
         shared.toRedis(datetime.today(),'runtime_update',ex=60)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
@@ -316,7 +330,7 @@ def readRedisRT(code):
         ....]
 }
 """
-def xueqiuRT(codes):
+def xueqiuRT(codes,r=None):
     timestramp = math.floor(time.time()*1000)
     cs = ""
     for c in codes:
@@ -337,11 +351,15 @@ def xueqiuRT(codes):
                         if d['volume'] is not None:
                             vol = float(d['volume'])
                         else:
-                            vol = 0                          
-                        appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current)
+                            vol = 0
+                        if r is None:                  
+                            appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current)
+                        else:
+                            r[i] = [d['timestamp']/1000,vol,current,current,current,current]
                     except Exception as e:
                         mylog.err("xueqiuRT:"+str(d))
                         mylog.err("xueqiuRT:"+str(e))
+                        return False
                 return True
         mylog.err('xueqiuRT:'+uri)
         mylog.err(str(js))
@@ -353,7 +371,7 @@ def xueqiuRT(codes):
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
 #var hq_str_sh600278="东方创业,11.680,11.170,11.680,11.680,11.680,11.670,11.680,1740300,20326704.000,14800,11.670,200,11.660,800,11.610,140100,11.560,50800,11.550,54100,11.680,300,11.690,23700,11.700,1200,11.710,1400,11.720,2020-03-09,09:29:35,00,";
 #var hq_str_code="0 name,1 today_open,2 last_close,3 open,4 high,5 low,6 close,7 current,8 成交量,9 成交额,(v,p),...10个,timestamp"
-def sinaRT(codes):
+def sinaRT(codes,r=None):
     cs = ""
     for c in codes:
         cs += "%s,"%(c.lower())    
@@ -367,6 +385,7 @@ def sinaRT(codes):
         if r.status_code==200:
             bi = 0
             ei = 0
+            i = 0
             while ei!=-1:
                 ei = r.text.find('\n',bi)
                 ln = r.text[bi:ei]
@@ -393,8 +412,13 @@ def sinaRT(codes):
                                 open1 = float(a[11])
                             if close1==0:
                                 close1 = lastp
-                            appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
+                            if r is None:
+                                appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
+                            else:
+                                r[i] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
+                            i+=1
                 bi = ei+1
+                return True
         else:
             mylog.err('sinaRT:'+uri)
             mylog.err(str(r.reason))

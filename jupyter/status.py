@@ -359,20 +359,59 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
         i+=1
     return D,K
 #加速版本
-def downloadAllKFast(companys,period,N,progress,ThreadCount=10):
-    D = None
-    K = np.ones((len(companys),N,11))    
-    i = 0
-    for com in companys:
-        b,k,d = xueqiu.K2(com[1],N)
-        K[i,:,0] = com[0]
-        if b and len(d)==N:
-            K[i,:,1] = k[:,4] #close
-            K[i,:,2] = k[:,0] #valume
-            if D is None:
-                D = d
-        i+=1
-    return D,K 
+#使用全局变量
+_K = None
+_D = None
+_lastp = None
+#返回K = [[[id,timestamp,open,high,low,close]
+#       ....
+#     len(companys)],]
+# shape = (len(companys),len(D),7)
+#D = [(datetime,),....]
+#没有数据返回None,None
+def updateRT(companys):
+    global _K,_D,_lastp
+    b,seqs = shared.fromRedis('runtime_sequence')
+    C = len(companys)
+    if b:
+        if _D is None:
+            _D = []
+        ba = False if _lastp is not None else True
+        if _K is None or len(_K) != C:
+            ps = []
+            ba = True
+        else:
+            ps = [_K]
+        for ts in seqs:
+            if ba:
+                b,p = shared.fromRedis("rt%d"%ts)
+                if b:
+                    if len(p)==C:
+                        ps.append(p)
+                    elif len(p)>C:
+                        ps.append(p[:C])
+                    else:
+                        pp = np.zeros((C,7))
+                        pp[:len(p)] = p
+                        ps.append(pp)
+                    _D.append((datetime.fromtimestamp(ts/1000000),))
+            elif _lastp == ts:
+                ba = True
+        if len(ps)>1:
+            _K = np.hstack(ps)
+            _lastp = seqs[-1]
+    return _K,_D
+
+def downloadAllKFast(companys,period,N,progress):
+    K_,D_ = updateRT(companys)
+    if K_ is not None:
+        D = D_
+        K = np.ones((len(companys),len(D),11))
+        K[:,:,0] = K_[:,:,0] #id
+        K[:,:,1] = K_[:,:,6] #close
+        K[:,:,2] = K_[:,:,2] #volume
+        return D,K 
+    return None,None
 #companys = [(company_id,code,name,category),....]
 #返回
 #(datetime,...),K[company,date,(id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw)]
@@ -908,7 +947,7 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
     for com in companys:
         id2com[com[0]] = com
     if bi is None:
-        D,K = downloadAllK(companys,5,N,progress)
+        D,K = downloadAllKFast(companys,5,N,progress)
     else:
         D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
