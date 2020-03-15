@@ -18,6 +18,20 @@ import random
 import threading
 import time
 import copy
+from matplotlib.ticker import Formatter
+class MyFormatterRT(Formatter):
+    def __init__(self, dates,fmt='%d %h:%M:%s'):
+        self.dates = dates
+        self.fmt = fmt
+
+    def __call__(self, x, pos=0):
+        'Return the label for time x at position pos'
+        ind = int(np.round(x))
+        if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
+            return ''
+
+        t = self.dates[ind][0]
+        return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
 
 PROD = 40
 
@@ -411,7 +425,7 @@ def updateRT(companys):
             _lastp = seqs[-1]
     return _K,_D
 
-def downloadAllKFast(companys,period,N,progress):
+def downloadAllKFast(companys,progress):
     K_,D_ = updateRT(companys)
     if K_ is not None:
         D = D_
@@ -430,6 +444,17 @@ def loadAllK(companys,bi,ei,period,N,progress,ThreadCount=10):
     count = 0
     tatoal = len(companys)
     D = None
+    if bi is None:
+        if period==5:
+            db = 'k5_xueqiu'
+            item = 'timestamp'
+        else:
+            db = 'kd_xueqiu'
+            item = 'date'
+        d = stock.query("""select %s from %s where id=8828 order by %s desc limit %d"""%(item,db,item,N))
+        bi = stock.timeString(d[-1][0])
+        ei = stock.timeString(d[0][0])
+
     for com in companys:
         _,k_,d_ = stock.loadKline(com[1],period,after=bi,ei=ei)
         if d_ is not None and (com[1]=='SH000001' or com[1]=='SZ399001'):
@@ -873,33 +898,13 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
     #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
     #数据a的时间序列和d相同,shape = (公司数,日期,数据)
     return d,a
-"""
-返回
-[
-    (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
-     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
-     6 该分类的前十名平均盈利[date],
-     7 该分类的跌幅前十的平均跌幅[date],
-    ...
-]
-"""
-def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
+
+def processKD(days,K,D,companys):
     result = []
-    #categorys = stock.query("""select id,name from category""")
-    companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
     for com in companys:
         id2com[com[0]] = com
-    if bi is not None:
-        if ei is not None:
-            D,K = getStatusN(bi=bi,ei=ei)
-        else:
-            D,K = getStatusN(bi=bi,ei=stock.dateString(date.today()))
-    else:
-        if N>50:
-            D,K = getStatusN(N=N)
-        else:
-            D,K = redisStatusCache50('company_status')
+
     idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
     idd[:,0] = K[:,0,0]
     for i in idd:
@@ -943,62 +948,48 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None):
      7 该分类的跌幅前十的平均跌幅[date],
     ...
 ]
+"""
+def StrongSorted(days,N=50,bi=None,ei=None,progress=None,companys=None):
+    if bi is not None:
+        if ei is not None:
+            D,K = getStatusN(bi=bi,ei=ei)
+        else:
+            D,K = getStatusN(bi=bi,ei=stock.dateString(date.today()))
+    else:
+        if N>50:
+            D,K = getStatusN(N=N)
+        else:
+            D,K = redisStatusCache50('company_status')
+
+    return processKD(days,K,D,companys)
+
+"""
+返回
+[
+    (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
+     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
+     6 该分类的前十名平均盈利[date],
+     7 该分类的跌幅前十的平均跌幅[date],
+    ...
+]
 本函数返回的是5分钟级别的短线情况
 days = 5仅仅代表5*5=25分钟,10代表10*5=50分钟
 """    
 def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
-    result = []
     progress(0)
-    #categorys = stock.query("""select id,name from category""")
-    if companys is None:
-        companys = stock.query("""select company_id,code,name,category from company_select""")
-    id2com = {}
-    for com in companys:
-        id2com[com[0]] = com
-    if bi is None:
-        D,K = downloadAllKFast(companys,5,N,progress)
-    else:
-        D,K = loadAllK(companys,bi,ei,5,N,progress)
+    D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
     if D is None or K is None:
         return []
-    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+    return processKD(days,K,D,companys)
 
-    idd[:,0] = K[:,0,0]
-    for i in idd:
-        k = int(i[0])
-        if k in id2com:
-            i[1] = id2com[k][1]
-            i[2] = id2com[k][2]
-            i[3] = id2com[k][3]
-    categorys = allCategory()
-    for day in days:
-        #dk = (K[:,day:,1]-K[:,:-day,1])/K[:,:-day,1] #使用n天前的收盘价和现在的收盘价进行比较，问题是如果n天前正好是一个跌幅比较大的天，和今天比将反向衬托今天好像大涨
-        #这里和n天前的5日均线比较这样结果比较平滑
-        ma5 = np.empty((K.shape[0],K.shape[1]))
-        for i in range(len(K)):
-            ma5[i,:] = stock.ma(K[i,:,1],5)
-        dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]
-        for category in categorys:
-            r = idd[:,3]==category
-            dK = dk[r]
-            if len(dK)>0:
-                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
-                ia = np.zeros((dK.shape[0],2))
-                ia[:,0] = np.arange(dK.shape[0])
-                for i in range(dK.shape[1]):
-                    ia[:,1] = dK[:,i]
-                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
-
-                top10mean = np.zeros((dK.shape[1]))
-                low10mean = np.zeros((dK.shape[1]))
-                for i in range(dK.shape[1]):
-                    top10mean[i] = sorti[:10,i,1].mean()
-                    low10mean[i] = sorti[-10:,i,1].mean()
-                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
-            else:
-                print("'%s' 分类里面没有公司"%category)
-    return result
+def StrongSortedRT(days,progress=None,companys=None):
+    progress(0)
+    D,K = downloadAllKFast(companys,progress)
+    progress(100)
+    if D is None or K is None:
+        return []
+    return processKD(days,K,D,companys)    
 
 mycolors=[
     "red",
@@ -1053,7 +1044,10 @@ def getmycolor(name):
 def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d',output=None):
     fig,axs = plt.subplots(figsize=(28,14))
     dd = r[3] #date
-    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
+    if cycle=='d' or cycle==5:
+        axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
+    else:
+        axs.xaxis.set_major_formatter(MyFormatterRT(dd))
     if top is None:
         axs.set_title("%s 周期%s"%(r[1],r[0]))
     else:
@@ -1401,13 +1395,15 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     display(box,output,output2)
     showPlot()
 
-
 def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,cycle='d',output=None):
     fig,axs = plt.subplots(figsize=(28,14))
     r = sortedCategory[0]
     dd = r[3] #date
 
-    axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
+    if cycle=='d' or cycle==5:
+        axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
+    else:
+        axs.xaxis.set_major_formatter(MyFormatterRT(dd,cycle))
     if top is None:
         axs.set_title("%s 周期%s"%(r[1],r[0]))
     else:
@@ -1512,11 +1508,16 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     if cycle=='d':
         periods = [3,5,10,20]
         period = 20
-        result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
-    else:
+        result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback,companys=companys)
+    elif cycle==5:
         periods = [1,3,6]
         period = 3
         result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
+    else: #实时
+        periods = [3,15,45,90]
+        period = 3
+        result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
+
     done = True
     sortType = 'TOP10'
     progressCallback(100)
@@ -1541,7 +1542,6 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             return sorted(categorys,key=lambda it:it[7][pos])
         else: #'弱势跌幅榜':
             return sorted(categorys,key=lambda it:it[7][pos],reverse=True)
-
     
     sortedCategory = getSortedCategory(period,-1)
     top = 10
@@ -1838,9 +1838,12 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             refreshbutton.button_style = 'success'
         progressCallback(0)
         if cycle=='d':
-            result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback)
-        else:
+            result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback,companys=companys)
+        elif cycle==5:
             result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
+        else: #实时
+            result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
+
         done = True
         progressCallback(100)
         needUpdate = False
@@ -1885,6 +1888,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
 
     display(box,output)
     showPlot() 
+    
     lastT = None
     def checkUpdate2():
         nonlocal lastT
@@ -1895,7 +1899,8 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if datetime.today().hour<15:
             xueqiu.Timer(1,checkUpdate2)
     #监视实时数据
-    xueqiu.Timer(1,checkUpdate2)
+    if cycle !='d' and cycle != 5:
+        xueqiu.Timer(1,checkUpdate2)
 """
 关注
 """

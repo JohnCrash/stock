@@ -225,8 +225,8 @@ def updateAllRT(ThreadCount=10):
                 time.sleep(.1)
 
             seqs.append(math.floor(time.time()*1000*1000))
-            shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=10*3600)
-            seqs = seqs[-3*60*4*10:] #3*60*4*10 每秒3的，保存10天的
+            shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=5*24*3600)
+            seqs = seqs[-3*60*4*3:] #3*60*4*10 每秒3的，保存3天的
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:',datetime.today(),(datetime.today()-t).seconds)
         shared.toRedis(datetime.today(),'runtime_update',ex=60)
