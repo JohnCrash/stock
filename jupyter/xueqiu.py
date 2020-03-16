@@ -214,7 +214,7 @@ def updateAllRT(ThreadCount=10):
                 l = i+100
                 if l>len(coms):
                     l = len(coms)
-                plane[i:l,1] = idds[i:l]
+                plane[i:l,0] = idds[i:l]
                 threading.Thread(target=updateRT,args=((coms[i:l],plane[i:l,1:],math.floor(i/100)))).start()
                 lock.acquire()
                 count+=1
@@ -338,11 +338,15 @@ def readRedisRT(code):
         ....]
 }
 """
-def xueqiuRT(codes,r=None):
+def xueqiuRT(codes,result=None):
     timestramp = math.floor(time.time()*1000)
     cs = ""
+    code2i = {}
+    inx = 0
     for c in codes:
         cs += "%s,"%(c.upper())
+        code2i[c.lower()] = inx
+        inx +=1
     uri = "https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=%s&_=%d"%(cs[:-1],timestramp)
     try:
         b,js = xueqiuJson(uri)
@@ -360,10 +364,14 @@ def xueqiuRT(codes,r=None):
                             vol = float(d['volume'])
                         else:
                             vol = 0
-                        if r is None:                  
+                        if result is None:                  
                             appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current)
                         else:
-                            r[i] = [d['timestamp']/1000,vol,current,current,current,current]
+                            code = d['symbol'].lower()
+                            if code in code2i:
+                                result[code2i[code]] = [d['timestamp']/1000,vol,current,current,current,current]
+                            else:
+                                result[i] = [d['timestamp']/1000,vol,current,current,current,current]
                     except Exception as e:
                         mylog.err("xueqiuRT:"+str(d))
                         mylog.err("xueqiuRT:"+str(e))
@@ -379,10 +387,14 @@ def xueqiuRT(codes,r=None):
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
 #var hq_str_sh600278="东方创业,11.680,11.170,11.680,11.680,11.680,11.670,11.680,1740300,20326704.000,14800,11.670,200,11.660,800,11.610,140100,11.560,50800,11.550,54100,11.680,300,11.690,23700,11.700,1200,11.710,1400,11.720,2020-03-09,09:29:35,00,";
 #var hq_str_code="0 name,1 today_open,2 last_close,3 open,4 high,5 low,6 close,7 current,8 成交量,9 成交额,(v,p),...10个,timestamp"
-def sinaRT(codes,r=None):
+def sinaRT(codes,result=None):
     cs = ""
+    inx = 0
+    code2i = {}
     for c in codes:
         cs += "%s,"%(c.lower())    
+        code2i[c.lower()] = inx
+        inx += 1
     uri = "http://hq.sinajs.cn/rn=%s&list=%s"%(str(uuid.uuid4())[:5],cs[:-1])
     try:
         s = requests.session()
@@ -398,6 +410,7 @@ def sinaRT(codes,r=None):
                 ei = r.text.find('\n',bi)
                 ln = r.text[bi:ei]
                 if len(ln)>16 and ln[:11]=='var hq_str_':
+                    code = ln[11:11+8].lower()
                     bii = ln.find('="')
                     eii = ln.find('";')
                     if bii!=-1 and eii!=-1:
@@ -410,8 +423,8 @@ def sinaRT(codes,r=None):
                             low = float(a[5])
                             close1=float(a[6])
                             lastp = 0
-                            for i in range(10,30,2):
-                                p = float(a[i+1])
+                            for j in range(10,30,2):
+                                p = float(a[j+1])
                                 if p>1:
                                     high = max(high,p)
                                     low = min(low,p)
@@ -420,13 +433,16 @@ def sinaRT(codes,r=None):
                                 open1 = float(a[11])
                             if close1==0:
                                 close1 = lastp
-                            if r is None:
+                            if result is None:
                                 appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
                             else:
-                                r[i] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
+                                if code in code2i:
+                                    result[code2i[code]] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
+                                else:
+                                    result[i] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
                             i+=1
                 bi = ei+1
-                return True
+            return True
         else:
             mylog.err('sinaRT:'+uri)
             mylog.err(str(r.reason))

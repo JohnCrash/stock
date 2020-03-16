@@ -114,25 +114,26 @@ status.downloadAllK(coms,5,96,progress)
 #b,k,d = xueqiu.K2('SH603499')
 #print(k[-1],len(k))
 #print(d[-1],len(d))
-"""
+
 companys = stock.query("select company_id,code,name,category from company_select")
-
+coms = []
+id2com = {}
+for com in companys:
+    coms.append(com[1])
+    id2com[com[0]] = com
 def progress(i):
-    pass
-
-lastT = None
-def checkUpdate2():
-    global lastT
-    while True:
-        b,t = shared.fromRedis('runtime_update')
-        if b and t!=lastT:
-            lastT = t
-            status.downloadAllKFast(companys,5,48,progress)
-        if datetime.today().hour>15:
-            break
-        else:
-            time.sleep(1)
-threading.Thread(target=checkUpdate2).start()
+    print(i)
+#result = status.StrongSortedRT([5,15,45,90],progress,companys)
 """
+D,K = status.downloadAllKFast(companys,progress)
+for i in range(len(K)):
+    idd = int(K[i,-1,0])
+    print(idd,id2com[idd][1],id2com[idd][2],K[i,-1,2],K[i,-1,1])
+"""
+#plane = np.zeros((len(companys),7),dtype=float)
+#xueqiu.sinaRT(coms[:10],plane[:10,1:])
+#print(plane)
+#xueqiu.updateAllRT()
 #status.downloadAllKFast(companys,5,48,progress)
 xueqiu.clearAllRT()
+#status.updateRT(companys)

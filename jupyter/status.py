@@ -913,11 +913,12 @@ def processKD(days,K,D,companys):
             i[1] = id2com[k][1]
             i[2] = id2com[k][2]
             i[3] = id2com[k][3]
-    
+
     for day in days:
         ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
         for i in range(len(K)):
             ma5[i,:] = stock.ma(K[i,:,1],5)
+            ma5[i,ma5[i,:]==0] = 1 #确保不会等于0
         dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]#收盘相对day前的增长率
         for category in allCategory():
             r = idd[:,3]==category
@@ -1847,11 +1848,13 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         done = True
         progressCallback(100)
         needUpdate = False
+        oldmark = mark
+        oldcategory = category
         sortedCategory = getSortedCategory(period,-1)
         markDropdown.options = markListItem()
         categoryDropdown.options = categoryListItem()
-        markDropdown.value = mark
-        categoryDropdown.value = category
+        markDropdown.value = oldmark
+        categoryDropdown.value = oldcategory
 
         LEN = len(sortedCategory[0][3])
         bi = LEN-pagecount
