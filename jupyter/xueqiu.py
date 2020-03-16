@@ -28,12 +28,15 @@ class Timer:
 
 mylog.init('./download_stock.log',name='xueqiu')
 
-def xueqiuJson(url):
+def xueqiuJson(url,timeout=None):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
             'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; Hm_lvt_1db88642e346389874251b5a1eded6e3=1583211614,1583214605,1583214738,1583227469; cookiesu=841583283988633; remember=1; xq_a_token=171db880453165ae48c6ef0787e8c1ebedb2329f; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOjY2MjU1ODA1MzMsImlzcyI6InVjIiwiZXhwIjoxNTg1ODc2MDEwLCJjdG0iOjE1ODMyODQwMTAyNTksImNpZCI6ImQ5ZDBuNEFadXAifQ.LxU7UsEexLjnPBQMLYFv9fY_t6nrVfo7O5I9WZJpJKWclifOflvky8ylZe1qsthHWVRdAmPddvL_-XzI8z-iAZEwg9fgpeTaH_6eUilbl-V39ZkCAN3_vQB_SDNW3qCiOo3PX6OgkPS54Q_MAfF5Mf2KAchA7kRliv56nWZwIGa15SFy-wsFoIQ8N3GmmiMOxxZNOAV9Kj_M0y7G4h97S7O-y1SLoCjBt-32dJKtUlgAIb115qpE4RZw5huZ9kdBGDAtqpE-VQkZhP9s7DO_pQByfvBDOUrhk4SHnSuby6xgsdBg-a5VtDONFF1ooNP-m1kp1_J7EhjcEQH9ZPu79g; xqat=171db880453165ae48c6ef0787e8c1ebedb2329f; xq_r_token=8e611dfd4d16ede5bc3d4fd79da4fe5ae44d3a87; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1583284043'}
-    r = s.get(url,headers=headers)
+    if timeout is None:
+        r = s.get(url,headers=headers)
+    else:
+        r = s.get(url,headers=headers,timeout=timeout)
     if r.status_code==200:
         return True,r.json()
     else:
@@ -193,23 +196,26 @@ def updateAllRT(ThreadCount=10):
         nonlocal count
         for i in range(5):
             try:
-                if batch%2==0:
-                    xueqiuRT(cs,r)
+                if batch%2==i%2:
+                    ret = xueqiuRT(cs,r)
                 else:
-                    sinaRT(cs,r)
-                break
+                    ret = sinaRT(cs,r)
+                if ret:
+                    break
             except Exception as e:
                 mylog.err("updateAllRT updateRT:"+e)
+            
         lock.acquire()
         count-=1
         lock.release()
     b,seqs = shared.fromRedis('runtime_sequence')
     if not b:
         seqs = []
+    plane = np.zeros((len(companys),7),dtype=float)
     while t.hour>=6 and t.hour<15:
         if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
             #[companys_id,timestamp,volume,open,high,low,close]
-            plane = np.zeros((len(companys),7),dtype=float)
+            seqs.append(math.floor(time.time()*1000*1000))
             for i in range(0,len(coms),100):
                 l = i+100
                 if l>len(coms):
@@ -223,8 +229,6 @@ def updateAllRT(ThreadCount=10):
                     time.sleep(.1)
             while count>0:
                 time.sleep(.1)
-
-            seqs.append(math.floor(time.time()*1000*1000))
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=5*24*3600)
             seqs = seqs[-3*60*4*3:] #3*60*4*10 每秒3的，保存3天的
             shared.toRedis(seqs,'runtime_sequence')
@@ -349,7 +353,7 @@ def xueqiuRT(codes,result=None):
         inx +=1
     uri = "https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=%s&_=%d"%(cs[:-1],timestramp)
     try:
-        b,js = xueqiuJson(uri)
+        b,js = xueqiuJson(uri,timeout=1)
         if b:
             if 'data' in js:
                 data = js['data']
@@ -366,7 +370,7 @@ def xueqiuRT(codes,result=None):
                             vol = 0
                         if result is None:                  
                             appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current)
-                        else:
+                        elif current>0:
                             code = d['symbol'].lower()
                             if code in code2i:
                                 result[code2i[code]] = [d['timestamp']/1000,vol,current,current,current,current]
@@ -383,7 +387,8 @@ def xueqiuRT(codes,result=None):
     except Exception as e:
         mylog.err("xueqiuRT:"+uri)
         mylog.err(str(e))
-        return False            
+        return False    
+    return False        
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
 #var hq_str_sh600278="东方创业,11.680,11.170,11.680,11.680,11.680,11.670,11.680,1740300,20326704.000,14800,11.670,200,11.660,800,11.610,140100,11.560,50800,11.550,54100,11.680,300,11.690,23700,11.700,1200,11.710,1400,11.720,2020-03-09,09:29:35,00,";
 #var hq_str_code="0 name,1 today_open,2 last_close,3 open,4 high,5 low,6 close,7 current,8 成交量,9 成交额,(v,p),...10个,timestamp"
@@ -401,7 +406,7 @@ def sinaRT(codes,result=None):
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
                 'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'zh-CN,zh;q=0.9'}
-        r = s.get(uri,headers=headers)
+        r = s.get(uri,headers=headers,timeout=1)
         if r.status_code==200:
             bi = 0
             ei = 0
@@ -435,7 +440,7 @@ def sinaRT(codes,result=None):
                                 close1 = lastp
                             if result is None:
                                 appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
-                            else:
+                            elif open1>0 and high>0 and low>0 and close1>0:
                                 if code in code2i:
                                     result[code2i[code]] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
                                 else:
@@ -451,6 +456,68 @@ def sinaRT(codes,result=None):
         mylog.err("sinaRT:"+uri)
         mylog.err(str(e))
         return False
+    return False
+#http://qt.gtimg.cn/q=sh601872,sh600370,sh600312,sh603559,sh600302,sh600252,sh600798&r=573645421
+#v_sh600302="1~标准股份~600302~5.11~4.80~5.20~89408~47563~41845~5.10~99~5.09~17~5.08~104~5.07~30~5.06~5~5.11~769~5.13~888~5.15~966~5.16~500~5.17~508~~20200309093940~0.31~6.46~5.20~4.82~5.11/89408/45641325~89408~4564~2.58~-165.44~~5.20~4.82~7.92~17.68~17.68~1.52~5.28~4.32~53.32~-3376~5.10~-18.29~62.32~~~1.14~4564.13~0.00~0~ ~GP-A~1.39~~0.00~-0.92~-0.66";
+def qqRT(codes,result=None):
+    cs = ""
+    inx = 0
+    code2i = {}
+    for c in codes:
+        cs += "%s,"%(c.lower())    
+        code2i[c.lower()] = inx
+        inx += 1
+    rn = 111
+    uri = "http://qt.gtimg.cn/q=%s&r=%s"%(cs[:-1],rn)
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'zh-CN,zh;q=0.9'}
+        r = s.get(uri,headers=headers,timeout=1)
+        if r.status_code==200:
+            bi = 0
+            ei = 0
+            i = 0
+            while ei!=-1:
+                ei = r.text.find('\n',bi)
+                ln = r.text[bi:ei]
+                if len(ln)>16 and ln[:2]=='v_':
+                    a = ln.split('~')
+                    if len(a)==67:
+                        code = a[0][2:10].lower()
+                        ts = a[30] #20200309093940
+                        timestamp = datetime(int(ts[:4]),int(ts[4:6]),int(ts[6:8]),int(ts[8:10]),int(ts[10:12]),int(ts[12:]))
+                        vol = float(a[6])
+                        for i in range(10):
+                            c = float(a[2*i+9])
+                            if i==0:
+                                open1 = c
+                                high = c
+                                low = c
+                            if c>0:
+                                high = max(high,c)
+                                low = min(low,c)
+                                close1 = c
+                        if result is None:
+                            appendRedisRT(code,timestamp,vol,open1,high,low,close1)
+                        elif vol>0 and open1>0 and high>0 and low>0 and close1>0:
+                            if code in code2i:
+                                result[code2i[code]] = [timestamp.timestamp(),vol,open1,high,low,close1]
+                            else:
+                                result[i] = [timestamp.timestamp(),vol,open1,high,low,close1]
+                        i+=1
+                bi = ei+1
+            return True
+        else:
+            mylog.err('qqRT:'+uri)
+            mylog.err(str(r.reason))
+            return False
+    except Exception as e:
+        mylog.err("qqRT:"+uri)
+        mylog.err(str(e))
+        return False
+    return False
 
 #雪球数据
 # True , ((timesramp,volume,open,high,low,close),...)
