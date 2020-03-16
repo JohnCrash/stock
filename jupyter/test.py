@@ -114,7 +114,7 @@ status.downloadAllK(coms,5,96,progress)
 #b,k,d = xueqiu.K2('SH603499')
 #print(k[-1],len(k))
 #print(d[-1],len(d))
-"""
+
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
 id2com = {}
@@ -123,7 +123,7 @@ for com in companys:
     id2com[com[0]] = com
 def progress(i):
     print(i)
-"""
+
 #result = status.StrongSortedRT([5,15,45,90],progress,companys)
 """
 D,K = status.downloadAllKFast(companys,progress)
@@ -160,34 +160,10 @@ v_sh600302="1~标准股份~600302~5.08~4.80~5.20~99633~53052~46581~5.05~4~5.03~2
 v_sh600252="1~中恒集团~600252~3.51~3.34~3.67~564559~232751~331808~3.51~2105~3.50~6001~3.49~1457~3.48~2020~3.47~300~3.52~2872~3.53~2281~3.54~1265~3.55~2852~3.56~4919~~20200309094242~0.17~5.09~3.67~3.49~3.51/564559/203506283~564559~20351~1.62~17.11~~3.67~3.49~5.39~121.98~121.98~1.95~3.67~3.01~28.71~-2306~3.60~15.85~19.89~~~1.15~20350.63~0.00~0~ ~GP-A~7.67~~1.71~11.41~9.23";
 v_sh600798="1~宁波海运~600798~3.48~3.30~3.45~292314~124368~167946~3.47~1218~3.46~1895~3.45~2243~3.44~1223~3.43~360~3.48~342~3.49~2528~3.50~7521~3.51~1630~3.52~3825~~20200309094242~0.18~5.45~3.63~3.45~3.48/292314/104432993~292314~10443~2.84~17.04~~3.63~3.45~5.45~35.87~41.99~1.18~3.63~2.97~41.22~-8907~3.57~17.31~17.82~~~1.25~10443.30~0.00~0~ ~GP-A~-2.25~~1.72~6.93~5.67";
 """
-bi = 0
-ei = 0
-i = 0
-while ei!=-1:
-    ei = text.find('\n',bi)
-    ln = text[bi:ei]
-    if len(ln)>16 and ln[:2]=='v_':
-        a = ln.split('~')
-        if len(a)==67:
-            code = a[0][2:10].lower()
-            ts = a[30] #20200309093940
-            timestamp = datetime(int(ts[:4]),int(ts[4:6]),int(ts[6:8]),int(ts[8:10]),int(ts[10:12]),int(ts[12:]))
-            vol = float(a[6])
-            for i in range(10):
-                c = float(a[2*i+9])
-                if i==0:
-                    open1 = c
-                    high = c
-                    low = c
-                if c>0:
-                    high = max(high,c)
-                    low = min(low,c)
-                    close1 = c
-            print(code,timestamp,vol,open1,high,low,close1)
-            i+=1
-    bi = ei+1
-#plane = np.zeros((len(companys),7),dtype=float)
-#xueqiu.sinaRT(coms[:10],plane[:10,1:])
+plane = np.zeros((len(companys),7),dtype=float)
+print(xueqiu.qqRT(coms[:100],plane[:100,1:]))
+for i in range(100):
+    print(companys[i][1],companys[i][2],plane[i,1:])
 #print(plane)
 #xueqiu.updateAllRT()
 #status.downloadAllKFast(companys,5,48,progress)

@@ -467,7 +467,7 @@ def qqRT(codes,result=None):
         cs += "%s,"%(c.lower())    
         code2i[c.lower()] = inx
         inx += 1
-    rn = 111
+    rn = str(math.floor(time.time()*1000))[1:10]
     uri = "http://qt.gtimg.cn/q=%s&r=%s"%(cs[:-1],rn)
     try:
         s = requests.session()
@@ -492,13 +492,13 @@ def qqRT(codes,result=None):
                         for i in range(10):
                             c = float(a[2*i+9])
                             if i==0:
-                                open1 = c
+                                close1 = c
                                 high = c
                                 low = c
                             if c>0:
                                 high = max(high,c)
                                 low = min(low,c)
-                                close1 = c
+                                open1 = c
                         if result is None:
                             appendRedisRT(code,timestamp,vol,open1,high,low,close1)
                         elif vol>0 and open1>0 and high>0 and low>0 and close1>0:
