@@ -422,6 +422,23 @@ def updateRT(companys):
                     ei = bi+col.shape[1]
                     _K[:,bi:ei,:] = col
                 bi = ei
+            #对数据进行不全纠正,有时候close=0表示数据下载错误，可以使用临近的数据进行补全
+            if len(ps)>3: #第一次加载完整数据
+                for i in range(C):
+                    for j in range(1,len(_D)): #从前向后补全
+                        if _K[i,j,6]==0 and _K[i,j-1,6]>0:
+                            _K[i,j,2:] = _K[i,j-1,2:]                    
+                    for j in range(len(_D)-2,-1,-1): #从后向前补全
+                        if _K[i,j,6]==0 and _K[i,j+1,6]>0:
+                            _K[i,j,2:] = _K[i,j+1,2:]
+            else:
+                for i in range(C): #增量式补全
+                    if _K[i,-1,6]==0 and _K[i,-2,6]>0:
+                        _K[i,-1,2:] = _K[i,-2,2:]
+                    elif _K[i,-1,6]>0 and _K[i,-2,6]==0:
+                        for j in range(len(_D)-2,-1,-1):
+                            if _K[i,j,6]==0 and _K[i,j+1,6]>0:
+                                _K[i,j,2:] = _K[i,j+1,2:]
             _lastp = seqs[-1]
     return _K,_D
 

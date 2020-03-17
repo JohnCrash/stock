@@ -194,12 +194,14 @@ def updateAllRT(ThreadCount=10):
     print('开始实时更新全部数据...')
     def updateRT(cs,r,batch):
         nonlocal count
-        for i in range(5):
+        for i in range(10):
             try:
-                if batch%2==i%2:
+                if (batch+i)%3==0:
                     ret = xueqiuRT(cs,r)
-                else:
+                elif (batch+i)%3==1:
                     ret = sinaRT(cs,r)
+                else:
+                    ret = qqRT(cs,r)
                 if ret:
                     break
             except Exception as e:
@@ -213,8 +215,8 @@ def updateAllRT(ThreadCount=10):
         seqs = []
     plane = np.zeros((len(companys),7),dtype=float)
     while t.hour>=6 and t.hour<15:
-        if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<=30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
-            #[companys_id,timestamp,volume,open,high,low,close]
+        if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
+            #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close]
             seqs.append(math.floor(time.time()*1000*1000))
             for i in range(0,len(coms),100):
                 l = i+100
@@ -232,8 +234,8 @@ def updateAllRT(ThreadCount=10):
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=5*24*3600)
             seqs = seqs[-3*60*4*3:] #3*60*4*10 每秒3的，保存3天的
             shared.toRedis(seqs,'runtime_sequence')
-            print('updateAllRT:',datetime.today(),(datetime.today()-t).seconds)
-        shared.toRedis(datetime.today(),'runtime_update',ex=60)
+            print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
+            shared.toRedis(datetime.today(),'runtime_update',ex=60)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
             time.sleep(dt)
@@ -353,7 +355,7 @@ def xueqiuRT(codes,result=None):
         inx +=1
     uri = "https://stock.xueqiu.com/v5/stock/realtime/quotec.json?symbol=%s&_=%d"%(cs[:-1],timestramp)
     try:
-        b,js = xueqiuJson(uri,timeout=1)
+        b,js = xueqiuJson(uri,timeout=3)
         if b:
             if 'data' in js:
                 data = js['data']
@@ -381,12 +383,10 @@ def xueqiuRT(codes,result=None):
                         mylog.err("xueqiuRT:"+str(e))
                         return False
                 return True
-        mylog.err('xueqiuRT:'+uri)
-        mylog.err(str(js))
+        mylog.err('xueqiuRT:'+str(js))
         return False
     except Exception as e:
-        mylog.err("xueqiuRT:"+uri)
-        mylog.err(str(e))
+        mylog.err("xueqiuRT:"+str(e))
         return False    
     return False        
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
@@ -406,7 +406,7 @@ def sinaRT(codes,result=None):
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
                 'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'zh-CN,zh;q=0.9'}
-        r = s.get(uri,headers=headers,timeout=1)
+        r = s.get(uri,headers=headers,timeout=3)
         if r.status_code==200:
             bi = 0
             ei = 0
@@ -449,12 +449,10 @@ def sinaRT(codes,result=None):
                 bi = ei+1
             return True
         else:
-            mylog.err('sinaRT:'+uri)
-            mylog.err(str(r.reason))
+            mylog.err('sinaRT:'+str(r.reason))
             return False
     except Exception as e:
-        mylog.err("sinaRT:"+uri)
-        mylog.err(str(e))
+        mylog.err('sinaRT:'+str(e))
         return False
     return False
 #http://qt.gtimg.cn/q=sh601872,sh600370,sh600312,sh603559,sh600302,sh600252,sh600798&r=573645421
@@ -474,7 +472,7 @@ def qqRT(codes,result=None):
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
                 'Accept-Encoding': 'gzip, deflate',
                 'Accept-Language': 'zh-CN,zh;q=0.9'}
-        r = s.get(uri,headers=headers,timeout=1)
+        r = s.get(uri,headers=headers,timeout=3)
         if r.status_code==200:
             bi = 0
             ei = 0
@@ -510,12 +508,10 @@ def qqRT(codes,result=None):
                 bi = ei+1
             return True
         else:
-            mylog.err('qqRT:'+uri)
-            mylog.err(str(r.reason))
+            mylog.err('qqRT:'+str(r.reason))
             return False
     except Exception as e:
-        mylog.err("qqRT:"+uri)
-        mylog.err(str(e))
+        mylog.err('qqRT:'+str(e))
         return False
     return False
 
