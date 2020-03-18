@@ -213,7 +213,7 @@ def updateAllRT(ThreadCount=10):
     b,seqs = shared.fromRedis('runtime_sequence')
     if not b:
         seqs = []
-    plane = np.zeros((len(companys),7),dtype=float)
+    plane = np.zeros((len(companys),9),dtype=float)
     while t.hour>=6 and t.hour<15:
         if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
             #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close]
@@ -242,12 +242,12 @@ def updateAllRT(ThreadCount=10):
         t = datetime.today()
 
 #(0 code,1 timesramp,2 volume,3 open,4 high,5 low,6 close)
-def appendRedisRT(code,timestamp,volume,open1,high,low,close1):
+def appendRedisRT(code,timestamp,volume,open1,high,low,close1,yesterday_close,today_open):
     name = "%s_RT"%code
     b,rt = shared.fromRedis(name)
     if not b or rt['v']!=1:
         rt = {'kk':{},'k':[],'r':[],'l':0,'v':1}
-    rt['r'].append((timestamp,volume,open1,high,low,close1))
+    rt['r'].append((timestamp,volume,open1,high,low,close1,yesterday_close,today_open))
     rt['r'] = rt['r'][-180:]
     t = next_k_timestamp(timestamp)
     if t is not None:
@@ -370,14 +370,22 @@ def xueqiuRT(codes,result=None):
                             vol = float(d['volume'])
                         else:
                             vol = 0
+                        if d['open'] is not None:
+                            today_open = float(d['open'])
+                        else:
+                            today_open = 0
+                        if d['last_close'] is not None:
+                            yesterday_close = float(d['last_close'])                            
+                        else:
+                            yesterday_close = 0
                         if result is None:                  
-                            appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current)
+                            appendRedisRT(d['symbol'],datetime.fromtimestamp(d['timestamp']/1000),vol,current,current,current,current,yesterday_close,today_open)
                         elif current>0:
                             code = d['symbol'].lower()
                             if code in code2i:
-                                result[code2i[code]] = [d['timestamp']/1000,vol,current,current,current,current]
+                                result[code2i[code]] = [d['timestamp']/1000,vol,current,current,current,current,yesterday_close,today_open]
                             else:
-                                result[i] = [d['timestamp']/1000,vol,current,current,current,current]
+                                result[i] = [d['timestamp']/1000,vol,current,current,current,current,yesterday_close,today_open]
                     except Exception as e:
                         mylog.err("xueqiuRT:"+str(d))
                         mylog.err("xueqiuRT:"+str(e))
@@ -427,6 +435,8 @@ def sinaRT(codes,result=None):
                             high = float(a[4])
                             low = float(a[5])
                             close1=float(a[6])
+                            today_open = float(a[1])
+                            yesterday_close = float(a[2])
                             lastp = 0
                             for j in range(10,30,2):
                                 p = float(a[j+1])
@@ -439,12 +449,12 @@ def sinaRT(codes,result=None):
                             if close1==0:
                                 close1 = lastp
                             if result is None:
-                                appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1)
+                                appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1,yesterday_close,today_open)
                             elif open1>0 and high>0 and low>0 and close1>0:
                                 if code in code2i:
-                                    result[code2i[code]] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
+                                    result[code2i[code]] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1,yesterday_close,today_open]
                                 else:
-                                    result[i] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1]
+                                    result[i] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1,yesterday_close,today_open]
                             i+=1
                 bi = ei+1
             return True
@@ -487,6 +497,8 @@ def qqRT(codes,result=None):
                         ts = a[30] #20200309093940
                         timestamp = datetime(int(ts[:4]),int(ts[4:6]),int(ts[6:8]),int(ts[8:10]),int(ts[10:12]),int(ts[12:]))
                         vol = float(a[6])
+                        yesterday_close = float(a[4])
+                        today_open = float(a[5])
                         for i in range(10):
                             c = float(a[2*i+9])
                             if i==0:
@@ -498,12 +510,12 @@ def qqRT(codes,result=None):
                                 low = min(low,c)
                                 open1 = c
                         if result is None:
-                            appendRedisRT(code,timestamp,vol,open1,high,low,close1)
+                            appendRedisRT(code,timestamp,vol,open1,high,low,close1,yesterday_close,today_open)
                         elif vol>0 and open1>0 and high>0 and low>0 and close1>0:
                             if code in code2i:
-                                result[code2i[code]] = [timestamp.timestamp(),vol,open1,high,low,close1]
+                                result[code2i[code]] = [timestamp.timestamp(),vol,open1,high,low,close1,yesterday_close,today_open]
                             else:
-                                result[i] = [timestamp.timestamp(),vol,open1,high,low,close1]
+                                result[i] = [timestamp.timestamp(),vol,open1,high,low,close1,yesterday_close,today_open]
                         i+=1
                 bi = ei+1
             return True

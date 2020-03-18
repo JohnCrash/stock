@@ -377,7 +377,7 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
 _K = None
 _D = None
 _lastp = None
-#返回K = [[[id,timestamp,open,high,low,close]
+#返回K = [[[0 id,1 timestamp,2 volume,3 open,4 high,5 low,6 close,7 yesterday_close,8 today_open]
 #       ....
 #     len(companys)],]
 # shape = (len(companys),len(D),7)
@@ -405,17 +405,17 @@ def updateRT(companys):
                     elif len(p)>C:
                         ps.append(p[:C])
                     else:
-                        pp = np.zeros((C,7))
+                        pp = np.zeros((C,9))
                         pp[:len(p)] = p
                         ps.append(pp)
                     _D.append((datetime.fromtimestamp(ts/1000000),))
             elif _lastp == ts:
                 ba = True
         if len(ps)>1:
-            _K = np.empty((C,len(_D),7))
+            _K = np.empty((C,len(_D),9))
             bi = 0
             for col in ps:
-                if col.shape[0]==C and col.shape[1]==7:
+                if col.shape[0]==C and col.shape[1]==9:
                     ei = bi+1
                     _K[:,bi,:] = col
                 else:
@@ -442,19 +442,25 @@ def updateRT(companys):
             _lastp = seqs[-1]
     return _K,_D
 
+"""
+K_=[[[0 idd,1 timestamp,2 volume,3 open,4 high,5 low,6 close,7 yesterday_close,8 today_open]
+K =[[[(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]]]
+"""
 def downloadAllKFast(companys,progress):
     K_,D_ = updateRT(companys)
     if K_ is not None:
         D = D_
         K = np.ones((len(companys),len(D),11))
         K[:,:,0] = K_[:,:,0] #id
-        K[:,:,1] = K_[:,:,6] #close
-        K[:,:,2] = K_[:,:,2] #volume
+        K[:,:,1] = K_[:,:,2] #volume
+        K[:,:,2] = K_[:,:,6] #close
+        K[:,:,3] = K_[:,:,7] #yesterday_close
+        K[:,:,4] = K_[:,:,8] #today_open
         return D,K 
     return None,None
 #companys = [(company_id,code,name,category),....]
 #返回
-#(datetime,...),K[company,date,(id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw)]
+#(datetime,...),K[company,date,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
 #除了id,close,volume其他都是0
 def loadAllK(companys,bi,ei,period,N,progress,ThreadCount=10):
     results = []
@@ -487,8 +493,11 @@ def loadAllK(companys,bi,ei,period,N,progress,ThreadCount=10):
         com = it[1]
         K[i,:,0] = com[0] #id
         if it[0] and len(it[2])==N: #时间上有可能错开，但是短期来说影响不大
-            K[i,:,1] = it[2][:,4] #close
-            K[i,:,2] = it[2][:,0] #valume
+            K[i,:,1] = it[2][:,0] #valume
+            K[i,:,2] = it[2][:,4] #close
+            K[i,0,3] = it[2][i,0]
+            K[i,1:,3] = it[2][:-1,4] #yesteryday_close
+            K[i,:,4] = it[2][:,1] #today_open ,0 volume 1 open 2 high ,3 low 4 close
         i+=1
     return D,K 
 
@@ -916,7 +925,76 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
     #数据a的时间序列和d相同,shape = (公司数,日期,数据)
     return d,a
 
-def processKD(days,K,D,companys):
+"""
+返回
+周期n表示相比n天前或者n个前的增长
+这里做一个扩展当周期是'd'时,周期盈利将变成日盈利(和昨日收盘进行比较)
+[
+    (0 周期,
+     1 分类名称,
+     2 周期盈利二维数组np.array[company_n,date_n],
+     3 日期列表[(date,),...],
+     4 np.array[(0 id , 1 code , 2 name , 3 category),],
+     5 按周期利润排序的索引和利润对[company,date,(index,dk)],
+     6 该分类的前十名平均盈利[date_n],
+     7 该分类的跌幅前十的平均跌幅[date_n]
+     )
+]
+K = [company_n,date_n,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
+D = [(date,)...]
+"""
+def processKD2(days,K,D,companys,topN=20):
+    result = []
+    id2com = {}
+    for com in companys:
+        id2com[com[0]] = com
+
+    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+    idd[:,0] = K[:,0,0]
+    for i in idd:
+        k = int(i[0])
+        if k in id2com:
+            i[1] = id2com[k][1]
+            i[2] = id2com[k][2]
+            i[3] = id2com[k][3]
+
+    for day in days:
+        if day=='d':
+            dk = np.zeros((len(K),len(D)))
+            for i in range(len(K)):
+                if not (K[i,:,3]==0).any():
+                    dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率
+        else:
+            ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
+            for i in range(len(K)):
+                ma5[i,:] = stock.ma(K[i,:,2],5)
+                ma5[i,ma5[i,:]==0] = 1 #确保不会等于0
+            dk = (K[:,day:,2]-ma5[:,:-day])/ma5[:,:-day]#收盘相对day前的增长率
+        for category in allCategory():
+            r = idd[:,3]==category
+            dK = dk[r]
+            if len(dK)>0:
+                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
+                ia = np.zeros((dK.shape[0],2))
+                ia[:,0] = np.arange(dK.shape[0])
+                for i in range(dK.shape[1]):
+                    ia[:,1] = dK[:,i]
+                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
+
+                top10mean = np.zeros((dK.shape[1]))
+                low10mean = np.zeros((dK.shape[1]))
+                for i in range(dK.shape[1]):
+                    top10mean[i] = sorti[:topN,i,1].mean()
+                    low10mean[i] = sorti[-topN:,i,1].mean()
+                if day=='d':
+                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean))
+                else:
+                    result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
+            else:
+                print("'%s' 分类里面没有公司"%category)
+    return result
+
+def processKD(days,K,D,companys,topN=10):
     result = []
     id2com = {}
     for com in companys:
@@ -957,16 +1035,7 @@ def processKD(days,K,D,companys):
             else:
                 print("'%s' 分类里面没有公司"%category)
     return result
-"""
-返回
-[
-    (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
-     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
-     6 该分类的前十名平均盈利[date],
-     7 该分类的跌幅前十的平均跌幅[date],
-    ...
-]
-"""
+
 def StrongSorted(days,N=50,bi=None,ei=None,progress=None,companys=None):
     if bi is not None:
         if ei is not None:
@@ -978,28 +1047,22 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None,companys=None):
             D,K = getStatusN(N=N)
         else:
             D,K = redisStatusCache50('company_status')
-
-    return processKD(days,K,D,companys)
-
-"""
-返回
-[
-    (0 周期,1 分类名称,2 周期盈利二维数组np.array[company_n,date_n],3 日期列表[(date,),...],
-     4 np.array[(0 id , 1 code , 2 name , 3 category),],5 按周期利润排序的索引和利润对[company,date,(index,dk)],
-     6 该分类的前十名平均盈利[date],
-     7 该分类的跌幅前十的平均跌幅[date],
-    ...
-]
-本函数返回的是5分钟级别的短线情况
-days = 5仅仅代表5*5=25分钟,10代表10*5=50分钟
-"""    
+    # K = [(0 idd,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw)]
+    # K_ = [(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
+    K_ = np.zeros((len(K),len(D),5))
+    K_[:,:,0] = K[:,:,0]
+    K_[:,:,1] = K[:,:,2]
+    K_[:,:,2] = K[:,:,1]
+    #舍弃3 yesteryday_close,4 today_open
+    return processKD2(days,K_,D,companys,10)
+  
 def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
     progress(0)
     D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
     if D is None or K is None:
         return []
-    return processKD(days,K,D,companys)
+    return processKD2(days,K,D,companys)
 
 def StrongSortedRT(days,progress=None,companys=None):
     progress(0)
@@ -1007,7 +1070,7 @@ def StrongSortedRT(days,progress=None,companys=None):
     progress(100)
     if D is None or K is None:
         return []
-    return processKD(days,K,D,companys)    
+    return processKD2(days,K,D,companys)    
 
 mycolors=[
     "red",
@@ -1532,7 +1595,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         period = 3
         result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
     else: #实时
-        periods = [3,15,45,90]
+        periods = [3,15,45,'d']
         period = 3
         result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
 
@@ -1962,3 +2025,26 @@ def favoriteList():
             border='solid',
             width='100%'))    
     display(box,out)
+
+def timeline(code,name=None,companys=None):
+    if companys is None:
+        companys = stock.query("select company_id,code,name,category from company_select")
+    for i in range(len(companys)):
+        if companys[i][1]==code or companys[i][2]==name:
+            K,D = updateRT(companys)
+            gs_kw = dict(width_ratios=[1], height_ratios=[2,1])
+            fig,axs = plt.subplots(2,1,sharex=True,figsize=(28,14),gridspec_kw = gs_kw)
+            fig.subplots_adjust(hspace=0.02,wspace=0.05)
+            axs[0].xaxis.set_major_formatter(MyFormatterRT(D))
+            axs[0].set_title("%s %s"%(companys[i][2],companys[i][1]))
+            xdd = np.arange(len(D))
+            axs[0].plot(xdd,K[i,:,6])
+            axs[0].grid(True)
+            vol = np.empty(len(D))
+            vol[0] = 0#K[i,0,2]
+            vol[1:] = K[i,1:,2]-K[i,:-1,2]
+            axs[1].bar(xdd,vol)
+            axs[1].grid(True)
+            fig.autofmt_xdate()
+            plt.show()
+            break

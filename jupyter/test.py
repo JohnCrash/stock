@@ -165,6 +165,7 @@ v_sh600798="1~宁波海运~600798~3.48~3.30~3.45~292314~124368~167946~3.47~1218~
 #print(xueqiu.qqRT(coms[:100],plane[:100,1:]))
 #for i in range(100):
 #    print(companys[i][1],companys[i][2],plane[i,1:])
+"""
 batch = 0
 for i in range(10):
     if (batch+i)%3==0:
@@ -173,7 +174,7 @@ for i in range(10):
         print('xueqiu','\n')
     else:
         print('qq','\n')
-
+"""
 #print(plane)
 #xueqiu.updateAllRT()
 #status.downloadAllKFast(companys,5,48,progress)
