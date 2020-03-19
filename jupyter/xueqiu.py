@@ -496,7 +496,7 @@ def qqRT(codes,result=None):
                         code = a[0][2:10].lower()
                         ts = a[30] #20200309093940
                         timestamp = datetime(int(ts[:4]),int(ts[4:6]),int(ts[6:8]),int(ts[8:10]),int(ts[10:12]),int(ts[12:]))
-                        vol = float(a[6])
+                        vol = float(a[6])*100
                         yesterday_close = float(a[4])
                         today_open = float(a[5])
                         for i in range(10):

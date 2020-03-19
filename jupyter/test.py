@@ -29,7 +29,35 @@ for com in companys:
     i+=1
 def progress(i):
     print(i)
+
+K,D = status.updateRT(companys,progress=progress)
+
+def code2Server(code):
+    j = 0
+    for i in range(0,len(companys),100):
+        batch = math.floor(i/100)
+        for com in companys[i:i+100]:
+            if com[1]==code:
+                if batch%3==0:
+                    print('xueqiu',code)
+                    print(K[j,:,2])
+                elif batch%3==1:
+                    print('sina',code)
+                    print(K[j,:,2])
+                else:
+                    print('qq',code)
+                    print(K[j,:,2])
+                return
+            j+=1
+
+code2Server('SH600360')
+code2Server('SZ002091')
+code2Server('SH603912')
+code2Server('SZ002418')
+code2Server('SZ300223')
+code2Server('SZ002065')
+code2Server('SZ002458')
 #status.StrongSorted([3],progress=progress,companys=companys)
-status.update_status(progress)
+
 #xueqiu.clearAllRT()
 #status.updateRT(companys)

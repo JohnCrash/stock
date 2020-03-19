@@ -447,8 +447,9 @@ def updateRT(companys,N=100,progress=None):
                             if _K[i,j,6]==0 and _K[i,j+1,6]>0:
                                 _K[i,j,2:] = _K[i,j+1,2:]
             _lastp = seqs[-1]
-    _K = _K[:,-N:,:]
-    _D = _D[-N:]
+    if type(N)==int:
+        _K = _K[:,-N:,:]
+        _D = _D[-N:]
     return _K,_D
 
 """
@@ -2068,7 +2069,7 @@ def timeline(code,name=None,companys=None):
             vol = np.empty(len(D))
             vol[0] = 0#K[i,0,2]
             vol[1:] = K[i,1:,2]-K[i,:-1,2]
-            axs[1].bar(xdd,vol)
+            axs[1].bar(xdd,K[i,:,2])
             axs[1].grid(True)
             fig.autofmt_xdate()
             plt.show()
