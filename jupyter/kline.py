@@ -20,7 +20,7 @@ import mylog
 from matplotlib._pylab_helpers import Gcf
 from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show
 
-mylog.init('./kline.log',name='kline')
+mylog.init('./log/kline.log',name='kline')
 warnings.filterwarnings("ignore", module="matplotlib")
 
 def plt_show(display_id,isupdate):

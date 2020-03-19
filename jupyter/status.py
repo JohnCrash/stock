@@ -18,7 +18,10 @@ import random
 import threading
 import time
 import copy
+import mylog
 from matplotlib.ticker import Formatter
+
+mylog.init('./log/status.log',name='status')
 class MyFormatterRT(Formatter):
     def __init__(self, dates,fmt='%d %h:%M:%s'):
         self.dates = dates
@@ -170,7 +173,7 @@ def update_status(progress):
             shared.delKey('company_status_date50') #清除redis中的缓存数据
             update_status_begin(lastday[0][0],False,progress)
     else:
-        update_status_begin('2010-1-2',True,progress)
+        update_status_begin('2015-1-2',True,progress)
     stock.closedb()
     progress(100)
 
@@ -383,7 +386,7 @@ _lastp = None
 # shape = (len(companys),len(D),7)
 #D = [(datetime,),....]
 #没有数据返回None,None
-def updateRT(companys):
+def updateRT(companys,N=100,progress=None):
     global _K,_D,_lastp
     b,seqs = shared.fromRedis('runtime_sequence')
     C = len(companys)
@@ -396,6 +399,8 @@ def updateRT(companys):
             ba = True
         else:
             ps = [_K]
+        progress(0)
+        i = 0
         for ts in seqs:
             if ba:
                 b,p = shared.numpyFromRedis("rt%d"%ts)
@@ -411,6 +416,8 @@ def updateRT(companys):
                     _D.append((datetime.fromtimestamp(ts/1000000),))
             elif _lastp == ts:
                 ba = True
+            progress(i/len(seqs))
+            i+=1
         if len(ps)>1:
             _K = np.empty((C,len(_D),9))
             bi = 0
@@ -440,14 +447,16 @@ def updateRT(companys):
                             if _K[i,j,6]==0 and _K[i,j+1,6]>0:
                                 _K[i,j,2:] = _K[i,j+1,2:]
             _lastp = seqs[-1]
+    _K = _K[:,-N:,:]
+    _D = _D[-N:]
     return _K,_D
 
 """
 K_=[[[0 idd,1 timestamp,2 volume,3 open,4 high,5 low,6 close,7 yesterday_close,8 today_open]
 K =[[[(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]]]
 """
-def downloadAllKFast(companys,progress):
-    K_,D_ = updateRT(companys)
+def downloadAllKFast(companys,progress=None):
+    K_,D_ = updateRT(companys,progress=progress)
     if K_ is not None:
         D = D_
         K = np.ones((len(companys),len(D),11))
@@ -943,9 +952,10 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
 K = [company_n,date_n,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
 D = [(date,)...]
 """
-def processKD2(days,K,D,companys,topN=20):
+def processKD2(days,K,D,companys,topN=20,progress=None):
     result = []
     id2com = {}
+    progress(0)
     for com in companys:
         id2com[com[0]] = com
 
@@ -957,7 +967,7 @@ def processKD2(days,K,D,companys,topN=20):
             i[1] = id2com[k][1]
             i[2] = id2com[k][2]
             i[3] = id2com[k][3]
-
+    j=0
     for day in days:
         if day=='d':
             dk = np.zeros((len(K),len(D)))
@@ -969,7 +979,7 @@ def processKD2(days,K,D,companys,topN=20):
             for i in range(len(K)):
                 ma5[i,:] = stock.ma(K[i,:,2],5)
                 ma5[i,ma5[i,:]==0] = 1 #确保不会等于0
-            dk = (K[:,day:,2]-ma5[:,:-day])/ma5[:,:-day]#收盘相对day前的增长率
+            dk = K[:,day:,2]/ma5[:,:-day]-1#收盘相对day前的增长率
         for category in allCategory():
             r = idd[:,3]==category
             dK = dk[r]
@@ -992,6 +1002,8 @@ def processKD2(days,K,D,companys,topN=20):
                     result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
             else:
                 print("'%s' 分类里面没有公司"%category)
+        progress(j/len(days))
+        j+=1
     return result
 
 def processKD(days,K,D,companys,topN=10):
@@ -1054,7 +1066,7 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None,companys=None):
     K_[:,:,1] = K[:,:,2]
     K_[:,:,2] = K[:,:,1]
     #舍弃3 yesteryday_close,4 today_open
-    return processKD2(days,K_,D,companys,10)
+    return processKD2(days,K_,D,companys,10,progress=progress)
   
 def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
     progress(0)
@@ -1062,15 +1074,20 @@ def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
     progress(100)
     if D is None or K is None:
         return []
-    return processKD2(days,K,D,companys)
+    return processKD2(days,K,D,companys,progress=progress)
 
 def StrongSortedRT(days,progress=None,companys=None):
     progress(0)
-    D,K = downloadAllKFast(companys,progress)
-    progress(100)
+    def progress0_50(i):
+        progress(i/2)
+    def progress50_100(i):
+        progress(i/2+50)
+    D,K = downloadAllKFast(companys,progress0_50)
     if D is None or K is None:
         return []
-    return processKD2(days,K,D,companys)    
+    result = processKD2(days,K,D,companys,progress=progress50_100)    
+    progress(100)
+    return result
 
 mycolors=[
     "red",
@@ -1596,7 +1613,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
     else: #实时
         periods = [3,15,45,'d']
-        period = 3
+        period = 15
         result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
 
     done = True
@@ -1625,7 +1642,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             return sorted(categorys,key=lambda it:it[7][pos],reverse=True)
     
     sortedCategory = getSortedCategory(period,-1)
-    top = 10
+    top = 30
     mark = None
     category = None
     pagecount = 50
@@ -1904,6 +1921,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             showPlot()
     def update(b):
         nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate
+        #t0 = datetime.today()
         if b:
             progress = widgets.IntProgress(value=0,
             min=0,max=100,step=1,
@@ -1924,7 +1942,8 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
         else: #实时
             result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
-
+        #mylog.info("1."+str(datetime.today()-t0))
+        #t0 = datetime.today()
         done = True
         progressCallback(100)
         needUpdate = False
@@ -1935,7 +1954,8 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         categoryDropdown.options = categoryListItem()
         markDropdown.value = oldmark
         categoryDropdown.value = oldcategory
-
+        #mylog.info("2."+str(datetime.today()-t0))
+        #t0 = datetime.today()
         LEN = len(sortedCategory[0][3])
         bi = LEN-pagecount
         ei = LEN
@@ -1946,7 +1966,9 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         needUpdate = True
         if not b:
             refreshbutton.button_style = ''
-        showPlot()
+        showPlot()  
+        #mylog.info("3."+str(datetime.today()-t0))
+        #t0 = datetime.today()
 
     def on_refresh(e):
         update(True)
@@ -1978,7 +2000,8 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         b,t = shared.fromRedis('runtime_update')
         if b and t!=lastT:
             lastT = t
-            update(False)
+            #update(False)
+            threading.Thread(target=update,args=((False,))).start()
         if datetime.today().hour<15:
             xueqiu.Timer(1,checkUpdate2)
     #监视实时数据
@@ -2029,9 +2052,11 @@ def favoriteList():
 def timeline(code,name=None,companys=None):
     if companys is None:
         companys = stock.query("select company_id,code,name,category from company_select")
+    def progress(i):
+        pass
     for i in range(len(companys)):
         if companys[i][1]==code or companys[i][2]==name:
-            K,D = updateRT(companys)
+            K,D = updateRT(companys,progress=progress)
             gs_kw = dict(width_ratios=[1], height_ratios=[2,1])
             fig,axs = plt.subplots(2,1,sharex=True,figsize=(28,14),gridspec_kw = gs_kw)
             fig.subplots_adjust(hspace=0.02,wspace=0.05)

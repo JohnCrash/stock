@@ -4,7 +4,9 @@ from datetime import datetime
 import time
 import subprocess
 import threading
+#import os
 
+#os.chdir('d:/source/stock')
 def jupyter():
     subprocess.run(['jupyter','lab'],shell=True)
 

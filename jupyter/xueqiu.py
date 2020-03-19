@@ -26,7 +26,7 @@ class Timer:
     def cancel(self):
         self._task.cancel()
 
-mylog.init('./download_stock.log',name='xueqiu')
+mylog.init('./log/download_stock.log',name='xueqiu')
 
 def xueqiuJson(url,timeout=None):
     s = requests.session()
