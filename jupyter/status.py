@@ -401,6 +401,7 @@ def updateRT(companys,N=100,progress=None):
             ps = [_K]
         progress(0)
         i = 0
+        seqs = seqs[-N:]
         for ts in seqs:
             if ba:
                 b,p = shared.numpyFromRedis("rt%d"%ts)
@@ -569,8 +570,129 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             A[-1,10] = stock.bollWidth(boll)[-1] #bollw
             k = A
             final_results.append((k,c))
-    return final_results  
+    return final_results 
 
+#tasks = [(k,(0 company_id,1 code,2 name,3 category,4 ttm,5 pb))...]
+#k = 0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
+#返回[(k,(0 company_id,1 code,2 name,3 category,4 ttm,5 pb))...]
+#返回一个系数，代表当前时间成交量应该占全天的比重
+def get_tvol(t):
+    voltv = [0.097,0.143,0.180,0.212,0.240,0.271,0.298,0.321,0.341,0.361,0.379,0.402,
+    0.423,0.439,0.455,0.468,0.480,0.492,0.501,0.514,0.526,0.540,0.555,0.566,
+    0.583,0.594,0.606,0.622,0.637,0.647,0.658,0.671,0.682,0.693,0.708,0.722,
+    0.736,0.751,0.767,0.784,0.801,0.823,0.847,0.870,0.895,0.920,0.956,1.000]
+    hour = t.hour
+    mint = t.minute
+    for i in range(len(xueqiu.k5date)):
+        it = xueqiu.k5date[i]
+        if it[0]==hour and it[1]==mint:
+            return voltv[i]
+    return 1
+
+def downloadRT(tasks,progress):
+    result = []
+    b,seqs = shared.fromRedis('runtime_sequence')
+    if b:
+        ts1 = seqs[-1]
+        t = datetime.fromtimestamp(ts1/1000000)
+        if t.weekday()==0: #星期一
+            dt = 3*3600*24*1000*1000
+        else:
+            dt = 3600*24*1000*1000
+        ts0 = ts1-dt
+        for ts in seqs:
+            if ts>ts0 and ts-ts0<60*1000000:
+                ts0 = ts
+                break
+
+        b1,p1 = shared.numpyFromRedis("rt%d"%ts1)
+        if b1:
+            b0,p0 = shared.numpyFromRedis("rt%d"%ts0) #昨天相同时刻
+            if b0:
+                v0 = p0[:,1]
+            else:
+                v0 = np.zeros(len(p1)) #简单线性处理
+            tv = get_tvol(t)
+            idd2inx = {}
+            for i in range(len(p1)):
+                idd2inx[p1[i,0]] = i
+            for it in tasks:
+                if it[1][0] in idd2inx:
+                    i = idd2inx[it[1][0]]
+                    k = it[0]
+                    if v0[i]>0:
+                        vol =  p1[i,1]*k[-1,2]/v0[i] #这里使用昨天全天的和昨天该时刻的来预测全天的量
+                    else:
+                        vol = p1[i,1]/tv #使用今天的量仅仅使用分布来推测全天的量
+                    if vol>10*k[-1,2]: #别太大
+                        vol = 10*k[-1,2]
+                    elif vol<0:
+                        vol = 0
+                    clos = p1[i,5]
+                    A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0]]))
+                    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
+                    A[-1,4] = stock.macdV(A[:,1])[-1] #macd
+                    A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
+                    A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
+                    boll = stock.boll(A[:,1])
+                    bo = boll[-1] #boll
+                    A[-1,7] = bo[2] #bollup
+                    A[-1,8] = bo[1] #bollmid
+                    A[-1,9] = bo[0] #bolldn
+                    A[-1,10] = stock.bollWidth(boll)[-1] #bollw
+                    k = A    
+                    result.append((k,it[1]))            
+    return result
+"""
+dd = 
+period = 'd','w'
+id2companys = {company_id:[0 company_id,1 code,2 name,3 category,4 ttm,5 pb]}
+cb 是过滤函数 
+"""
+def searchRasingCompanyStatusByRT(dd,period,cb,id2companys,progress):
+    if period=='d':
+        db = 'company_status'
+    else:
+        db = 'company_status_week'
+    progress(10)
+    d,a = redisStatusCache50(db)
+    progress(30)
+    istoday = False
+    bi = len(d)-1
+    for i in range(len(d)):
+        if str(d[i][0])==dd:
+            bi = i
+    if date.today()==date.fromisoformat(dd):
+        istoday = True
+
+    rasing = []
+    vlines = {}
+    tasks = []
+    results = []
+    for i in range(len(a)):
+        #progress       
+        c = a[i]
+        idd = int(c[-1][0])
+        #反转数组的前后顺序，反转后-1代表最近的数据
+        k = c[:bi+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
+        if idd in id2companys:
+            if istoday and xueqiu.isTransTime() and period=='d': #将当日数据叠加进数据中
+                tasks.append((k,id2companys[idd]))
+            else:
+                results.append((k,id2companys[idd]))
+    
+    if len(tasks)>0:
+        results = downloadRT(tasks,progress)
+    
+    for it in results:
+        b,vline = cb(it[0],it[1],istoday)
+        if b:
+            idd = it[1][0]
+            rasing.append(idd)
+            vlines[idd] = vline
+
+    progress(100)
+    return rasing,vlines
 #这是使用Redis进行优化的版本    
 def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
     if period=='d':

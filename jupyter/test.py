@@ -15,7 +15,7 @@ from IPython.core.interactiveshell import InteractiveShell
 import kline
 import math
 
-
+"""
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
 id2com = {}
@@ -57,6 +57,15 @@ code2Server('SZ002418')
 code2Server('SZ300223')
 code2Server('SZ002065')
 code2Server('SZ002458')
+"""
+c,k,d = stock.loadKline('SH000001',5)
+t = 0
+for i in range(48):
+    t += k[-48+i,0]
+a = 0
+for i in range(48):
+    a += k[-48+i,0]
+    print("%.3f,"%(a/t))
 #status.StrongSorted([3],progress=progress,companys=companys)
 
 #xueqiu.clearAllRT()
