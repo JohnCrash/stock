@@ -16,7 +16,7 @@ from IPython.core.interactiveshell import InteractiveShell
 import kline
 import math
 
-"""
+
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
 id2com = {}
@@ -31,37 +31,13 @@ for com in companys:
 def progress(i):
     print(i)
 
-K,D = status.updateRT(companys,progress=progress)
+#K,D = status.updateRT(companys,progress=progress)
+status.StrongSortedRT([3],progress=progress,companys=companys)
 
-def code2Server(code):
-    j = 0
-    for i in range(0,len(companys),100):
-        batch = math.floor(i/100)
-        for com in companys[i:i+100]:
-            if com[1]==code:
-                if batch%3==0:
-                    print('xueqiu',code)
-                    print(K[j,:,2])
-                elif batch%3==1:
-                    print('sina',code)
-                    print(K[j,:,2])
-                else:
-                    print('qq',code)
-                    print(K[j,:,2])
-                return
-            j+=1
-
-code2Server('SH600360')
-code2Server('SZ002091')
-code2Server('SH603912')
-code2Server('SZ002418')
-code2Server('SZ300223')
-code2Server('SZ002065')
-code2Server('SZ002458')
 """
 def progress(i):
     print(i)
-companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+companys = stock.query("select company_id,code,name,category,ttm,pb from company_select")
 id2companys = {}
 for c in companys:
     id2companys[c[0]] = c
@@ -76,7 +52,7 @@ def isRasing(a,c,istoday):
             return True,[{'x':[-1],'color':'magenta','linestyle':'--','linewidth':2}]
     return False,[]    
 rasing,vlines = status.searchRasingCompanyStatusByRT('2020-04-20','d',isRasing,id2companys,progress)    
-#status.StrongSorted([3],progress=progress,companys=companys)
+"""
 
 #xueqiu.clearAllRT()
 #status.updateRT(companys)

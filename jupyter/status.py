@@ -1101,7 +1101,10 @@ def processKD2(days,K,D,companys,topN=20,progress=None):
             ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
             for i in range(len(K)):
                 ma5[i,:] = stock.ma(K[i,:,2],5)
-                ma5[i,ma5[i,:]==0] = 1 #确保不会等于0
+                eqz = ma5[i,:]==0
+                if eqz.any():
+                    ma5[i,eqz] = 1 #确保不会等于0,避免被零除错误
+                    K[i,eqz,2] = 1 #确保这些计算处理的dk = 0
             dk = K[:,day:,2]/ma5[:,:-day]-1#收盘相对day前的增长率
         for category in allCategory():
             r = idd[:,3]==category
