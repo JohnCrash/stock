@@ -1174,7 +1174,7 @@ def processKD(days,K,D,companys,topN=10):
                 print("'%s' 分类里面没有公司"%category)
     return result
 
-def StrongSorted(days,N=50,bi=None,ei=None,progress=None,companys=None):
+def StrongSorted(days,N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
     if bi is not None:
         if ei is not None:
             D,K = getStatusN(bi=bi,ei=ei)
@@ -1192,17 +1192,17 @@ def StrongSorted(days,N=50,bi=None,ei=None,progress=None,companys=None):
     K_[:,:,1] = K[:,:,2]
     K_[:,:,2] = K[:,:,1]
     #舍弃3 yesteryday_close,4 today_open
-    return processKD2(days,K_,D,companys,10,progress=progress)
+    return processKD2(days,K_,D,companys,topN=topN,progress=progress)
   
-def StrongSorted5k(days,N=50,bi=None,ei=None,progress=None,companys=None):
+def StrongSorted5k(days,N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
     progress(0)
     D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
     if D is None or K is None:
         return []
-    return processKD2(days,K,D,companys,progress=progress)
+    return processKD2(days,K,D,companys,topN=topN,progress=progress)
 
-def StrongSortedRT(days,progress=None,companys=None):
+def StrongSortedRT(days,topN=20,progress=None,companys=None):
     progress(0)
     def progress0_50(i):
         progress(i/2)
@@ -1211,7 +1211,7 @@ def StrongSortedRT(days,progress=None,companys=None):
     D,K = downloadAllKFast(companys,progress0_50)
     if D is None or K is None:
         return []
-    result = processKD2(days,K,D,companys,progress=progress50_100)    
+    result = processKD2(days,K,D,companys,topN=topN,progress=progress50_100)    
     progress(100)
     return result
 
@@ -1539,7 +1539,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
         if bi<0:
             bi = 0
         ei = bi+pagecount
-        if ei>LEN:
+        if ei>=LEN:
             ei = LEN-1
         pos = ei
         setSlider(bi,ei,pos)            
@@ -1547,7 +1547,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     def on_next(e):
         nonlocal bi,ei,pos,pagecount,LEN
         ei += pagecount
-        if ei>LEN:
+        if ei>=LEN:
             ei = LEN-1
         bi = ei-pagecount
         if bi<0:
@@ -1593,14 +1593,16 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     def on_nextpos(e):
         nonlocal pos,bi,ei,LEN,slider,needUpdateSlider
         pos += 1
-        if pos>LEN-1:
+        if pos>=LEN:
             pos=LEN-1
         needUpdateSlider = False
         slider.value = pos
         showPlot()
     def on_sliderChange(e):
-        nonlocal pos,needUpdateSlider
+        nonlocal pos,needUpdateSlider,LEN
         pos = e['new']
+        if pos>=LEN:
+            pos = LEN-1
         sortCompanyList()
         if needUpdateSlider:
             showPlot()
@@ -1728,19 +1730,20 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     display(out2)
     with out2:
         display(progress)
+    sample = 20
     update_status(progressCallback) #更新公司日状态
     if cycle=='d':
         periods = [3,5,10,20]
         period = 20
-        result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback,companys=companys)
+        result = StrongSorted(periods,N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
     elif cycle==5:
         periods = [1,3,6]
         period = 3
-        result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
+        result = StrongSorted5k(periods,N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
     else: #实时
         periods = [3,15,45,'d']
         period = 15
-        result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
+        result = StrongSortedRT(periods,topN=sample,progress=progressCallback,companys=companys)
 
     done = True
     sortType = 'TOP10'
@@ -1822,6 +1825,12 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         description='排名',
         layout=Layout(display='block',width='96px'),
         disabled=False)
+    sampleDropdown = widgets.Dropdown(
+        options=[1,2,3,5,10,20,30,50,100],
+        value=sample,
+        description='样本',
+        layout=Layout(display='block',width='96px'),
+        disabled=False)    
     listDropdown = widgets.Dropdown(
         options=[None,3,5,10,20,30],
         value=None,
@@ -1921,7 +1930,14 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         showPlot()
 
     topDropdown.observe(on_top,names='value')
-    
+
+    def on_sample(e):
+        nonlocal sample
+        sample = e['new']
+        listDropdown.value = None
+        update(True)
+
+    sampleDropdown.observe(on_sample,names='value')
     def on_list(e):
         nonlocal top,pos,category,sortedCategory,cycle
         count = e['new']
@@ -2046,7 +2062,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if needUpdateSlider and category is None:
             showPlot()
     def update(b):
-        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate
+        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate,sample
         #t0 = datetime.today()
         if b:
             progress = widgets.IntProgress(value=0,
@@ -2063,11 +2079,11 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             refreshbutton.button_style = 'success'
         progressCallback(0)
         if cycle=='d':
-            result = StrongSorted(periods,N,bi=bi,ei=ei,progress=progressCallback,companys=companys)
+            result = StrongSorted(periods,N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
         elif cycle==5:
-            result = StrongSorted5k(periods,N,bi=None,ei=None,progress=progressCallback,companys=companys)
+            result = StrongSorted5k(periods,N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
         else: #实时
-            result = StrongSortedRT(periods,progress=progressCallback,companys=companys)
+            result = StrongSortedRT(periods,topN=sample,progress=progressCallback,companys=companys)
         #mylog.info("1."+str(datetime.today()-t0))
         #t0 = datetime.today()
         done = True
@@ -2113,9 +2129,9 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
                     border='solid',
                     width='100%')
     if LEN <= pagecount:
-        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
+        box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,sampleDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
     else:
-        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
+        box = Box(children=[prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,periodDropdown,topDropdown,sampleDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
 
     display(box,output)
     showPlot() 
