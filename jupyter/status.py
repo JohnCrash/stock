@@ -895,7 +895,7 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=
             display(progress)            
         progressCallback(0)
         if bi is None:
-            rasing,vlines = searchRasingCompanyStatusByRedis(E.date,period,cb,filter,id2companys,progressCallback)
+            rasing,vlines = searchRasingCompanyStatusByRT(E.date,period,cb,id2companys,progressCallback)
         else:
             rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,cb,filter,id2companys,progressCallback)
         cats = {}
