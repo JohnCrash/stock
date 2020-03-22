@@ -1081,10 +1081,9 @@ K = [company_n,date_n,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
 D = [(date,)...]
 #使用线程加速 ,单线程更快，测试结果多线程用时4s,单线程用2s
 """
-def processKD2_CB(K,D,companys,topN=20,progress=None): #对processKD2的优化，只有在需要的时候才处理数据
+def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需要的时候才处理数据
     id2com = {}
 
-    progress(0)
     for com in companys:
         id2com[com[0]] = com
 
@@ -1096,10 +1095,13 @@ def processKD2_CB(K,D,companys,topN=20,progress=None): #对processKD2的优化�
             i[1] = id2com[k][1]
             i[2] = id2com[k][2]
             i[3] = id2com[k][3]
-
+    result = []
+    result_passed = {}
     def calcDayCB(day):
-        nonlocal idd,id2com,result,K,D,topN
-        result = []
+        nonlocal idd,id2com,result,K,D,topN,result_passed
+        
+        if day in result_passed:
+            return result
         if day=='d':
             dk = np.zeros((len(K),len(D)))
             for i in range(len(K)):
@@ -1136,6 +1138,8 @@ def processKD2_CB(K,D,companys,topN=20,progress=None): #对processKD2的优化�
                     result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
             else:
                 print("'%s' 分类里面没有公司"%category)
+        result_passed[day] = True
+        return result
     
     return calcDayCB
 
@@ -1238,7 +1242,7 @@ def processKD(days,K,D,companys,topN=10):
                 print("'%s' 分类里面没有公司"%category)
     return result
 
-def StrongSorted(days,N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
+def StrongSorted(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
     if bi is not None:
         if ei is not None:
             D,K = getStatusN(bi=bi,ei=ei)
@@ -1256,26 +1260,22 @@ def StrongSorted(days,N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
     K_[:,:,1] = K[:,:,2]
     K_[:,:,2] = K[:,:,1]
     #舍弃3 yesteryday_close,4 today_open
-    return processKD2(days,K_,D,companys,topN=topN,progress=progress)
+    return processKD2_CB(K_,D,companys,topN=topN)
   
-def StrongSorted5k(days,N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
+def StrongSorted5k(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
     progress(0)
     D,K = loadAllK(companys,bi,ei,5,N,progress)
     progress(100)
     if D is None or K is None:
         return []
-    return processKD2(days,K,D,companys,topN=topN,progress=progress)
+    return processKD2_CB(K,D,companys,topN=topN)
 
-def StrongSortedRT(days,topN=20,progress=None,companys=None):
+def StrongSortedRT(topN=20,progress=None,companys=None):
     progress(0)
-    def progress0_50(i):
-        progress(i/2)
-    def progress50_100(i):
-        progress(i/2+50)
-    D,K = downloadAllKFast(companys,progress0_50)
+    D,K = downloadAllKFast(companys,progress)
     if D is None or K is None:
         return []
-    result = processKD2(days,K,D,companys,topN=topN,progress=progress50_100)    
+    result = processKD2_CB(K,D,companys,topN=topN)    
     progress(100)
     return result
 
@@ -1799,23 +1799,25 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     if cycle=='d':
         periods = [3,5,10,20]
         period = 20
-        result = StrongSorted(periods,N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
+        result_cb = StrongSorted(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
     elif cycle==5:
         periods = [1,3,6]
         period = 3
-        result = StrongSorted5k(periods,N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
+        result_cb = StrongSorted5k(N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
     else: #实时
         periods = [3,15,45,'d']
         period = 15
-        result = StrongSortedRT(periods,topN=sample,progress=progressCallback,companys=companys)
+        result_cb = StrongSortedRT(topN=sample,progress=progressCallback,companys=companys)
+    result = result_cb(period)
 
     done = True
     sortType = 'TOP10'
     progressCallback(100)
     output = widgets.Output()
     def getSortedCategory(day,pos):
-        nonlocal sortType
+        nonlocal sortType,result_cb,result
         categorys = []
+        result = result_cb(day)
         if len(result)==0:
             return []
         for r in result:
@@ -2128,7 +2130,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     lock = threading.Lock()
     def update(b):
         lock.acquire()
-        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate,sample
+        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate,sample,result_cb
         #t0 = datetime.today()
         if b:
             progress = widgets.IntProgress(value=0,
@@ -2145,11 +2147,12 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             refreshbutton.button_style = 'success'
         progressCallback(0)
         if cycle=='d':
-            result = StrongSorted(periods,N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
+            result_cb = StrongSorted(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
         elif cycle==5:
-            result = StrongSorted5k(periods,N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
+            result_cb = StrongSorted5k(N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
         else: #实时
-            result = StrongSortedRT(periods,topN=sample,progress=progressCallback,companys=companys)
+            result_cb = StrongSortedRT(topN=sample,progress=progressCallback,companys=companys)
+        result = result_cb(period)
         #mylog.info("1."+str(datetime.today()-t0))
         #t0 = datetime.today()
         done = True
