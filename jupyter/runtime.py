@@ -26,7 +26,7 @@ print("5分钟后开始更新数据库...")
 while True:
     if t.hour==15 and t.minute==5:
         print("开始从雪球下载数据")
-        subprocess.run(['node','./stock/download_script/download.js'])
+        subprocess.run(['node','d:/source/stock/download_script/download.js'])
         print("开始更新数据库...")
         status.update_status(process)
         print("更新完成。")

@@ -49,12 +49,16 @@ def popularCategory():
 def isPopularCategory(name):
     return name in popularCategory()
 
-def allCategory():
+def allCategoryGlobal():
     ls = stock.query("select name from category")
     r = []
     for l in ls:
         r.append(l[0])
     return r
+_all_category = allCategoryGlobal()    
+def allCategory():
+    global _all_category
+    return _all_category
 
 #见数据插入到company_status表
 def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd):
@@ -1070,11 +1074,71 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
      5 按周期利润排序的索引和利润对[company,date,(index,dk)],
      6 该分类的前十名平均盈利[date_n],
      7 该分类的跌幅前十的平均跌幅[date_n]
+     8 (0前面10名的成交量最近5分钟) ？
      )
 ]
 K = [company_n,date_n,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
 D = [(date,)...]
+#使用线程加速 ,单线程更快，测试结果多线程用时4s,单线程用2s
 """
+def processKD2_CB(K,D,companys,topN=20,progress=None): #对processKD2的优化，只有在需要的时候才处理数据
+    id2com = {}
+
+    progress(0)
+    for com in companys:
+        id2com[com[0]] = com
+
+    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+    idd[:,0] = K[:,0,0]
+    for i in idd:
+        k = int(i[0])
+        if k in id2com:
+            i[1] = id2com[k][1]
+            i[2] = id2com[k][2]
+            i[3] = id2com[k][3]
+
+    def calcDayCB(day):
+        nonlocal idd,id2com,result,K,D,topN
+        result = []
+        if day=='d':
+            dk = np.zeros((len(K),len(D)))
+            for i in range(len(K)):
+                if not (K[i,:,3]==0).any():
+                    dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率
+        else:
+            ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
+            for i in range(len(K)):
+                ma5[i,:] = stock.ma(K[i,:,2],5)
+                eqz = ma5[i,:]==0
+                if eqz.any():
+                    ma5[i,eqz] = 1 #确保不会等于0,避免被零除错误
+                    K[i,eqz,2] = 1 #确保这些计算处理的dk = 0
+            dk = K[:,day:,2]/ma5[:,:-day]-1#收盘相对day前的增长率
+        for category in allCategory():
+            r = idd[:,3]==category
+            dK = dk[r]
+            if len(dK)>0:
+                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
+                ia = np.zeros((dK.shape[0],2))
+                ia[:,0] = np.arange(dK.shape[0])
+                for i in range(dK.shape[1]):
+                    ia[:,1] = dK[:,i]
+                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
+
+                top10mean = np.zeros((dK.shape[1]))
+                low10mean = np.zeros((dK.shape[1]))
+                for i in range(dK.shape[1]):
+                    top10mean[i] = sorti[:topN,i,1].mean()
+                    low10mean[i] = sorti[-topN:,i,1].mean()
+                if day=='d':
+                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean))
+                else:
+                    result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
+            else:
+                print("'%s' 分类里面没有公司"%category)
+    
+    return calcDayCB
+
 def processKD2(days,K,D,companys,topN=20,progress=None):
     result = []
     id2com = {}
@@ -2061,7 +2125,9 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         needUpdate = True
         if needUpdateSlider and category is None:
             showPlot()
+    lock = threading.Lock()
     def update(b):
+        lock.acquire()
         nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate,sample
         #t0 = datetime.today()
         if b:
@@ -2108,7 +2174,8 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         needUpdate = True
         if not b:
             refreshbutton.button_style = ''
-        showPlot()  
+        showPlot() 
+        lock.release() 
         #mylog.info("3."+str(datetime.today()-t0))
         #t0 = datetime.today()
 
