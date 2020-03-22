@@ -20,7 +20,7 @@ import mylog
 from matplotlib._pylab_helpers import Gcf
 from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show
 
-mylog.init('./log/kline.log',name='kline')
+log = mylog.init('kline.log',name='kline')
 warnings.filterwarnings("ignore", module="matplotlib")
 
 def plt_show(display_id,isupdate):
@@ -1380,17 +1380,17 @@ class Plote:
                 try:
                     self.reload(all=False)
                 except Exception as e:
-                    mylog.err("reload %s"%str(e))
+                    log.err("reload %s"%str(e))
                 recalcRange(False)
                 try:    
                     showline()
                 except Exception as e:
-                    mylog.err("showline %s"%str(e))                
+                    log.err("showline %s"%str(e))
                 refreshbutton.button_style = ''
                 try:
                     startTimer()
                 except Exception as e:
-                    mylog.err("startTimer %s"%str(e))                        
+                    log.err("startTimer %s"%str(e))
                 break
 
         def startTimer():

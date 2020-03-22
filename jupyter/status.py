@@ -21,7 +21,7 @@ import copy
 import mylog
 from matplotlib.ticker import Formatter
 
-mylog.init('./log/status.log',name='status')
+log = mylog.init('status.log',name='status')
 class MyFormatterRT(Formatter):
     def __init__(self, dates,fmt='%d %h:%M:%s'):
         self.dates = dates
@@ -2153,7 +2153,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         else: #实时
             result_cb = StrongSortedRT(topN=sample,progress=progressCallback,companys=companys)
         result = result_cb(period)
-        #mylog.info("1."+str(datetime.today()-t0))
+        #log.info("1."+str(datetime.today()-t0))
         #t0 = datetime.today()
         done = True
         progressCallback(100)
@@ -2165,7 +2165,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         categoryDropdown.options = categoryListItem()
         markDropdown.value = oldmark
         categoryDropdown.value = oldcategory
-        #mylog.info("2."+str(datetime.today()-t0))
+        #log.info("2."+str(datetime.today()-t0))
         #t0 = datetime.today()
         LEN = len(sortedCategory[0][3])
         bi = LEN-pagecount
@@ -2179,7 +2179,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             refreshbutton.button_style = ''
         showPlot() 
         lock.release() 
-        #mylog.info("3."+str(datetime.today()-t0))
+        #log.info("3."+str(datetime.today()-t0))
         #t0 = datetime.today()
 
     def on_refresh(e):

@@ -26,7 +26,7 @@ class Timer:
     def cancel(self):
         self._task.cancel()
 
-mylog.init('./log/download_stock.log',name='xueqiu')
+log = mylog.init('download_stock.log',name='xueqiu')
 
 def xueqiuJson(url,timeout=None):
     s = requests.session()
@@ -93,7 +93,7 @@ def qqK5(code,n=96):
         else:
             return False,r.reason
     except Exception as e:
-        mylog.err("qqK5:"+str(code)+"ERROR:"+str(e))
+        log.err("qqK5:"+str(code)+"ERROR:"+str(e))
         return False,str(e)
 
 #通过调用qqK5转换而来
@@ -121,7 +121,7 @@ def qqK15(code,n=32):
                     k.append([k2[0],volume,k0[2],high,low,k2[5]])
             return b,k[-n:]
         else:
-            mylog.err("qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3))
+            log.err("qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3))
             return False,"qqK15调用qqK5 '%s'返回的数量为%d,请求的数量为%d"%(code,len(K),n*3)
     else:
         return b,K
@@ -160,7 +160,7 @@ def sinaK(code,period,n):
         else:
             return False,r.reason
     except Exception as e:
-        mylog.err("sinaK15:"+str(code)+"ERROR:"+str(e))
+        log.err("sinaK15:"+str(code)+"ERROR:"+str(e))
         return False,str(e)
 
 def sinaK15(code,n=32):
@@ -205,7 +205,7 @@ def updateAllRT(ThreadCount=10):
                 if ret:
                     break
             except Exception as e:
-                mylog.err("updateAllRT updateRT:"+e)
+                log.err("updateAllRT updateRT:"+e)
             
         lock.acquire()
         count-=1
@@ -387,14 +387,14 @@ def xueqiuRT(codes,result=None):
                             else:
                                 result[i] = [d['timestamp']/1000,vol,current,current,current,current,yesterday_close,today_open]
                     except Exception as e:
-                        mylog.err("xueqiuRT:"+str(d))
-                        mylog.err("xueqiuRT:"+str(e))
+                        log.err("xueqiuRT:"+str(d))
+                        log.err("xueqiuRT:"+str(e))
                         return False
                 return True
-        mylog.err('xueqiuRT:'+str(js))
+        log.err('xueqiuRT:'+str(js))
         return False
     except Exception as e:
-        mylog.err("xueqiuRT:"+str(e))
+        log.err("xueqiuRT:"+str(e))
         return False    
     return False        
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
@@ -459,10 +459,10 @@ def sinaRT(codes,result=None):
                 bi = ei+1
             return True
         else:
-            mylog.err('sinaRT:'+str(r.reason))
+            log.err('sinaRT:'+str(r.reason))
             return False
     except Exception as e:
-        mylog.err('sinaRT:'+str(e))
+        log.err('sinaRT:'+str(e))
         return False
     return False
 #http://qt.gtimg.cn/q=sh601872,sh600370,sh600312,sh603559,sh600302,sh600252,sh600798&r=573645421
@@ -520,10 +520,10 @@ def qqRT(codes,result=None):
                 bi = ei+1
             return True
         else:
-            mylog.err('qqRT:'+str(r.reason))
+            log.err('qqRT:'+str(r.reason))
             return False
     except Exception as e:
-        mylog.err('qqRT:'+str(e))
+        log.err('qqRT:'+str(e))
         return False
     return False
 
@@ -582,7 +582,7 @@ def xueqiuK(code,period,n):
         else:
             return b,dd
     except Exception as e:
-        mylog.err("xueqiuK15:"+str(code)+"ERROR:"+str(e))
+        log.err("xueqiuK15:"+str(code)+"ERROR:"+str(e))
         return False,str(e) 
 #返回标准格式
 # True , ((timesramp,volume,open,high,low,close),...)
@@ -645,17 +645,17 @@ stockK15Service = [
     }
 ]
 def logServiceState():
-    mylog.warn("==============stockK15Service=============")
+    log.warn("==============stockK15Service=============")
     for it in stockK15Service:
-        mylog.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
+        log.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
         if 'errmsg' in it:
-            mylog.warn(str(it['errmsg']))
+            log.warn(str(it['errmsg']))
             it['errmsg'].clear()
-    mylog.warn("==============stockK5Service=============")
+    log.warn("==============stockK5Service=============")
     for it in stockK5Service:
-        mylog.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
+        log.warn("%s error:%d success:%d avg:%fms"%(it['name'],it['error'],it['success'],1000*it['avg']))
         if 'errmsg' in it:
-            mylog.warn(str(it['errmsg']))        
+            log.warn(str(it['errmsg']))        
             it['errmsg'].clear()
 
 #下载K数据，返回True/False,[(timesramp,volume,open,high,low,close)...],source
@@ -819,11 +819,11 @@ def checkK(code,period,k,d,base,n):
     today = date.today()
     if d[0][0].day!=today.day: #存在不在一天的数据就可以进行检查
         c,K,D = stock.loadKline(code,period,after=datetimeString(d[0][0]))
-        mylog.warn("checkK %s,%s,%s,%d"%(code,period,base,n))        
+        log.warn("checkK %s,%s,%s,%d"%(code,period,base,n))        
         for i in range(len(k)):
             if d[i][0]!=today.day and i<len(K) and not isEqK(k[i],K[i]):
-                mylog.warn("%d\t%s\t%s"%(i,str(d[i][0]),str(k[i])))
-                mylog.warn("%d\t%s\t%s"%(i,str(D[i][0]),str(K[i])))
+                log.warn("%d\t%s\t%s"%(i,str(d[i][0]),str(k[i])))
+                log.warn("%d\t%s\t%s"%(i,str(D[i][0]),str(K[i])))
                 break
 #返回指定代码的k线数据
 # True , np.array((timesramp,volume,open,high,low,close),...),[(timesramp,)...] 保持和loadKline相同的数据结构
@@ -866,9 +866,9 @@ def K(code,period,n):
                 break
         #如果有接缝，校验接缝处的数据
         if bi>=0 and not isEqK(oldK[-1,1:],k[bi][2:]): #不做成交量校验了
-            mylog.err("K '%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
-            mylog.err("oldK=%s,%s"%(str(d[-1]),str(oldK[-1])))
-            mylog.err("k[bi]=%s"%(str(k[bi])))
+            log.err("K '%s' %s base='%s' 和 '%s'存在%d处存在较大差异"%(code,str(period),base,s,bi))
+            log.err("oldK=%s,%s"%(str(d[-1]),str(oldK[-1])))
+            log.err("k[bi]=%s"%(str(k[bi])))
 
         for i in range(bi+1,len(k)):
             v = k[i]
@@ -886,7 +886,7 @@ def K(code,period,n):
             d.append((v[0],))
         k = np.array(K)
     else:
-        mylog.err("'%s' %s %s 下载时出错"%(code,str(period),base))
+        log.err("'%s' %s %s 下载时出错"%(code,str(period),base))
         return False,0,0
     
     #太长就进行截取,保留5天的数据
@@ -911,8 +911,8 @@ def isTransTime():
     return False
 
 def logCheckResult(code,period,source,checkdata,date=None):
-    mylog.warn(u"logCheckResult '%s' '%s' %s 数据和日线数据不一致"%(code,period,str(date)))
-    mylog.warn(u"\nsource:%s\nnew:%s"%(str(source),str(checkdata)))
+    log.warn(u"logCheckResult '%s' '%s' %s 数据和日线数据不一致"%(code,period,str(date)))
+    log.warn(u"\nsource:%s\nnew:%s"%(str(source),str(checkdata)))
     cacheName = "k%s_%s"%(str(period).lower(),code.lower())
     b,cache = shared.fromRedis(cacheName)
     if b:
@@ -940,7 +940,7 @@ def appendK(code,period,k,d):
                             nk[-1][0] = nk[-1][0]/dev[0]
                         else:
                             logCheckResult(code,period,k[i],nk[-2],d[i][0])
-                            mylog.err("差异：%s"%dev)
+                            log.err("差异：%s"%dev)
                     break
         #校验处理完成
         #=======================================================        
@@ -976,7 +976,7 @@ def xueqiuKday(code,period):
                 lasti = i
                 break
         if lasti is None:
-            mylog.err("xueqiuKday lasti=None,%s,%s \nk=%s\nd=%s"%(code,period,str(k),str(d)))
+            log.err("xueqiuKday lasti=None,%s,%s \nk=%s\nd=%s"%(code,period,str(k),str(d)))
             return False,0,0
         #0 volume,1 open,2 high,3 low,4 close
         yesterday = k[lasti-N+1:lasti+1,:]
