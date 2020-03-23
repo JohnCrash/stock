@@ -2236,7 +2236,7 @@ def favoriteList():
     prevButton = None
     for it in colles:
         but = widgets.Button(
-                    description=str(it),
+                    description="%s (%d)"%(str(it),len(colles[it])),
                     disabled=False,
                     button_style='')
         but.it = it
