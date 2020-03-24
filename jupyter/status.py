@@ -595,6 +595,7 @@ def get_tvol(t):
 
 def downloadRT(tasks,progress):
     result = []
+    progress(0)
     b,seqs = shared.fromRedis('runtime_sequence')
     if b:
         ts1 = seqs[-1]
@@ -620,6 +621,7 @@ def downloadRT(tasks,progress):
             idd2inx = {}
             for i in range(len(p1)):
                 idd2inx[p1[i,0]] = i
+            count = 0
             for it in tasks:
                 if it[1][0] in idd2inx:
                     i = idd2inx[it[1][0]]
@@ -645,7 +647,10 @@ def downloadRT(tasks,progress):
                     A[-1,9] = bo[0] #bolldn
                     A[-1,10] = stock.bollWidth(boll)[-1] #bollw
                     k = A    
-                    result.append((k,it[1]))            
+                    result.append((k,it[1]))
+                    progress(count/len(tasks))
+                    count+=1 
+    progress(100)        
     return result
 """
 dd = 
@@ -685,9 +690,13 @@ def searchRasingCompanyStatusByRT(dd,period,cb,id2companys,progress):
             else:
                 results.append((k,id2companys[idd]))
     
+    progress(40)
+    def progress40_90(i):
+        if math.floor(i)%5==0:
+            progress(i/2+40)
     if len(tasks)>0:
-        results = downloadRT(tasks,progress)
-    
+        results = downloadRT(tasks,progress40_90)
+    progress(90)
     for it in results:
         b,vline = cb(it[0],it[1],istoday)
         if b:
@@ -1405,9 +1414,10 @@ def PlotCategory(bi,ei,pos,r,top=None,focus=None,cycle='d',output=None):
 """
 按分类列出强势股
 """
-def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[3,5,10,20],cycle='d',sortType='TOP10'):
+def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[3,5,10,20],cycle='d',sortType='TOP10',result_cb=None):
     def getResult(day,categoryName):
         nonlocal category
+        category = result_cb(day)
         for r in category:
             if r[0]==day and r[1]==categoryName:
                 return r
@@ -1926,7 +1936,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
     needUpdateSlider = True
     needUpdate = True
     def showPlot():
-        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle,needUpdate,sortType
+        nonlocal output,category,mark,period,top,sortedCategory,result,bi,ei,pos,needUpdateSlider,periods,cycle,needUpdate,sortType,result_cb
         if needUpdate:
             if category is None:
                 #output.clear_output(wait=True)
@@ -1938,7 +1948,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
             else:
                 output.clear_output()
                 with output:
-                    StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle,sortType=sortType)
+                    StrongCategoryCompanyList(result,category,toplevelpos=pos,period=period,periods=periods,cycle=cycle,sortType=sortType,result_cb=result_cb)
             needUpdateSlider = True
 
     def setSlider(minv,maxv,value):
