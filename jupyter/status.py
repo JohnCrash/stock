@@ -653,7 +653,7 @@ def downloadRT(tasks,progress):
     progress(100)        
     return result
 """
-dd = 
+dd = 最后一个数据的时间点
 period = 'd','w'
 id2companys = {company_id:[0 company_id,1 code,2 name,3 category,4 ttm,5 pb]}
 cb 是过滤函数 
@@ -754,7 +754,7 @@ def searchRasingCompanyStatusByRedis(dd,period,cb,filter,id2companys,progress):
 
 historyRasingCache = [0,0,0,0]
 #主要用于观察过去的数据
-def searchRasingCompanyStatusByRedisRange(bi,ei,dd,period,cb,filter,id2companys,progress):
+def searchRasingCompanyStatusByRedisRange(bi,ei,dd,period,cb,id2companys,progress):
     global historyRasingCache
     if historyRasingCache[0]==bi and historyRasingCache[1]==ei:
         d = historyRasingCache[2]
@@ -813,7 +813,7 @@ def searchRasingCompanyStatusByRedisRange(bi,ei,dd,period,cb,filter,id2companys,
         idd = int(c[-1][0])
         #反转数组的前后顺序，反转后-1代表最近的数据
         k = c[:bii+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
-        if idd in id2companys and filter(k,id2companys[idd],False,period):
+        if idd in id2companys:
             results.append((k,id2companys[idd]))
     for it in results:
         b,vline = cb(it[0],it[1],False)
@@ -842,7 +842,7 @@ def defaultFilter(a,c,istoday,period):
 """
 按分类列出崛起的股票的数量与列表
 """
-def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=None,ei=None):
+def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
     today_but = None
     output = widgets.Output()
     output2 = widgets.Output()
@@ -910,7 +910,7 @@ def RasingCategoryList(period='d',cb=isRasing,filter=defaultFilter,name=None,bi=
         if bi is None:
             rasing,vlines = searchRasingCompanyStatusByRT(E.date,period,cb,id2companys,progressCallback)
         else:
-            rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,cb,filter,id2companys,progressCallback)
+            rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,cb,id2companys,progressCallback)
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -1152,106 +1152,8 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
     
     return calcDayCB
 
-def processKD2(days,K,D,companys,topN=20,progress=None):
-    result = []
-    id2com = {}
-    progress(0)
-    for com in companys:
-        id2com[com[0]] = com
-
-    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
-    idd[:,0] = K[:,0,0]
-    for i in idd:
-        k = int(i[0])
-        if k in id2com:
-            i[1] = id2com[k][1]
-            i[2] = id2com[k][2]
-            i[3] = id2com[k][3]
-    j=0
-    for day in days:
-        if day=='d':
-            dk = np.zeros((len(K),len(D)))
-            for i in range(len(K)):
-                if not (K[i,:,3]==0).any():
-                    dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率
-        else:
-            ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
-            for i in range(len(K)):
-                ma5[i,:] = stock.ma(K[i,:,2],5)
-                eqz = ma5[i,:]==0
-                if eqz.any():
-                    ma5[i,eqz] = 1 #确保不会等于0,避免被零除错误
-                    K[i,eqz,2] = 1 #确保这些计算处理的dk = 0
-            dk = K[:,day:,2]/ma5[:,:-day]-1#收盘相对day前的增长率
-        for category in allCategory():
-            r = idd[:,3]==category
-            dK = dk[r]
-            if len(dK)>0:
-                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
-                ia = np.zeros((dK.shape[0],2))
-                ia[:,0] = np.arange(dK.shape[0])
-                for i in range(dK.shape[1]):
-                    ia[:,1] = dK[:,i]
-                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
-
-                top10mean = np.zeros((dK.shape[1]))
-                low10mean = np.zeros((dK.shape[1]))
-                for i in range(dK.shape[1]):
-                    top10mean[i] = sorti[:topN,i,1].mean()
-                    low10mean[i] = sorti[-topN:,i,1].mean()
-                if day=='d':
-                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean))
-                else:
-                    result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
-            else:
-                print("'%s' 分类里面没有公司"%category)
-        progress(j/len(days))
-        j+=1
-    return result
-
-def processKD(days,K,D,companys,topN=10):
-    result = []
-    id2com = {}
-    for com in companys:
-        id2com[com[0]] = com
-
-    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
-    idd[:,0] = K[:,0,0]
-    for i in idd:
-        k = int(i[0])
-        if k in id2com:
-            i[1] = id2com[k][1]
-            i[2] = id2com[k][2]
-            i[3] = id2com[k][3]
-
-    for day in days:
-        ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
-        for i in range(len(K)):
-            ma5[i,:] = stock.ma(K[i,:,1],5)
-            ma5[i,ma5[i,:]==0] = 1 #确保不会等于0
-        dk = (K[:,day:,1]-ma5[:,:-day])/ma5[:,:-day]#收盘相对day前的增长率
-        for category in allCategory():
-            r = idd[:,3]==category
-            dK = dk[r]
-            if len(dK)>0:
-                sorti = np.zeros((dK.shape[0],dK.shape[1],2))
-                ia = np.zeros((dK.shape[0],2))
-                ia[:,0] = np.arange(dK.shape[0])
-                for i in range(dK.shape[1]):
-                    ia[:,1] = dK[:,i]
-                    sorti[:,i,:] = np.array(sorted(ia,key=lambda it:it[1],reverse=True))
-
-                top10mean = np.zeros((dK.shape[1]))
-                low10mean = np.zeros((dK.shape[1]))
-                for i in range(dK.shape[1]):
-                    top10mean[i] = sorti[:10,i,1].mean()
-                    low10mean[i] = sorti[-10:,i,1].mean()
-                result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
-            else:
-                print("'%s' 分类里面没有公司"%category)
-    return result
-
 def StrongSorted(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
+    K_ = None
     if bi is not None:
         if ei is not None:
             D,K = getStatusN(bi=bi,ei=ei)
@@ -1262,12 +1164,33 @@ def StrongSorted(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
             D,K = getStatusN(N=N)
         else:
             D,K = redisStatusCache50('company_status')
+        b,t = shared.fromRedis('runtime_update')
+        if b and (datetime.today()-t).seconds<60: #有新的数据,将最新的数据叠加进去
+            b,seqs = shared.fromRedis('runtime_sequence')
+            if b and len(seqs)>0:
+                b,p = shared.numpyFromRedis("rt%d"%seqs[-1])
+                if b:
+                    K_ = np.zeros((len(K),len(D)+1,5))
+                    K_[:,:-1,0] = K[:,:,0]
+                    K_[:,:-1,1] = K[:,:,2]
+                    K_[:,:-1,2] = K[:,:,1]
+                    idd2inx = {}
+                    for i in range(len(p)):
+                        idd2inx[int(p[i,0])] = i
+                    for i in range(len(K)):
+                        idd = int(K_[i,-2,0])
+                        K_[i,-1,0] = idd
+                        K_[i,-1,1] = p[idd2inx[idd],2]
+                        K_[i,-1,2] = p[idd2inx[idd],6]
+                    dd = date.fromtimestamp(seqs[-1]/(1000*1000))
+                    D.append((dd,))
     # K = [(0 idd,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw)]
     # K_ = [(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
-    K_ = np.zeros((len(K),len(D),5))
-    K_[:,:,0] = K[:,:,0]
-    K_[:,:,1] = K[:,:,2]
-    K_[:,:,2] = K[:,:,1]
+    if K_ is None:
+        K_ = np.zeros((len(K),len(D),5))
+        K_[:,:,0] = K[:,:,0]
+        K_[:,:,1] = K[:,:,2]
+        K_[:,:,2] = K[:,:,1]
     #舍弃3 yesteryday_close,4 today_open
     return processKD2_CB(K_,D,companys,topN=topN)
   
