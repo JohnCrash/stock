@@ -1165,7 +1165,8 @@ def StrongSorted(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
         else:
             D,K = redisStatusCache50('company_status')
         b,t = shared.fromRedis('runtime_update')
-        if b and (datetime.today()-t).seconds<60: #有新的数据,将最新的数据叠加进去
+        today = datetime.today()
+        if b and t.month==today.month and t.day==today.day and D[-1][0].day!=t.day: #有新的数据,将最新的数据叠加进去
             b,seqs = shared.fromRedis('runtime_sequence')
             if b and len(seqs)>0:
                 b,p = shared.numpyFromRedis("rt%d"%seqs[-1])
@@ -1179,9 +1180,18 @@ def StrongSorted(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
                         idd2inx[int(p[i,0])] = i
                     for i in range(len(K)):
                         idd = int(K_[i,-2,0])
-                        K_[i,-1,0] = idd
-                        K_[i,-1,1] = p[idd2inx[idd],2]
-                        K_[i,-1,2] = p[idd2inx[idd],6]
+                        if idd in idd2inx:
+                            K_[i,-1,0] = idd
+                            K_[i,-1,1] = p[idd2inx[idd],2]
+                            clos = p[idd2inx[idd],6]
+                            if clos>0 and K_[i,-1,2]>0:
+                                v = clos/K_[i,-1,2]
+                                if v<=1.1 and v>=0.9:
+                                    K_[i,-1,2] = p[idd2inx[idd],6]
+                                else:
+                                    K_[i,-1,2] = K_[i,-2,2]
+                            else:
+                                K_[i,-1,2] = K_[i,-2,2]
                     dd = date.fromtimestamp(seqs[-1]/(1000*1000))
                     D.append((dd,))
     # K = [(0 idd,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw)]

@@ -183,6 +183,7 @@ config {
     figure: callback figure(self,)返回figure
     cb : function(self,axs,bi,ei)
     lightweight: True or False 如果是True仅仅加载一年的数据
+    prediction:[[date,volume,open,high,low,close],...]#提前加入未来的预测k线图
 }
 """
 class Plote:
@@ -404,6 +405,10 @@ class Plote:
                             if self._mink > k[i][3]:
                                 self._mink = k[i][3]
                                 self._minx = i
+                if 'prediction' in self._configarg:
+                    for k_ in self._configarg['prediction']:
+                        self._k = np.vstack((self._k,k_[1:]))
+                        self._date.append((date.fromisoformat(k_[0]),))
         if len(self._k)==0: #完全没有数据不进行进一步处理
             return
         #将大盘指数画在图表中   
@@ -537,6 +542,7 @@ class Plote:
     def isWatchTime(self):
         t = datetime.today()
         return t.weekday()>=0 and t.weekday()<5 and t.hour>=9 and t.hour<=15
+
     #显示K线图
     def showKline(self,bi=None,ei=None,figsize=(30,16)):     
         if bi is None:
