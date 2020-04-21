@@ -28,11 +28,12 @@ class Timer:
 
 log = mylog.init('download_stock.log',name='xueqiu')
 
+
 def xueqiuJson(url,timeout=None):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
-            'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; Hm_lvt_1db88642e346389874251b5a1eded6e3=1583211614,1583214605,1583214738,1583227469; cookiesu=841583283988633; remember=1; xq_a_token=171db880453165ae48c6ef0787e8c1ebedb2329f; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOjY2MjU1ODA1MzMsImlzcyI6InVjIiwiZXhwIjoxNTg1ODc2MDEwLCJjdG0iOjE1ODMyODQwMTAyNTksImNpZCI6ImQ5ZDBuNEFadXAifQ.LxU7UsEexLjnPBQMLYFv9fY_t6nrVfo7O5I9WZJpJKWclifOflvky8ylZe1qsthHWVRdAmPddvL_-XzI8z-iAZEwg9fgpeTaH_6eUilbl-V39ZkCAN3_vQB_SDNW3qCiOo3PX6OgkPS54Q_MAfF5Mf2KAchA7kRliv56nWZwIGa15SFy-wsFoIQ8N3GmmiMOxxZNOAV9Kj_M0y7G4h97S7O-y1SLoCjBt-32dJKtUlgAIb115qpE4RZw5huZ9kdBGDAtqpE-VQkZhP9s7DO_pQByfvBDOUrhk4SHnSuby6xgsdBg-a5VtDONFF1ooNP-m1kp1_J7EhjcEQH9ZPu79g; xqat=171db880453165ae48c6ef0787e8c1ebedb2329f; xq_r_token=8e611dfd4d16ede5bc3d4fd79da4fe5ae44d3a87; xq_is_login=1; u=6625580533; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1583284043'}
+            'Cookie':'_ga=GA1.2.528987204.1555945543; device_id=3977a79bb79f8dd823919ae175048ee6; s=ds12dcnoxk; bid=693c9580ce1eeffbf31bb1efd0320f72_jushvajy; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; _gid=GA1.2.2101692300.1585791003; Hm_lvt_1db88642e346389874251b5a1eded6e3=1585824059,1585824478,1585826449,1585872476; remember=1; xq_a_token=b4d6d8d0ad043e0f4370c514bad3097678175362; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOjY2MjU1ODA1MzMsImlzcyI6InVjIiwiZXhwIjoxNTg4NDY4NjgwLCJjdG0iOjE1ODU4NzY2ODAwNjQsImNpZCI6ImQ5ZDBuNEFadXAifQ.HMAADRs9WCAMa97WNO1ksUVtplddrbdNsPDQ70qvyIvFUwF0uGEC4L-R9_91_2HicKglDw6CPgAz8uHJVAHBNplSNkTVgWDwagN_mkbYnCi9lqripUYir1QRDroDRT57mH1aUgaLWVOMbHuFaMD3BmkS63MySozS8SEyW_4XcJ83Qa2FqxCPzbe7Ulc_P7y0CuQlOFKwyn2bGss0VICsXIcen_W9mFaRZdlmc-apvVSJthdftC822btwZzXTi3gEjKKcthemv26efCRc1tldpjgh_dFF2_vBYUUxJlnFUvOdPNaCtz-3JG14nFCS9uu1pAhzhjdx3zLEi4aXhitYNw; xqat=b4d6d8d0ad043e0f4370c514bad3097678175362; xq_r_token=f49395586f492df863a1f25fb6630d7c68e5185d; xq_is_login=1; u=6625580533; is_overseas=0; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1585876699'}
     if timeout is None:
         r = s.get(url,headers=headers)
     else:
@@ -126,6 +127,55 @@ def qqK15(code,n=32):
     else:
         return b,K
 
+#新浪资金流向,数据间隔2分钟
+#返回数据结构
+#[[date,larg,big,mid,tiny],...]
+def sinaFlow():
+    try: 
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'zh-CN,zh;q=0.9'}
+        url = """https://stock.sina.com.cn/stock/api/jsonp.php/var%20_sh0000012020=/TouziService.getMinuteFlow?random=$rn"""
+        r = s.get(url,headers=headers)
+        if r.status_code==200:
+            bi = r.text.find("=(\"")
+            ei = r.text.find("\");")
+            if bi>0 and ei>0 and ei>bi:
+                a = r.text[bi+3:ei].split('|')
+                flow = []
+                for v in a:
+                    vs = v.split(',')
+                    if len(vs)==1: #year
+                        year = vs[0]
+                    elif len(vs)==5: #time,larg,big,mid,tiny
+                        t = datetime.fromisoformat(year+' '+vs[0])
+                        larg = float(vs[1])
+                        big = float(vs[2])
+                        mid = float(vs[3])
+                        tiny = float(vs[4])
+                        flow.append([t,larg,big,mid,tiny])
+                    else:
+                        raise ValueError(str(vs))
+                return True,flow
+            else:
+                raise ValueError(str(r.text))
+        else:
+            return False,r.reason
+    except Exception as e:
+        log.error("sinaFlow ERROR:"+str(e))
+        return False,str(e)
+
+#将资金流向放入到redis中去
+def sinaFlowRT():
+    try:
+        b,a = sinaFlow()
+        if b and len(a)>0:
+            t=a[0][0]
+            k = """flow_%d_%d"""%(t.month,t.day)
+            shared.toRedis(a,k,ex=5*24*3600)
+    except Exception as e:
+        log.error("sinaFlowRT ERROR:"+str(e))
 #新浪财经数据
 # True , [(0 timesramp,1 volume,2 open,3 high,4 low,5 close),...]
 # False, "Error infomation"
@@ -214,6 +264,7 @@ def updateAllRT(ThreadCount=10):
     if not b:
         seqs = []
     plane = np.zeros((len(companys),9),dtype=float)
+    lastUpdateFlow = -1
     while t.hour>=6 and t.hour<15:
         if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
             #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close]
@@ -236,6 +287,9 @@ def updateAllRT(ThreadCount=10):
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
+            if t.minute%2==0 and t.minute!=lastUpdateFlow: #每2分钟更新一次
+                lastUpdateFlow = t.minute
+                sinaFlowRT()
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
             time.sleep(dt)

@@ -16,7 +16,7 @@ from IPython.core.interactiveshell import InteractiveShell
 import kline
 import math
 
-
+"""
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
 id2com = {}
@@ -31,8 +31,8 @@ for com in companys:
 def progress(i):
     print(i)
 
-#K,D = status.updateRT(companys,progress=progress)
 status.StrongSortedRT([3],progress=progress,companys=companys)
+"""
 
 """
 def progress(i):
@@ -56,3 +56,7 @@ rasing,vlines = status.searchRasingCompanyStatusByRT('2020-04-20','d',isRasing,i
 
 #xueqiu.clearAllRT()
 #status.updateRT(companys)
+
+#xueqiu.sinaFlowRT()
+#print('Done')
+status.saveflow()

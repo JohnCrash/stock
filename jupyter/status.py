@@ -2228,3 +2228,65 @@ def timeline(code,name=None,companys=None):
             fig.autofmt_xdate()
             plt.show()
             break
+#交易结束保存资金流向数据
+def saveflow(name=None):
+    if name==None:
+        t = datetime.today()
+        name = "flow_%d_%d"%(t.month,t.day)     
+    b,a = shared.fromRedis(name)
+    if b:
+        sqlstr = None
+        for v in a:
+            if sqlstr is None:
+                sqlstr = "('%s',%f,%f,%f,%f)"%(stock.timeString(v[0]),v[1],v[2],v[3],v[4])
+            else:
+                sqlstr += ",('%s',%f,%f,%f,%f)"%(stock.timeString(v[0]),v[1],v[2],v[3],v[4])
+        stock.execute("insert ignore into flow (date,larg,big,mid,tiny) values %s"%sqlstr)
+
+#显示资金流向
+def showflow(name=None):
+    if name==None:
+        t = datetime.today()
+        name = "flow_%d_%d"%(t.month,t.day)        
+    output = widgets.Output()
+    display(output)
+    fig,axs = plt.subplots(figsize=(28,14))
+    axs.set_title("资金流向 %s"%name)    
+    def plotflow():
+        b,a = shared.fromRedis(name)
+        if b:
+            d = np.zeros((len(a),5))
+            i = 0
+            dd = []
+            xticks=[]
+            for v in a:
+                dd.append([v[0]])
+                d[i][0] = i
+                d[i][1] = v[1]
+                d[i][2] = v[2]
+                d[i][3] = v[3]
+                d[i][4] = v[4]
+                i+=1
+            for i in range(4*60):
+                if i%10==0:
+                    xticks.append(i)
+
+            axs.xaxis.set_major_formatter(MyFormatterRT(dd))
+            axs.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(v[1]/1e8))
+            axs.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(v[2]/1e8))
+            axs.plot(d[:,0],d[:,3],color="cyan",label="中 %d亿"%(v[3]/1e8))
+            axs.plot(d[:,0],d[:,4],color="purple",label="小 %d亿"%(v[4]/1e8))
+            axs.set_xticks(xticks)
+            axs.grid(True)
+            axs.set_xlim(0,4*60)
+            axs.axhline(y=0,color='black',linestyle='--')
+            fig.autofmt_xdate()
+            plt.legend()
+    def update():
+        t = datetime.today()
+        if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
+            plotflow()
+        if t.hour>=6 and t.hour<15:
+            xueqiu.Timer(120,update)
+    update()
+    plotflow()

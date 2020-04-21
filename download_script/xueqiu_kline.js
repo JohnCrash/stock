@@ -108,6 +108,16 @@ const ucount={
     "120":4,
     'd':2
 }
+//快速全部现在,将名称改为ucount
+const ucount_fast={
+    "1":96*5*10,
+    "5":96*10,
+    "15":32*10,
+    "30":16*10,
+    "60":8*10,
+    "120":4*10,
+    'd':142
+}
 /**
  * 下载指定公司的kline数据
  */
@@ -116,7 +126,7 @@ function company_kline(id,code,lv,callback){
     function xueqiuURI(timestamp){
         let uri;
         if(lv=='d')
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-2&indicator=kline,ma,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${ucount[lv]}&indicator=kline,ma,macd`;
         else
             uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${ucount[lv]}&indicator=kline,macd`;
         

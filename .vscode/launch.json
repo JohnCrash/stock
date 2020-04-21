@@ -53,6 +53,12 @@
             "program": "${workspaceFolder}\\download_script\\research_kd.js"
         },
         {
+            "type": "node",
+            "request": "launch",
+            "name": "test js",
+            "program": "${workspaceFolder}\\download_script\\test.js"
+        },        
+        {
             "type": "python",
             "request": "launch",
             "name": "Debug test.py",

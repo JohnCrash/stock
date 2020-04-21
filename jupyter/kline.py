@@ -541,7 +541,7 @@ class Plote:
     #当前时间,周1~周5 9:00-15:00返回True
     def isWatchTime(self):
         t = datetime.today()
-        return t.weekday()>=0 and t.weekday()<5 and t.hour>=9 and t.hour<=15
+        return t.weekday()>=0 and t.weekday()<5 and t.hour>=8 and t.hour<=15
 
     #显示K线图
     def showKline(self,bi=None,ei=None,figsize=(30,16)):     
