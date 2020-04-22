@@ -59,4 +59,12 @@ rasing,vlines = status.searchRasingCompanyStatusByRT('2020-04-20','d',isRasing,i
 
 #xueqiu.sinaFlowRT()
 #print('Done')
+#status.saveflow()
+def process(i):
+    pass
+print("保存资金流向到数据库...")
+xueqiu.sinaFlowRT()
 status.saveflow()
+print("开始更新数据库...")
+status.update_status(process)
+print("更新完成。") 

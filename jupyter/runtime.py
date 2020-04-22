@@ -25,14 +25,14 @@ def process(i):
 print("5分钟后开始更新数据库...")
 while True:
     if t.hour==15 and t.minute==5:
-        print("开始从雪球下载数据")
-        subprocess.run(['node','d:/source/stock/download_script/download.js'])
         print("保存资金流向到数据库...")
         xueqiu.sinaFlowRT()
         status.saveflow()
         print("开始更新数据库...")
         status.update_status(process)
-        print("更新完成。")
+        print("更新完成。")        
+        print("开始从雪球下载数据")
+        subprocess.run(['node','d:/source/stock/download_script/download.js'])
         break
     elif t.hour==15:
         time.sleep(1)

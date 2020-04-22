@@ -2251,8 +2251,10 @@ def showflow(name=None):
     output = widgets.Output()
     display(output)
     fig,axs = plt.subplots(figsize=(28,14))
-    axs.set_title("资金流向 %s"%name)    
+    axs.set_title("资金流向 %s"%name)
+    first = True 
     def plotflow():
+        nonlocal output,fig,axs,name
         b,a = shared.fromRedis(name)
         if b:
             d = np.zeros((len(a),5))
@@ -2272,21 +2274,24 @@ def showflow(name=None):
                     xticks.append(i)
 
             axs.xaxis.set_major_formatter(MyFormatterRT(dd))
-            axs.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(v[1]/1e8))
-            axs.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(v[2]/1e8))
-            axs.plot(d[:,0],d[:,3],color="cyan",label="中 %d亿"%(v[3]/1e8))
-            axs.plot(d[:,0],d[:,4],color="purple",label="小 %d亿"%(v[4]/1e8))
+            axs.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(d[-1,1]/1e8))
+            axs.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(d[-1,2]/1e8))
+            axs.plot(d[:,0],d[:,3],color="cyan",label="中 %d亿"%(d[-1,3]/1e8))
+            axs.plot(d[:,0],d[:,4],color="purple",label="小 %d亿"%(d[-1,4]/1e8))
             axs.set_xticks(xticks)
             axs.grid(True)
             axs.set_xlim(0,4*60)
             axs.axhline(y=0,color='black',linestyle='--')
             fig.autofmt_xdate()
-            plt.legend()
+            axs.legend()
+            kline.output_show(output)
     def update():
+        nonlocal first
         t = datetime.today()
-        if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
+        if first or ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
             plotflow()
         if t.hour>=6 and t.hour<15:
-            xueqiu.Timer(120,update)
+            xueqiu.Timer(60,update)
+        first = False
     update()
-    plotflow()
+#显示涨停板数和跌停板数量
