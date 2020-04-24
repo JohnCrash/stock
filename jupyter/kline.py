@@ -194,6 +194,7 @@ class Plote:
         self._showma = False
         self._showmacd = False
         self._showkdj = False
+        self._showrsi = False
         self._showvolume = False
         self._showboll = False
         self._showvlines = False
@@ -203,13 +204,14 @@ class Plote:
         self._showtrend = False
         self._showenergy = False
         self._mad = None
+        self._rsi = None
         if len(self._k)==0: #完全没有数据
             return
         if 'ma' in self._config:
             self._showma = True
         if 'figure' in self._config:
             self._figureInx = []
-            if type(self._config['figure'])==dict:
+            if type(self._config['figure'])==list:
                 figures = self._config['figure']
             elif callable(self._config['figure']):
                 figures = self._config['figure'](self)
@@ -258,6 +260,7 @@ class Plote:
             else:
                 self._volumeenergy = stock.kdj(stock.volumeEnergyK(self._k))[:,2]
                 self._volumekdj = stock.kdj(self._k[:,0])[:,2]
+            self._rsi = stock.rsi(self._k[:,4],6)
             self._showenergy = True
         else:
             if self._period==5 or self._period==15:
@@ -290,12 +293,19 @@ class Plote:
             elif type(self._config['kdj'])==np.ndarray:
                 self._kdj = self._config['kdj']
             self._showkdj = True
+        if 'rsi' in self._config and self._config['rsi']:
+            self._rsiInx = self._axsInx+1
+            self._axsInx += 1
+            if self._rsi is None:
+                self._rsi = stock.rsi(self._k[:,4],6)
+            self._showrsi = True            
         if 'volume' in self._config and self._config['volume']:
             self._volInx =self._axsInx+1
             self._axsInx += 1
             self._volumema20 = stock.ma(self._k[:,0],20)
             #self._volumema5 = stock.ma(self._k[:,0],3)
             self._showvolume = True
+
         #将大盘指数的收盘价显示在图表中
         
         self._widths = [1]
@@ -723,6 +733,9 @@ class Plote:
             if self._szclose is not None:
                 axs[self._energyInx].plot(x,self._szvolumeenergy[bi:ei],color='black',linewidth=2,linestyle='--')
                 axs[self._energyInx].plot(x,self._szvolumekdj[bi:ei],color='gray',linewidth=1,linestyle='-.')
+            #将rsi指标显示在能量线上,做范围调整，标准rsi<20是超买，>80是超卖，将其调整到0-100
+            rsi100 = self._rsi[bi:ei]*1.4-20
+            axs[self._energyInx].plot(x,rsi100,label="RSI",color='orange',linestyle='--')
         #绘制bollwidth
         if self._showbollwidth:
             axs[self._bollwidthInx].plot(x,self._bollwidth[bi:ei],color='red',linewidth=2)
@@ -849,10 +862,15 @@ class Plote:
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,0],label="K",color='orange')
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,1],label="D",color='blue')
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,2],label="J",color='purple')
+        #绘制rsi
+        if self._showrsi:
+            axs[self._rsiInx].plot(x,self._rsi[bi:ei],label="RSI",color='orange')
+            axs[self._rsiInx].axhline(20,color='black',linestyle='--')
+            axs[self._rsiInx].axhline(80,color='black',linestyle='--')
         #绘制额外的图表
         if self._showfigure:
             i = 0
-            if type(self._config['figure'])==dict:
+            if type(self._config['figure'])==list:
                 figures = self._config['figure']
             elif callable(self._config['figure']):
                 figures = self._config['figure'](self)

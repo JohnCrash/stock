@@ -1106,6 +1106,10 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
             i[3] = id2com[k][3]
     result = []
     result_passed = {}
+    """
+    day = int 周期（和多少个周期前比较增长）
+    day = 'd' 周期盈利将变成日盈利(和昨日收盘进行比较)
+    """
     def calcDayCB(day):
         nonlocal idd,id2com,result,K,D,topN,result_passed
         
@@ -1115,7 +1119,7 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
             dk = np.zeros((len(K),len(D)))
             for i in range(len(K)):
                 if not (K[i,:,3]==0).any():
-                    dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率
+                    dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率                   
         else:
             ma5 = np.empty((K.shape[0],K.shape[1])) #收盘价5日均线
             for i in range(len(K)):
@@ -2250,13 +2254,14 @@ def showflow(name=None):
         name = "flow_%d_%d"%(t.month,t.day)        
     output = widgets.Output()
     display(output)
-    fig,axs = plt.subplots(figsize=(28,14))
-    axs.set_title("资金流向 %s"%name)
     first = True 
     def plotflow():
-        nonlocal output,fig,axs,name
+        nonlocal output,name
         b,a = shared.fromRedis(name)
         if b:
+            t = datetime.today()
+            fig,axs = plt.subplots(figsize=(28,14))
+            axs.set_title("资金流向 %s %s"%(name,str(t)))
             d = np.zeros((len(a),5))
             i = 0
             dd = []
@@ -2289,9 +2294,104 @@ def showflow(name=None):
         nonlocal first
         t = datetime.today()
         if first or ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
-            plotflow()
+            with output:
+                plotflow()
         if t.hour>=6 and t.hour<15:
             xueqiu.Timer(60,update)
         first = False
     update()
+
+_K2m = None
+_D2m = None
+_lastp2m = None
+# D=[(timestamp,),...]
+# K=(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)
+def getRT2m(companys):
+    global _K2m,_D2m,_lastp2m
+    b,seqs = shared.fromRedis('runtime_sequence')
+    C = len(companys)
+    if b:
+        if _D2m is None:
+            _D = []
+        ba = False if _lastp2m is not None else True
+        if _K2m is None or len(_K2m) != C:
+            ps = []
+            ba = True
+        else:
+            ps = [_K2m]
+        i = 0
+        for ts in seqs:
+            if ba:
+                t = datetime.fromtimestamp(ts/1000000)
+                if t.minte%2==0 and (len(_D2m)==0 or _D2m[-1][0].minte!=t.minte):
+                    b,p = shared.numpyFromRedis("rt%d"%ts)
+                    if b:
+                        if len(p)==C:
+                            ps.append(p)
+                        elif len(p)>C:
+                            ps.append(p[:C])
+                        else:
+                            pp = np.zeros((C,9))
+                            pp[:len(p)] = p
+                            ps.append(pp)
+                        _D2m.append((datetime(t.year,t.month,t.day,t.hour,t.minte,0),))
+            elif _lastp2m == ts:
+                ba = True
+            i+=1
+        if len(ps)>1:
+            _K2m = np.empty((C,len(_D2m),9))
+            bi = 0
+            for col in ps:
+                if col.shape[0]==C and col.shape[1]==9:
+                    ei = bi+1
+                    _K2m[:,bi,:] = col
+                else:
+                    ei = bi+col.shape[1]
+                    _K2m[:,bi:ei,:] = col
+                bi = ei
+            #对数据进行不全纠正,有时候close=0表示数据下载错误，可以使用临近的数据进行补全
+            if len(ps)>3: #第一次加载完整数据
+                for i in range(C):
+                    for j in range(1,len(_D2m)): #从前向后补全
+                        if _K2m[i,j,6]==0 and _K2m[i,j-1,6]>0:
+                            _K2m[i,j,2:] = _K2m[i,j-1,2:]                    
+                    for j in range(len(_D2m)-2,-1,-1): #从后向前补全
+                        if _K2m[i,j,6]==0 and _K2m[i,j+1,6]>0:
+                            _K2m[i,j,2:] = _K2m[i,j+1,2:]
+            else:
+                for i in range(C): #增量式补全
+                    if _K2m[i,-1,6]==0 and _K2m[i,-2,6]>0:
+                        _K2m[i,-1,2:] = _K2m[i,-2,2:]
+                    elif _K2m[i,-1,6]>0 and _K2m[i,-2,6]==0:
+                        for j in range(len(_D)-2,-1,-1):
+                            if _K2m[i,j,6]==0 and _K2m[i,j+1,6]>0:
+                                _K2m[i,j,2:] = _K2m[i,j+1,2:]
+            _lastp2m = seqs[-1]
+    if _K2m is not None:
+        D = _D2m
+        K = np.ones((len(companys),len(D),11))
+        K[:,:,0] = _K2m[:,:,0] #id
+        K[:,:,1] = _K2m[:,:,2] #volume
+        K[:,:,2] = _K2m[:,:,6] #close
+        K[:,:,3] = _K2m[:,:,7] #yesterday_close
+        K[:,:,4] = _K2m[:,:,8] #today_open
+        return D,K             
+    return None,None
 #显示涨停板数和跌停板数量
+"""
+elif day=='涨停' or day=='跌停':
+    dk = np.zeros((len(K),len(D)))
+    for i in range(len(K)):
+        if not (K[i,:,3]==0).any():
+            dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率            
+    for category in allCategory():
+        r = idd[:,3]==category
+        dK = dk[r]
+        if len(dK)>0:
+            result.append((day,category,dK,D[:],idd[r],None,np.count_nonzero(dK>=0.097,axis=0),np.count_nonzero(dK<=-0.097,axis=0)))
+    result_passed[day] = True
+    return result 
+"""
+def showzdt():
+    companys = stock.query("""select company_id,code,name,category from company_select""")
+    K,D = getRT2m(companys)

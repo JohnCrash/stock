@@ -297,6 +297,34 @@ def kdj(k,n=9):
         kdj[i,2] = 3.*kdj[i,0]-2.*kdj[i,1]
     return kdj  
 
+"""
+计算一般值的相对强弱指数RSI
+计算公式来源:http://www.bary.com/doc/a/209624790300910442/
+"""
+def rsi(k,n=6):
+    S = k[1:]-k[:-1]
+    U = S
+    D = np.copy(S)
+    U[U<0] = 0
+    D[D>0] = 0
+    D = np.abs(D)
+    RSI = emaV(U,n)/(emaV(U,n)+emaV(D,n))
+    RSI[RSI>1] = 1
+    result = np.empty(len(k))
+    result[0] = 50
+    result[1:] = RSI*100
+    return result
+
+"""
+CCI（Commodity Channel lndex）顺势指标是测量股价是否已超出常态分布范围的一个指数，
+由唐纳德·R.兰伯特（DonaldLambert）所创，属于超买超卖类指标中较特殊的一种，波动于正无限大和负无限小之间。
+"""
+def cci():
+    pass
+
+"""
+成交量能量
+"""
 def volumeEnergy(k,n=20):
     ve = np.zeros((len(k)))
     ma20 = ma(k,n)
