@@ -23,7 +23,7 @@ from matplotlib.ticker import Formatter
 
 log = mylog.init('status.log',name='status')
 class MyFormatterRT(Formatter):
-    def __init__(self, dates,fmt='%d %h:%M:%s'):
+    def __init__(self, dates,fmt='m:s'):
         self.dates = dates
         self.fmt = fmt
 
@@ -34,7 +34,10 @@ class MyFormatterRT(Formatter):
             return ''
 
         t = self.dates[ind][0]
-        return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
+        if self.fmt=='m:s':
+            return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
+        else:
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
 
 PROD = 40
 
@@ -2297,7 +2300,7 @@ def showflow(name=None):
             with output:
                 plotflow()
         if t.hour>=6 and t.hour<15:
-            xueqiu.Timer(60,update)
+            xueqiu.Timer(120,update)
         first = False
     update()
 
@@ -2312,7 +2315,7 @@ def getRT2m(companys):
     C = len(companys)
     if b:
         if _D2m is None:
-            _D = []
+            _D2m = []
         ba = False if _lastp2m is not None else True
         if _K2m is None or len(_K2m) != C:
             ps = []
@@ -2323,7 +2326,7 @@ def getRT2m(companys):
         for ts in seqs:
             if ba:
                 t = datetime.fromtimestamp(ts/1000000)
-                if t.minte%2==0 and (len(_D2m)==0 or _D2m[-1][0].minte!=t.minte):
+                if t.minute%2==0 and (len(_D2m)==0 or _D2m[-1][0].minute!=t.minute):
                     b,p = shared.numpyFromRedis("rt%d"%ts)
                     if b:
                         if len(p)==C:
@@ -2334,7 +2337,7 @@ def getRT2m(companys):
                             pp = np.zeros((C,9))
                             pp[:len(p)] = p
                             ps.append(pp)
-                        _D2m.append((datetime(t.year,t.month,t.day,t.hour,t.minte,0),))
+                        _D2m.append((datetime(t.year,t.month,t.day,t.hour,t.minute,0),))
             elif _lastp2m == ts:
                 ba = True
             i+=1
@@ -2377,21 +2380,169 @@ def getRT2m(companys):
         K[:,:,4] = _K2m[:,:,8] #today_open
         return D,K             
     return None,None
-#显示涨停板数和跌停板数量
+
 """
-elif day=='涨停' or day=='跌停':
-    dk = np.zeros((len(K),len(D)))
-    for i in range(len(K)):
-        if not (K[i,:,3]==0).any():
-            dk[i,:] = K[i,:,2]/K[i,:,3]-1 #收盘相对昨天收盘的增长率            
-    for category in allCategory():
-        r = idd[:,3]==category
-        dK = dk[r]
-        if len(dK)>0:
-            result.append((day,category,dK,D[:],idd[r],None,np.count_nonzero(dK>=0.097,axis=0),np.count_nonzero(dK<=-0.097,axis=0)))
-    result_passed[day] = True
-    return result 
+显示涨停板数和跌停板数量
 """
 def showzdt():
     companys = stock.query("""select company_id,code,name,category from company_select""")
-    K,D = getRT2m(companys)
+    id2com = {}
+    pos = -1
+    bi = -100
+    ei = -1
+    for com in companys:
+        id2com[com[0]] = com
+    backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
+    frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+    slider = widgets.IntSlider(
+        value=pos,
+        min=bi,
+        max=ei,
+        step=1,
+        description='',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=False,
+        layout=Layout(width='128px')
+        #readout=True,
+        #readout_format='d'
+    )
+    periodDropdown = widgets.Dropdown(
+        options=['2分钟','日'],
+        value='2分钟',
+        description='周期',
+        layout=Layout(display='block',width='120px'),
+        disabled=False)    
+    categoryDropdown = widgets.Dropdown(
+        options=allCategory(),
+        value=None,
+        description='选择分类',
+        layout=Layout(display='block',width='215px'),
+        disabled=False)     
+    refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))           
+    output = widgets.Output()
+    box_layout = Layout(display='flex',
+                    flex_flow='wrap',
+                    align_items='stretch',
+                    border='solid',
+                    width='100%')    
+    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,refreshbutton],layout=box_layout)
+
+    def on_prevpos(e):
+        nonlocal pos,bi,ei,slider
+        pos -= 1
+        if pos<bi:
+            pos=bi
+        slider.value = pos
+        update_zdt()
+    def on_nextpos(e):
+        nonlocal pos,bi,ei,slider
+        pos += 1
+        if pos>-1:
+            pos=-1
+        slider.value = pos
+        update_zdt()
+    def on_refresh(e):
+        update_zdt()(True)
+    def on_sliderChange(e):
+        nonlocal pos
+        pos = e['new']
+        update_zdt()
+    def slider_range(b,e):
+        nonlocal slider,pos
+        bi = b
+        ei = e
+        slider.max = ei
+        slider.min = bi
+        slider.pos = pos
+    refreshbutton.on_click(on_refresh)
+    backbutton.on_click(on_prevpos)
+    frontbutton.on_click(on_nextpos)
+    slider.observe(on_sliderChange,names='value')   
+    display(box,output)
+    first = True
+    def update_zdt():
+        nonlocal output,pos,bi,ei
+        D,K = getRT2m(companys)
+        slider_range(-len(D)+1,-1)
+        K[K[:,:,3]<=0] = 1
+        r = K[:,:,2]/K[:,:,3]-1
+        um = np.count_nonzero(r>=0.097,axis=0)
+        dm = np.count_nonzero(r<=-0.097,axis=0)
+        fig,axs = plt.subplots(2,1,figsize=(28,12))
+        fig.subplots_adjust(hspace=0.01,wspace=0.05) #调整子图上下间距
+        axs[0].set_title("涨停跌停")
+        axs[0].xaxis.set_major_formatter(MyFormatterRT(D,fmt='m'))
+        x = np.linspace(0,len(um)-1,len(um))
+        xticks = []
+        for i in range(len(D)):
+            if D[i][0].minute==0 or D[i][0].minute==30:
+                xticks.append(i)  
+        xticks.append(len(D)-1)
+        xticks.append(len(D)-1)
+        axs[0].plot(x,um,color="red",label="涨停%d"%(um[-1]))
+        axs[0].plot(x,dm,color="green",label="跌停%d"%(dm[-1]))
+        axs[0].axvline(len(D)+pos,color="red",linewidth=2,linestyle='--')
+        axs[0].set_xticks(xticks)
+        fig.autofmt_xdate()
+        #fig.tight_layout()
+        axs[0].legend()
+        axs[0].grid(True)
+        axs[0].set_xlim(0,len(D))
+
+        idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+        idd[:,0] = K[:,0,0]        
+        for i in idd:
+            k = int(i[0])
+            if k in id2com:
+                i[1] = id2com[k][1]
+                i[2] = id2com[k][2]
+                i[3] = id2com[k][3]        
+        dr = K[:,pos,2]/K[:,pos,3]-1
+        S = []
+        for category in allCategory():
+            sr = idd[:,3]==category
+            uns = np.count_nonzero(dr[sr]>=0.097)
+            dns = np.count_nonzero(dr[sr]<=-0.097)
+            if uns>0 or dns>0:
+                S.append((category,uns,dns))
+        SS = sorted(S,key=lambda it:100*it[1]-it[2],reverse=True)
+        def getcols(s,c):
+            a = []
+            for v in s:
+                a.append(v[c])
+            return a
+        labels = getcols(SS,0)
+        ums = getcols(SS,1)
+        dms = getcols(SS,2)
+        x = np.arange(len(labels))  # the label locations
+        width = 0.4  # the width of the bars
+        rects1 = axs[1].bar(x - width/2, ums, width, color='red', label='涨停')
+        rects2 = axs[1].bar(x + width/2, dms, width, color='green',label='跌停')
+        def autolabel(rects):
+            """Attach a text label above each bar in *rects*, displaying its height."""
+            for rect in rects:
+                height = rect.get_height()
+                axs[1].annotate('{}'.format(height),
+                            xy=(rect.get_x() + rect.get_width() / 2, height),
+                            xytext=(0, 3),  # 3 points vertical offset
+                            textcoords="offset points",
+                            ha='center', va='bottom')   
+        autolabel(rects1)
+        autolabel(rects2)
+        axs[1].set_xticks(x)
+        axs[1].set_xticklabels(labels)        
+        axs[1].legend()
+        axs[1].set_xlim(-1,len(labels))
+        kline.output_show(output)
+    def update():
+        nonlocal first,output
+        t = datetime.today()
+        if first or ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
+            with output:
+                update_zdt()
+        if t.hour>=6 and t.hour<15:
+            xueqiu.Timer(120,update)
+        first = False
+    update()        
