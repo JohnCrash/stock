@@ -266,7 +266,7 @@ def updateAllRT(ThreadCount=10):
     plane = np.zeros((len(companys),9),dtype=float)
     lastUpdateFlow = -1
     while t.hour>=6 and t.hour<15:
-        if ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5:
+        if stock.isTransTime():
             #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close]
             seqs.append(math.floor(time.time()*1000*1000))
             for i in range(0,len(coms),100):
