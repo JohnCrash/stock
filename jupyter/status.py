@@ -2388,6 +2388,9 @@ def getRT2m(companys):
 def showzdt():
     D = None
     K = None
+    hot = None
+    uhots = []
+    dhots = []
     mode = '2分钟'
     companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
@@ -2419,13 +2422,19 @@ def showzdt():
         value=mode,
         description='周期',
         layout=Layout(display='block',width='120px'),
-        disabled=False)    
+        disabled=False)
     categoryDropdown = widgets.Dropdown(
-        options=['全部']+allCategory(),
+        options=['全部','涨停热点','跌停热点']+allCategory(),
         value=sel,
         description='选择分类',
         layout=Layout(display='block',width='215px'),
-        disabled=False)     
+        disabled=False)
+    hotsDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='热点',
+        layout=Layout(display='block',width='215px'),
+        disabled=False)        
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))           
     output = widgets.Output()
     box_layout = Layout(display='flex',
@@ -2433,9 +2442,9 @@ def showzdt():
                     align_items='stretch',
                     border='solid',
                     width='100%')    
-    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,refreshbutton],layout=box_layout)
+    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,refreshbutton],layout=box_layout)
     def getData():
-        nonlocal K,D,mode,companys
+        nonlocal K,D,mode,companys,uhots,dhots
         if mode == '2分钟':
             D,K = getRT2m(companys)
         else:
@@ -2446,6 +2455,37 @@ def showzdt():
             K[:,:,2] = K_[:,:,1]
             K[:,0,3] = K_[:,0,1]
             K[:,1:,3] = K_[:,:-1,1]
+        K[K[:,:,3]<=0] = 1
+        #重新计算热点分类
+        idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+        idd[:,0] = K[:,0,0]        
+        for i in idd:
+            k = int(i[0])
+            if k in id2com:
+                i[1] = id2com[k][1]
+                i[2] = id2com[k][2]
+                i[3] = id2com[k][3]            
+        r = K[:,:,2]/K[:,:,3]-1
+        S = []
+        for category in allCategory():
+            sr = idd[:,3]==category
+            u = np.count_nonzero(r[sr,:]>=0.097)
+            d = np.count_nonzero(r[sr,:]<=-0.097)
+            S.append((category,u,d))
+        #涨幅榜前10
+        um = sorted(S,key=lambda it:it[1],reverse=True)
+        uhots = []
+        for i in range(10):
+            if i < len(um):
+                uhots.append(um[i][0])
+        #跌幅前10
+        dm = sorted(S,key=lambda it:it[2],reverse=True)
+        dhots = []
+        for i in range(10):
+            if i < len(dm):
+                dhots.append(dm[i][0])
+        hotsDropdown.options = []
+        hotsDropdown.value = None
     def on_prevpos(e):
         nonlocal pos,bi,ei,slider
         pos -= 1
@@ -2474,9 +2514,15 @@ def showzdt():
         slider.min = bi
         slider.pos = pos
     def on_category(e):
-        nonlocal sel
+        nonlocal sel,uhots,dhots
         if e['name']=='value':
             sel = e['new']
+            if sel=='涨停热点':
+                hotsDropdown.options = uhots
+                hotsDropdown.value = uhots[0]
+            elif sel=='跌停热点':
+                hotsDropdown.options = dhots
+                hotsDropdown.value = dhots[0]
             update_zdt()
     def on_period(e):
         nonlocal mode,pos
@@ -2485,8 +2531,14 @@ def showzdt():
             pos = -1
             getData()
             update_zdt()
+    def on_hots(e):
+        nonlocal hot
+        if e['name']=='value':
+            hot = e['new']
+            update_zdt()
     periodDropdown.observe(on_period,names='value')
     categoryDropdown.observe(on_category,names='value')
+    hotsDropdown.observe(on_hots,names='value')
     refreshbutton.on_click(on_refresh)
     backbutton.on_click(on_prevpos)
     frontbutton.on_click(on_nextpos)
@@ -2494,7 +2546,7 @@ def showzdt():
     display(box,output)
     first = True
     def update_zdt():
-        nonlocal output,pos,bi,ei,sel,idd,K,D,mode
+        nonlocal output,pos,bi,ei,sel,idd,K,D,mode,uhots,dhots,hot
 
         slider_range(-len(D)+1,-1)
 
@@ -2506,23 +2558,14 @@ def showzdt():
                 i[1] = id2com[k][1]
                 i[2] = id2com[k][2]
                 i[3] = id2com[k][3]           
-        K[K[:,:,3]<=0] = 1
-        if sel=='全部':
-            r = K[:,:,2]/K[:,:,3]-1
-        else:
-            #选择分类的涨停和跌停
-            sr = idd[:,3]==sel
-            r = K[sr,:,2]/K[sr,:,3]-1
-        um = np.count_nonzero(r>=0.097,axis=0)
-        dm = np.count_nonzero(r<=-0.097,axis=0)            
         fig,axs = plt.subplots(2,1,figsize=(30,14))
         fig.subplots_adjust(hspace=0.1,wspace=0.05) #调整子图上下间距
         axs[0].set_title("'%s'涨停跌停"%sel)
         if mode=='2分钟':
             axs[0].xaxis.set_major_formatter(MyFormatterRT(D,fmt='m'))
         else:
-            axs[0].xaxis.set_major_formatter(kline.MyFormatter(D,'d'))
-        x = np.linspace(0,len(um)-1,len(um))
+            axs[0].xaxis.set_major_formatter(kline.MyFormatter(D,'d'))        
+        x = np.linspace(0,len(D)-1,len(D))
         xticks = []
         if mode=='2分钟':
             for i in range(len(D)):
@@ -2535,15 +2578,42 @@ def showzdt():
         xticks.append(len(D)-1)
         xticks.append(len(D)-1)
         xticks.append(len(D)+pos)
-        xticks.append(len(D)+pos)
-        axs[0].plot(x,um,color="red",label="涨停%d"%(um[-1]))
-        axs[0].plot(x,dm,color="green",label="跌停%d"%(dm[-1]))
+        xticks.append(len(D)+pos)            
+        if sel=='全部':
+            r = K[:,:,2]/K[:,:,3]-1
+            um = np.count_nonzero(r>=0.097,axis=0)
+            dm = np.count_nonzero(r<=-0.097,axis=0)            
+            axs[0].plot(x,um,color="red",label="涨停%d"%(um[-1]))
+            axs[0].plot(x,dm,color="green",label="跌停%d"%(dm[-1]))            
+        elif sel=='涨停热点' or sel=='跌停热点':
+            hots = uhots if sel=='涨停热点' else dhots
+            for category in hots:
+                sr = idd[:,3]==category
+                r = K[sr,:,2]/K[sr,:,3]-1
+                if sel=='涨停热点':
+                    m = np.count_nonzero(r>=0.097,axis=0)
+                else:
+                    m = np.count_nonzero(r<=-0.097,axis=0)
+                if hot==category:
+                    axs[0].plot(x,m,linewidth=3,label=category)
+                else:
+                    axs[0].plot(x,m,linestyle='--',alpha=0.5,label=category)
+        else:
+            #选择分类的涨停和跌停
+            sr = idd[:,3]==sel
+            r = K[sr,:,2]/K[sr,:,3]-1
+            um = np.count_nonzero(r>=0.097,axis=0)
+            dm = np.count_nonzero(r<=-0.097,axis=0)            
+            axs[0].plot(x,um,color="red",label="涨停%d"%(um[-1]))
+            axs[0].plot(x,dm,color="green",label="跌停%d"%(dm[-1]))
+
         axs[0].axvline(len(D)+pos,color="red",linewidth=2,linestyle='--')
         axs[0].set_xticks(xticks)
         axs[0].legend()
         axs[0].grid(True)
         axs[0].set_xlim(0,len(D))  
         plt.setp(axs[0].get_xticklabels(),rotation=20,horizontalalignment='right')
+
         dr = K[:,pos,2]/K[:,pos,3]-1
         def autolabel(rects):
             """Attach a text label above each bar in *rects*, displaying its height."""
@@ -2578,7 +2648,10 @@ def showzdt():
             autolabel(rects1)
             autolabel(rects2)
         else:
-            sr = idd[:,3]==sel
+            if sel=='涨停热点' or sel=='跌停热点':
+                sr = idd[:,3]==hot
+            else:
+                sr = idd[:,3]==sel
             idds = idd[sr]
             R = dr[sr]*100
             for i in range(len(R)):
