@@ -121,14 +121,14 @@ const ucount_fast={
 /**
  * 下载指定公司的kline数据
  */
-function company_kline(id,code,lv,callback){
+function company_kline(id,code,lv,callback,uctable=ucount){
 
     function xueqiuURI(timestamp){
         let uri;
         if(lv=='d')
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${ucount[lv]}&indicator=kline,ma,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${uctable[lv]}&indicator=kline,ma,macd`;
         else
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${ucount[lv]}&indicator=kline,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${uctable[lv]}&indicator=kline,macd`;
         
         return uri;
     }

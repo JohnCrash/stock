@@ -2384,8 +2384,9 @@ def getRT2m(companys):
 
 """
 显示涨停板数和跌停板数量
+bi,ei可以指定数据范围
 """
-def showzdt():
+def showzdt(bi=None,ei=None):
     D = None
     K = None
     hot = None
@@ -2395,8 +2396,8 @@ def showzdt():
     companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
     pos = -1
-    bi = -100
-    ei = -1
+    bii = -100
+    eii = -1
     sel = '全部'
     idd = None
     for com in companys:
@@ -2405,8 +2406,8 @@ def showzdt():
     frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
     slider = widgets.IntSlider(
         value=pos,
-        min=bi,
-        max=ei,
+        min=bii,
+        max=eii,
         step=1,
         description='',
         disabled=False,
@@ -2437,6 +2438,8 @@ def showzdt():
         disabled=False)        
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))           
     output = widgets.Output()
+    output2 = widgets.Output()
+    output3 = widgets.Output()
     box_layout = Layout(display='flex',
                     flex_flow='wrap',
                     align_items='stretch',
@@ -2444,11 +2447,16 @@ def showzdt():
                     width='100%')    
     box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,refreshbutton],layout=box_layout)
     def getData():
-        nonlocal K,D,mode,companys,uhots,dhots
+        nonlocal K,D,mode,companys,uhots,dhots,bi,ei
         if mode == '2分钟':
             D,K = getRT2m(companys)
         else:
-            D,K_ = redisStatusCache50('company_status')
+            if bi is None:
+                D,K_ = redisStatusCache50('company_status')
+            else:
+                if ei is None:
+                    ei=stock.dateString(date.today())
+                D,K_ = getStatusN(bi=bi,ei=ei)
             K = np.zeros((len(K_),len(D),5))
             K[:,:,0] = K_[:,:,0]
             K[:,:,1] = K_[:,:,2]
@@ -2487,14 +2495,14 @@ def showzdt():
         hotsDropdown.options = []
         hotsDropdown.value = None
     def on_prevpos(e):
-        nonlocal pos,bi,ei,slider
+        nonlocal pos,bii,eii,slider
         pos -= 1
-        if pos<bi:
-            pos=bi
+        if pos<bii:
+            pos=bii
         slider.value = pos
         update_zdt()
     def on_nextpos(e):
-        nonlocal pos,bi,ei,slider
+        nonlocal pos,bii,eii,slider
         pos += 1
         if pos>-1:
             pos=-1
@@ -2507,11 +2515,11 @@ def showzdt():
         pos = e['new']
         update_zdt()
     def slider_range(b,e):
-        nonlocal slider,pos,bi,ei
-        bi = b
-        ei = e
-        slider.max = ei
-        slider.min = bi
+        nonlocal slider,pos,bii,eii
+        bii = b
+        eii = e
+        slider.max = eii
+        slider.min = bii
         slider.pos = pos
     def on_category(e):
         nonlocal sel,uhots,dhots
@@ -2543,10 +2551,37 @@ def showzdt():
     backbutton.on_click(on_prevpos)
     frontbutton.on_click(on_nextpos)
     slider.observe(on_sliderChange,names='value')   
-    display(box,output)
+    display(box,output,output2,output3)
+    def clear_output2():
+        nonlocal output2,output3
+        output2.clear_output()
+        output3.clear_output()
+    def on_company(e):
+        nonlocal output3
+        output3.clear_output()
+        with output3:
+            kline.Plote(e.code,'d',config={'index':True},context="实时涨跌",mode="auto").show()
+    def list_output2(names,codes):
+        nonlocal box_layout,output2
+        children = []
+        with output2:
+            for i in range(len(names)):
+                but = widgets.Button(
+                    description=names[i],
+                    disabled=False,
+                    button_style='',
+                    layout=Layout(width='96px')
+                    )
+                but.code = codes[i]
+                but.on_click(on_company)
+                
+                children.append(but)
+        with output2:
+            box = Box(children=children,layout=box_layout)
+            display(box)
     first = True
     def update_zdt():
-        nonlocal output,pos,bi,ei,sel,idd,K,D,mode,uhots,dhots,hot
+        nonlocal output,pos,bii,eii,sel,idd,K,D,mode,uhots,dhots,hot
 
         slider_range(-len(D)+1,-1)
 
@@ -2647,6 +2682,7 @@ def showzdt():
             rects2 = axs[1].bar(x + width/2, dms, width, color='green',label='跌停') 
             autolabel(rects1)
             autolabel(rects2)
+            clear_output2()
         else:
             if sel=='涨停热点' or sel=='跌停热点':
                 sr = idd[:,3]==hot
@@ -2656,11 +2692,14 @@ def showzdt():
             R = dr[sr]*100
             for i in range(len(R)):
                 rate = R[i]
-                S.append((idds[i,2],rate if rate>0 else 0,rate if rate<0 else 0))
+                S.append((idds[i,2],rate if rate>0 else 0,rate if rate<0 else 0,idds[i,1]))
             SS = sorted(S,key=lambda it:it[1]+it[2],reverse=True)
             labels = getcols(SS,0)
             ums = getcols(SS,1)
             dms = getcols(SS,2)
+            codes = getcols(SS,3)
+            clear_output2()
+            list_output2(labels,codes)
             x = np.arange(len(labels))  # the label locations
             width = 0.2  # the width of the bars
             rects1 = axs[1].bar(x, ums, 0.9, color='red', label='涨跌分布')

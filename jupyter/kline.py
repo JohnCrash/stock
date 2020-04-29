@@ -1014,7 +1014,76 @@ class Plote:
             periodDropdownvalue = '周线'
             indexDropdownvalue = 'MACD+'
             mainDropdownvalue = 'BOLL+' 
-
+        def config_index(sel):
+            if sel=='MACD+':
+                self.enable('macd')
+                self.enable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+            elif sel=='KDJ+':
+                self.disable('macd')
+                self.enable('energy')
+                self.enable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+            elif sel=='MACD+Best':
+                self.enable('macd')
+                self.enable('energy')
+                self.disable('kdj')
+                self.enable('best')
+                self.disable('bollwidth')
+            elif sel=='MACD+BollWidth':
+                self.enable('macd')
+                self.enable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.enable('bollwidth')
+            elif sel=='MACD':
+                self.enable('macd')
+                self.disable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')                
+            elif sel=='CLEAR':
+                self.disable('macd')
+                self.disable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+            self.config()    
+        def config_main(sel):
+            if sel=='BOLL+':
+                self.enable('boll')
+                self.enable('trend')
+                self.disable('ma')
+            elif sel=='MA':
+                self.enable('ma')
+                self.disable('boll')
+                self.disable('trend')
+                self._config['ma'] = [5,10,20,30,60]
+            elif sel=='BOLL':
+                self.enable('boll')
+                self.disable('trend')
+                self.disable('ma')
+            elif sel=='TREND':
+                self.disable('boll')
+                self.enable('trend')
+                self.enable('ma')
+                self._config['ma'] = [5,10,20]
+            elif sel=='CLEAR':
+                self.disable('boll')
+                self.disable('trend')
+                self.disable('ma')
+            self.config()                     
+        b,main_sel = shared.fromRedis('kline.main')
+        if b and mainDropdownvalue != main_sel:
+            mainDropdownvalue = main_sel
+            config_main(main_sel)
+        b,index_sel = shared.fromRedis('kline.index')
+        if b and indexDropdownvalue != index_sel:
+            indexDropdownvalue = index_sel
+            config_index(index_sel)
         mainDropdown = widgets.Dropdown(
             options=['BOLL+','MA','BOLL','TREND','CLEAR'],
             value=mainDropdownvalue,
@@ -1216,77 +1285,22 @@ class Plote:
                     self._trendHeadPos = endPT-1
             setSlider(beginPT,endPT,self._trendHeadPos)
         needRecalcRange = False
+
         def on_index(e):
             sel = e['new']
-            if sel=='MACD+':
-                self.enable('macd')
-                self.enable('energy')
-                self.disable('kdj')
-                self.disable('best')
-                self.disable('bollwidth')
-            elif sel=='KDJ+':
-                self.disable('macd')
-                self.enable('energy')
-                self.enable('kdj')
-                self.disable('best')
-                self.disable('bollwidth')
-            elif sel=='MACD+Best':
-                self.enable('macd')
-                self.enable('energy')
-                self.disable('kdj')
-                self.enable('best')
-                self.disable('bollwidth')
-            elif sel=='MACD+BollWidth':
-                self.enable('macd')
-                self.enable('energy')
-                self.disable('kdj')
-                self.disable('best')
-                self.enable('bollwidth')
-            elif sel=='MACD':
-                self.enable('macd')
-                self.disable('energy')
-                self.disable('kdj')
-                self.disable('best')
-                self.disable('bollwidth')                
-            elif sel=='CLEAR':
-                self.disable('macd')
-                self.disable('energy')
-                self.disable('kdj')
-                self.disable('best')
-                self.disable('bollwidth')
-            self.config()
+            shared.toRedis(sel,'kline.index')
+            config_index(sel)
             nonlocal needRecalcRange
             if needRecalcRange:
                 recalcRange()
                 needRecalcRange = False
             showline()            
         indexDropdown.observe(on_index,names='value')
-
+           
         def on_main(e):
             sel = e['new']
-            if sel=='BOLL+':
-                self.enable('boll')
-                self.enable('trend')
-                self.disable('ma')
-            elif sel=='MA':
-                self.enable('ma')
-                self.disable('boll')
-                self.disable('trend')
-                self._config['ma'] = [5,10,20,30,60]
-            elif sel=='BOLL':
-                self.enable('boll')
-                self.disable('trend')
-                self.disable('ma')
-            elif sel=='TREND':
-                self.disable('boll')
-                self.enable('trend')
-                self.enable('ma')
-                self._config['ma'] = [5,10,20]
-            elif sel=='CLEAR':
-                self.disable('boll')
-                self.disable('trend')
-                self.disable('ma')
-            self.config()
+            shared.toRedis(sel,'kline.main')
+            config_main(sel)
             showline()
 
         mainDropdown.observe(on_main,names='value')           

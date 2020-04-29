@@ -70,4 +70,4 @@ print("开始更新数据库...")
 status.update_status(process)
 print("更新完成。") 
 """
-status.showzdt()
+status.showzdt(bi='2019-01-02',ei='2019-10-01')
