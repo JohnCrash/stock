@@ -617,7 +617,7 @@ def downloadRT(tasks,progress):
         if b1:
             b0,p0 = shared.numpyFromRedis("rt%d"%ts0) #昨天相同时刻
             if b0:
-                v0 = p0[:,1]
+                v0 = p0[:,2]
             else:
                 v0 = np.zeros(len(p1)) #简单线性处理
             tv = get_tvol(t)
@@ -630,14 +630,14 @@ def downloadRT(tasks,progress):
                     i = idd2inx[it[1][0]]
                     k = it[0]
                     if v0[i]>0:
-                        vol =  p1[i,1]*k[-1,2]/v0[i] #这里使用昨天全天的和昨天该时刻的来预测全天的量
+                        vol =  p1[i,2]*k[-1,2]/v0[i] #这里使用昨天全天的和昨天该时刻的来预测全天的量
                     else:
-                        vol = p1[i,1]/tv #使用今天的量仅仅使用分布来推测全天的量
+                        vol = p1[i,2]/tv #使用今天的量仅仅使用分布来推测全天的量
                     if vol>10*k[-1,2]: #别太大
                         vol = 10*k[-1,2]
                     elif vol<0:
                         vol = 0
-                    clos = p1[i,5]
+                    clos = p1[i,6]
                     A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0]]))
                     #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
                     A[-1,4] = stock.macdV(A[:,1])[-1] #macd
@@ -655,6 +655,7 @@ def downloadRT(tasks,progress):
                     count+=1 
     progress(100)        
     return result
+  
 """
 dd = 最后一个数据的时间点
 period = 'd','w'

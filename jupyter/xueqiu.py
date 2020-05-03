@@ -267,7 +267,7 @@ def updateAllRT(ThreadCount=10):
     lastUpdateFlow = -1
     while t.hour>=6 and t.hour<15:
         if stock.isTransTime():
-            #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close]
+            #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close,7 yesterday_close,8 today_open]
             seqs.append(math.floor(time.time()*1000*1000))
             for i in range(0,len(coms),100):
                 l = i+100
