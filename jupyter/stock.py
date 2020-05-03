@@ -112,7 +112,7 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
     
     if len(company)==0:
         print('数据库中没有该股票:',code)
-        return (code,code,code),np.array([]).reshape(-1,5),()
+        return (code,code,code),np.array([]),()
     if period=='d':
         if after is None:
             data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))

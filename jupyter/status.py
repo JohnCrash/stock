@@ -2558,7 +2558,7 @@ def showzdt(bi=None,ei=None):
         output3.clear_output()
     def on_company(e):
         nonlocal output3
-        output3.clear_output()
+        output3.clear_output(wait=True)
         with output3:
             kline.Plote(e.code,'d',config={'index':True},context="实时涨跌",mode="auto").show()
     def list_output2(names,codes):

@@ -70,4 +70,9 @@ print("开始更新数据库...")
 status.update_status(process)
 print("更新完成。") 
 """
-status.showzdt(bi='2019-01-02',ei='2019-10-01')
+#status.showzdt(bi='2019-01-02',ei='2019-10-01')
+b,seqs = shared.fromRedis('runtime_sequence')
+for s in seqs:
+    b,p = shared.numpyFromRedis("rt%d"%s)
+    if b:
+        shared.numpyToRedis(p,"rt%d"%s,ex=4*24*3600)
