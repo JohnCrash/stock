@@ -313,7 +313,9 @@ def rsi(k,n=6):
     U[U<0] = 0
     D[D>0] = 0
     D = np.abs(D)
-    RSI = emaV(U,n)/(emaV(U,n)+emaV(D,n))
+    F = emaV(U,n)+emaV(D,n)
+    F[F==0] = 1
+    RSI = emaV(U,n)/F
     RSI[RSI>1] = 1
     result = np.empty(len(k))
     result[0] = 50

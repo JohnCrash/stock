@@ -64,7 +64,7 @@ def allCategory():
     return _all_category
 
 #见数据插入到company_status表
-def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd):
+def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,rsi,idd):
     if len(k)>0:
         qs = ""
         for i in range(len(k)):
@@ -72,9 +72,9 @@ def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd):
             try:
                 macd = 0 if k[i][3] is None else k[i][3]
                 if i!=len(k)-1:
-                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f),"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd,energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i])
+                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f),"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd,energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
                 else:
-                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd,energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i])
+                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd,energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
             except Exception as e:
                 print(e)
                 print(k[i])
@@ -82,25 +82,25 @@ def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd):
         stock.execute("insert ignore into company_status values %s"%(qs))
 
 #bi是更新点-1插入全部
-def update_company_status_week(cid,k,macd,vma20,energy,volumeJ,boll,bollw,idd,bi):
+def update_company_status_week(cid,k,macd,vma20,energy,volumeJ,boll,bollw,rsi,idd,bi):
     if len(k)>0:
         #下面更新接头部分的值
         i = bi
         if bi>0:
-            qs = "update company_status_week set close=%f,volume=%f,macd=%f,volumema20=%f,energy=%f,volumeJ=%f,bollup=%f,bollmid=%f,bolldn=%f,bollw=%f where id=%d and date='%s'"%\
-            (k[i][4],k[i][0],macd[i],vma20[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],cid,stock.dateString(idd[i][0]))
+            qs = "update company_status_week set close=%f,volume=%f,macd=%f,volumema20=%f,energy=%f,volumeJ=%f,bollup=%f,bollmid=%f,bolldn=%f,bollw=%f,rsi=%f where id=%d and date='%s'"%\
+            (k[i][4],k[i][0],macd[i],vma20[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],ris[i],cid,stock.dateString(idd[i][0]))
             stock.execute(qs)
 
         #下面是插入新的值
         if bi+1<len(k):
             qs = ""
             for i in range(bi+1,len(k)):
-                #id , date , close , volume , macd , volumema20 , energy , voluemJ, bollup , bollmid, bolldn , bollw
+                #id , date , close , volume , macd , volumema20 , energy , voluemJ, bollup , bollmid, bolldn , bollw , rsi
                 #k0 volume,1 open,2 high,3 low,4 close
                 if i!=len(k)-1:
-                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f),"""%(cid,stock.dateString(idd[i][0]),k[i][4],k[i][0],macd[i],vma20[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i])
+                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f),"""%(cid,stock.dateString(idd[i][0]),k[i][4],k[i][0],macd[i],vma20[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
                 else:
-                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)"""%(cid,stock.dateString(idd[i][0]),k[i][4],k[i][0],macd[i],vma20[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i])
+                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)"""%(cid,stock.dateString(idd[i][0]),k[i][4],k[i][0],macd[i],vma20[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
             stock.execute("insert ignore into company_status_week values %s"%(qs))
 
 #依据完整数据更新
@@ -112,7 +112,8 @@ def update_company_status_all_data(idk,idd):
     volumeJ = stock.kdj(k[:,1])[:,2]
     boll = stock.boll(k[:,2])
     bollw = stock.bollWidth(boll)
-    insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd)
+    rsi = stock.rsi(k[:,2])
+    insert_company_status(k,vma20,energy,volumeJ,boll,bollw,rsi,idd)
 
 #依据增量数据更新
 def update_company_status_delta_data(idk,idd):
@@ -123,10 +124,11 @@ def update_company_status_delta_data(idk,idd):
     volumeJ = stock.kdj(k[:,1])[:,2]
     boll = stock.boll(k[:,2])
     bollw = stock.bollWidth(boll)
+    rsi = stock.rsi(k[:,2])
     if len(k)>PROD:
-        insert_company_status(k[PROD+1:],vma20[PROD+1:],energy[PROD+1:],volumeJ[PROD+1:],boll[PROD+1:],bollw[PROD+1:],idd[PROD+1:])
+        insert_company_status(k[PROD+1:],vma20[PROD+1:],energy[PROD+1:],volumeJ[PROD+1:],boll[PROD+1:],bollw[PROD+1:],rsi[PROD+1:],idd[PROD+1:])
     else:
-        insert_company_status(k,vma20,energy,volumeJ,boll,bollw,idd)
+        insert_company_status(k,vma20,energy,volumeJ,boll,bollw,rsi,idd)
 
 #可以从一个起点日期使用增量进行更新，或者更新全部数据
 def update_status_begin(beginday,isall,progress):
@@ -277,9 +279,10 @@ def update_status_week(progress):
         volumeJ = stock.kdj(WK[:,0])[:,2]
         boll = stock.boll(WK[:,4])
         bollw = stock.bollWidth(boll)
+        rsi = stock.rsi(WK[:,4])
         #将周数据更新到company_status_week表中
         #相等部分更新，后面部分插入
-        update_company_status_week(key,WK,macd,volumema20,energy,volumeJ,boll,bollw,wd,bi)
+        update_company_status_week(key,WK,macd,volumema20,energy,volumeJ,boll,bollw,rsi,wd,bi)
     progress(90)
     #全部更新完成写入最新的更新日期
     stock.execute("update data set status_week_update='%s' where id=1"%(lastday[0][0]))
@@ -575,6 +578,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             A[-1,8] = bo[1] #bollmid
             A[-1,9] = bo[0] #bolldn
             A[-1,10] = stock.bollWidth(boll)[-1] #bollw
+            A[-1,11] = stock.rsi(A[:,1]) #rsi
             k = A
             final_results.append((k,c))
     return final_results 
@@ -639,7 +643,7 @@ def downloadRT(tasks,progress):
                         vol = 0
                     clos = p1[i,6]
                     A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0]]))
-                    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
+                    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi
                     A[-1,4] = stock.macdV(A[:,1])[-1] #macd
                     A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
                     A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
@@ -649,13 +653,20 @@ def downloadRT(tasks,progress):
                     A[-1,8] = bo[1] #bollmid
                     A[-1,9] = bo[0] #bolldn
                     A[-1,10] = stock.bollWidth(boll)[-1] #bollw
+                    A[-1,11] = stock.rsi(A[:,1]) #rsi
                     k = A    
                     result.append((k,it[1]))
                     progress(count/len(tasks))
                     count+=1 
     progress(100)        
     return result
-  
+
+"""
+搜索符合条件的股票
+
+"""
+def search():
+    pass
 """
 dd = 最后一个数据的时间点
 period = 'd','w'

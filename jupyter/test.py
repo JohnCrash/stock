@@ -70,6 +70,8 @@ print("开始更新数据库...")
 status.update_status(process)
 print("更新完成。") 
 """
+
+'''
 #status.showzdt(bi='2019-01-02',ei='2019-10-01')
 companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
 id2companys = {}
@@ -99,3 +101,4 @@ for k in cl:
     print(k,'\t',len(cl[k]))
     for c in cl[k]:
         print('\t',c)
+'''
