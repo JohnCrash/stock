@@ -15,7 +15,8 @@ from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
 import kline
 import math
-
+import subprocess
+import threading
 """
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
@@ -102,3 +103,14 @@ for k in cl:
     for c in cl[k]:
         print('\t',c)
 '''
+
+subprocess.run(['d:/test.bat'])
+print('DONE!')
+
+"""
+r = status.search(status.cb_rsi_left_buy)
+for k in r:
+    print(k,' ',len(r[k]))
+    for c in r[k]:
+        print('\t',c)
+"""        

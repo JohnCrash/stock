@@ -314,11 +314,11 @@ def redisStatusCache50(db):
         d = stock.query("""select date from %s where id=8828 order by date desc limit 50"""%(db))
         d = list(d)
         d.reverse()
-        cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
+        cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw,rsi from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
         r = stock.query("""select count(*) from company""")
         n = r[0][0] #公司数量
         dn = len(d)
-        a = np.ones((n,dn,11))
+        a = np.ones((n,dn,12))
         lastid = -1
         nc = -1
         temp = []
@@ -567,7 +567,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
                     xueqiu.logCheckResult(c[1],15,k[-1],k0)
 
             idd = c[0]
-            A = np.vstack((k,[[idd,k1[4],k1[0],0,0,0,0,0,0,0,0]]))
+            A = np.vstack((k,[[idd,k1[4],k1[0],0,0,0,0,0,0,0,0,0]]))
             #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
             A[-1,4] = stock.macdV(A[:,1])[-1] #macd
             A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
@@ -578,7 +578,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             A[-1,8] = bo[1] #bollmid
             A[-1,9] = bo[0] #bolldn
             A[-1,10] = stock.bollWidth(boll)[-1] #bollw
-            A[-1,11] = stock.rsi(A[:,1]) #rsi
+            A[-1,11] = stock.rsi(A[:,1])[-1] #rsi
             k = A
             final_results.append((k,c))
     return final_results 
@@ -600,9 +600,18 @@ def get_tvol(t):
             return voltv[i]
     return 1
 
-def downloadRT(tasks,progress):
+"""
+输入：
+tasks[0] = [0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw]...
+tasks[1] = [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]...
+返回的形式和输入一样，只不过是将当前的数据进行了补全
+return [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw]...,
+        [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]...]
+"""
+def downloadRT(tasks,progress=None):
     result = []
-    progress(0)
+    if progress is not None:
+        progress(0)
     b,seqs = shared.fromRedis('runtime_sequence')
     if b:
         ts1 = seqs[-1]
@@ -642,7 +651,7 @@ def downloadRT(tasks,progress):
                     elif vol<0:
                         vol = 0
                     clos = p1[i,6]
-                    A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0]]))
+                    A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0,0]]))
                     #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi
                     A[-1,4] = stock.macdV(A[:,1])[-1] #macd
                     A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
@@ -653,20 +662,100 @@ def downloadRT(tasks,progress):
                     A[-1,8] = bo[1] #bollmid
                     A[-1,9] = bo[0] #bolldn
                     A[-1,10] = stock.bollWidth(boll)[-1] #bollw
-                    A[-1,11] = stock.rsi(A[:,1]) #rsi
+                    A[-1,11] = stock.rsi(A[:,1])[-1] #rsi
                     k = A    
                     result.append((k,it[1]))
-                    progress(count/len(tasks))
+                    if progress is not None:
+                        progress(count/len(tasks))
                     count+=1 
-    progress(100)        
+    if progress is not None:
+        progress(100)        
     return result
+
+_id2companys_ = None
+_companys_ = None
+def get_id2companys():
+    global _id2companys_,_companys_
+    if _id2companys_ is None:
+        _companys_ = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+        _id2companys_ = {}
+        for c in _companys_:
+            _id2companys_[c[0]] = c
+    return _id2companys_,_companys_
+
+#search回调macd能量线双崛起 
+def cb_macd_energy_buy(a,c,d=None):
+    dMACD = a[-1,4]-a[-2,4]
+    #macd在零轴附件（预计2日穿过或者已经穿过2日）,股价涨,能量线崛起
+    if dMACD>0 and a[-1,1]-a[-2,1]>0 and a[-1,5]>=3 and a[-2,5]<3:
+        if (a[-1,4]<0 and a[-1,4]+2*dMACD>0) or (a[-1,4]>0 and a[-1,4]-2*dMACD<0):
+            return True
+    return False
+
+def cb_rsi_left_buy(a,c,d=None):
+    return a[-1,11]<=20
+
+def cb_rsi_left_sell(a,c,d=None):
+    return a[-1,11]>=80
+
+def cb_volumeJ_left_buy(a,c,d=None):
+    return a[-1,6]<=5
+
+def cb_volumeJ_left_sell(a,c,d=None):
+    return a[-1,6]>=95
+
+def cb_rsi_right_buy(a,c,d=None):
+    return a[-2,11]<=20 and a[-1,11]>20
+
+def cb_rsi_right_sell(a,c,d=None):
+    return a[-2,11]>=80 and a[-1,11]<80
+
+def cb_volumeJ_right_buy(a,c,d=None):
+    return a[-2,6]<=5 and a[-1,6]>5
+
+def cb_volumeJ_right_sell(a,c,d=None):
+    return a[-2,6]>=95 and a[-1,6]<95
 
 """
 搜索符合条件的股票
-
+method(k,c,d) 搜索方法
+k [0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi]
+c [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]
+d [date]
+返回按分类符合条件的集合
+{category:[[0 company_id,1 code,2 name,3 category,4 ttm,5 pb],]}
 """
-def search():
-    pass
+def search(method,category=None):
+    d,a = redisStatusCache50('company_status')
+    id2companys,_ = get_id2companys()
+    tasks = []
+    results = []
+    isNotDownloadK = date.today()!=d[-1][0]
+    if stock.isTransTime() or isNotDownloadK:
+        dd = d+[(date.today(),)]
+    else:
+        dd = d
+    for i in range(len(a)):
+        c = a[i]
+        idd = int(c[-1][0])
+        #反转数组的前后顺序，反转后-1代表最近的数据
+        k = c#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw,11 rsi
+        if idd in id2companys and (category is None or id2companys[idd][3]==category):
+            if stock.isTransTime() or isNotDownloadK: #将当日数据叠加进数据中
+                tasks.append((k,id2companys[idd]))
+            else:
+                results.append((k,id2companys[idd]))
+
+    if len(tasks)>0:
+        results = downloadRT(tasks)                
+    r = {}
+    for it in results:
+        b = method(it[0],it[1],dd)
+        if b:
+            if it[1][3] not in r:
+                r[it[1][3]] = []
+            r[it[1][3]].append(it[1])
+    return r     
 """
 dd = 最后一个数据的时间点
 period = 'd','w'
@@ -893,15 +982,11 @@ def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
 
     #可以提前准备的数据
     categorys = stock.query("""select id,name from category""")
-    companys = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+    id2companys,companys = get_id2companys()
     if bi is not None:
         dates = stock.query("select date from %s where id=8828 and date>='%s' and date<='%s' order by date desc"%('company_status' if period=='d' else 'company_status_week',bi,ei))
     else:
         dates = stock.query('select date from %s where id=8828 order by date desc limit 50'%('company_status' if period=='d' else 'company_status_week'))
-
-    id2companys = {}
-    for c in companys:
-        id2companys[c[0]] = c
     
     prevClickButton = None
     prevClickButtonStyle = None
@@ -1037,8 +1122,41 @@ def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
         but.on_click(onCatsList)
         items.append(but)
 
+    methodDropdown = widgets.Dropdown(
+        options=['双崛起买点','RSI左买点','RSI右买点','volumeJ左买点','volumeJ右买点']+['自定义'] if cb is not None else [],
+        value='自定义' if cb is not None else '双崛起',
+        description='搜索算法',
+        layout=Layout(display='block',width='296px'),
+        disabled=False)
+    custom_cb = cb
+    def wrap(func):
+        def ccb(a,c,itd):
+            if func(a,c):
+                return True,[{'x':[-1],'color':'magenta','linestyle':'--','linewidth':2}]
+            else:
+                return False,[]
+        return ccb
+    def on_selectmethod(e):
+        nonlocal cb,custom_cb
+        sel = e['new']
+        if sel=='双崛起买点':
+            cb = wrap(cb_macd_energy_buy)
+        elif sel=='RSI左买点':
+            cb = wrap(cb_rsi_left_buy)
+        elif sel=='RSI右买点':
+            cb = wrap(cb_rsi_right_buy)
+        elif sel=='volumeJ左买点':
+            cb = wrap(cb_volumeJ_left_buy)
+        elif sel=='volumeJ右买点':
+            cb = wrap(cb_volumeJ_right_buy)
+        elif sel=='自定义':
+            cb = custom_cb
+
+    methodDropdown.observe(on_selectmethod,names='value')
+
     box = Box(children=items, layout=box_layout)
-    display(box,output)
+    toolbox = Box(children=[methodDropdown], layout=box_layout)
+    display(toolbox,box,output)
 
     def updatek15():
         nonlocal today_but
