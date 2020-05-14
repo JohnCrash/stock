@@ -56,7 +56,8 @@
             "type": "node",
             "request": "launch",
             "name": "test js",
-            "program": "${workspaceFolder}\\download_script\\test.js"
+            "program": "${workspaceFolder}\\download_script\\addstock.js",
+            "args": ["BK0608","水泥"]
         },        
         {
             "type": "python",

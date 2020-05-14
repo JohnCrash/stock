@@ -2411,7 +2411,7 @@ def showflow(name=None):
             for i in range(4*60):
                 if i%10==0:
                     xticks.append(i)
-
+            xticks.append(len(a)-1)
             axs.xaxis.set_major_formatter(MyFormatterRT(dd))
             axs.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(d[-1,1]/1e8))
             axs.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(d[-1,2]/1e8))

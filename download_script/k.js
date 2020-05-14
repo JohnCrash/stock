@@ -189,7 +189,7 @@ function companys_task_continue(itemStr,n,task){
 }
 
 function query(querys){
-    let queryArray = (typeof(query)==='object' && query.length) ? query : arguments;
+    let queryArray = (typeof(querys)==='object' && query.length) ? querys : arguments;
     return new Promise((resolve,reject)=>{
         let tasks = [];
         for(let str of queryArray){

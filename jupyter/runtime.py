@@ -13,7 +13,7 @@ def jupyter():
 def jupyter_https():
     subprocess.run(['jupyter','lab'],cwd='d:\\source\\stock\\jupyter\\config')
 threading.Thread(target=jupyter).start()
-threading.Thread(target=jupyter_https).start()
+#threading.Thread(target=jupyter_https).start()
 
 t = datetime.today()
 while t.hour<15:

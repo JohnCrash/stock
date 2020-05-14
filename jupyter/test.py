@@ -103,9 +103,10 @@ for k in cl:
     for c in cl[k]:
         print('\t',c)
 '''
-
-subprocess.run(['d:/test.bat'])
-print('DONE!')
+xueqiu.sinaFlowRT()
+status.saveflow() 
+#subprocess.run(['d:/test.bat'])
+#print('DONE!')
 
 """
 r = status.search(status.cb_rsi_left_buy)

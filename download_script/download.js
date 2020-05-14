@@ -7,7 +7,7 @@ const {research_k15} = require('./research_k15');
 const {xueqiu_company_aysnc} = require('./xueqiu_aync');
 const async = require('async');
 const process = require('process');
-const kline = [5,15,60,'d'];
+const kline = [5,'d'];
 
 download_kline(kline,(err)=>{
     if(err)
