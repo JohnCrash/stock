@@ -12,6 +12,7 @@ import threading
 import stock
 import mylog
 import asyncio
+import config
 
 class Timer:
     def __init__(self, timeout, callback):
@@ -33,7 +34,7 @@ def xueqiuJson(url,timeout=None):
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
-            'Cookie':'_ga=GA1.2.528987204.1555945543; xq_a_token.sig=71HQ_PXQYeTyQvRDRGXoyAI8Cdg; xq_r_token.sig=QUTS2bLrXGdbA80soO-wu-fOBgY; snbim_minify=true; device_id=c8a242cd517399e92fd6562fe3c117c8; s=cx12eqso7r; bid=693c9580ce1eeffbf31bb1efd0320f72_k9ifcem7; Hm_lvt_1db88642e346389874251b5a1eded6e3=1588479908,1588497324,1588500208,1588725333; remember=1; xq_a_token=5e8099ac0db1c598a4f5a6e387ce8b475b55907d; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOjY2MjU1ODA1MzMsImlzcyI6InVjIiwiZXhwIjoxNTkxMzE5NTQ5LCJjdG0iOjE1ODg3Mjc1NDk3NjAsImNpZCI6ImQ5ZDBuNEFadXAifQ.BxX9yHSOGmay23lKFDds6HCph2yoDFNbakT-KXDIcVf9-RdY-nSdTHwecvJIx5GeUKqL0yQACue8E7rdb_mWu2srL21IB-A38q2mXdQldd6hFlMnCf_YC1nmKy-D9VeWcG0i1kBdMxN_FJU5Ec9gq9Kz8skKd0KkIzmEpKVTo7TXpdH3KGUYEi30Peo8byzLGr1-jfI6cFDZOH2Ari5xcftDyKX1m6katCCVhax2WBvnVyVstgdR6ARDcXobYj8TUgA04ad87-MzHUN9hxWDFG2DnUW71JkSJylD6AKj08Uel7fG5Z8RohLpTTPf3xI0PVjtkzW4QDVIbpPuQlf8yQ; xqat=5e8099ac0db1c598a4f5a6e387ce8b475b55907d; xq_r_token=7d0878951d8ea7e00bba60070b2f3616df9c6198; xq_is_login=1; u=6625580533; is_overseas=0; Hm_lpvt_1db88642e346389874251b5a1eded6e3=1588727553'}
+            'Cookie':config.xueqiu_cookie}
     if timeout is None:
         r = s.get(url,headers=headers)
     else:

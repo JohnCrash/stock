@@ -3,6 +3,7 @@ import numpy as np
 import math
 from datetime import date,datetime
 import shared
+import config
 
 def isTransTime(t=None):
     if t is None:
@@ -18,7 +19,7 @@ gdb = None
 def opendb():
     global gdb
     if gdb is None:
-        gdb = MySQLdb.connect("localhost", "root", "789", "stock", charset='utf8',port=3307 )
+        gdb = MySQLdb.connect("localhost", config.mysql_user, config.mysql_pwd, "stock", charset='utf8',port=config.mysql_port )
 
 def closedb():
     global gdb
