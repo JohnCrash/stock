@@ -4,14 +4,14 @@ from datetime import datetime
 import time
 import subprocess
 import threading
+import config
 #import os
 
-#os.chdir('d:/source/stock')
 def jupyter():
-    subprocess.run(['jupyter','lab'],cwd='d:\\source\\stock\\jupyter')
+    subprocess.run(['jupyter','lab'])
 
-def jupyter_https():
-    subprocess.run(['jupyter','lab'],cwd='d:\\source\\stock\\jupyter\\config')
+#def jupyter_https():
+#    subprocess.run(['jupyter','lab'],cwd='d:\\source\\stock\\jupyter\\config')
 threading.Thread(target=jupyter).start()
 #threading.Thread(target=jupyter_https).start()
 
@@ -33,7 +33,7 @@ while True:
         status.saveflow()      
         print("开始从雪球下载数据")
         for i in range(3):
-            r = subprocess.run(['node','d:/source/stock/download_script/download.js'])
+            r = subprocess.run(['node',config.download_js])
             if r.returncode==0:
                 break
         print("开始更新数据库...")
