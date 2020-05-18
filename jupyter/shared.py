@@ -1,7 +1,6 @@
 """
 使用redis在多个python间共享数据
 """
-import struct
 import redis
 import numpy as np
 import pickle
