@@ -228,7 +228,7 @@ def clearAllRT():
         shared.delKey('runtime_sequence')
         shared.delKey('runtime_update')
 #更新全部数据
-def updateAllRT(ThreadCount=10):
+def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     b,_ = shared.fromRedis('runtime_update')
     if b:
         print('更新程序已经在运行了')
