@@ -257,10 +257,10 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     break
             except Exception as e:
                 log.error("updateAllRT updateRT:"+e)
-            
-        lock.acquire()
-        count-=1
-        lock.release()
+        if ThreadCount>1:
+            lock.acquire()
+            count-=1
+            lock.release()
     b,seqs = shared.fromRedis('runtime_sequence')
     if not b:
         seqs = []
@@ -275,12 +275,15 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                 if l>len(coms):
                     l = len(coms)
                 plane[i:l,0] = idds[i:l]
-                threading.Thread(target=updateRT,args=((coms[i:l],plane[i:l,1:],math.floor(i/100)))).start()
-                lock.acquire()
-                count+=1
-                lock.release()
-                while count>=ThreadCount:
-                    time.sleep(.1)
+                if ThreadCount>1:
+                    threading.Thread(target=updateRT,args=((coms[i:l],plane[i:l,1:],math.floor(i/100)))).start()
+                    lock.acquire()
+                    count+=1
+                    lock.release()
+                    while count>=ThreadCount:
+                        time.sleep(.1)
+                else:
+                    updateRT(coms[i:l],plane[i:l,1:],math.floor(i/100))
             while count>0:
                 time.sleep(.1)
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=4*24*3600)
