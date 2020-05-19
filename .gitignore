@@ -9,3 +9,4 @@ jupyter/config/
 *.log
 *.ipynb
 jupyter/config.py
+download_script/config.js
