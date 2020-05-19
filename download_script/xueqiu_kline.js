@@ -250,6 +250,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
         nextdate = Date.now();
         c.queue({
             uri:xueqiuURI(nextdate),
+            jQuery: false,
             headers:{
                 Cookie:xuequeCookie,
                 Accept:'application/json, text/plain, */*'
