@@ -1004,7 +1004,7 @@ def appendK(code,period,k,d):
         #=======================================================        
     else:
         return False,k,d
-    if b:
+    if b and len(d)>0:
         bi = -1
         for i in range(len(nd)-1,-1,-1):
             if d[-1][0]==nd[i][0]:
