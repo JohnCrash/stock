@@ -15,6 +15,7 @@ from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
 import kline
 import math
+import config
 import subprocess
 import threading
 """
@@ -117,8 +118,21 @@ for k in r:
     for c in r[k]:
         print('\t',c)
 """        
+"""
 s = requests.session()
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
         'Accept-Encoding': 'gzip, deflate'}
 r = s.get('https://xueqiu.com/',headers=headers)    
-print(r)    
+if r.status_code==200:
+    cookie = ""
+    for it in r.cookies:
+        if cookie != "":
+            cookie += "; "
+        cookie += "%s=%s"%(it.name,it.value)
+"""        
+#2020-5-24 18:30 产生的cookie
+#过期 2020-05-24 18:33:23
+#看看此cookie什么时候过期
+config.xueqiu_cookie = "u=181590314603123; xq_a_token=328f8bbf7903261db206d83de7b85c58e4486dda; xq_id_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1aWQiOi0xLCJpc3MiOiJ1YyIsImV4cCI6MTU5MTg0Mjc0NiwiY3RtIjoxNTkwMzE0NTcyMTc2LCJjaWQiOiJkOWQwbjRBWnVwIn0.hYulk1CAui6ZwGsAWT1-UNsExLyGpL-932q-EOvHmD4xWD6PZ8PEFwR1AvV1EJF2qpTmbgJARCP4pYEaov6_q32tOfdMogouuC42S6VSXRH8_kij1ZJ5Czo2_5obrnGRAfSopgbqXtQryGVnq7AuaU8hRhpHOHaHKAs6WsHYRYFpKzM8oou_QcGjmf9aRjfoh8B08ANa8qe6I_jc9Alase6E14nMuBkYVIv3ZERRNjV6g-32aO8og_wDmUnbIInG_qgtmrdDh8jf1yrnHpM6yj-oI0F5Cd1V77nhRiyHuwk1zxIHMkJsN_sNcyExb0-w8J7ru1V2sBLiXl6SBuGh3g; xq_r_token=22ab4927b9acb2a02a4efefe14ccbbc589e007cb; xqat=328f8bbf7903261db206d83de7b85c58e4486dda; acw_tc=2760825015903146031176766e4babd51f2c70e7d445cc809b41e549210145; aliyungf_tc=AQAAAJn5gzfUtwEA4PCD3pBqgWAE3771"
+b,k = xueqiu.xueqiuK('SZ399001',5,96)
+print(b,k)

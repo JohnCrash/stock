@@ -29,6 +29,21 @@ class Timer:
 
 log = mylog.init('download_stock.log',name='xueqiu')
 
+#获取xueqiu网站的cookie
+def xueqiuCookie():
+    s = requests.session()
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+            'Accept-Encoding': 'gzip, deflate'}
+    r = s.get('https://xueqiu.com/',headers=headers)    
+    if r.status_code==200:
+        cookie = ""
+        for it in r.cookies:
+            if cookie != "":
+                cookie += "; "
+            cookie += "%s=%s"%(it.name,it.value)
+        return True,cookie
+    else:
+        False,r.reason
 
 def xueqiuJson(url,timeout=None):
     s = requests.session()
