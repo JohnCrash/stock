@@ -1,3 +1,4 @@
+import stock
 import xueqiu
 import status
 from datetime import datetime
@@ -22,14 +23,14 @@ if platform.platform()[:7]=='Windows':
 
 while True:
     t = datetime.today()
-    if t.hour>=9 and t.hour<15:
+    if t.hour>=9 and t.hour<15 and stock.isTransDay():
         try:
             xueqiu.updateAllRT()
             time.sleep(1)
         except Exception as e:
             log.error(str(e))
             print(e)
-    elif t.hour==15 and t.day!=download_done_day:
+    elif t.hour==15 and t.day!=download_done_day and stock.isTransDay():
         print("5分钟后开始更新数据库...")
         time.sleep(5*60)
         print("保存资金流向到数据库...")

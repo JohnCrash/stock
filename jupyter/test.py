@@ -9,7 +9,7 @@ import shared
 import xueqiu
 import threading
 import queue
-
+import requests
 import time
 from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
@@ -103,11 +103,13 @@ for k in cl:
     for c in cl[k]:
         print('\t',c)
 '''
-xueqiu.sinaFlowRT()
-status.saveflow() 
+#xueqiu.sinaFlowRT()
+#status.saveflow() 
 #subprocess.run(['d:/test.bat'])
 #print('DONE!')
 
+#b,k = xueqiu.xueqiuK('SZ399001',5,96)
+#print(k)
 """
 r = status.search(status.cb_rsi_left_buy)
 for k in r:
@@ -115,3 +117,8 @@ for k in r:
     for c in r[k]:
         print('\t',c)
 """        
+s = requests.session()
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+        'Accept-Encoding': 'gzip, deflate'}
+r = s.get('https://xueqiu.com/',headers=headers)    
+print(r)    

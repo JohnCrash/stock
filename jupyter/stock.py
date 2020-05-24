@@ -10,6 +10,17 @@ def isTransTime(t=None):
         t = datetime.today()
     return ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5
 
+#判断今天是不是可以交易
+def isTransDay():
+    t = datetime.today()
+    if t.weekday()>=0 and t.weekday()<5:
+        b,isb = shared.fromRedis('istransday_%d_%d'%(t.month,t.day))
+        if b:
+            return isb
+        return True
+    else:
+        return False
+
 def dateString(t):
     return '%s-%s-%s'%(t.year,t.month,t.day)
 def timeString(t):

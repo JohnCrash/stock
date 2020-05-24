@@ -232,7 +232,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     b,_ = shared.fromRedis('runtime_update')
     if b:
         print('更新程序已经在运行了')
-        return
+        return 'alrady'
     companys = stock.query("""select company_id,code,name,category from company_select""")
     coms = []
     idds = []
@@ -242,6 +242,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     t = datetime.today()
     lock = threading.Lock()
     count = 0
+    firstRow = True
     print('开始实时更新全部数据...')
     def updateRT(cs,r,batch):
         nonlocal count
@@ -286,6 +287,18 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     updateRT(coms[i:l],plane[i:l,1:],math.floor(i/100))
             while count>0:
                 time.sleep(.1)
+            #如果今天第一次下载数据，这里检查看看今天是不是交易日
+            if firstRow:
+                firstRow = False
+                n = 0
+                for i in range(len(plane)):
+                    if  datetime.fromtimestamp(plane[i][1]).day == t.day:
+                        #只要有今天的最新数据表示今天可以进行交易
+                        n+=1
+                shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=24*3600)                        
+                if n < 300:
+                    #并且标记今天不是可以交易的日子
+                    return 'closed'
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=4*24*3600)
             seqs = seqs[-3*60*4*3:] #3*60*4*10 每秒3次，保存3天的
             shared.toRedis(seqs,'runtime_sequence')
@@ -298,6 +311,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
         if dt>0:
             time.sleep(dt)
         t = datetime.today()
+    return 'done'
 
 #(0 code,1 timesramp,2 volume,3 open,4 high,5 low,6 close)
 def appendRedisRT(code,timestamp,volume,open1,high,low,close1,yesterday_close,today_open):
