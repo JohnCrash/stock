@@ -673,6 +673,9 @@ class Plote:
                 axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
                 axv5.axhline(y=ck5v[todaybi-48:todaybi].mean(),color='darkorange',linestyle='--')
                 axv5.axhline(y=ck5v[todaybi:todayei].mean(),color='dodgerblue',linestyle='--')
+                #绘制一条均线
+                k5ma30 = stock.maK(k5[todaybi:],60)
+                axk5.plot(k5x,k5ma30,color='darkorange',linestyle='--')
                 if axb5 is not None:
                     axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
                     axb5.plot(np.linspace(todaybi,todaybi+47,48),yb[todaybi-48:todaybi],color='darkorange',label='yesterday')
