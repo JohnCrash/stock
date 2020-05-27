@@ -786,16 +786,6 @@ class Plote:
             axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
         #绘制趋势线
         if self._showtrend:
-            for line in self._trend:
-                if (line[1]>=bi and line[1]<=ei) or (line[0]>=bi and line[0]<=ei):
-                    x0 = line[0]
-                    x1 = line[1]
-                    k = line[2]
-                    b = line[3]
-                    if type(self._period)==str or self._day_trend is None:
-                        axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
-                    else:
-                        axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=1,linestyle='-.',alpha=0.6)
             #将日线的趋势线绘制到小级别图表中(仅仅绘制最后2个趋势线)
             if type(self._period)==int and self._day_trend is not None and len(self._day_trend)>2:
                 def get_date_index(d,t):
@@ -832,6 +822,17 @@ class Plote:
                         axsK.plot([x0,x2],[k*line[0]+b,y2],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
                     else:
                         axsK.plot([x0,x1],[k*line[0]+b,k*line[1]+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+            else:
+                for line in self._trend:
+                    if (line[1]>=bi and line[1]<=ei) or (line[0]>=bi and line[0]<=ei):
+                        x0 = line[0]
+                        x1 = line[1]
+                        k = line[2]
+                        b = line[3]
+                        if type(self._period)==str or self._day_trend is None:
+                            axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                        else:
+                            axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=1,linestyle='-.',alpha=0.6)                
             """
             for line in self._trend2:
                 if line[1]>bi and line[0]<ei:
