@@ -5,13 +5,15 @@ var bodyParser = require('body-parser');
 var cookieParser = require('cookie-parser');
 var mysql   = require('mysql');
 var async = require('async');
+const config = require("../download_script/config");
 
 var connection = mysql.createPool({
-    connectionLimit : 100,
+    connectionLimit : 30,
     host     : 'localhost',
-    user     : 'root',
-    password : 'nv30ati2',
-    database : 'stock'
+    port    : config.port,
+    user     : config.user,
+    password : config.password,
+    database : config.database
   });
 
 var app = express();

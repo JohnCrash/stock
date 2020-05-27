@@ -567,26 +567,34 @@ def MacdBestPt(k,m):
     return np.array(minpts),np.array(maxpts),np.array(pts)  
 
 """
-将k进行合并，例如日k合并为周k，该方法不进行周对齐，精确的方法使用weekK
+将k进行合并
+例如将5分钟线合并成15,30,...分钟线
+该方法不进行周对齐，精确的方法使用weekK
 """
-def mergeK(k,n):
+def mergeK(k,d,n):
+    n = int(n)
     m = len(k)%n
-    L = math.floor(len(k)/n)
+    L = int(math.floor(len(k)/n))
     l = L+(1 if m!=0 else 0)
-    w = np.zeros((l,5))
+    nk = np.zeros((l,5))
+    nd = []
+    
     for i in range(L):
-        w[i,0] = k[i*n:i*n+n,0].sum() #volume
-        w[i,1] = k[i*n,1] #open
-        w[i,2] = k[i*n:i*n+n,2].max() #high
-        w[i,3] = k[i*n:i*n+n,3].min() #low
-        w[i,4] = k[i*n+n-1,4] #close
+        nk[i,0] = k[i*n:i*n+n,0].sum() #volume
+        nk[i,1] = k[i*n,1] #open
+        nk[i,2] = k[i*n:i*n+n,2].max() #high
+        nk[i,3] = k[i*n:i*n+n,3].min() #low
+        nk[i,4] = k[i*n+n-1,4] #close
+        nd.append(d[i*n+n-1])
     if m>0:
-        w[-1,0] = k[L*n:,0].sum() #volume
-        w[-1,1] = k[L*n,1] #open
-        w[-1,2] = k[L*n:,2].max() #high
-        w[-1,3] = k[L*n:,3].min() #low
-        w[-1,4] = k[-1,4] #close
-    return w
+        nk[-1,0] = k[L*n:,0].sum() #volume
+        nk[-1,1] = k[L*n,1] #open
+        nk[-1,2] = k[L*n:,2].max() #high
+        nk[-1,3] = k[L*n:,3].min() #low
+        nk[-1,4] = k[-1,4] #close
+        nd.append(d[-1])
+    
+    return nk,nd
 
 """
 将数据d放大到L的长度，中间用临近相同数据填充

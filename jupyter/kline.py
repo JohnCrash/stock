@@ -225,7 +225,12 @@ class Plote:
         if 'trend' in self._config and self._config['trend']:
             macd = stock.macd(self._k)
             self._macd = macd
-            self._trend = trend.macdTrend(self._k,self._macd)
+            self._trend,b = trend.macdTrend(self._k,self._macd)
+            #如果是日线的趋势线将被保存,用于小级别中绘制
+            if self._period == 'd':
+                self._day_trend = self._trend
+                self._day_date = self._date
+                self._day_b = b
             #self._trend2 = trend.large(self._k,self._trend,0.15)
             self._showtrend = True
         self._gotoTrendHeandPos = False
@@ -350,8 +355,14 @@ class Plote:
                 after = stock.dateString(date.today()-timedelta(days=5*365 if self._lastday is None else self._lastday)) #5年数据
             else:
                 after = stock.dateString(date.today()-timedelta(days=60 if self._lastday is None else self._lastday))
-
-            c,k,d = stock.loadKline(code,period,after=after)
+            
+            if period==5 or period=='d':
+                c,k,d = stock.loadKline(code,period,after=after)
+            elif period=='w':
+                c,k,d = stock.loadKline(code,'d',after=after)
+            else:
+                c,k,d = stock.loadKline(code,5,after=after)
+                k,d = stock.mergeK(k,d,period/5)
             self._cacheK[code] = {}
             self._cacheK[code][period] = (c,k,d,after)
         
@@ -468,6 +479,7 @@ class Plote:
         self._rate = None
         self._macd = None
         self._mode = mode
+        self._day_trend = None
         self._lastday = lastday
         if period=='d':
             self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[5,10,20],"debug":False,"volumeprices":True}            
@@ -780,7 +792,46 @@ class Plote:
                     x1 = line[1]
                     k = line[2]
                     b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                    if type(self._period)==str or self._day_trend is None:
+                        axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                    else:
+                        axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=1,linestyle='-.',alpha=0.6)
+            #将日线的趋势线绘制到小级别图表中(仅仅绘制最后2个趋势线)
+            if type(self._period)==int and self._day_trend is not None and len(self._day_trend)>2:
+                def get_date_index(d,t):
+                    for i in range(len(self._date)):
+                        s = self._date[i][0]
+                        if s.year==d.year and s.month==d.month and s.day==d.day:
+                            if t==0:
+                                return i
+                            else:
+                                if s.hour==15:
+                                    return i
+                    if t==0:
+                        return 0
+                    else:
+                        return len(self._date)-1
+                def get_date_by_index(date,i):
+                    i = int(i)
+                    if i>=len(date):
+                        i = len(date)-1
+                    return date[i][0]
+                for i in [-3,-2,-1]:
+                    line = self._day_trend[i]
+
+                    line_x0_date = get_date_by_index(self._day_date,line[0])
+                    line_x1_date = get_date_by_index(self._day_date,line[1]-1)
+                    x0 = get_date_index(line_x0_date,0)
+                    x1 = get_date_index(line_x1_date,1)
+                    k = line[2]
+                    b = line[3]
+                    
+                    if i==-2 and self._day_b: #对趋势线做延长处理 
+                        x2 = len(self._date)-1
+                        y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
+                        axsK.plot([x0,x2],[k*line[0]+b,y2],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                    else:
+                        axsK.plot([x0,x1],[k*line[0]+b,k*line[1]+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
             """
             for line in self._trend2:
                 if line[1]>bi and line[0]<ei:
@@ -1073,17 +1124,16 @@ class Plote:
                 self.disable('trend')
                 self.disable('ma')
             elif sel=='TREND':
-                self.disable('boll')
                 self.enable('trend')
-                self.enable('ma')
-                self._config['ma'] = [5,10,20]
+                self.disable('boll')
+                self.disable('ma')
             elif sel=='CLEAR':
                 self.disable('boll')
                 self.disable('trend')
                 self.disable('ma')
             self.config()                     
         b,main_sel = shared.fromRedis('kline.main')
-        if b and mainDropdownvalue != main_sel:
+        if b:
             mainDropdownvalue = main_sel
             config_main(main_sel)
         b,index_sel = shared.fromRedis('kline.index')
@@ -1105,7 +1155,7 @@ class Plote:
             layout=Layout(width='96px')
         )           
         periodDropdown = widgets.Dropdown(
-            options=['日线', '周线', '15分钟','5分钟','15分钟校','5分钟校'],
+            options=['日线', '周线', '120分钟','60分钟','30分钟','15分钟','5分钟','5分钟校'],
             value=periodDropdownvalue,
             description='',
             disabled=False,
@@ -1234,7 +1284,12 @@ class Plote:
         def updateTrend():
             if self._macd is not None:
                 if self._trendHeadPos<len(self._k):
-                    self._trend = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
+                    self._trend,b = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
+                    #如果是日线的趋势线将被保存,用于小级别中绘制
+                    if self._period == 'd':
+                        self._day_trend = self._trend
+                        self._day_date = self._date
+                        self._day_b = b                    
             #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):
@@ -1314,9 +1369,11 @@ class Plote:
             name2peroid = {
                 '日线':['d',False,False],
                 '周线':['w',False,False],
+                '120分钟':[120,False,True],
+                '60分钟':[60,False,True],
+                '30分钟':[30,False,True],
                 '15分钟':[15,False,True],
                 '5分钟':[5,False,True],
-                '15分钟校':[15,True,True],
                 '5分钟校':[5,True,True]
             }
             period = e['new']
