@@ -42,7 +42,7 @@ def k2x4(bi,ei,k):
 [
     [bi,ei,k,b,R,b1,b2], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
     ...
-],是否为猜测趋势线
+],是否为猜测趋势线 (趋势线两端都在macd相同周期)
 m是macd，该算法基于macd的周期
 """
 def macdTrend(k,m):
@@ -50,11 +50,15 @@ def macdTrend(k,m):
     lines = []
     bi = 0
     ei = 0
-    for i in range(len(pts)-1):
+    length = len(pts)
+    for i in range(length-1):
         bi = pts[i]
         ei = pts[i+1]
         if bi<ei:
-            line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
+            if i==length-2:
+                line = [bi,ei]+lastSequaresLine(k2x4(bi,len(k)-1,k)) #让最后一根线使用全部数据进行拟合
+            else:
+                line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
             lines.append(line)
     b = False
     if ei!=0 and ei<len(k)-1:
