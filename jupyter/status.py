@@ -2865,3 +2865,67 @@ def showzdt(bi=None,ei=None):
             xueqiu.Timer(120,update)
         first = False
     update()        
+
+"""
+指数分类界面
+"""
+def K(code):
+    kline.Plote(code,'d',config={'index':True},mode='auto').show()
+
+def Indexs():
+    menus = {
+        "大盘":['SH000001', #上证
+            'SZ399001', #深成
+            'SZ399006'],#创业
+        "科技":['BK0021', #半导体
+            'BK0489', #5G
+            'BK0444', #大数据
+            'BK0063', #计算机应用
+            'BK0022', #光学光电子
+            'BK0029', #通信设备
+            'BK0066', #国防军工
+            'BK0410'], #稀土永磁
+        "金融":["BK0057", #证券
+            "BK0055"], #银行
+        "消费":[
+            'BK0033', #饮料
+            'BK0034', #食品加工
+            'BK0638', #农业种植
+            'BK0040', #化学制药
+            'BK0044', #医疗器械
+            'BK0031' #家电
+        ],
+        "基建":[
+            'BK0018', #专用设备
+            'BK0436', #特高压
+            'BK0608', #水泥
+            'BK0015' #建筑材料
+        ]
+    }
+    buts = []
+    oldbut = None
+    def onClick(e):
+        nonlocal menus,oldbut
+        if oldbut is not None:
+            oldbut.button_style = ''
+        e.button_style = 'warning'
+        output.clear_output()
+        with output:
+            for code in menus[e.description]:
+                K(code)
+        oldbut = e
+        e.button_style = 'success'
+    for m in menus:
+        but = widgets.Button(description=m)
+        buts.append(but)
+        but.on_click(onClick)
+    output = widgets.Output()
+    box_layout = Layout(display='flex',
+                    flex_flow='wrap',
+                    align_items='stretch',
+                    border='solid',
+                    width='100%')    
+    
+    box = Box(children=buts,layout=box_layout)
+    display(box,output)
+    onClick(buts[0])
