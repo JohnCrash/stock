@@ -1008,10 +1008,27 @@ def logCheckResult(code,period,source,checkdata,date=None):
         base = cache['base']
         checkK(code,period,k,d,base,0)
 
+#判断d是不是一个有效的k时间
+def isValidKDate(d,period):
+    n = int(period/5)
+    for i in range(len(k5date)):
+        if k5date[i][0]==d.hour and k5date[i][1]==d.minute:
+            return (i+1)%n==0
+    return False
+
 #将下载数据附加在k,d数据上
 def appendK(code,period,k,d):
     if period==5 or period==15:
         b,nk,nd = K(code,period,32 if period==15 else 96)
+    elif type(period)==int:
+        b,nk,nd = K(code,5,96)
+        if b:
+            bi=0
+            for i in range(len(nd)):
+                if isValidKDate(nd[i][0],period):
+                    bi = i+1
+                    break
+            nk,nd = stock.mergeK(nk[bi:],nd[bi:],int(period/5))
     elif period=='d':
         b,nk,nd = xueqiuKday(code,5)
         #这里对昨天的k15数据计算得到的日线数据和雪球日线数据进行校验

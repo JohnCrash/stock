@@ -23,6 +23,8 @@ from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show
 log = mylog.init('kline.log',name='kline')
 warnings.filterwarnings("ignore", module="matplotlib")
 
+_cacheK = {}
+
 def plt_show(display_id,isupdate):
     try:
         for figure_manager in Gcf.get_all_fig_managers():
@@ -346,9 +348,10 @@ class Plote:
     对不同基本的数据留有缓存
     """
     def getKlineData(self,code,period):
+        global _cacheK
         if len(code)>3 and code[2]==':':
             code = code.replace(':','')
-        if not (code in self._cacheK and period in self._cacheK[code]):
+        if not (code in _cacheK and period in _cacheK[code]):
             if period == 'w':
                 after = None #全部数据
             elif period == 'd':
@@ -363,10 +366,10 @@ class Plote:
             else:
                 c,k,d = stock.loadKline(code,5,after=after)
                 k,d = stock.mergeK(k,d,period/5)
-            self._cacheK[code] = {}
-            self._cacheK[code][period] = (c,k,d,after)
+            _cacheK[code] = {}
+            _cacheK[code][period] = (c,k,d,after)
         
-        cur = self._cacheK[code][period]
+        cur = _cacheK[code][period]
         _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
         return cur[0],k,d
 
@@ -435,8 +438,9 @@ class Plote:
         #将大盘指数画在图表中   
         if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
             #这里做日期对齐
+            idxcode = 'SZ399001' if (self._comarg[1]).upper()=='Z' else 'SH000001'
             if self._period=='w':
-                _,szk,szd = self.getKlineData('SZ399001','d')
+                _,szk,szd = self.getKlineData(idxcode,'d')
                 K = stock.alignK(self._date,szk,szd)
                 WK,WD = stock.weekK(K,self._date)
                 self._szclose = WK[:,4]
@@ -444,7 +448,7 @@ class Plote:
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
                 self._szmacd = stock.macd(WK)
             else:
-                _,szk,szd = self.getKlineData('SZ399001',self._period)
+                _,szk,szd = self.getKlineData(idxcode,self._period)
                 K = stock.alignK(self._date,szk,szd)
                 self._szclose = K[:,4]
                 self._szvolumekdj = stock.kdj(K[:,0])[:,2]
@@ -469,7 +473,6 @@ class Plote:
         self._prefix = prefix
         self._context = context
         self._correcttionVolume = False
-        self._cacheK = {}
         self._configarg = config
         self._comarg = company
         self._datearg = date
@@ -792,39 +795,59 @@ class Plote:
             #将日线的趋势线绘制到小级别图表中(仅仅绘制最后2个趋势线)
             if type(self._period)==int and self._day_trend is not None and len(self._day_trend)>2:
                 def get_date_index(d,t):
+                    lsi = -1
+                    isb = False
                     for i in range(len(self._date)):
                         s = self._date[i][0]
                         if s.year==d.year and s.month==d.month and s.day==d.day:
                             if t==0:
                                 return i
                             else:
-                                if s.hour==15:
-                                    return i
-                    if t==0:
-                        return 0
-                    else:
+                                lsi = i
+                                isb = True
+                        elif isb and lsi!=-1:
+                            return lsi
+                    if isb and lsi!=-1:
+                        return lsi
+                    elif t==1 and self._date[0][0]<datetime(d.year,d.month,d.day):
                         return len(self._date)-1
+                    else:
+                        return 0
                 def get_date_by_index(date,i):
                     i = int(i)
                     if i>=len(date):
                         i = len(date)-1
                     return date[i][0]
+                def line_crop(x0,x1,y0,y1): #让直线在bi和ei之间，防止这些直线压缩主视图
+                    if x0>ei or x1<bi:
+                        return False,0,0,0,0
+                    elif x0>=bi and x1<ei:
+                        return True,x0,x1,y0,y1
+                    k = (y1-y0)/(x1-x0)
+                    b = y0-k*x0
+                    xx0 = bi if x0<bi else x0
+                    xx1 = ei-1 if x1>=ei else x1
+                    return True,xx0,xx1,k*xx0+b,k*xx1+b
                 for i in [-3,-2,-1]:
                     line = self._day_trend[i]
 
                     line_x0_date = get_date_by_index(self._day_date,line[0])
-                    line_x1_date = get_date_by_index(self._day_date,line[1]-1)
+                    line_x1_date = get_date_by_index(self._day_date,line[1])
                     x0 = get_date_index(line_x0_date,0)
                     x1 = get_date_index(line_x1_date,1)
+                    #print(i,x0,x1,line_x0_date,line_x1_date,len(self._date))
                     k = line[2]
                     b = line[3]
-                    
                     if i==-2 and self._day_b: #对趋势线做延长处理 
                         x2 = len(self._date)-1
                         y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
-                        axsK.plot([x0,x2],[k*line[0]+b,y2],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                        isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)
+                        if isv:
+                            axsK.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
                     else:
-                        axsK.plot([x0,x1],[k*line[0]+b,k*line[1]+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                        isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
+                        if isv:
+                            axsK.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
             else:
                 for line in self._trend:
                     if (line[1]>=bi and line[1]<=ei) or (line[0]>=bi and line[0]<=ei):
