@@ -436,7 +436,7 @@ class Plote:
         if len(self._k)==0: #完全没有数据不进行进一步处理
             return
         #将大盘指数画在图表中   
-        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001':
+        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001' and self._company[1] != 'SZ399006':
             #这里做日期对齐
             idxcode = 'SZ399001' if (self._comarg[1]).upper()=='Z' else 'SH000001'
             if self._period=='w':
