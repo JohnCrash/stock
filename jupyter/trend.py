@@ -40,7 +40,7 @@ def k2x4(bi,ei,k):
 """
 返回基于macd最值的趋势数组
 [
-    [bi,ei,k,b,R,b1,b2], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
+    [bi,ei,k,b,R], #bi起始位置，ei结束位置，k斜率，b斜截，R拟合度
     ...
 ],是否为猜测趋势线 (趋势线两端都在macd相同周期)
 m是macd，该算法基于macd的周期
@@ -60,12 +60,26 @@ def macdTrend(k,m):
             else:
                 line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
             lines.append(line)
+    
     b = False
     if ei!=0 and ei<len(k)-1:
         line = [ei,len(k)]+lastSequaresLine(k2x4(ei,len(k),k))
         lines.append(line)
         b = True
-    return np.array(lines),b
+    #最后一个趋势使用平均斜率
+    avg_line = [line[0],line[1],line[2],line[3],line[4]]
+    n = 0
+    avg_k = 0
+    for l in lines:
+        if line[2]*l[2]>0:
+            avg_k += l[2]
+            n+=1
+    if n>0:
+        avg_k /= n
+        #让两条线的中点重合
+        avg_line[3] = (line[2]-avg_k)*(line[1]+line[0])/2 + line[3]
+        avg_line[2] = avg_k        
+    return np.array(lines),avg_line,b
 
 """
 返回最大平均偏离值

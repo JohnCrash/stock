@@ -227,11 +227,12 @@ class Plote:
         if 'trend' in self._config and self._config['trend']:
             macd = stock.macd(self._k)
             self._macd = macd
-            self._trend,b = trend.macdTrend(self._k,self._macd)
+            self._trend,last_line,b = trend.macdTrend(self._k,self._macd)
             #如果是日线的趋势线将被保存,用于小级别中绘制
             if self._period == 'd':
                 self._day_trend = self._trend
                 self._day_date = self._date
+                self._day_last_line = last_line
                 self._day_b = b
             #self._trend2 = trend.large(self._k,self._trend,0.15)
             self._showtrend = True
@@ -436,7 +437,7 @@ class Plote:
         if len(self._k)==0: #完全没有数据不进行进一步处理
             return
         #将大盘指数画在图表中   
-        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001' and self._company[1] != 'SZ399006':
+        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001' and self._company[1] != 'SZ399006' and self._company[1] != 'SZ399006':
             #这里做日期对齐
             idxcode = 'SZ399001' if (self._comarg[1]).upper()=='Z' else 'SH000001'
             if self._period=='w':
@@ -848,6 +849,17 @@ class Plote:
                         isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
                         if isv:
                             axsK.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
+                #绘制平均斜率
+                line = self._day_last_line
+                line_x0_date = get_date_by_index(self._day_date,line[0])
+                line_x1_date = get_date_by_index(self._day_date,line[1])
+                x0 = get_date_index(line_x0_date,0)
+                x1 = get_date_index(line_x1_date,1)                
+                k = line[2]
+                b = line[3]
+                isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
+                if isv:                
+                    axsK.plot([X0,X1],[Y0,Y1],color='slategrey',linewidth=3,linestyle='--')                
             else:
                 for line in self._trend:
                     if (line[1]>=bi and line[1]<=ei) or (line[0]>=bi and line[0]<=ei):
@@ -859,6 +871,13 @@ class Plote:
                             axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
                         else:
                             axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=1,linestyle='-.',alpha=0.6)                
+                #绘制平均斜率
+                line = self._day_last_line
+                x0 = line[0]
+                x1 = line[1]
+                k = line[2]
+                b = line[3]
+                axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='slategrey',linewidth=3,linestyle='--')
             """
             for line in self._trend2:
                 if line[1]>bi and line[0]<ei:
@@ -1311,12 +1330,13 @@ class Plote:
         def updateTrend():
             if self._macd is not None:
                 if self._trendHeadPos<len(self._k):
-                    self._trend,b = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
+                    self._trend,last_line,b = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
                     #如果是日线的趋势线将被保存,用于小级别中绘制
                     if self._period == 'd':
                         self._day_trend = self._trend
                         self._day_date = self._date
-                        self._day_b = b                    
+                        self._day_last_line = last_line
+                        self._day_b = b              
             #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
 
         def on_prev(b):
