@@ -72,7 +72,7 @@
             "request": "launch",
             "name": "test js",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["SZ399006","创业板指"]
+            "args": ["SH688001","华兴源创"]
         },              
         {
             "type": "python",

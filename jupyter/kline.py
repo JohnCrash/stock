@@ -1208,6 +1208,7 @@ class Plote:
             layout=Layout(width='96px')
         )
         refreshbutton = widgets.Button(description="刷新",layout=Layout(width='64px'))
+        listbutton = widgets.Button(description="列表",layout=Layout(width='64px'))
         #output = widgets.Output()
         b,favorites = shared.fromRedis('favorite_'+str(date.today()))
         isfavorite = False
@@ -1229,6 +1230,9 @@ class Plote:
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
         items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
+        list_output = widgets.Output()
+        if self.code()[0] == 'b':
+            items.append(listbutton)
 
         fafavoriteNodeWidget = widgets.Text(
             value=favoriteNode,
@@ -1247,6 +1251,7 @@ class Plote:
         needUpdateSlider = True
         def showline():
             nonlocal needUpdateSlider
+            print('showline')
             self.showKline(beginPT,endPT,figsize=figsize)
             if figure2 is not None:
                 bi = figure2.date2index( self.index2date(beginPT) )
@@ -1458,6 +1463,18 @@ class Plote:
             refreshbutton.button_style = ''
         refreshbutton.on_click(refresh)
 
+        def on_list(e):
+            #https://stock.xueqiu.com/v5/stock/forum/stocks.json?ind_code=BK0021
+            uri = """https://stock.xueqiu.com/v5/stock/forum/stocks.json?ind_code=%s"""%(self.code().upper())
+            b,r = xueqiu.xueqiuJson(uri)
+            if b:
+                if 'data' in r:
+                    companys = r['data']['items']
+                    list_output.clear_output()
+                    with list_output:
+                        for com in companys:
+                            Plote(com['symbol'],'d',config={'index':True},mode='runtime').show()
+        listbutton.on_click(on_list)
         backbutton.on_click(on_prev)
         frontbutton.on_click(on_next)
         slider.observe(on_sliderChange,names='value')
@@ -1466,8 +1483,9 @@ class Plote:
             figuretoggle.observe(on_change,names='value')
 
         display(box)
-        
         self.showKline(beginPT,endPT,figsize=figsize)
+        if self.code()[0]=='b':
+            display(list_output)        
         if figure2 is not None:
             bi = figure2.date2index( self.index2date(beginPT) )
             ei = figure2.date2index( self.index2date(endPT) )
