@@ -1251,7 +1251,6 @@ class Plote:
         needUpdateSlider = True
         def showline():
             nonlocal needUpdateSlider
-            print('showline')
             self.showKline(beginPT,endPT,figsize=figsize)
             if figure2 is not None:
                 bi = figure2.date2index( self.index2date(beginPT) )
