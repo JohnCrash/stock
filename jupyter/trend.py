@@ -37,6 +37,21 @@ def k2x4(bi,ei,k):
     x[:,1] = k[bi:ei,1:5].reshape(-1)
     return x
 
+#计算line的平均趋势线,并且让平均趋势线和line的中心重回
+def avgLine(lines,line):
+    avg_line = [line[0],line[1],line[2],line[3],line[4]]
+    n = 0
+    avg_k = 0
+    for l in lines:
+        if line[2]*l[2]>0:
+            avg_k += l[2]
+            n+=1
+    if n>0:
+        avg_k /= n
+        #让两条线的中点重合
+        avg_line[3] = (line[2]-avg_k)*(line[1]+line[0])/2 + line[3]
+        avg_line[2] = avg_k
+    return avg_line   
 """
 返回基于macd最值的趋势数组
 [
@@ -60,26 +75,15 @@ def macdTrend(k,m):
             else:
                 line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
             lines.append(line)
-    
+    avg_lines = [avgLine(lines,line)]
     b = False
     if ei!=0 and ei<len(k)-1:
         line = [ei,len(k)]+lastSequaresLine(k2x4(ei,len(k),k))
         lines.append(line)
+        avg_lines.append(avgLine(lines,line))
         b = True
-    #最后一个趋势使用平均斜率
-    avg_line = [line[0],line[1],line[2],line[3],line[4]]
-    n = 0
-    avg_k = 0
-    for l in lines:
-        if line[2]*l[2]>0:
-            avg_k += l[2]
-            n+=1
-    if n>0:
-        avg_k /= n
-        #让两条线的中点重合
-        avg_line[3] = (line[2]-avg_k)*(line[1]+line[0])/2 + line[3]
-        avg_line[2] = avg_k        
-    return np.array(lines),avg_line,b
+    
+    return np.array(lines),avg_lines,b
 
 """
 返回最大平均偏离值

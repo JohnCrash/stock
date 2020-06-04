@@ -352,7 +352,7 @@ class Plote:
         global _cacheK
         if len(code)>3 and code[2]==':':
             code = code.replace(':','')
-        if not (code in _cacheK and period in _cacheK[code]):
+        if not (code in _cacheK and period in _cacheK[code]):    
             if period == 'w':
                 after = None #全部数据
             elif period == 'd':
@@ -367,9 +367,9 @@ class Plote:
             else:
                 c,k,d = stock.loadKline(code,5,after=after)
                 k,d = stock.mergeK(k,d,period/5)
-            _cacheK[code] = {}
+            if code is not _cacheK:
+                _cacheK[code] = {}
             _cacheK[code][period] = (c,k,d,after)
-        
         cur = _cacheK[code][period]
         _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
         return cur[0],k,d
@@ -437,7 +437,7 @@ class Plote:
         if len(self._k)==0: #完全没有数据不进行进一步处理
             return
         #将大盘指数画在图表中   
-        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001' and self._company[1] != 'SZ399006' and self._company[1] != 'SZ399006':
+        if "index" in config and config["index"] and self._company[1] != 'SZ399001' and self._company[1] != 'SH000001' and self._company[1] != 'SZ399006':
             #这里做日期对齐
             idxcode = 'SZ399001' if (self._comarg[1]).upper()=='Z' else 'SH000001'
             if self._period=='w':
@@ -587,6 +587,101 @@ class Plote:
         else:
             if ei<=-len(self._k):
                 ei = -len(self._k)+1
+
+        #绘制趋势线
+        def drawTrendLine(ax,period,dates,cx0,cx1,lw=3):
+            if type(period)==int and self._day_trend is not None and len(self._day_trend)>2:
+                def get_date_index(d,t):
+                    lsi = -1
+                    isb = False
+                    for i in range(len(dates)):
+                        s = dates[i][0]
+                        if s.year==d.year and s.month==d.month and s.day==d.day:
+                            if t==0:
+                                return i
+                            else:
+                                lsi = i
+                                isb = True
+                        elif isb and lsi!=-1:
+                            return lsi
+                    if isb and lsi!=-1:
+                        return lsi
+                    elif t==1 and dates[0][0]<datetime(d.year,d.month,d.day):
+                        return len(dates)-1
+                    else:
+                        return 0
+                def get_date_by_index(date,i):
+                    i = int(i)
+                    if i>=len(date):
+                        i = len(date)-1
+                    return date[i][0]
+                def line_crop(x0,x1,y0,y1): #让直线在bi和ei之间，防止这些直线压缩主视图
+                    if x0>cx1 or x1<cx0:
+                        return False,0,0,0,0
+                    elif x0>=cx0 and x1<cx1:
+                        return True,x0,x1,y0,y1
+                    k = (y1-y0)/(x1-x0)
+                    b = y0-k*x0
+                    xx0 = cx0 if x0<cx0 else x0
+                    xx1 = cx1-1 if x1>=cx1 else x1
+                    return True,xx0,xx1,k*xx0+b,k*xx1+b
+                for i in [-3,-2,-1]:
+                    line = self._day_trend[i]
+
+                    line_x0_date = get_date_by_index(self._day_date,line[0])
+                    line_x1_date = get_date_by_index(self._day_date,line[1])
+                    x0 = get_date_index(line_x0_date,0)
+                    x1 = get_date_index(line_x1_date,1)
+                    #print(i,x0,x1,line_x0_date,line_x1_date,len(dates))
+                    k = line[2]
+                    b = line[3]
+                    if i==-2 and self._day_b: #对趋势线做延长处理 
+                        x2 = len(dates)-1
+                        y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
+                        isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)
+                        if isv:
+                            ax.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.')
+                    else:
+                        isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
+                        if isv:
+                            ax.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.')
+                #绘制平均斜率
+                for line in self._day_last_line:
+                    line_x0_date = get_date_by_index(self._day_date,line[0])
+                    line_x1_date = get_date_by_index(self._day_date,line[1])
+                    x0 = get_date_index(line_x0_date,0)
+                    x1 = get_date_index(line_x1_date,1)                
+                    k = line[2]
+                    b = line[3]
+                    if self._day_b:#对趋势线做延长处理 
+                        x2 = len(dates)-1
+                        y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
+                        isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)    
+                        if isv:
+                            ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
+                    else:
+                        isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
+                        if isv:                
+                            ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')                
+            else:
+                for line in self._trend:
+                    if (line[1]>=cx0 and line[1]<=cx1) or (line[0]>=cx0 and line[0]<=cx1):
+                        x0 = line[0]
+                        x1 = line[1]
+                        k = line[2]
+                        b = line[3]
+                        if type(period)==str or self._day_trend is None:
+                            ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.')
+                        else:
+                            ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.',alpha=0.6)                
+                #绘制平均斜率
+                for line in self._day_last_line:
+                    x0 = line[0]
+                    x1 = line[1]
+                    k = line[2]
+                    b = line[3]
+                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
+
         while True:
             if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()): #下面的代码在右侧开辟一个区域绘制5分钟时k图
                 gs_kw = dict(width_ratios=[2,1], height_ratios=self._heights)
@@ -655,7 +750,7 @@ class Plote:
                 k5x = np.linspace(todaybi,todayei-1,todayei-todaybi)
                 plotK(axk5,k5,todaybi,todayei)
                 #如果不是大盘，将大盘绘制在图表的对应位置
-                if self._comarg.lower()!='sz399001' and self._comarg.lower()!='sh000001':
+                if self._comarg.lower()!='sz399001' and self._comarg.lower()!='sh000001' and self._comarg.lower()!='sh399006':
                     b,szk,szd = xueqiu.K('SZ399001',5,todayei-todaybi)
                     if b:
                         szkmax = szk[:,4].max()
@@ -687,6 +782,7 @@ class Plote:
                     axb5.set_xlim(todaybi-1,todaybi+48)
                     axb5.grid(True)            
                 axv5.axhline(color='black')
+                drawTrendLine(axk5,5,d5,todaybi-1,todaybi+48,2)
             else:
                 gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
                 fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
@@ -794,99 +890,7 @@ class Plote:
         #绘制趋势线
         if self._showtrend:
             #将日线的趋势线绘制到小级别图表中(仅仅绘制最后2个趋势线)
-            if type(self._period)==int and self._day_trend is not None and len(self._day_trend)>2:
-                def get_date_index(d,t):
-                    lsi = -1
-                    isb = False
-                    for i in range(len(self._date)):
-                        s = self._date[i][0]
-                        if s.year==d.year and s.month==d.month and s.day==d.day:
-                            if t==0:
-                                return i
-                            else:
-                                lsi = i
-                                isb = True
-                        elif isb and lsi!=-1:
-                            return lsi
-                    if isb and lsi!=-1:
-                        return lsi
-                    elif t==1 and self._date[0][0]<datetime(d.year,d.month,d.day):
-                        return len(self._date)-1
-                    else:
-                        return 0
-                def get_date_by_index(date,i):
-                    i = int(i)
-                    if i>=len(date):
-                        i = len(date)-1
-                    return date[i][0]
-                def line_crop(x0,x1,y0,y1): #让直线在bi和ei之间，防止这些直线压缩主视图
-                    if x0>ei or x1<bi:
-                        return False,0,0,0,0
-                    elif x0>=bi and x1<ei:
-                        return True,x0,x1,y0,y1
-                    k = (y1-y0)/(x1-x0)
-                    b = y0-k*x0
-                    xx0 = bi if x0<bi else x0
-                    xx1 = ei-1 if x1>=ei else x1
-                    return True,xx0,xx1,k*xx0+b,k*xx1+b
-                for i in [-3,-2,-1]:
-                    line = self._day_trend[i]
-
-                    line_x0_date = get_date_by_index(self._day_date,line[0])
-                    line_x1_date = get_date_by_index(self._day_date,line[1])
-                    x0 = get_date_index(line_x0_date,0)
-                    x1 = get_date_index(line_x1_date,1)
-                    #print(i,x0,x1,line_x0_date,line_x1_date,len(self._date))
-                    k = line[2]
-                    b = line[3]
-                    if i==-2 and self._day_b: #对趋势线做延长处理 
-                        x2 = len(self._date)-1
-                        y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
-                        isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)
-                        if isv:
-                            axsK.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
-                    else:
-                        isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
-                        if isv:
-                            axsK.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
-                #绘制平均斜率
-                line = self._day_last_line
-                line_x0_date = get_date_by_index(self._day_date,line[0])
-                line_x1_date = get_date_by_index(self._day_date,line[1])
-                x0 = get_date_index(line_x0_date,0)
-                x1 = get_date_index(line_x1_date,1)                
-                k = line[2]
-                b = line[3]
-                isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
-                if isv:                
-                    axsK.plot([X0,X1],[Y0,Y1],color='slategrey',linewidth=3,linestyle='--')                
-            else:
-                for line in self._trend:
-                    if (line[1]>=bi and line[1]<=ei) or (line[0]>=bi and line[0]<=ei):
-                        x0 = line[0]
-                        x1 = line[1]
-                        k = line[2]
-                        b = line[3]
-                        if type(self._period)==str or self._day_trend is None:
-                            axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=3,linestyle='-.')
-                        else:
-                            axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=1,linestyle='-.',alpha=0.6)                
-                #绘制平均斜率
-                line = self._day_last_line
-                x0 = line[0]
-                x1 = line[1]
-                k = line[2]
-                b = line[3]
-                axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='slategrey',linewidth=3,linestyle='--')
-            """
-            for line in self._trend2:
-                if line[1]>bi and line[0]<ei:
-                    x0 = line[0]
-                    x1 = line[1]
-                    k = line[2]
-                    b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',alpha=0.8,linewidth=6,linestyle='-.')
-            """
+            drawTrendLine(axsK,self._period,self._date,bi,ei)
         if self._trendHeadPos>=0 and self._trendHeadPos<=len(self._k):
             axsK.axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
             for i in range(self._axsInx+1):
@@ -930,7 +934,7 @@ class Plote:
             axs[self._volInx].axhline(color='black')
         #绘制交易点
         if 'trans' in self._config:
-            plotTransPt(axs,self._axsInx,self._config['trans'],bi,ei) 
+            plotTransPt(axs,self._axsInx,self._config['trans'],bi,ei)
       
         axsK.grid(True)
         #这里显示涨跌比率
@@ -1249,15 +1253,17 @@ class Plote:
         endPT = ei
         showRange = ei-bi            
         needUpdateSlider = True
+        skipUpdate = False
         def showline():
             nonlocal needUpdateSlider
-            self.showKline(beginPT,endPT,figsize=figsize)
-            if figure2 is not None:
-                bi = figure2.date2index( self.index2date(beginPT) )
-                ei = figure2.date2index( self.index2date(endPT) )
-                if bi != ei:
-                    figure2.showKline(bi,ei,figsize=figsize)
-            needUpdateSlider = True
+            if not skipUpdate:
+                self.showKline(beginPT,endPT,figsize=figsize)
+                if figure2 is not None:
+                    bi = figure2.date2index( self.index2date(beginPT) )
+                    ei = figure2.date2index( self.index2date(endPT) )
+                    if bi != ei:
+                        figure2.showKline(bi,ei,figsize=figsize)
+                needUpdateSlider = True
 
         def setSlider(minv,maxv,value):
             nonlocal needUpdateSlider
@@ -1333,15 +1339,38 @@ class Plote:
 
         def updateTrend():
             if self._macd is not None:
-                if self._trendHeadPos<len(self._k):
-                    self._trend,last_line,b = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
-                    #如果是日线的趋势线将被保存,用于小级别中绘制
-                    if self._period == 'd':
+                #当是日线以下数据时使用日线趋势下，先将_trendHeadPos转换为日期然后在重新计算日线趋势线
+                if type(self._period)==int:
+                    p = self._trendHeadPos
+                    if p>=len(self._k):
+                        p = len(self._k)-1
+                    if p<0:
+                        p = 0
+                    t = self._date[p][0]
+                    code = self.code().upper()
+                    _,dk,dd= self.getKlineData(code,'d')
+                    for i in range(len(dd)):
+                        d = dd[i][0]
+                        if d.year==t.year and d.month==t.month and d.day==t.day:
+                            p = i
+                            break
+                    if p<len(dk):
+                        m = stock.macd(dk)
+                        self._trend,last_line,b = trend.macdTrend(dk[:p+1,:],m[:p+1])
+                        #如果是日线的趋势线将被保存,用于小级别中绘制
                         self._day_trend = self._trend
-                        self._day_date = self._date
+                        self._day_date = dd
                         self._day_last_line = last_line
-                        self._day_b = b              
-            #self._trend2 = trend.large(self._k[:self._trendHeadPos,:],self._trend,0.15)
+                        self._day_b = b 
+                else:
+                    if self._trendHeadPos<len(self._k):
+                        self._trend,last_line,b = trend.macdTrend(self._k[:self._trendHeadPos+1,:],self._macd[:self._trendHeadPos+1])
+                        #如果是日线的趋势线将被保存,用于小级别中绘制
+                        if self._period == 'd':
+                            self._day_trend = self._trend
+                            self._day_date = self._date
+                            self._day_last_line = last_line
+                            self._day_b = b              
 
         def on_prev(b):
             nonlocal needUpdateSlider,beginPT,endPT
@@ -1439,17 +1468,27 @@ class Plote:
 
             self.reload()
             #日线和周线切换为MACD+,其他切换为MACD
-            nonlocal needRecalcRange
+            #日线和周线切换到BULL+,其他期货到TREND
+            nonlocal needRecalcRange,skipUpdate
             if sel[2]:
                 if indexDropdown.value!="CLEAR":
+                    skipUpdate = True
                     needRecalcRange = True
                     indexDropdown.value = "CLEAR"
-                    return
+                if mainDropdown.value=="BOLL+":
+                    skipUpdate = True
+                    needRecalcRange = True
+                    mainDropdown.value="TREND"
             else:
                 if indexDropdown.value != "MACD+":
+                    skipUpdate = True
                     needRecalcRange = True
                     indexDropdown.value = "MACD+"
-                    return
+                if mainDropdown.value=="TREND":
+                    skipUpdate = True
+                    needRecalcRange = True
+                    mainDropdown.value="BOLL+"                
+            skipUpdate = False
             recalcRange()
             showline()
 
