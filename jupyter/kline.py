@@ -589,7 +589,7 @@ class Plote:
                 ei = -len(self._k)+1
 
         #绘制趋势线
-        def drawTrendLine(ax,period,dates,cx0,cx1,lw=3):
+        def drawTrendLine(ax,period,dates,cx0,cx1,cy0=None,cy1=None,lw=3):
             if type(period)==int and self._day_trend is not None and len(self._day_trend)>2:
                 def get_date_index(d,t):
                     lsi = -1
@@ -616,15 +616,39 @@ class Plote:
                         i = len(date)-1
                     return date[i][0]
                 def line_crop(x0,x1,y0,y1): #让直线在bi和ei之间，防止这些直线压缩主视图
-                    if x0>cx1 or x1<cx0:
+                    if x1==x0:
                         return False,0,0,0,0
-                    elif x0>=cx0 and x1<cx1:
-                        return True,x0,x1,y0,y1
                     k = (y1-y0)/(x1-x0)
                     b = y0-k*x0
-                    xx0 = cx0 if x0<cx0 else x0
-                    xx1 = cx1-1 if x1>=cx1 else x1
-                    return True,xx0,xx1,k*xx0+b,k*xx1+b
+                    if x0<cx0:
+                        xx0 = cx0
+                    elif x0>cx1:
+                        xx0 = cx1
+                    else:
+                        xx0 = x0
+                    if x1<cx0:
+                        xx1 = cx0
+                    elif x1>cx1:
+                        xx1 = cx1
+                    else:
+                        xx1 = x1
+                    if xx0==xx1:
+                        return False,0,0,0,0
+                    if cy0 is not None and cy1 is not None:
+                        #对y方向也进行剪切
+                        yy0 = k*xx0+b
+                        yy1 = k*xx1+b
+                        if yy0<cy0:
+                            yy0 = cy0
+                        elif yy0>cy1:
+                            yy0 = cy1
+                        if yy1<cy0:
+                            yy1 = cy0
+                        elif yy1>cy1:
+                            yy1 = cy1
+                        return yy0!=yy1,(yy0-b)/k,(yy1-b)/k,yy0,yy1
+                    else:
+                        return True,xx0,xx1,k*xx0+b,k*xx1+b
                 for i in [-3,-2,-1]:
                     line = self._day_trend[i]
 
@@ -782,7 +806,7 @@ class Plote:
                     axb5.set_xlim(todaybi-1,todaybi+48)
                     axb5.grid(True)            
                 axv5.axhline(color='black')
-                drawTrendLine(axk5,5,d5,todaybi-1,todaybi+48,2)
+                drawTrendLine(axk5,5,d5,todaybi-1,todaybi+48,k5[todaybi-1:todaybi+48,3].min(),k5[todaybi-1:todaybi+48,2].max(),2)
             else:
                 gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
                 fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
