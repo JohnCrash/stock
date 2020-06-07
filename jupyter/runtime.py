@@ -7,10 +7,11 @@ import subprocess
 import threading
 import platform
 import config
+import shared
 import mylog
 #import os
 log = mylog.init('runtime.log',name='runtime')
-download_done_day = -1
+_,download_done_day = shared.fromRedis("last_download_day")
 def process(i):
     pass
 
@@ -30,9 +31,10 @@ while True:
         except Exception as e:
             log.error(str(e))
             print(e)
-    elif t.hour==15 and t.day!=download_done_day and stock.isTransDay():
-        print("5分钟后开始更新数据库...")
-        time.sleep(5*60)
+    elif (t.hour<9 or t.hour>=15) and t.day!=download_done_day and stock.isTransDay():
+        if t.hour==15:
+            print("5分钟后开始更新数据库...")
+            time.sleep(5*60)
         print("保存资金流向到数据库...")
         try:
             xueqiu.sinaFlowRT()
@@ -52,5 +54,6 @@ while True:
         status.update_status(process)
         print("更新完成。")          
         download_done_day = t.day
+        shared.toRedis(download_done_day,"last_download_day")
     else:
         time.sleep(10)

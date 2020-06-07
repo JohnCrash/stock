@@ -424,9 +424,51 @@ function xueqiuPostJson(uri,form,cb){
         form
     });
 }
+
+var xuequeCookie = ""
+function getXueqiuCookie(){
+    return xuequeCookie
+}
+//获取xueqiu网站的cookie
+function initXueqiuCookie(cb){
+    if(cb && xuequeCookie.length>0){
+        cb(true,xuequeCookie)
+        return
+    }
+    uri = "https://xueqiu.com/"
+    let c = new Crawler({
+        maxConnections : 1,
+        callback : function(error, res, done){
+            if(error)console.error(error);
+            if(res.statusCode==200){
+                cookie = "";
+                for( it of res.headers['set-cookie']){
+                    c = it.substr(0,it.search(';'))
+                    if(c.substr(-1)!="="){
+                        cookie += c
+                        if(cookie!="")
+                            cookie += "; "
+                    }                        
+                }
+                xuequeCookie = cookie
+                if(cb){
+                    cb(true,cookie)
+                }
+            }else{
+                console.error("xueqiuCookie",res.statusCode,res.boday);
+                if(cb)
+                    cb(false,null)
+            }
+            done();
+        }
+    });    
+    c.queue({
+        uri:uri
+    });
+}
 //macd_all();
 //macd_year();
 //macd_wave();
-var xuequeCookie = config.xueqiu_cookie
+
 module.exports = {k_company,companys_task,dateString,query,connection,
-    paralle_companys_task,xuequeCookie,xueqiuPostJson,xueqiuGetJson,companys_task_continue};
+    paralle_companys_task,xuequeCookie,xueqiuPostJson,xueqiuGetJson,companys_task_continue,initXueqiuCookie,getXueqiuCookie};

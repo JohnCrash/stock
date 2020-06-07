@@ -28,6 +28,7 @@ class Timer:
         self._task.cancel()
 
 log = mylog.init('download_stock.log',name='xueqiu')
+xueqiu_cookie = ""
 
 #获取xueqiu网站的cookie
 def xueqiuCookie():
@@ -45,11 +46,34 @@ def xueqiuCookie():
     else:
         False,r.reason
 
+"""
+在xueqiu cookie过期后调用来重新初始化cookie
+"""
+def init_xueqiu_cookie(isinit=False):
+    global xueqiu_cookie
+    if not isinit:
+        b,c = shared.fromRedis("XueqiuCookie")
+        if b:
+            xueqiu_cookie = c
+            return c
+    for i in range(10):
+        b,c = xueqiuCookie()
+        if b:
+            xueqiu_cookie = c
+            shared.toRedis(c,"XueqiuCookie")
+            return c
+        else:
+            time.sleep(1)
+    return ""
+
+init_xueqiu_cookie()
+
 def xueqiuJson(url,timeout=None):
+    global xueqiu_cookie
     s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
-            'Cookie':config.xueqiu_cookie}
+            'Cookie':xueqiu_cookie}
     if timeout is None:
         r = s.get(url,headers=headers)
     else:
@@ -57,7 +81,11 @@ def xueqiuJson(url,timeout=None):
     if r.status_code==200:
         return True,r.json()
     else:
+        if r.status_code==400 and r.text.find('重新登录')>0:
+            init_xueqiu_cookie(True)
+            return xueqiuJson(url,timeout)
         return False,r.reason
+        
 #腾讯证券 5分钟数据
 def qqK5(code,n=96):
     try:
@@ -313,6 +341,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                 shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=24*3600)                        
                 if n < 300:
                     #并且标记今天不是可以交易的日子
+                    print("***休市*** ",str(t))
                     return 'closed'
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=4*24*3600)
             seqs = seqs[-3*60*4*3:] #3*60*4*10 每秒3次，保存3天的
@@ -586,6 +615,7 @@ def qqRT(codes,result=None):
                         vol = float(a[6])*100
                         yesterday_close = float(a[4])
                         today_open = float(a[5])
+                        open1 = today_open
                         for i in range(10):
                             c = float(a[2*i+9])
                             if i==0:

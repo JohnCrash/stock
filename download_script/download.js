@@ -10,9 +10,14 @@ const process = require('process');
 const kline = [5,'d'];
 
 download_kline(kline,(err)=>{
-    if(err)
+    if(err){
         console.error(err);
-    else
+        process.exit(-1);
+    }else{
+        console.log('DONE!');
+        process.exit(0);
+    }    
+    /*//同步自选到company_select2表
         xueqiu_company_aysnc(err=>{
             if(err){
                 console.error(err);
@@ -21,7 +26,8 @@ download_kline(kline,(err)=>{
                 console.log('DONE!');
                 process.exit(0);
             }
-        })    
+        })   
+    */ 
     //    research_k15((e)=>{
     //        console.log('DONE!');
     //    });

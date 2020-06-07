@@ -659,7 +659,7 @@ class Plote:
                     #print(i,x0,x1,line_x0_date,line_x1_date,len(dates))
                     k = line[2]
                     b = line[3]
-                    if i==-2 and self._day_b: #对趋势线做延长处理 
+                    if i==-2 and self._day_b and x1!=x0: #对趋势线做延长处理 
                         x2 = len(dates)-1
                         y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
                         isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)
@@ -677,7 +677,7 @@ class Plote:
                     x1 = get_date_index(line_x1_date,1)                
                     k = line[2]
                     b = line[3]
-                    if self._day_b:#对趋势线做延长处理 
+                    if self._day_b and x1!=x0:#对趋势线做延长处理 
                         x2 = len(dates)-1
                         y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
                         isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)    

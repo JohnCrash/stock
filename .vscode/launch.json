@@ -70,10 +70,16 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "test js",
+            "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
             "args": ["SH688001","华兴源创"]
-        },              
+        },   
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "test js",
+            "program": "${workspaceFolder}\\download_script\\test.js"
+        },                    
         {
             "type": "python",
             "request": "launch",

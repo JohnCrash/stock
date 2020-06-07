@@ -2,9 +2,9 @@
  * 同步雪球全部股票到company_select2
  */
 const async = require("async");
-const {companys_task,k_company,dateString,query,connection,
-    xuequeCookie,xueqiuPostJson,xueqiuGetJson} = require('./k');
-    
+const {companys_task,k_company,dateString,query,xueqiuPostJson,xueqiuGetJson} = require('./k');
+
+//同步自选
  function xueqiu_company_aysnc(done){
     xueqiuGetJson('https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1',
     (err,json)=>{

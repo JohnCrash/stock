@@ -1,7 +1,7 @@
 /**
  * 专门用来下载雪球网的k线数据
  */
-const {paralle_companys_task,companys_task_continue,k_company,dateString,query,connection,xuequeCookie} = require('./k');
+const {paralle_companys_task,companys_task_continue,k_company,dateString,query,connection,getXueqiuCookie,initXueqiuCookie} = require('./k');
 const async = require('async');
 const Crawler = require("crawler");
 
@@ -218,7 +218,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
                                 c.queue({
                                     uri:xueqiuURI(items[0][0]),
                                     headers:{
-                                        Cookie:xuequeCookie,
+                                        Cookie:getXueqiuCookie(),
                                         Accept:'application/json, text/plain, */*'
                                     }
                                 });
@@ -252,7 +252,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
             uri:xueqiuURI(nextdate),
             jQuery: false,
             headers:{
-                Cookie:xuequeCookie,
+                Cookie:getXueqiuCookie(),
                 Accept:'application/json, text/plain, */*'
             }
         });        
@@ -263,26 +263,30 @@ function company_kline(id,code,lv,callback,uctable=ucount){
  * lvs是k线级别1,5,15,30,60,120,'d'数组
  */
 function download_kline(lvs,done){
-    companys_task_continue('id,code',1,com=>cb=>{
-        let task = [];
-        for(let lv of lvs){
-            task.push(
-                (callback)=>{
-                    company_kline(com.id,com.code,lv,callback);
+    initXueqiuCookie((b,c)=>{
+        if(b){
+            companys_task_continue('id,code',1,com=>cb=>{
+                let task = [];
+                for(let lv of lvs){
+                    task.push(
+                        (callback)=>{
+                            company_kline(com.id,com.code,lv,callback);
+                        }
+                    );    
                 }
-            );    
+                async.series(task,(err,results)=>{
+                    if(err)
+                        console.error(err);
+                    cb(err);
+                });
+            }).then(usetime=>{
+                if(done)done();
+            }).catch(err=>{
+                console.log(err);
+                if(done)done();
+            });
         }
-        async.series(task,(err,results)=>{
-            if(err)
-                console.error(err);
-            cb(err);
-        });
-    }).then(usetime=>{
-        if(done)done();
-    }).catch(err=>{
-        console.log(err);
-        if(done)done();
-    });
+    })
 }
 
 module.exports = {download_kline,company_kline};

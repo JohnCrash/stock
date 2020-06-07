@@ -616,23 +616,9 @@ def downloadRT(tasks,progress=None):
     if b:
         ts1 = seqs[-1]
         t = datetime.fromtimestamp(ts1/1000000)
-        if t.weekday()==0: #星期一
-            dt = 3*3600*24*1000*1000
-        else:
-            dt = 3600*24*1000*1000
-        ts0 = ts1-dt
-        for ts in seqs:
-            if ts>ts0 and ts-ts0<60*1000000:
-                ts0 = ts
-                break
 
         b1,p1 = shared.numpyFromRedis("rt%d"%ts1)
         if b1:
-            b0,p0 = shared.numpyFromRedis("rt%d"%ts0) #昨天相同时刻
-            if b0:
-                v0 = p0[:,2]
-            else:
-                v0 = np.zeros(len(p1)) #简单线性处理
             tv = get_tvol(t)
             idd2inx = {}
             for i in range(len(p1)):
@@ -642,14 +628,12 @@ def downloadRT(tasks,progress=None):
                 if it[1][0] in idd2inx:
                     i = idd2inx[it[1][0]]
                     k = it[0]
-                    if v0[i]>0:
-                        vol =  p1[i,2]*k[-1,2]/v0[i] #这里使用昨天全天的和昨天该时刻的来预测全天的量
-                    else:
-                        vol = p1[i,2]/tv #使用今天的量仅仅使用分布来推测全天的量
+
+                    vol = p1[i,2]/tv #使用今天的量仅仅使用分布来推测全天的量
                     if vol>10*k[-1,2]: #别太大
                         vol = 10*k[-1,2]
-                    elif vol<0:
-                        vol = 0
+                    elif vol<=0:
+                        vol = k[-1,2]
                     clos = p1[i,6]
                     A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0,0]]))
                     #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi
@@ -782,6 +766,7 @@ def searchRasingCompanyStatusByRT(dd,period,cb,id2companys,progress):
     vlines = {}
     tasks = []
     results = []
+
     for i in range(len(a)):
         #progress       
         c = a[i]
