@@ -2855,7 +2855,7 @@ def showzdt(bi=None,ei=None):
 指数分类界面
 """
 def K(code):
-    kline.Plote(code,'d',config={'index':True},mode='runtime').show()
+    kline.Plote(code,'d',config={'index':True},mode='auto').show()
 
 def Indexs():
     menus = {

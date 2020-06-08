@@ -24,7 +24,7 @@ log = mylog.init('kline.log',name='kline')
 warnings.filterwarnings("ignore", module="matplotlib")
 
 _cacheK = {}
-
+_flow = None
 def plt_show(display_id,isupdate):
     try:
         for figure_manager in Gcf.get_all_fig_managers():
@@ -207,6 +207,7 @@ class Plote:
         self._showenergy = False
         self._mad = None
         self._rsi = None
+        self._showflow = False
         if len(self._k)==0: #完全没有数据
             return
         if 'ma' in self._config:
@@ -306,7 +307,12 @@ class Plote:
             self._axsInx += 1
             if self._rsi is None:
                 self._rsi = stock.rsi(self._k[:,4],6)
-            self._showrsi = True            
+            self._showrsi = True   
+        if 'flow' in self._config and self._config['flow']:
+            self._flowInx =self._axsInx+1
+            self._axsInx += 1
+            self._flow = self.getFlow(self._date)
+            self._showflow = True                     
         if 'volume' in self._config and self._config['volume']:
             self._volInx =self._axsInx+1
             self._axsInx += 1
@@ -373,6 +379,37 @@ class Plote:
         cur = _cacheK[code][period]
         _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
         return cur[0],k,d
+    """
+    取得资金流 ,d是k线图日期数组
+    """
+    def getFlow(self,d):
+        global _flow
+        if _flow is None:
+            #一般只加载最多一年的数据
+            after = stock.dateString(date.today()-timedelta(days=365 if self._lastday is None else self._lastday)) #1年数据
+            _flow = stock.loadFlow(after)
+        J = 0
+        k = np.zeros((len(d),4))
+        b = False
+        if type(d[0][0])==datetime:
+            b = True
+        for i in range(len(d)):
+            t = d[i][0]
+            t = d[i][0]
+            if not b:
+                t = datetime(t.year,t.month,t.day)
+            for j in range(J,len(_flow[1])):
+                t2 = _flow[1][j][0]
+                if t<t2:
+                    k[i] = _flow[0][j-1] if j-1>=0 else _flow[0][j]
+                    break
+                elif t==t2:
+                    k[i] = _flow[0][j]
+                    break
+            if j == len(_flow[1])-1:
+                k[i] = _flow[0][-1]
+            J = j
+        return k
 
     def init(self,company,period,config,date_ = None,companyInfo=None):
         self._period = period
@@ -539,6 +576,8 @@ class Plote:
         elif k=='figure':
             if 'figure' in self._backup:
                 self._config['figure'] = self._backup['figure']
+        elif k=='flow':
+            self._config['flow'] = True
 
     def disable(self,k):
         if k in self._config:
@@ -911,6 +950,13 @@ class Plote:
             axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
             axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
             axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
+        if self._showflow:
+            axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',color='purple')
+            axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',color='cyan')
+            axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',color='yellow')
+            axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',color='red')
+            axs[self._flowInx].axhline(color='black')
+
         #绘制趋势线
         if self._showtrend:
             #将日线的趋势线绘制到小级别图表中(仅仅绘制最后2个趋势线)
@@ -1152,36 +1198,49 @@ class Plote:
                 self.disable('kdj')
                 self.disable('best')
                 self.disable('bollwidth')
+                self.disable('flow')
             elif sel=='KDJ+':
                 self.disable('macd')
                 self.enable('energy')
                 self.enable('kdj')
                 self.disable('best')
                 self.disable('bollwidth')
+                self.disable('flow')
             elif sel=='MACD+Best':
                 self.enable('macd')
                 self.enable('energy')
                 self.disable('kdj')
                 self.enable('best')
                 self.disable('bollwidth')
+                self.disable('flow')
             elif sel=='MACD+BollWidth':
                 self.enable('macd')
                 self.enable('energy')
                 self.disable('kdj')
                 self.disable('best')
                 self.enable('bollwidth')
+                self.disable('flow')
             elif sel=='MACD':
                 self.enable('macd')
                 self.disable('energy')
                 self.disable('kdj')
                 self.disable('best')
-                self.disable('bollwidth')                
+                self.disable('bollwidth')
+                self.disable('flow')
+            elif sel=='FLOW':
+                self.disable('macd')
+                self.disable('energy')
+                self.disable('kdj')
+                self.disable('best')
+                self.disable('bollwidth')
+                self.enable('flow')
             elif sel=='CLEAR':
                 self.disable('macd')
                 self.disable('energy')
                 self.disable('kdj')
                 self.disable('best')
                 self.disable('bollwidth')
+                self.disable('flow')
             self.config()    
         def config_main(sel):
             if sel=='BOLL+':
@@ -1222,7 +1281,7 @@ class Plote:
             layout=Layout(width='96px')
         )    
         indexDropdown = widgets.Dropdown(
-            options=['MACD+','KDJ+','MACD+Best','MACD+BollWidth','MACD','CLEAR'],
+            options=['MACD+','KDJ+','MACD+Best','MACD+BollWidth','MACD','FLOW','CLEAR'],
             value=indexDropdownvalue,
             description='',
             disabled=False,

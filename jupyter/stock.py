@@ -154,6 +154,30 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
     return company[0],kline,kdate
 
 """
+加载资金流向数据
+flow {
+    0 larg, 特大 单笔>100w
+    1 big,  大 20-100w
+    2 mid,  中 5-20w
+    3 tiny  小 <5w
+}
+date {
+    0 - [date,]
+}
+"""
+def loadFlow(after=None):
+    if after is None:
+        data = query("select date,larg,big,mid,tiny from flow order by date")
+    else:
+        data = query("select date,larg,big,mid,tiny from flow where date>='%s' order by date"%(after))
+    flowdate = []
+    flow = []
+    for i in range(len(data)):
+        flowdate.append((data[i][0],))
+        flow.append(data[i][1:])
+    flowk = np.array(flow).reshape(-1,4)
+    return flowk,flowdate
+"""
 从共享内存加载k线数据
 """
 def loadKlineCache():
