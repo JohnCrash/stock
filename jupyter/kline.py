@@ -10,6 +10,7 @@ from IPython.core.interactiveshell import InteractiveShell
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
 import time
+import copy
 import trend
 import  warnings
 import shared
@@ -388,6 +389,18 @@ class Plote:
             #一般只加载最多一年的数据
             after = stock.dateString(date.today()-timedelta(days=365 if self._lastday is None else self._lastday)) #1年数据
             _flow = stock.loadFlow(after)
+        if stock.isTransDay():
+            today = datetime.today()
+            b,a = shared.fromRedis("flow_%d_%d"%(today.month,today.day))
+            if b:
+                offset = len(_flow[0])
+                flow = (np.zeros((offset+len(a),4)),copy.copy(_flow[1]))
+                flow[0][:offset,:] = _flow[0]
+                for i in range(len(a)):
+                    flow[0][i+offset] = a[i][1:]
+                    flow[1].append((a[i][0],))
+        else:
+            flow = _flow
         J = 0
         k = np.zeros((len(d),4))
         b = False
@@ -395,19 +408,18 @@ class Plote:
             b = True
         for i in range(len(d)):
             t = d[i][0]
-            t = d[i][0]
             if not b:
-                t = datetime(t.year,t.month,t.day)
-            for j in range(J,len(_flow[1])):
-                t2 = _flow[1][j][0]
+                t = datetime(t.year,t.month,t.day,15,0,0)
+            for j in range(J,len(flow[1])):
+                t2 = flow[1][j][0]
                 if t<t2:
-                    k[i] = _flow[0][j-1] if j-1>=0 else _flow[0][j]
+                    k[i] = flow[0][j-1] if j-1>=0 else flow[0][j]
                     break
                 elif t==t2:
-                    k[i] = _flow[0][j]
+                    k[i] = flow[0][j]
                     break
-            if j == len(_flow[1])-1:
-                k[i] = _flow[0][-1]
+            if j == len(flow[1])-1:
+                k[i] = flow[0][-1]
             J = j
         return k
 
@@ -951,11 +963,33 @@ class Plote:
             axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
             axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
         if self._showflow:
-            axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',color='purple')
-            axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',color='cyan')
-            axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',color='yellow')
-            axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',color='red')
-            axs[self._flowInx].axhline(color='black')
+            if self._period=='d' or self._period=='w':
+                axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',color='purple')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',color='cyan')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',color='yellow')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',color='red')
+            else: #确保相同天是连续的，不同天是断开的
+                dss = []
+                dds = self._date
+                ld = dds[0][0].day
+                bii = 0
+                for i in range(len(dds)):
+                    if dds[i][0].day!=ld:
+                        dss.append((bii,i))
+                        bii = i
+                        ld = dds[i][0].day
+                if bii != len(dds)-1:
+                    dss.append((bii,len(dds)))
+                for ds in dss:
+                    bii = ds[0]
+                    eii = ds[1]
+                    if (bii>=bi and bii<=ei) or (eii>=bi and eii<=ei):
+                        xx = np.linspace(bii,eii-1,eii-bii)
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,3],label='ting',color='purple')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,2],label='mid',color='cyan')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,1],label='big',color='yellow')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,0],label='larg',color='red')
+            axs[self._flowInx].axhline(color='black',linestyle='--')
 
         #绘制趋势线
         if self._showtrend:
