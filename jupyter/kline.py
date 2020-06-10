@@ -399,6 +399,8 @@ class Plote:
                 for i in range(len(a)):
                     flow[0][i+offset] = a[i][1:]
                     flow[1].append((a[i][0],))
+            else:
+                flow = _flow
         else:
             flow = _flow
         J = 0
@@ -765,11 +767,11 @@ class Plote:
                 gs = axs[0].get_gridspec()
                 for it in ax[:,1]:
                     it.remove()
-                if self._axsInx<3:
+                if self._axsInx<2:
                     axk5 = fig.add_subplot(gs[:-1,-1])
                 else:
                     axk5 = fig.add_subplot(gs[:-2,-1])
-                if self._axsInx>2:
+                if self._axsInx>=2:
                     axb5 = fig.add_subplot(gs[-2,-1])
                 else:
                     axb5 = None
@@ -964,10 +966,10 @@ class Plote:
             axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
         if self._showflow:
             if self._period=='d' or self._period=='w':
-                axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',color='purple')
-                axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',color='cyan')
-                axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',color='yellow')
-                axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',color='red')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',linewidth=1,color='cyan')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',linewidth=1,color='yellow')
+                axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',linewidth=2,color='red')
             else: #确保相同天是连续的，不同天是断开的
                 dss = []
                 dds = self._date
@@ -985,10 +987,10 @@ class Plote:
                     eii = ds[1]
                     if (bii>=bi and bii<=ei) or (eii>=bi and eii<=ei):
                         xx = np.linspace(bii,eii-1,eii-bii)
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,3],label='ting',color='purple')
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,2],label='mid',color='cyan')
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,1],label='big',color='yellow')
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,0],label='larg',color='red')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,3],label='ting',linewidth=1,color='purple')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,2],label='mid',linewidth=1,color='cyan')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,1],label='big',linewidth=1,color='yellow')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,0],label='larg',linewidth=2,color='red')
             axs[self._flowInx].axhline(color='black',linestyle='--')
 
         #绘制趋势线
@@ -1421,7 +1423,7 @@ class Plote:
 
         def on_zoomin(b):
             nonlocal beginPT,endPT,showRange
-            showRange = math.floor(showRange*3/4)
+            showRange = math.floor(showRange*1/2)
             beginPT = endPT - showRange
             self._trendHeadPos = endPT
             setSlider(beginPT,endPT,endPT)
@@ -1429,7 +1431,7 @@ class Plote:
 
         def on_zoomout(b):
             nonlocal beginPT,endPT,showRange
-            showRange = math.floor(showRange*4/3)
+            showRange = math.floor(showRange*2)
             beginPT = endPT - showRange
             if beginPT < 0:
                 beginPT = 0
@@ -1591,7 +1593,10 @@ class Plote:
                 if indexDropdown.value!="CLEAR":
                     skipUpdate = True
                     needRecalcRange = True
-                    indexDropdown.value = "CLEAR"
+                    if type(self._period)==int and indexDropdown.value=='CLEAR':
+                        indexDropdown.value = "CLEAR"    
+                    else:
+                        indexDropdown.value = "FLOW"
                 if mainDropdown.value=="BOLL+":
                     skipUpdate = True
                     needRecalcRange = True
