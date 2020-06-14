@@ -72,7 +72,7 @@
             "request": "launch",
             "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["SH688001","华兴源创"]
+            "args": ["SH688012","中微公司"]
         },   
         {
             "type": "node",

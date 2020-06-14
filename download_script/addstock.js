@@ -1,5 +1,5 @@
 const {company_kline} = require('./xueqiu_kline');
-const {query,connection} = require('./k');
+const {query,connection,initXueqiuCookie} = require('./k');
 const {CompanyScheme,valueList} = require("./dbscheme");
 const process = require('process');
 
@@ -17,6 +17,10 @@ const ucount_fast={
  */
 function add_new_stock(code,name,category){
     //先检查是否存在
+    initXueqiuCookie((b,c)=>{
+    if(!b){
+        console.error("初始化cookie失败");
+        return;}
     query(`select id from company where code='${code}'`,`select id from company where name='${name}'`)
     .then(results=>{
         if(results[0].length==0&&results[1].length==0){
@@ -47,7 +51,7 @@ function add_new_stock(code,name,category){
     })
     .catch(err=>{
         console.log(err);
-    })
+    })})
 }
 
 //每次只能加入一只股票

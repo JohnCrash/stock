@@ -1403,7 +1403,8 @@ class Plote:
             if endPT >= len(self._k):
                 endPT = len(self._k)
                 beginPT = endPT-showRange
-
+                if beginPT<0:
+                    beginPT = 0
             self._trendHeadPos = endPT
             setSlider(beginPT,endPT,endPT)
             showline()
@@ -1416,7 +1417,8 @@ class Plote:
             if beginPT < 0 :
                 endPT = showRange
                 beginPT = 0
-
+                if endPT>len(self._k):
+                    endPT = len(self._k)
             self._trendHeadPos = endPT
             setSlider(beginPT,endPT,endPT)
             showline()

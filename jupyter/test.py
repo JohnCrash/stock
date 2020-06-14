@@ -35,7 +35,7 @@ def progress(i):
 
 status.StrongSortedRT([3],progress=progress,companys=companys)
 """
-
+"""
 def progress(i):
     #print(i)
     pass
@@ -55,7 +55,7 @@ def isRasing(a,c,istoday):
             return True,[{'x':[-1],'color':'magenta','linestyle':'--','linewidth':2}]
     return False,[]    
 rasing,vlines = status.searchRasingCompanyStatusByRT('2020-06-05','d',isRasing,id2companys,progress)    
-
+"""
 #xueqiu.clearAllRT()
 #status.updateRT(companys)
 
@@ -143,3 +143,5 @@ if r.status_code==200:
 #c,k,d = stock.loadKline("SH000001",5)
 #k15,d15 = stock.mergeK(k,d,3)
 #print(k15)
+
+shared.delKey("SH688012")
