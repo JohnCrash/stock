@@ -2416,7 +2416,7 @@ def showflow(name=None):
             with output:
                 plotflow()
         if t.hour>=6 and t.hour<15:
-            xueqiu.Timer(120,update)
+            xueqiu.Timer(60,update) #60秒更新一次
         first = False
     update()
 
@@ -2854,18 +2854,25 @@ def showzdt(bi=None,ei=None):
 """
 指数分类界面
 """
-def K(code):
-    kline.Plote(code,'d',config={'index':True},mode='auto').show()
+def K(code,pos=None):
+    if pos is None:
+        kline.Plote(code,'d',config={'index':True},mode='runtime').show()
+    else:
+        kline.Plote(code,'d',config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
 
 def Indexs():
     menus = {
         "大盘":['SH000001', #上证
-            'SZ399001'], #深成
-            #'SZ399006'],#创业
+            'SZ399001', #深成
+            'SZ399006'],#创业
         "科技":['BK0021', #半导体
             'BK0489', #5G
             'BK0444', #大数据
             'BK0063', #计算机应用
+            'BK0414',#云计算 *
+            'BK0626',#消费电子 *
+            'BK0586',#芯片概念 *
+            'BK0441',#新能源汽车 *
             'BK0022', #光学光电子
             'BK0029', #通信设备
             'BK0066', #国防军工

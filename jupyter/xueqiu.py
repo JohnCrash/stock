@@ -348,7 +348,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
-            if t.minute%2==0 and t.minute!=lastUpdateFlow: #每2分钟更新一次
+            if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
         dt = 20-(datetime.today()-t).seconds #20秒更新一次

@@ -858,3 +858,10 @@ def spp(k,n=60):
             if k[i,3]<k[i+1,3] and k[i,3]<k[i-1,3]:
                 sp.append((i,k[i,3]))
     return sp,pp
+
+"""
+一堆股票的指数计算方法
+输入的是k,输出指数k
+"""
+def index(ks):
+    pass
