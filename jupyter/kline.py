@@ -622,6 +622,30 @@ class Plote:
         t = datetime.today()
         return t.weekday()>=0 and t.weekday()<5 and t.hour>=8 and t.hour<=15
 
+    #取得选择天的k5
+    def getCurrentK5(self):
+        pos = self._trendHeadPos
+        _,kd,dd = self.getKlineData(self._comarg,'d')
+        while True:
+            _,k5,d5 = self.getKlineData(self._comarg,5)
+            if pos>=0 and pos<len(dd):
+                d_pos = dd[pos][0]
+            elif pos>=len(dd):
+                return k5,d5
+            else:
+                break
+            for i in range(len(d5)-1,48,-1):
+                d = d5[i][0]
+                if d_pos.year==d.year and d_pos.month==d.month and d_pos.day==d.day:
+                    return k5[:i+1],d5[:i+1]
+            #尝试直接到数据库中查找
+            for bd in (1,2,3,20):
+                _,k5,d5 = stock.loadKline(self._comarg,5,stock.dateString(d_pos-timedelta(days=bd)),stock.dateString(d_pos+timedelta(days=1)))
+                if len(k5)>=96:
+                    return k5,d5
+            break
+        return np.array([]).reshape(-1,5),[]
+
     #显示K线图
     def showKline(self,bi=None,ei=None,figsize=(30,16)):     
         if bi is None:
@@ -776,8 +800,11 @@ class Plote:
                 else:
                     axb5 = None
                 axv5 = fig.add_subplot(gs[-1,-1])
-                axk5.set_title('5分钟K')
-                _,k5s,d5s = self.getKlineData(self._comarg,5)
+                k5s,d5s = self.getCurrentK5()
+                if len(d5s)>0:
+                    axk5.set_title('%s 5分钟K'%(stock.dateString(d5s[-1][0])))
+                else:
+                    axk5.set_title('5分钟K')
                 k5 = k5s[-48*20:]
                 d5 = d5s[-48*20:]
                 if len(d5)<1:
@@ -790,6 +817,7 @@ class Plote:
                 maxk5x = todayei-1
                 mink5close = k5[todayei-1][3]
                 mink5x = todayei-1
+                todaybi = 0
                 for i in range(todayei-1,-1,-1):
                     if d5[i][0].day != d5[-1][0].day:
                         todaybi = i+1
