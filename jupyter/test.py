@@ -144,4 +144,6 @@ if r.status_code==200:
 #k15,d15 = stock.mergeK(k,d,3)
 #print(k15)
 
-shared.delKey("SH688012")
+#shared.delKey("SH688012")
+
+xueqiu.updateAllRT()

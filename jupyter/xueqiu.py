@@ -262,6 +262,35 @@ def sinaK15(code,n=32):
 def sinaK5(code,n=96):
     return sinaK(code,5,n)
 
+#当company_select改变时，重新对过往的实时数据进行调整，调整完后和company_select当前的状态保持一致
+def rebuild_runtime_sequence(idds,seqs):
+    plane = np.zeros((len(idds),9),dtype=float)
+    mapit = None #假设过往数据，公司的数量一样多并且顺序相同
+    for i in range(len(idds)):
+        plane[i] = idds[i]
+    default = np.zeros(8,dtype=float)
+    for n in seqs:
+        b,f = shared.numpyFromRedis("rt%d"%n)
+        if b:
+            #如果mapit还没有生成，这里构造mapit
+            if mapit is None:
+                mapit = []
+                id2j = {}
+                for i in range(len(f)):
+                    id2j[int(f[i,0])] = i
+                for i in range(len(idds)):
+                    idd = idds[i]
+                    if idd in id2j:
+                        mapit.append(id2j[idd])
+                    else:
+                        mapit.append(-1)
+            for i in range(len(idds)):
+                j = mapit[i]
+                if j>=0:
+                    plane[i,1:] = f[j,1:]
+                else:
+                    plane[i,1:] = default
+            shared.numpyToRedis(plane,"rt%d"%n,ex=4*24*3600)
 #清除全部实时数据
 def clearAllRT():
     b,seqs = shared.fromRedis('runtime_sequence')
@@ -310,9 +339,15 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
         seqs = []
     plane = np.zeros((len(companys),9),dtype=float)
     lastUpdateFlow = -1
+    #如果company_select中的公司数量改变了确保过往的临时数据也做相应的改变
+    if len(seqs)>0:
+        b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
+        if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
+            rebuild_runtime_sequence(idds,seqs)
     while t.hour>=6 and t.hour<15:
         if stock.isTransTime():
             #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close,7 yesterday_close,8 today_open]
+            #[0 companys_id,1 timestamp,2 volume,3 current]
             seqs.append(math.floor(time.time()*1000*1000))
             for i in range(0,len(coms),100):
                 l = i+100
@@ -344,7 +379,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     print("***休市*** ",str(t))
                     return 'closed'
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=4*24*3600)
-            seqs = seqs[-3*60*4*3:] #3*60*4*10 每秒3次，保存3天的
+            seqs = seqs[-4*60*4*3:] #4*60*4*10 每秒3次，保存4天的
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
