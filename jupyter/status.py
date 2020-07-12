@@ -2285,7 +2285,16 @@ def saveflow(name=None):
 def showflow(name=None):
     if name==None:
         t = datetime.today()
-        name = "flow_%d_%d"%(t.month,t.day)        
+        n=0
+        while n<5:
+            name = "flow_%d_%d"%(t.month,t.day)
+            b,a = shared.fromRedis(name)
+            if b:
+                break
+            else:
+                t = t-timedelta(days=1)
+            n+=1
+
     output = widgets.Output()
     display(output)
     first = True 

@@ -191,5 +191,24 @@ def transferRT():
 
 transferRT()
 '''
-k,d = xueqiu.getCompanyLastK(1)
-print(k,d)
+
+def docb(ts,P):
+    plane = np.copy(P)
+    b = False
+    for i in range(len(plane)):
+        p = plane[i]
+        if p[4]==1:
+            k,_ = xueqiu.getCompanyLastK(int(p[0])) #取指定公司的最后一个k线数据
+            plane[i,2:] = [k[0],k[4],k[4],k[4]]
+            b = True
+    if b:
+        shared.numpyToRedis(plane,"rt%d"%ts,ex=4*24*3600)
+xueqiu.foreachRT(docb)
+
+companys = stock.query("select company_id,code,name,category from company_select")
+k,d = xueqiu.getRT(companys)
+for i in range(len(k)):
+    K = k[i]
+    if int(K[0][0])==2847:
+        print(K)
+

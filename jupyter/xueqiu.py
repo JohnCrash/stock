@@ -353,8 +353,7 @@ def foreachRT(cb):
         for ts in seqs:
             b,p = shared.numpyFromRedis("rt%d"%ts)
             if b:
-                t = datetime.fromtimestamp(ts/1000000)
-                cb(t,p)
+                cb(ts,p)
 #返回最后一帧数据,返回plane,timestamp
 def lastRT():
     b,seqs = shared.fromRedis('runtime_sequence')
@@ -382,14 +381,14 @@ def getCompanyLastK(idd):
     return _companyLastK[idd]
 #检查数据帧看看current是不是为0
 def checkFrame(plane):
+    b = False
     for i in range(len(plane)):
         p = plane[i]
-        if p[3]<=0 or p[4]<=0:
+        if p[2]<=0 or p[3]<=0 or p[4]<=0:
             k,_ = getCompanyLastK(int(p[0])) #取指定公司的最后一个k线数据
-            p[2] = k[0]
-            p[3] = k[4]
-            p[4] = k[4]
-            p[5] = k[4]
+            plane[i,2:] = [k[0],k[4],k[4],k[4]]
+            b = True
+    return True
 #当company_select改变时，重新对过往的实时数据进行调整，调整完后和company_select当前的状态保持一致
 def rebuild_runtime_sequence(idds,seqs):
     plane = np.zeros((len(idds),6),dtype=float)
