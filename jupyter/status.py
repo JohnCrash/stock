@@ -2544,7 +2544,29 @@ def showzdt(bi=None,ei=None):
                     )
                 but.code = codes[i]
                 but.on_click(on_company)
-                
+                children.append(but)
+        with output2:
+            box = Box(children=children,layout=box_layout)
+            display(box)
+    def on_category_list(e):
+        nonlocal output3
+        output3.clear_output(wait=True)
+        with output3:
+            for c in e.category[3]:
+                kline.Plote(c[1],'d',config={'index':True},context="实时涨跌",mode="runtime").show()
+    def list_output2_category(categorys):
+        nonlocal box_layout,output2
+        children = []
+        with output2:
+            for i in range(len(categorys)):
+                but = widgets.Button(
+                    description=categorys[i][0],
+                    disabled=False,
+                    button_style='',
+                    layout=Layout(width='96px')
+                    )
+                but.category = categorys[i]
+                but.on_click(on_category_list)
                 children.append(but)
         with output2:
             box = Box(children=children,layout=box_layout)
@@ -2638,10 +2660,17 @@ def showzdt(bi=None,ei=None):
         if sel=='全部':
             for category in allCategory():
                 sr = idd[:,3]==category
-                uns = np.count_nonzero(dr[sr]>=0.097)
-                dns = np.count_nonzero(dr[sr]<=-0.097)
+                upset = dr[sr]>=0.097
+                downset = dr[sr]<=-0.097
+                uns = np.count_nonzero(upset)
+                dns = np.count_nonzero(downset)
                 if uns>0 or dns>0:
-                    S.append((category,uns,dns))
+                    coms = []
+                    for cidd in K[sr,pos,0][upset]:
+                        coms.append(id2com[int(cidd)])
+                    for cidd in K[sr,pos,0][downset]:
+                        coms.append(id2com[int(cidd)])                        
+                    S.append((category,uns,dns,coms))
             SS = sorted(S,key=lambda it:100*it[1]-it[2],reverse=True)
             labels = getcols(SS,0)
             ums = getcols(SS,1)
@@ -2653,6 +2682,7 @@ def showzdt(bi=None,ei=None):
             autolabel(rects1)
             autolabel(rects2)
             clear_output2()
+            list_output2_category(SS)
         else:
             if sel=='涨停热点' or sel=='跌停热点':
                 sr = idd[:,3]==hot
