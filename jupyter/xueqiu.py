@@ -261,14 +261,141 @@ def sinaK15(code,n=32):
     return sinaK(code,15,n)
 def sinaK5(code,n=96):
     return sinaK(code,5,n)
+#将时间戳转换为日戳
+def toDayTimestramp(ts):
+    t = datetime.fromtimestamp(ts/1000000)
+    return int(datetime(t.year,t.month,t.day).timestamp()*1000*1000)
+#加速版本,使用全局变量
+_rtcach = {}
+def getrtcach(step):
+    if step in _rtcach:
+        return _rtcach[step]
+    else:
+        return None,None,None
+def setrtcach(step,k,d,lastp):
+    _rtcach[step] = (k,d,lastp)
 
+def defaultProgress(i):
+    pass
+"""
+返回company_select中公司的全部分时数据
+companys company_select表的返回
+step     间隔多少取一个数据
+N        返回表的长度，丢弃较早的数据,0表示全部数据
+progress 进度回调
+返回K = [[[0 id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
+       ....
+     len(companys)],]
+     shape = (len(companys),len(D),6)
+D = [(datetime,),....]
+没有数据返回None,None
+"""
+def getRT(companys,step=1,N=100,progress=defaultProgress):
+    _K,_D,_lastp = getrtcach(step)
+    b,seqs = shared.fromRedis('runtime_sequence')
+    C = len(companys)
+    progress(0)
+    if b:
+        if _D is None:
+            _D = []
+        ba = False if _lastp is not None else True
+        if _K is None or len(_K) != C:
+            ps = []
+            ba = True
+        else:
+            ps = [_K]
+        i = j = 0
+        seqs = seqs[-N*step:]
+        for ts in seqs:
+            if ba: #如果已经存在_lastp直接跳到这个位置在开始追加
+                if j==step-1:
+                    j = 0
+                    b,p = shared.numpyFromRedis("rt%d"%ts)
+                    if b:
+                        if len(p)==C:
+                            ps.append(p)
+                        elif len(p)>C:
+                            ps.append(p[:C])
+                        else:
+                            pp = np.zeros((C,6))
+                            pp[:len(p)] = p
+                            ps.append(pp)
+                        _D.append((datetime.fromtimestamp(ts/1000000),))
+                else:
+                    j+=1
+            elif _lastp == ts:
+                ba = True
+            progress(i/len(seqs))
+            i+=1
+        if len(ps)>1: #开始进行合并
+            _K = np.empty((C,len(_D),6))
+            bi = 0
+            for col in ps:
+                if col.shape[0]==C and col.shape[1]==6:
+                    ei = bi+1
+                    _K[:,bi,:] = col
+                else:
+                    ei = bi+col.shape[1]
+                    _K[:,bi:ei,:] = col
+                bi = ei
+            _lastp = seqs[-1]
+    if type(N)==int:
+        _K = _K[:,-N:,:]
+        _D = _D[-N:]
+    setrtcach(step,_K,_D,_lastp)
+    return _K,_D
+
+#遍历全部的数据帧
+#cb是回调函数，cb(timestamp,plane)
+def foreachRT(cb):
+    b,seqs = shared.fromRedis('runtime_sequence')
+    if b:
+        for ts in seqs:
+            b,p = shared.numpyFromRedis("rt%d"%ts)
+            if b:
+                t = datetime.fromtimestamp(ts/1000000)
+                cb(t,p)
+#返回最后一帧数据,返回plane,timestamp
+def lastRT():
+    b,seqs = shared.fromRedis('runtime_sequence')
+    if b:
+        ts = seqs[-1]
+        b,p = shared.numpyFromRedis("rt%d"%ts)
+        if b:
+            t = datetime.fromtimestamp(ts/1000000)
+            return p,t
+    return None,None
+#返回最后一次更新分时数据的时间
+def getLastUpdateTimestamp():
+    return shared.fromRedis('runtime_update')
+_companyLastK = {}
+#返回一个公司最近的k,d数据
+def getCompanyLastK(idd):
+    global _companyLastK
+    if idd in _companyLastK:
+        return _companyLastK[idd]
+    k = stock.query("""select date,volume,open,high,low,close from kd_xueqiu where id=%d order by date desc limit 1"""%(idd))
+    if len(k)>0:
+        _companyLastK[idd] = ((k[0][1],k[0][2],k[0][3],k[0][4],k[0][5]),k[0][0])
+    else:
+        _companyLastK[idd] = ((1,1,1,1,1),k[0][0])
+    return _companyLastK[idd]
+#检查数据帧看看current是不是为0
+def checkFrame(plane):
+    for i in range(len(plane)):
+        p = plane[i]
+        if p[3]<=0 or p[4]<=0:
+            k,_ = getCompanyLastK(int(p[0])) #取指定公司的最后一个k线数据
+            p[2] = k[0]
+            p[3] = k[4]
+            p[4] = k[4]
+            p[5] = k[4]
 #当company_select改变时，重新对过往的实时数据进行调整，调整完后和company_select当前的状态保持一致
 def rebuild_runtime_sequence(idds,seqs):
-    plane = np.zeros((len(idds),9),dtype=float)
+    plane = np.zeros((len(idds),6),dtype=float)
     mapit = None #假设过往数据，公司的数量一样多并且顺序相同
     for i in range(len(idds)):
         plane[i] = idds[i]
-    default = np.zeros(8,dtype=float)
     for n in seqs:
         b,f = shared.numpyFromRedis("rt%d"%n)
         if b:
@@ -289,7 +416,8 @@ def rebuild_runtime_sequence(idds,seqs):
                 if j>=0:
                     plane[i,1:] = f[j,1:]
                 else:
-                    plane[i,1:] = default
+                    k,_ = getCompanyLastK(int(idds[i]))
+                    plane[i,1:] = [0,k[0],k[4],k[4],k[4]]
             shared.numpyToRedis(plane,"rt%d"%n,ex=4*24*3600)
 #清除全部实时数据
 def clearAllRT():
@@ -337,7 +465,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     b,seqs = shared.fromRedis('runtime_sequence')
     if not b:
         seqs = []
-    plane = np.zeros((len(companys),9),dtype=float)
+    plane = np.zeros((len(companys),6),dtype=float)
     lastUpdateFlow = -1
     #如果company_select中的公司数量改变了确保过往的临时数据也做相应的改变
     if len(seqs)>0:
@@ -346,8 +474,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             rebuild_runtime_sequence(idds,seqs)
     while t.hour>=6 and t.hour<15:
         if stock.isTransTime():
-            #[0 companys_id,1 timestamp,2 volume,3 open,4 high,5 low,6 close,7 yesterday_close,8 today_open]
-            #[0 companys_id,1 timestamp,2 volume,3 current]
+            #[0 companys_id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
             seqs.append(math.floor(time.time()*1000*1000))
             for i in range(0,len(coms),100):
                 l = i+100
@@ -373,11 +500,12 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     if  datetime.fromtimestamp(plane[i][1]).day == t.day:
                         #只要有今天的最新数据表示今天可以进行交易
                         n+=1
-                shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=24*3600)                        
+                shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=24*3600)
                 if n < 300:
                     #并且标记今天不是可以交易的日子
                     print("***休市*** ",str(t))
                     return 'closed'
+            checkFrame(plane)
             shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=4*24*3600)
             seqs = seqs[-4*60*4*3:] #4*60*4*10 每秒3次，保存4天的
             shared.toRedis(seqs,'runtime_sequence')
@@ -534,9 +662,9 @@ def xueqiuRT(codes,result=None):
                         elif current>0:
                             code = d['symbol'].lower()
                             if code in code2i:
-                                result[code2i[code]] = [d['timestamp']/1000,vol,current,current,current,current,yesterday_close,today_open]
+                                result[code2i[code]] = [d['timestamp']/1000,vol,current,yesterday_close,today_open]
                             else:
-                                result[i] = [d['timestamp']/1000,vol,current,current,current,current,yesterday_close,today_open]
+                                result[i] = [d['timestamp']/1000,vol,current,yesterday_close,today_open]
                     except Exception as e:
                         log.error("xueqiuRT:"+str(d))
                         log.error("xueqiuRT:"+str(e))
@@ -603,9 +731,9 @@ def sinaRT(codes,result=None):
                                 appendRedisRT(code,timestamp,float(a[8]),open1,high,low,close1,yesterday_close,today_open)
                             elif open1>0 and high>0 and low>0 and close1>0:
                                 if code in code2i:
-                                    result[code2i[code]] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1,yesterday_close,today_open]
+                                    result[code2i[code]] = [timestamp.timestamp(),float(a[8]),open1,yesterday_close,today_open]
                                 else:
-                                    result[i] = [timestamp.timestamp(),float(a[8]),open1,high,low,close1,yesterday_close,today_open]
+                                    result[i] = [timestamp.timestamp(),float(a[8]),open1,yesterday_close,today_open]
                             i+=1
                 bi = ei+1
             return True
@@ -665,9 +793,9 @@ def qqRT(codes,result=None):
                             appendRedisRT(code,timestamp,vol,open1,high,low,close1,yesterday_close,today_open)
                         elif vol>0 and open1>0 and high>0 and low>0 and close1>0:
                             if code in code2i:
-                                result[code2i[code]] = [timestamp.timestamp(),vol,open1,high,low,close1,yesterday_close,today_open]
+                                result[code2i[code]] = [timestamp.timestamp(),vol,open1,yesterday_close,today_open]
                             else:
-                                result[i] = [timestamp.timestamp(),vol,open1,high,low,close1,yesterday_close,today_open]
+                                result[i] = [timestamp.timestamp(),vol,open1,yesterday_close,today_open]
                         i+=1
                 bi = ei+1
             return True

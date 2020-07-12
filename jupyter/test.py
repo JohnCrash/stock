@@ -146,4 +146,50 @@ if r.status_code==200:
 
 #shared.delKey("SH688012")
 
-xueqiu.updateAllRT()
+#xueqiu.updateAllRT()
+'''
+def getkkbyidd2(idd,ts):
+    t = datetime.fromtimestamp(ts/1000000)
+    K = stock.query("""select date,volume,open,high,low,close from kd_xueqiu where id=%d order by date desc limit 10"""%(idd))
+    for i in range(len(K)):
+        k = K[i]
+        if k[0].year==t.year and k[0].month==t.month and k[0].day==t.day:
+            if i+1<len(K):
+                yesterday_k = K[i+1]
+                return [yesterday_k[5],k[2]]
+    return [1,1]
+_g = {}
+def getkkbyidd(idd,t):
+    global _g
+    k = "%d-%d"%(idd,t)
+    if k in _g:
+        return _g[k]
+    _g[k] = getkkbyidd2(idd,t)
+    return _g[k]
+def getkk(p,t):
+    plane = np.zeros((len(p),2),dtype=float)
+    for i in range(len(p)):
+        idd = int(p[i][0])
+        try:
+            ts = xueqiu.toDayTimestramp(t)
+        except Exception as e:
+            print(idd,t,ts,e)
+        plane[i] = getkkbyidd(idd,ts)
+    return plane
+def transferRT():
+    plane = None 
+    b,seqs = shared.fromRedis('runtime_sequence')
+    if b:
+        for n in seqs:
+            b,p = shared.numpyFromRedis("rt%d"%n)
+            if b:
+                if plane is None:
+                    plane = np.zeros((len(p),6),dtype=float)
+                plane[:,:4] = p
+                plane[:,4:] = getkk(p,n)
+                shared.numpyToRedis(plane,"rt%d"%n,ex=4*24*3600)
+
+transferRT()
+'''
+k,d = xueqiu.getCompanyLastK(1)
+print(k,d)
