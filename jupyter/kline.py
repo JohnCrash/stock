@@ -625,7 +625,7 @@ class Plote:
     #取得选择天的k5
     def getCurrentK5(self):
         pos = self._trendHeadPos
-        _,kd,dd = self.getKlineData(self._comarg,'d')
+        _,kd,dd = self.getKlineData(self._comarg,self._period)
         while True:
             _,k5,d5 = self.getKlineData(self._comarg,5)
             if pos>=0 and pos<len(dd):
