@@ -39,7 +39,7 @@ def k2x4(bi,ei,k):
 
 #计算line的平均趋势线,并且让平均趋势线和line的中心重回
 def avgLine(lines,line):
-    avg_line = [line[0],line[1],line[2],line[3],line[4]]
+    avg_line = [line[0],line[1],line[2],line[3],line[4]] #bi,ei,k,b,R
     n = 0
     avg_k = 0
     for l in lines:
@@ -75,7 +75,10 @@ def macdTrend(k,m):
             else:
                 line = [bi,ei]+lastSequaresLine(k2x4(bi,ei+1,k))
             lines.append(line)
-    avg_lines = [avgLine(lines,line)]
+    if len(lines)==0:
+        return np.array([]),[],False
+    else:
+        avg_lines = [avgLine(lines,line)]
     b = False
     if ei!=0 and ei<len(k)-1:
         line = [ei,len(k)]+lastSequaresLine(k2x4(ei,len(k),k))

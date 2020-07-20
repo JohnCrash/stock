@@ -18,6 +18,9 @@ import math
 import config
 import subprocess
 import threading
+
+shared.delKey('company_status_last50') #清除redis中的缓存数据
+shared.delKey('company_status_date50') #清除redis中的缓存数据
 """
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
@@ -62,13 +65,13 @@ rasing,vlines = status.searchRasingCompanyStatusByRT('2020-06-05','d',isRasing,i
 #xueqiu.sinaFlowRT()
 #print('Done')
 #status.saveflow()
-
+"""
 def process(i):
     pass
 print("开始更新数据库...")
 status.update_status(process)
 print("更新完成。") 
-
+"""
 
 '''
 #status.showzdt(bi='2019-01-02',ei='2019-10-01')

@@ -209,6 +209,9 @@ class Plote:
         self._mad = None
         self._rsi = None
         self._showflow = False
+        self._gotoTrendHeandPos = False
+        self._widths = [1]
+        self._heights = [3]        
         if len(self._k)==0: #完全没有数据
             return
         if 'ma' in self._config:
@@ -238,7 +241,7 @@ class Plote:
                 self._day_b = b
             #self._trend2 = trend.large(self._k,self._trend,0.15)
             self._showtrend = True
-        self._gotoTrendHeandPos = False
+        
         if self._date and 'markpos' in self._config:
             dd = self._config['markpos']
             if type(self._date[-1][0])!=type(dd):
@@ -322,9 +325,6 @@ class Plote:
             self._showvolume = True
 
         #将大盘指数的收盘价显示在图表中
-        
-        self._widths = [1]
-        self._heights = [3]
         for i in range(self._axsInx):
             self._heights.append(1)
         if 'vlines' in self._config:
@@ -459,7 +459,10 @@ class Plote:
                 d = self._date
                 #这里计算相对于昨天的涨跌率
                 if period=='d':
-                    self._rate = round((k[-1][4]/k[-2][4]-1)*100,2)
+                    if len(k)>2:
+                        self._rate = round((k[-1][4]/k[-2][4]-1)*100,2)
+                    else:
+                        self._rate = 0
                 elif period==15 or period==5:
                     dd = d[-1][0]
                     self._maxk = k[-1][2]
@@ -647,7 +650,9 @@ class Plote:
         return np.array([]).reshape(-1,5),[]
 
     #显示K线图
-    def showKline(self,bi=None,ei=None,figsize=(30,16)):     
+    def showKline(self,bi=None,ei=None,figsize=(30,16)):  
+        if self._axsInx==0:
+            return
         if bi is None:
             bi = len(self._k)-self._showcount
         if ei is None:
