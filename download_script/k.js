@@ -188,6 +188,40 @@ function companys_task_continue(itemStr,n,task){
     });
 }
 
+function companys_task_continue2(itemStr,n,task){
+    let dd =(new Date()).getDate();
+    function flagit(com){
+        connection.query(`update company set \`ignore\`=${dd} where id=${com.id}`,(error, results, field)=>{
+            if(error)console.error(error);
+        });
+    }    
+    return new Promise((resolve,reject)=>{
+        let t0 = Date.now();
+        connection.query(`select ${itemStr?itemStr:"*"} from company where \`ignore\`!=${dd}`,(error, results, field)=>{
+            if(error){    
+                console.error(error);
+                reject(error);
+            }else{
+                let tasks = [];
+                for(let com of results){
+                    tasks.push(task(com,flagit));
+                }
+                console.info('需要更新：',tasks.length,'只股票信息')
+                if(tasks.length>0)
+                    async.parallelLimit(tasks,n,(err,result)=>{
+                        if(err){
+                            reject(error);
+                        }else{
+                            resolve(Date.now()-t0);
+                        }
+                    });                    
+                else
+                    resolve(Date.now()-t0);
+            } 
+        });
+    });
+}
+
 function query(querys){
     let queryArray = (typeof(querys)==='object' && query.length) ? querys : arguments;
     return new Promise((resolve,reject)=>{
@@ -387,6 +421,7 @@ function xueqiuGetJson(uri,cb){
     });    
     c.queue({
         uri,
+        jQuery: false,
         headers:{
             Cookie:xuequeCookie
         }
@@ -417,6 +452,7 @@ function xueqiuPostJson(uri,form,cb){
     });    
     c.queue({
         uri,
+        jQuery: false,
         headers:{
             Cookie:xuequeCookie
         },
@@ -470,5 +506,5 @@ function initXueqiuCookie(cb){
 //macd_year();
 //macd_wave();
 
-module.exports = {k_company,companys_task,dateString,query,connection,
+module.exports = {k_company,companys_task,dateString,query,connection,companys_task_continue2,
     paralle_companys_task,xuequeCookie,xueqiuPostJson,xueqiuGetJson,companys_task_continue,initXueqiuCookie,getXueqiuCookie};

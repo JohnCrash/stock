@@ -377,7 +377,7 @@ def getCompanyLastK(idd):
     if len(k)>0:
         _companyLastK[idd] = ((k[0][1],k[0][2],k[0][3],k[0][4],k[0][5]),k[0][0])
     else:
-        _companyLastK[idd] = ((1,1,1,1,1),k[0][0])
+        _companyLastK[idd] = ((1,1,1,1,1),(datetime.today(),))
     return _companyLastK[idd]
 #检查数据帧看看current是不是为0
 def checkFrame(plane):
@@ -467,10 +467,13 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     plane = np.zeros((len(companys),6),dtype=float)
     lastUpdateFlow = -1
     #如果company_select中的公司数量改变了确保过往的临时数据也做相应的改变
-    if len(seqs)>0:
-        b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
-        if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
-            rebuild_runtime_sequence(idds,seqs)
+    try:
+        if len(seqs)>0:
+            b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
+            if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
+                rebuild_runtime_sequence(idds,seqs)
+    except Exception as e:
+        log.error("updateAllRT updateRT:"+e)
     while t.hour>=6 and t.hour<15:
         if stock.isTransTime():
             #[0 companys_id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
@@ -944,11 +947,12 @@ def getK(code,period,n,provider=None):
         service = stockK5Service
     elif period==15:
         service = stockK15Service
-    if code.upper()=='SZ399001': #新浪的的深成指和雪球有较大差异
+    CODE = code.upper()
+    if CODE=='SZ399001' or CODE=='SH000001' or CODE=='SZ399006': #主要指数使用xueqiu数据，不同来源的数据成交量有差异
         if period == 15:
-            provider = '雪球k15'
+            provider = u'雪球k15'
         else:
-            provider = '雪球k5'
+            provider = u'雪球k5'
     if service is not None:
         for i in range(10):
             if provider is None:
@@ -1184,7 +1188,7 @@ def K(code,period,n):
 def isTransTime():
     to = datetime.today()
     if to.weekday()>=0 and to.weekday()<=4 and to.hour>=9 and to.hour<=14:
-        if to.hour==9 and to.minute<30:
+        if to.hour==9 and to.minute<15: #包括集合竞价阶段
             return False
         return True
     return False

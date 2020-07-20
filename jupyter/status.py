@@ -2296,9 +2296,12 @@ def showflow(name=None):
     first = True 
     def plotflow():
         nonlocal output,name
-        b,a = shared.fromRedis(name)
+        t = datetime.today()
+        n = "flow_%d_%d"%(t.month,t.day)
+        b,a = shared.fromRedis(n)
+        if not b:
+            b,a = shared.fromRedis(name)
         if b:
-            t = datetime.today()
             fig,axs = plt.subplots(figsize=(28,14))
             axs.set_title("资金流向 %s %s"%(name,str(t)))
             d = np.zeros((len(a),5))
@@ -2402,7 +2405,9 @@ def showzdt(bi=None,ei=None):
         description='热点',
         layout=Layout(display='block',width='215px'),
         disabled=False)        
-    listbutton = widgets.Button(description="列表",layout=Layout(width='48px'))           
+    listbutton = widgets.Button(description="细节列表",layout=Layout(width='84px')) 
+    zzbutton = widgets.Button(description="昨涨停",layout=Layout(width='64px'))
+    zdbutton = widgets.Button(description="昨跌停",layout=Layout(width='64px'))          
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))           
     output = widgets.Output()
     output2 = widgets.Output()
@@ -2412,7 +2417,7 @@ def showzdt(bi=None,ei=None):
                     align_items='stretch',
                     border='solid',
                     width='100%')    
-    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,refreshbutton],layout=box_layout)
+    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,zzbutton,zdbutton,refreshbutton],layout=box_layout)
     def getData():
         nonlocal K,D,mode,companys,uhots,dhots,bi,ei
         if mode == '2分钟':

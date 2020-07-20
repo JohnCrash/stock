@@ -62,16 +62,13 @@ rasing,vlines = status.searchRasingCompanyStatusByRT('2020-06-05','d',isRasing,i
 #xueqiu.sinaFlowRT()
 #print('Done')
 #status.saveflow()
-"""
+
 def process(i):
     pass
-print("保存资金流向到数据库...")
-xueqiu.sinaFlowRT()
-status.saveflow()
 print("开始更新数据库...")
 status.update_status(process)
 print("更新完成。") 
-"""
+
 
 '''
 #status.showzdt(bi='2019-01-02',ei='2019-10-01')
@@ -191,7 +188,7 @@ def transferRT():
 
 transferRT()
 '''
-
+'''
 def docb(ts,P):
     plane = np.copy(P)
     b = False
@@ -212,3 +209,4 @@ for i in range(len(k)):
     if int(K[0][0])==2847:
         print(K)
 
+'''

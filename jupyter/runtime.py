@@ -24,7 +24,7 @@ if platform.platform()[:7]=='Windows':
 
 while True:
     t = datetime.today()
-    if t.hour>=9 and t.hour<15 and stock.isTransDay():
+    if t.hour>=9 and t.hour<15 and stock.isTransDay() and stock.isTransTime():
         try:
             xueqiu.updateAllRT()
             time.sleep(1)

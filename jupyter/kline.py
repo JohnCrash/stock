@@ -664,7 +664,7 @@ class Plote:
         else:
             if ei<=-len(self._k):
                 ei = -len(self._k)+1
-
+        axsK = None
         #绘制趋势线
         def drawTrendLine(ax,period,dates,cx0,cx1,cy0=None,cy1=None,lw=3):
             if type(period)==int and self._day_trend is not None and len(self._day_trend)>2:
@@ -776,12 +776,13 @@ class Plote:
                         else:
                             ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.',alpha=0.6)                
                 #绘制平均斜率
-                for line in self._day_last_line:
-                    x0 = line[0]
-                    x1 = line[1]
-                    k = line[2]
-                    b = line[3]
-                    axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
+                if axsK is not None:
+                    for line in self._day_last_line:
+                        x0 = line[0]
+                        x1 = line[1]
+                        k = line[2]
+                        b = line[3]
+                        axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
 
         while True:
             if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()): #下面的代码在右侧开辟一个区域绘制5分钟时k图

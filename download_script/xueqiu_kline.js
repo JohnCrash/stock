@@ -1,7 +1,7 @@
 /**
  * 专门用来下载雪球网的k线数据
  */
-const {paralle_companys_task,companys_task_continue,k_company,dateString,query,connection,getXueqiuCookie,initXueqiuCookie} = require('./k');
+const {paralle_companys_task,companys_task_continue2,k_company,dateString,query,connection,getXueqiuCookie,initXueqiuCookie} = require('./k');
 const async = require('async');
 const Crawler = require("crawler");
 
@@ -123,12 +123,13 @@ const ucount_fast={
  */
 function company_kline(id,code,lv,callback,uctable=ucount){
 
-    function xueqiuURI(timestamp){
+    function xueqiuURI(timestamp,fast=false){
         let uri;
+        let uct = fast?ucount_fast:uctable;
         if(lv=='d')
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${uctable[lv]}&indicator=kline,ma,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${uct[lv]}&indicator=kline,ma,macd`;
         else
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${uctable[lv]}&indicator=kline,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${uct[lv]}&indicator=kline,macd`;
         
         return uri;
     }
@@ -161,7 +162,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
             callback : function(error, res, done){
                 if(error){
                     console.error(code,error);
-                    callback(error);
+                    callback(error,id);
                 }else{
                     try{
                         let sl = JSON.parse(res.body);
@@ -216,7 +217,8 @@ function company_kline(id,code,lv,callback,uctable=ucount){
                                 //console.log(code,'next segment : ',items[0][0]);
                                 nextdate=items[0][0];
                                 c.queue({
-                                    uri:xueqiuURI(items[0][0]),
+                                    uri:xueqiuURI(items[0][0],true),
+                                    jQuery: false,
                                     headers:{
                                         Cookie:getXueqiuCookie(),
                                         Accept:'application/json, text/plain, */*'
@@ -224,24 +226,24 @@ function company_kline(id,code,lv,callback,uctable=ucount){
                                 });
                             }else{
                                 //console.log(code,'DONE');
-                                callback();    
+                                callback(null,id);    
                             }
                         }else{
                             let err = res.body;
                             if(sl.data && sl.data.column && sl.data.item && sl.data.item.length && isCorrect(sl.data.column)){
                                 //console.log(code,'DONE');
-                                callback();
+                                callback(null,id);
                             }else if(sl.data && sl.error_code==0){
                                 //console.log(code,'NO K');
-                                callback();                                
+                                callback(null,id);                                
                             }else{
                                 console.error(code,err);
-                                callback(err);    
+                                callback(err,id);    
                             }
                         }
                     }catch(err){
                         console.error(code,err);
-                        callback(err);
+                        callback(err,id);
                     }
                 }
                 done();
@@ -265,7 +267,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
 function download_kline(lvs,done){
     initXueqiuCookie((b,c)=>{
         if(b){
-            companys_task_continue('id,code',1,com=>cb=>{
+            companys_task_continue2('id,code',1,(com,flagit)=>cb=>{
                 let task = [];
                 for(let lv of lvs){
                     task.push(
@@ -274,9 +276,12 @@ function download_kline(lvs,done){
                         }
                     );    
                 }
-                async.series(task,(err,results)=>{
+                async.series(task,(err,id)=>{
                     if(err)
                         console.error(err);
+                    else{
+                        flagit(com); //成功更新标记它
+                    }
                     cb(err);
                 });
             }).then(usetime=>{

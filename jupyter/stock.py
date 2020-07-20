@@ -8,7 +8,8 @@ import config
 def isTransTime(t=None):
     if t is None:
         t = datetime.today()
-    return ((t.hour==9 and t.minute>=30) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5
+    #包括集合竞价
+    return ((t.hour==9 and t.minute>=15) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) and t.weekday()>=0 and t.weekday()<5
 
 #判断今天是不是可以交易
 def isTransDay():
