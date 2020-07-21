@@ -29,13 +29,9 @@ client.get("XueqiuCookie",(err,reply)=>{
   console.log(err,reply)
 });
 */
-/*
+
 initXueqiuCookie((b,c)=>{
-  discard_category(()=>{
-    console.log('DONE')
+  company_kline(8949,'SZ399006','d',(err,id)=>{
+    console.log(err,id);
   });
 })
-*/
-a = new Date();
-
-console.log(a);

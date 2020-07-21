@@ -2419,7 +2419,7 @@ def showzdt(bi=None,ei=None):
                     width='100%')    
     box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,zzbutton,zdbutton,refreshbutton],layout=box_layout)
     def getData():
-        nonlocal K,D,mode,companys,uhots,dhots,bi,ei
+        nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos
         if mode == '2分钟':
             D,K = getRT2m(companys)
         else:
@@ -2445,12 +2445,12 @@ def showzdt(bi=None,ei=None):
                 i[1] = id2com[k][1]
                 i[2] = id2com[k][2]
                 i[3] = id2com[k][3]            
-        r = K[:,:,2]/K[:,:,3]-1
+        r = K[:,pos,2]/K[:,pos,3]-1
         S = []
         for category in allCategory():
             sr = idd[:,3]==category
-            u = np.count_nonzero(r[sr,:]>=0.097)
-            d = np.count_nonzero(r[sr,:]<=-0.097)
+            u = np.count_nonzero(r[sr]>=0.097)
+            d = np.count_nonzero(r[sr]<=-0.097)
             S.append((category,u,d))
         #涨幅榜前10
         um = sorted(S,key=lambda it:it[1],reverse=True)
@@ -2592,6 +2592,12 @@ def showzdt(bi=None,ei=None):
             clear_output2()
             list_output2_category(SS)
     listbutton.on_click(on_list)
+    def on_zd(e):
+        pass
+    def on_zz(e):
+        pass
+    zdbutton.on_click(on_zd)
+    zzbutton.on_click(on_zz)
     first = True
     def update_zdt():
         nonlocal output,pos,bii,eii,sel,idd,K,D,mode,uhots,dhots,hot,SS
