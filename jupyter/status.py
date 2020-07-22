@@ -2359,8 +2359,11 @@ def showzdt(bi=None,ei=None):
     D = None
     K = None
     hot = None
+    firstgetData = True
+    listState = False
     uhots = []
     dhots = []
+    SS = None
     mode = '2分钟'
     companys = stock.query("""select company_id,code,name,category from company_select""")
     id2com = {}
@@ -2405,9 +2408,9 @@ def showzdt(bi=None,ei=None):
         description='热点',
         layout=Layout(display='block',width='215px'),
         disabled=False)        
-    listbutton = widgets.Button(description="细节列表",layout=Layout(width='84px')) 
-    zzbutton = widgets.Button(description="昨涨停",layout=Layout(width='64px'))
-    zdbutton = widgets.Button(description="昨跌停",layout=Layout(width='64px'))          
+    listbutton = widgets.Button(description="选择列表",layout=Layout(width='82px')) 
+    zzbutton = widgets.Button(description="涨停当前",layout=Layout(width='82px'))
+    zdbutton = widgets.Button(description="跌停当前",layout=Layout(width='82px'))          
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))           
     output = widgets.Output()
     output2 = widgets.Output()
@@ -2419,7 +2422,7 @@ def showzdt(bi=None,ei=None):
                     width='100%')    
     box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,zzbutton,zdbutton,refreshbutton],layout=box_layout)
     def getData():
-        nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos
+        nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos,firstgetData
         if mode == '2分钟':
             D,K = getRT2m(companys)
         else:
@@ -2466,6 +2469,9 @@ def showzdt(bi=None,ei=None):
                 dhots.append(dm[i][0])
         hotsDropdown.options = []
         hotsDropdown.value = None
+        #第一次加载数据，这里将上上一个交易日收盘时的涨停和跌停股找出来
+        if firstgetData:
+            firstgetData = False
     def on_prevpos(e):
         nonlocal pos,bii,eii,slider
         pos -= 1
@@ -2585,12 +2591,16 @@ def showzdt(bi=None,ei=None):
         with output2:
             box = Box(children=children,layout=box_layout)
             display(box)
-    SS = None
+    
     def on_list(e):
-        nonlocal SS
-        if SS is not None:
-            clear_output2()
-            list_output2_category(SS)
+        nonlocal listState
+        if listState:
+            listState = False
+            e.button_style = ''
+        else:
+            listState = True
+            e.button_style = 'success'
+        update_zdt()
     listbutton.on_click(on_list)
     def on_zd(e):
         pass
@@ -2600,7 +2610,7 @@ def showzdt(bi=None,ei=None):
     zzbutton.on_click(on_zz)
     first = True
     def update_zdt():
-        nonlocal output,pos,bii,eii,sel,idd,K,D,mode,uhots,dhots,hot,SS
+        nonlocal output,pos,bii,eii,sel,idd,K,D,mode,uhots,dhots,hot,SS,listState
 
         slider_range(-len(D)+1,-1)
 
@@ -2709,6 +2719,9 @@ def showzdt(bi=None,ei=None):
             autolabel(rects1)
             autolabel(rects2)
             clear_output2()
+            if listState:
+                if SS is not None:
+                    list_output2_category(SS)                
         else:
             if sel=='涨停热点' or sel=='跌停热点':
                 sr = idd[:,3]==hot
@@ -2725,7 +2738,8 @@ def showzdt(bi=None,ei=None):
             dms = getcols(SS,2)
             codes = getcols(SS,3)
             clear_output2()
-            list_output2(labels,codes,ums,dms)
+            if listState:
+                list_output2(labels,codes,ums,dms)
             x = np.arange(len(labels))  # the label locations
             width = 0.2  # the width of the bars
             rects1 = axs[1].bar(x, ums, 0.9, color='red', label='涨跌分布')
