@@ -880,19 +880,22 @@ class Plote:
                     k5curyb = False
                 axk5.text(todayei-1,k5cury,str(k5currate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not k5curyb else 'bottom',color='red' if k5currate>=0 else 'darkgreen')
                 ck5v,mad = stock.correctionVolume(k5,d5,5)
-                axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
-                axv5.axhline(y=ck5v[todaybi-48:todaybi].mean(),color='darkorange',linestyle='--')
-                axv5.axhline(y=ck5v[todaybi:todayei].mean(),color='dodgerblue',linestyle='--')
+                #axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
+                #axv5.axhline(y=ck5v[todaybi-48:todaybi].mean(),color='darkorange',linestyle='--')
+                #axv5.axhline(y=ck5v[todaybi:todayei].mean(),color='dodgerblue',linestyle='--')
+                axv5.step(k5x,k5[todaybi:todayei,0],label='volume')
+                axv5.step(k5x,mad[-1,-todayei+todaybi:],label='mad',color='orangered')
                 #绘制一条均线
                 k5ma30 = stock.maK(k5[todaybi:],60)
                 axk5.plot(k5x,k5ma30,color='darkorange',linestyle='--')
+                axv5.axhline(color='black')
                 if axb5 is not None:
                     axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
                     axb5.plot(np.linspace(todaybi,todaybi+47,48),yb[todaybi-48:todaybi],color='darkorange',label='yesterday')
                     axb5.set_xticks(xticks)
                     axb5.set_xlim(todaybi-1,todaybi+48)
                     axb5.grid(True)            
-                axv5.axhline(color='black')
+                
                 drawTrendLine(axk5,5,d5,todaybi-1,todaybi+48,k5[todaybi-1:todaybi+48,3].min(),k5[todaybi-1:todaybi+48,2].max(),2)
             else:
                 gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
@@ -1066,7 +1069,7 @@ class Plote:
         if self._showvolume:
             axs[self._volInx].step(x,self._k[bi:ei,0],where='mid',label='volume')
             if self._mad is not None: #绘制5分钟或者15分钟的碗型
-                axs[self._volInx].step(x,self._mad[bi:ei],label='mad',color='orangered') #low
+                axs[self._volInx].step(x,self._mad[bi:ei],where='mid',label='mad',color='orangered') #low
             else:
                 axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
                 axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
