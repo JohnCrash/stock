@@ -1121,7 +1121,6 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
      5 按周期利润排序的索引和利润对[company,date,(index,dk)],
      6 该分类的前十名平均盈利[date_n],
      7 该分类的跌幅前十的平均跌幅[date_n]
-     8 (0前面10名的成交量最近5分钟) ？
      )
 ]
 K = [company_n,date_n,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
@@ -2359,8 +2358,8 @@ def showzdt(bi=None,ei=None):
     D = None
     K = None
     hot = None
-    firstgetData = True
     listState = False
+    method = 'None'
     uhots = []
     dhots = []
     SS = None
@@ -2407,10 +2406,14 @@ def showzdt(bi=None,ei=None):
         value=None,
         description='热点',
         layout=Layout(display='block',width='215px'),
-        disabled=False)        
-    listbutton = widgets.Button(description="选择列表",layout=Layout(width='82px')) 
-    zzbutton = widgets.Button(description="涨停当前",layout=Layout(width='82px'))
-    zdbutton = widgets.Button(description="跌停当前",layout=Layout(width='82px'))          
+        disabled=False)     
+    nextDropdown = widgets.Dropdown(
+        options=['None','平均'],
+        value=method,
+        description='次日',
+        layout=Layout(display='block',width='215px'),
+        disabled=False)           
+    listbutton = widgets.Button(description="选择列表",layout=Layout(width='82px'))         
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))           
     output = widgets.Output()
     output2 = widgets.Output()
@@ -2420,9 +2423,9 @@ def showzdt(bi=None,ei=None):
                     align_items='stretch',
                     border='solid',
                     width='100%')    
-    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,zzbutton,zdbutton,refreshbutton],layout=box_layout)
+    box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,nextDropdown,refreshbutton],layout=box_layout)
     def getData():
-        nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos,firstgetData
+        nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos
         if mode == '2分钟':
             D,K = getRT2m(companys)
         else:
@@ -2469,9 +2472,7 @@ def showzdt(bi=None,ei=None):
                 dhots.append(dm[i][0])
         hotsDropdown.options = []
         hotsDropdown.value = None
-        #第一次加载数据，这里将上上一个交易日收盘时的涨停和跌停股找出来
-        if firstgetData:
-            firstgetData = False
+
     def on_prevpos(e):
         nonlocal pos,bii,eii,slider
         pos -= 1
@@ -2530,6 +2531,13 @@ def showzdt(bi=None,ei=None):
     frontbutton.on_click(on_nextpos)
     slider.observe(on_sliderChange,names='value')   
     display(box,output,output2,output3)
+    #涨停板次日
+    def on_next(e):
+        nonlocal method
+        if e['name']=='value':
+            method = e['new']
+            update_zdt()
+    nextDropdown.observe(on_next,names='value')
     def clear_output2():
         nonlocal output2,output3
         output2.clear_output()
@@ -2602,15 +2610,9 @@ def showzdt(bi=None,ei=None):
             e.button_style = 'success'
         update_zdt()
     listbutton.on_click(on_list)
-    def on_zd(e):
-        pass
-    def on_zz(e):
-        pass
-    zdbutton.on_click(on_zd)
-    zzbutton.on_click(on_zz)
     first = True
     def update_zdt():
-        nonlocal output,pos,bii,eii,sel,idd,K,D,mode,uhots,dhots,hot,SS,listState
+        nonlocal K,D,output,pos,bii,eii,sel,idd,K,D,mode,uhots,dhots,hot,SS,listState,method
 
         slider_range(-len(D)+1,-1)
 
@@ -2622,14 +2624,14 @@ def showzdt(bi=None,ei=None):
                 i[1] = id2com[k][1]
                 i[2] = id2com[k][2]
                 i[3] = id2com[k][3]           
-        fig,axs = plt.subplots(2,1,figsize=(30,14))
+        fig,axs = plt.subplots(2,1,figsize=(30,14),sharex=False if method=='None' else True)
         fig.subplots_adjust(hspace=0.1,wspace=0.05) #调整子图上下间距
         axs[0].set_title("'%s'涨停跌停"%sel)
         if mode=='2分钟':
             axs[0].xaxis.set_major_formatter(MyFormatterRT(D,fmt='m'))
         else:
             axs[0].xaxis.set_major_formatter(kline.MyFormatter(D,'d'))        
-        x = np.linspace(0,len(D)-1,len(D))
+        X = np.linspace(0,len(D)-1,len(D))
         xticks = []
         if mode=='2分钟':
             for i in range(len(D)):
@@ -2647,8 +2649,8 @@ def showzdt(bi=None,ei=None):
             r = K[:,:,2]/K[:,:,3]-1
             um = np.count_nonzero(r>=0.097,axis=0)
             dm = np.count_nonzero(r<=-0.097,axis=0)            
-            axs[0].plot(x,um,color="red",label="涨停%d"%(um[-1]))
-            axs[0].plot(x,dm,color="green",label="跌停%d"%(dm[-1]))            
+            axs[0].plot(X,um,color="red",label="涨停%d"%(um[-1]))
+            axs[0].plot(X,dm,color="green",label="跌停%d"%(dm[-1]))            
         elif sel=='涨停热点' or sel=='跌停热点':
             hots = uhots if sel=='涨停热点' else dhots
             for category in hots:
@@ -2659,17 +2661,17 @@ def showzdt(bi=None,ei=None):
                 else:
                     m = np.count_nonzero(r<=-0.097,axis=0)
                 if hot==category:
-                    axs[0].plot(x,m,linewidth=3,label=category)
+                    axs[0].plot(X,m,linewidth=3,label=category)
                 else:
-                    axs[0].plot(x,m,linestyle='--',alpha=0.5,label=category)
+                    axs[0].plot(X,m,linestyle='--',alpha=0.5,label=category)
         else:
             #选择分类的涨停和跌停
             sr = idd[:,3]==sel
             r = K[sr,:,2]/K[sr,:,3]-1
             um = np.count_nonzero(r>=0.097,axis=0)
             dm = np.count_nonzero(r<=-0.097,axis=0)            
-            axs[0].plot(x,um,color="red",label="涨停%d"%(um[-1]))
-            axs[0].plot(x,dm,color="green",label="跌停%d"%(dm[-1]))
+            axs[0].plot(X,um,color="red",label="涨停%d"%(um[-1]))
+            axs[0].plot(X,dm,color="green",label="跌停%d"%(dm[-1]))
 
         axs[0].axvline(len(D)+pos,color="red",linewidth=2,linestyle='--')
         axs[0].set_xticks(xticks)
@@ -2714,10 +2716,25 @@ def showzdt(bi=None,ei=None):
             dms = getcols(SS,2)
             x = np.arange(len(labels))  # the label locations
             width = 0.4  # the width of the bars
-            rects1 = axs[1].bar(x - width/2, ums, width, color='red', label='涨停')
-            rects2 = axs[1].bar(x + width/2, dms, width, color='green',label='跌停') 
-            autolabel(rects1)
-            autolabel(rects2)
+            if method=='None':                
+                rects1 = axs[1].bar(x - width/2, ums, width, color='red', label='涨停')
+                rects2 = axs[1].bar(x + width/2, dms, width, color='green',label='跌停') 
+                autolabel(rects1)
+                autolabel(rects2)
+            else:
+                #计算昨天涨停的次日的平均涨落
+                t = datetime.today()
+                ei = len(D)+1
+                Nam = np.zeros(len(D))
+                for i in range(len(D)-1,-1,-1):
+                    if D[i][0].day!=t.day:
+                        t = D[i][0]
+                        r = K[:,i,2]/K[:,i,3]-1
+                        s = r>=0.097
+                        if ei>i+1 and np.count_nonzero(s)>0:
+                            Nam[i+1:ei] = np.mean((K[s,i+1:ei,2]/K[s,i+1:ei,3]-1),axis=0)
+                        ei = i+1                
+                axs[1].plot(X,Nam,color="red",label="次日平均涨幅")
             clear_output2()
             if listState:
                 if SS is not None:
@@ -2747,20 +2764,19 @@ def showzdt(bi=None,ei=None):
             axs[1].axhline(0,color='black',linewidth=2,linestyle='--')
             #autolabel(rects1)
         axs[1].grid(True)
-        axs[1].set_xticks(x)
-        axs[1].set_xticklabels(labels)
-        if len(labels)>90:
-            rotate = 90
-        elif len(labels)>70:
-            rotate = 45
-        elif len(labels)>40:
-            rotate = 30
-        else:
-            rotate = 20
-        plt.setp(axs[1].get_xticklabels(),rotation=rotate,horizontalalignment='right')
-        #axs[1].legend()
-        axs[1].set_xlim(-1,len(labels))
-        #fig.autofmt_xdate()
+        if method=='None':    
+            axs[1].set_xticks(x)
+            axs[1].set_xticklabels(labels)
+            if len(labels)>90:
+                rotate = 90
+            elif len(labels)>70:
+                rotate = 45
+            elif len(labels)>40:
+                rotate = 30
+            else:
+                rotate = 20
+            plt.setp(axs[1].get_xticklabels(),rotation=rotate,horizontalalignment='right')
+            axs[1].set_xlim(-1,len(labels))
         kline.output_show(output)
     def update():
         nonlocal first,output,D,K,refreshbutton
