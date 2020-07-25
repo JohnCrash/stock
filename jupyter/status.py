@@ -2726,7 +2726,7 @@ def showzdt(bi=None,ei=None):
                 t = datetime.today()
                 ei = len(D)+1
                 Nam = np.zeros(len(D))
-                for i in range(len(D)-1,-1,-1):
+                for i in range(len(D)-1,-1,-1): #反向搜索
                     if D[i][0].day!=t.day:
                         t = D[i][0]
                         r = K[:,i,2]/K[:,i,3]-1
@@ -2754,14 +2754,29 @@ def showzdt(bi=None,ei=None):
             ums = getcols(SS,1)
             dms = getcols(SS,2)
             codes = getcols(SS,3)
-            clear_output2()
-            if listState:
-                list_output2(labels,codes,ums,dms)
             x = np.arange(len(labels))  # the label locations
             width = 0.2  # the width of the bars
-            rects1 = axs[1].bar(x, ums, 0.9, color='red', label='涨跌分布')
-            rects2 = axs[1].bar(x, dms, 0.9, color='green')
-            axs[1].axhline(0,color='black',linewidth=2,linestyle='--')
+            if method=='None': 
+                rects1 = axs[1].bar(x, ums, 0.9, color='red', label='涨跌分布')
+                rects2 = axs[1].bar(x, dms, 0.9, color='green')
+                axs[1].axhline(0,color='black',linewidth=2,linestyle='--')
+            else:
+                t = datetime.today()
+                ei = len(D)+1
+                Nam = np.zeros(len(D))
+                for i in range(len(D)-1,-1,-1): #反向搜索
+                    if D[i][0].day!=t.day:
+                        t = D[i][0]
+                        r = K[sr,i,2]/K[sr,i,3]-1
+                        s = r>=0.097
+                        if ei>i+1 and np.count_nonzero(s)>0:
+                            r = K[sr,i+1:ei,2]/K[sr,i+1:ei,3]-1
+                            Nam[i+1:ei] = np.mean(r[s,:],axis=0)
+                        ei = i+1                
+                axs[1].plot(X,Nam,color="red",label="次日平均涨幅")
+            clear_output2()
+            if listState:
+                list_output2(labels,codes,ums,dms)            
             #autolabel(rects1)
         axs[1].grid(True)
         if method=='None':    
