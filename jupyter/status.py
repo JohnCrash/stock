@@ -1121,6 +1121,8 @@ def getStatusN(db='company_status',N=50,bi=None,ei=None):
      5 按周期利润排序的索引和利润对[company,date,(index,dk)],
      6 该分类的前十名平均盈利[date_n],
      7 该分类的跌幅前十的平均跌幅[date_n]
+     8 该分类成交量占比变化率[date_n]
+     9 该分类成交量占比[date_n]
      )
 ]
 K = [company_n,date_n,(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)]
@@ -1166,9 +1168,13 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
                     ma5[i,eqz] = 1 #确保不会等于0,避免被零除错误
                     K[i,eqz,2] = 1 #确保这些计算处理的dk = 0
             dk = K[:,day:,2]/ma5[:,:-day]-1#收盘相对day前的增长率
+        S = np.sum(K[:,:,1],axis=0)
         for category in allCategory():
             r = idd[:,3]==category
             dK = dk[r]
+            vK = np.sum(K[r,:,1],axis=0)/S #分类占比
+            ma5 = stock.ma(vK,5)
+            vdK = vK[day:]/ma5[:-day]-1 #分类占比变化
             if len(dK)>0:
                 sorti = np.zeros((dK.shape[0],dK.shape[1],2))
                 ia = np.zeros((dK.shape[0],2))
@@ -1183,9 +1189,9 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
                     top10mean[i] = sorti[:topN,i,1].mean()
                     low10mean[i] = sorti[-topN:,i,1].mean()
                 if day=='d':
-                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean))
+                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean,vdK,vK[day:]))
                 else:
-                    result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean))
+                    result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean,vdK,vK[day:]))
             else:
                 print("'%s' 分类里面没有公司"%category)
         result_passed[day] = True
@@ -1668,18 +1674,19 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     showPlot()
 
 def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,cycle='d',output=None):
-    fig,axs = plt.subplots(figsize=(28,14))
+    fig,axs = plt.subplots(2,1,figsize=(28,16),sharex=True)
+    fig.subplots_adjust(hspace=0.0,wspace=0.00) #调整子图上下间距
     r = sortedCategory[0]
     dd = r[3] #date
 
     if cycle=='d' or cycle==5:
-        axs.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
+        axs[0].xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
     else:
-        axs.xaxis.set_major_formatter(MyFormatterRT(dd,cycle))
+        axs[0].xaxis.set_major_formatter(MyFormatterRT(dd,cycle))
     if top is None:
-        axs.set_title("%s 周期%s"%(r[1],r[0]))
+        axs[0].set_title("%s 周期%s"%(r[1],r[0]))
     else:
-        axs.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
+        axs[0].set_title("%s 周期%s Top%s"%(r[1],r[0],top))
     
     i = 0
     xdd = np.arange(len(dd))
@@ -1708,9 +1715,14 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
                 else:
                     return ''
         return ''
+    def mapLineWidth(v):
+        lw = v/0.005
+        return lw if lw>0.5 else 0.5
     for r in sortedCategory:
         color = getmycolor(r[1])
         dk = r[6] #
+        vk = r[8] #成交量占比变化
+        lw = mapLineWidth(r[9][-1]) #成交量占比,变换为线宽
         if pervSortedCategory is None:
             title = "%d %s"%(i+1,r[1])
         else:
@@ -1719,25 +1731,31 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
             if i<top:
                 if focus is not None:
                     if isFocusIt(focus,r[1],i,top):
-                        axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,label = title,color=color)
+                        axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,label = title,color=color)
+                        axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,label = title,color=color)
                     else:
-                        axs.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,label = title,color=color)
+                        axs[0].plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,linewidth=lw,label = title,color=color)
+                        axs[1].plot(xdd[bi:ei],vk[bi:ei],alpha=0.2,linewidth=lw,label = title,color=color)
                 else:        
-                    axs.plot(xdd[bi:ei],dk[bi:ei],label = title,color=color)
+                    axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,label = title,color=color)
+                    axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,label = title,color=color)
             else:
                 if focus is not None and isFocusIt(focus,r[1],i,top):
-                    axs.plot(xdd[bi:ei],dk[bi:ei],linewidth=3,linestyle='--',label = title,color=color)
+                    axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
+                    axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
         i+=1
-    axs.axvline(pos,color="red",linewidth=2,linestyle='--')
+    axs[0].axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
     xticks.append(pos)
-    axs.set_xticks(xticks)
-    axs.grid(True)
-    axs.axhline(0,color='black',linewidth=1,linestyle='--')
-    axs.set_xlim(bi,ei-1)
-    plt.legend(bbox_to_anchor=(1, 1),loc='upper left',fontsize='large')
+    axs[0].set_xticks(xticks)
+    axs[0].grid(True)
+    axs[1].grid(True)
+    axs[0].axhline(0,color='black',linewidth=1,linestyle='--')
+    axs[1].axhline(0,color='black',linewidth=1,linestyle='--')
+    axs[0].set_xlim(bi,ei-1)
+    plt.legend(bbox_to_anchor=(1, 2),loc='upper left',fontsize='large')
     fig.autofmt_xdate()
     if output is None:
         plt.show()
