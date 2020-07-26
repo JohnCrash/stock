@@ -1722,7 +1722,7 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
         color = getmycolor(r[1])
         dk = r[6] #
         vk = r[8] #成交量占比变化
-        lw = mapLineWidth(r[9][-1]) #成交量占比,变换为线宽
+        lw = mapLineWidth(r[9][pos]) #成交量占比,变换为线宽
         if pervSortedCategory is None:
             title = "%d %s"%(i+1,r[1])
         else:
@@ -1745,6 +1745,7 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
                     axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
         i+=1
     axs[0].axvline(pos,color="red",linewidth=2,linestyle='--')
+    axs[1].axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
