@@ -508,8 +508,8 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     print("***休市*** ",str(t))
                     return 'closed'
             checkFrame(plane)
-            shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=4*24*3600)
-            seqs = seqs[-4*60*4*3:] #4*60*4*10 每秒3次，保存4天的
+            shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=6*24*3600)
+            seqs = seqs[-6*60*4*3:] #6*60*4*10 每秒3次，保存6天的
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)

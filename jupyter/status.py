@@ -64,17 +64,17 @@ def allCategory():
     return _all_category
 
 #见数据插入到company_status表
-def insert_company_status(k,vma20,energy,volumeJ,boll,bollw,rsi,idd):
+def insert_company_status(k,macd,vma20,energy,volumeJ,boll,bollw,rsi,idd):
     if len(k)>0:
         qs = ""
         for i in range(len(k)):
             #id , date , close , volume , volumema20 , macd , energy , voluemJ , bollup , bollmid, bolldn , bollw
             try:
-                macd = 0 if k[i][3] is None else k[i][3]
+                #macd = 0 if k[i][3] is None else k[i][3]
                 if i!=len(k)-1:
-                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f),"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd,energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
+                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f),"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
                 else:
-                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd,energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
+                    qs+="""(%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)"""%(k[i][0],stock.dateString(idd[i]),k[i][2],k[i][1],vma20[i],macd[i],energy[i],volumeJ[i],boll[i,2],boll[i,1],boll[i,0],bollw[i],rsi[i])
             except Exception as e:
                 print(e)
                 print(k[i])
@@ -106,19 +106,21 @@ def update_company_status_week(cid,k,macd,vma20,energy,volumeJ,boll,bollw,rsi,id
 #依据完整数据更新
 def update_company_status_all_data(idk,idd):
     k = np.array(idk)
-    #k= [0 id,1 volume,2 close,3 macd ]
+    #k= [0 id,1 volume,2 close]
+    macd = stock.macdV(k[:,2])
     vma20 = stock.ma(k[:,1],20)
     energy = stock.kdj(stock.volumeEnergy(k[:,1]))[:,2]
     volumeJ = stock.kdj(k[:,1])[:,2]
     boll = stock.boll(k[:,2])
     bollw = stock.bollWidth(boll)
     rsi = stock.rsi(k[:,2])
-    insert_company_status(k,vma20,energy,volumeJ,boll,bollw,rsi,idd)
+    insert_company_status(k,macd,vma20,energy,volumeJ,boll,bollw,rsi,idd)
 
 #依据增量数据更新
 def update_company_status_delta_data(idk,idd):
     k = np.array(idk)
-    #k= [0 id,1 volume,2 close,3 macd ]
+    #k= [0 id,1 volume,2 close]
+    macd = stock.macdV(k[:,2])
     vma20 = stock.ma(k[:,1],20)
     energy = stock.kdj(stock.volumeEnergy(k[:,1]))[:,2]
     volumeJ = stock.kdj(k[:,1])[:,2]
@@ -126,14 +128,14 @@ def update_company_status_delta_data(idk,idd):
     bollw = stock.bollWidth(boll)
     rsi = stock.rsi(k[:,2])
     if len(k)>PROD:
-        insert_company_status(k[PROD+1:],vma20[PROD+1:],energy[PROD+1:],volumeJ[PROD+1:],boll[PROD+1:],bollw[PROD+1:],rsi[PROD+1:],idd[PROD+1:])
+        insert_company_status(k[PROD+1:],macd[PROD+1:],vma20[PROD+1:],energy[PROD+1:],volumeJ[PROD+1:],boll[PROD+1:],bollw[PROD+1:],rsi[PROD+1:],idd[PROD+1:])
     else:
-        insert_company_status(k,vma20,energy,volumeJ,boll,bollw,rsi,idd)
+        insert_company_status(k,macd,vma20,energy,volumeJ,boll,bollw,rsi,idd)
 
 #可以从一个起点日期使用增量进行更新，或者更新全部数据
 def update_status_begin(beginday,isall,progress):
     if isall:
-        rs = stock.query("""select id,date,volume,close,macd from kd_xueqiu where date>'%s'"""%(beginday))
+        rs = stock.query("""select id,date,volume,close from kd_xueqiu where date>'%s'"""%(beginday))
         progress(30)
     else:
         #需要提前20个交易日的数据
@@ -145,7 +147,7 @@ def update_status_begin(beginday,isall,progress):
                 lastday = lastdays[i+PROD][0]
                 break
 
-        rs = stock.query("""select id,date,volume,close,macd from kd_xueqiu where date>='%s'"""%(lastday))
+        rs = stock.query("""select id,date,volume,close from kd_xueqiu where date>='%s'"""%(lastday))
     idk = {}
     idd = {}
     for i in range(len(rs)):
@@ -154,8 +156,8 @@ def update_status_begin(beginday,isall,progress):
         if key not in idk:
             idk[key] = []
             idd[key] = []
-        #0 id,1 volume,2 close,3 macd
-        idk[key].append([rs[i][0],rs[i][2],rs[i][3],rs[i][4]])
+        #0 id,2 volume,3 close
+        idk[key].append([rs[i][0],rs[i][2],rs[i][3]])
         idd[key].append(rs[i][1])
     progress(40)
     count = 0
@@ -390,8 +392,8 @@ def downloadAllK(companys,period,N,progress,ThreadCount=10):
 K_=[[[0 idd,1 timestamp,2 volume,3 current,4 yesteryday_close,5 today_open]
 K =[[[(0 idd,1 volume,2 current,3 yesteryday_close,4 today_open)]]]
 """
-def downloadAllKFast(companys,progress=None):
-    K_,D_ = xueqiu.getRT(companys,progress=progress)
+def downloadAllKFast(companys,step=1,progress=None):
+    K_,D_ = xueqiu.getRT(companys,step=step,progress=progress)
     if K_ is not None:
         D = D_
         K = np.ones((len(companys),len(D),11))
@@ -439,7 +441,6 @@ def loadAllK(companys,bi,ei,period,N,progress,ThreadCount=10):
         if it[0] and len(it[2])==N: #时间上有可能错开，但是短期来说影响不大
             K[i,:,1] = it[2][:,0] #valume
             K[i,:,2] = it[2][:,4] #close
-            K[i,0,3] = it[2][i,0]
             K[i,1:,3] = it[2][:-1,4] #yesteryday_close
             K[i,:,4] = it[2][:,1] #today_open ,0 volume 1 open 2 high ,3 low 4 close
         i+=1
@@ -1174,7 +1175,10 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
             dK = dk[r]
             vK = np.sum(K[r,:,1],axis=0)/S #分类占比
             ma5 = stock.ma(vK,5)
-            vdK = vK[day:]/ma5[:-day]-1 #分类占比变化
+            if day=='d':
+                vdK = vK #分类占比
+            else:
+                vdK = vK[day:]/ma5[:-day]-1 #分类占比变化
             if len(dK)>0:
                 sorti = np.zeros((dK.shape[0],dK.shape[1],2))
                 ia = np.zeros((dK.shape[0],2))
@@ -1189,7 +1193,7 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
                     top10mean[i] = sorti[:topN,i,1].mean()
                     low10mean[i] = sorti[-topN:,i,1].mean()
                 if day=='d':
-                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean,vdK,vK[day:]))
+                    result.append((day,category,dK,D[:],idd[r],sorti,top10mean,low10mean,vdK,vdK))
                 else:
                     result.append((day,category,dK,D[day:],idd[r],sorti,top10mean,low10mean,vdK,vK[day:]))
             else:
@@ -1257,9 +1261,9 @@ def StrongSorted5k(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
         return []
     return processKD2_CB(K,D,companys,topN=topN)
 
-def StrongSortedRT(topN=20,progress=None,companys=None):
+def StrongSortedRT(topN=20,step=1,progress=None,companys=None):
     progress(0)
-    D,K = downloadAllKFast(companys,progress)
+    D,K = downloadAllKFast(companys,step,progress)
     if D is None or K is None:
         return []
     result = processKD2_CB(K,D,companys,topN=topN)    
@@ -1770,7 +1774,7 @@ bi 开始时间
 ei 结束时间
 N 和 bi,ei只能选择一种
 """
-def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
+def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
     companys = stock.query("""select company_id,code,name,category from company_select""")
     out2 = widgets.Output()
     progress = widgets.IntProgress(value=0,
@@ -1802,13 +1806,13 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         period = 20
         result_cb = StrongSorted(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
     elif cycle==5:
-        periods = [1,3,6]
+        periods = [1,3,6,9,12,15]
         period = 3
-        result_cb = StrongSorted5k(N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
+        result_cb = StrongSorted5k(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
     else: #实时
         periods = [3,15,45,'d']
         period = 15
-        result_cb = StrongSortedRT(topN=sample,progress=progressCallback,companys=companys)
+        result_cb = StrongSortedRT(topN=sample,step=step,progress=progressCallback,companys=companys)
     result = result_cb(period)
 
     done = True
@@ -2146,7 +2150,7 @@ def StrongCategoryList(N=50,cycle='d',bi=None,ei=None):
         if cycle=='d':
             result_cb = StrongSorted(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
         elif cycle==5:
-            result_cb = StrongSorted5k(N,bi=None,ei=None,topN=sample,progress=progressCallback,companys=companys)
+            result_cb = StrongSorted5k(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
         else: #实时
             result_cb = StrongSortedRT(topN=sample,progress=progressCallback,companys=companys)
         result = result_cb(period)
@@ -2853,7 +2857,8 @@ def Indexs():
             'BK0066', #国防军工
             'BK0410'], #稀土永磁
         "金融":["BK0057", #证券
-            "BK0055"], #银行
+            "BK0055", #银行
+            "BK0056"], #保险
         "消费":[
             'BK0033', #饮料
             'BK0034', #食品加工

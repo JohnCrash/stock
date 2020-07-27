@@ -17,22 +17,14 @@ const columns = [
     "turnoverrate",
     "amount",
     "volume_post",
-    "amount_post",    
-    "dea",
-    "dif",
-    "macd"];
+    "amount_post"];
 const dbcolumns = [
     "volume",
     "open",
     "high",
     "low",
     "close",
-    "chg",
-    "percent",
-    "turnoverrate",
-    "dea",
-    "dif",
-    "macd"];
+    "turnoverrate"];
 let column2index = {};
 for(let k in columns){
     column2index[columns[k]] = k;
@@ -50,30 +42,14 @@ const columns_d = [
     "turnoverrate",
     "amount",
     "volume_post",
-    "amount_post",
-    "ma5",
-    "ma10",
-    "ma20",
-    "ma30",
-    "dea",
-    "dif",
-    "macd"];
+    "amount_post"];
 const dbcolumns_d = [
     "volume",
     "open",
     "high",
     "low",
     "close",
-    "chg",
-    "percent",
-    "turnoverrate",
-    "ma5",
-    "ma10",
-    "ma20",
-    "ma30",
-    "dea",
-    "dif",
-    "macd"];
+    "turnoverrate"];
 let column2index_d = {};
 for(let k in columns_d){
     column2index_d[columns_d[k]] = k;
@@ -127,9 +103,9 @@ function company_kline(id,code,lv,callback,uctable=ucount){
         let uri;
         let uct = fast?ucount_fast:uctable;
         if(lv=='d')
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${uct[lv]}&indicator=kline,ma,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=day&type=before&count=-${uct[lv]}&indicator=kline`;
         else
-            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${uct[lv]}&indicator=kline,macd`;
+            uri = `https://stock.xueqiu.com/v5/stock/chart/kline.json?symbol=${code}&begin=${timestamp}&period=${lv}m&type=before&count=-${uct[lv]}&indicator=kline`;
         
         return uri;
     }

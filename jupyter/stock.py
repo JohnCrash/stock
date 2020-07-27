@@ -115,7 +115,7 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
         if code[2]==':':
             code = code.replace(':','')
         b,company = shared.fromRedis(code)
-        if not b:
+        if not b or len(company)==0:
             company = query("""select id,code,name,category from company where code='%s'"""%code)
             shared.toRedis(company,code)
     elif len(code)>3 and code[0]=='B' and code[1]=='K':

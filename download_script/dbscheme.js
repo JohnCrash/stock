@@ -103,12 +103,7 @@ const K5Scheme={
     high:"number",
     low:"number",
     close:"number",
-    chg:"number",
-    percent:"number",
-    turnoverrate:"number",
-    dea:'number',
-    dif:"number",
-    macd:'number'
+    turnoverrate:"number"
 };
 
 const K15Scheme={
@@ -151,16 +146,7 @@ const KDScheme={
     high:"number",
     low:"number",
     close:"number",
-    chg:"number",
-    percent:"number",
-    turnoverrate:"number",
-    ma5:'number',
-    ma10:'number',
-    ma20:'number',
-    ma30:'number',
-    dea:'number',
-    dif:"number",
-    macd:'number'
+    turnoverrate:"number"
 };
 
 function eqPair(t,scheme){
