@@ -2309,24 +2309,25 @@ def favoriteList():
             width='100%'))    
     display(box,out)
 
-def timeline(code,name=None,companys=None):
+def timeline(code,step=1,name=None,companys=None):
     if companys is None:
         companys = stock.query("select company_id,code,name,category from company_select")
     for i in range(len(companys)):
         if companys[i][1]==code or companys[i][2]==name:
-            K,D = xueqiu.getRT(companys)
+            K,D = xueqiu.getRT(companys,step=step)
             gs_kw = dict(width_ratios=[1], height_ratios=[2,1])
             fig,axs = plt.subplots(2,1,sharex=True,figsize=(28,14),gridspec_kw = gs_kw)
             fig.subplots_adjust(hspace=0.02,wspace=0.05)
             axs[0].xaxis.set_major_formatter(MyFormatterRT(D))
             axs[0].set_title("%s %s"%(companys[i][2],companys[i][1]))
             xdd = np.arange(len(D))
-            axs[0].plot(xdd,K[i,:,6])
+            axs[0].plot(xdd,K[i,:,3])
             axs[0].grid(True)
             vol = np.empty(len(D))
             vol[0] = 0#K[i,0,2]
             vol[1:] = K[i,1:,2]-K[i,:-1,2]
-            axs[1].bar(xdd,K[i,:,2])
+            #axs[1].bar(xdd,K[i,:,2])
+            axs[1].bar(xdd,vol)
             axs[1].grid(True)
             fig.autofmt_xdate()
             plt.show()
