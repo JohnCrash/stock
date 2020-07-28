@@ -1149,7 +1149,16 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
     """
     day = int 周期（和多少个周期前比较增长）
     day = 'd' 周期盈利将变成日盈利(和昨日收盘进行比较)
+    day = 's' 通过和大盘比较上涨和下跌周期来确定强弱
     """
+    def calcCB(day):
+        if day=='s':
+            return calcStrongCB()
+        else:
+            return calcDayCB(day)
+    def calcStrongCB():
+        nonlocal idd,id2com,result,K,D,topN,result_passed
+
     def calcDayCB(day):
         nonlocal idd,id2com,result,K,D,topN,result_passed
         
@@ -1201,7 +1210,7 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
         result_passed[day] = True
         return result
     
-    return calcDayCB
+    return calcCB
 
 def StrongSorted(N=50,bi=None,ei=None,topN=20,progress=None,companys=None):
     K_ = None
@@ -1677,21 +1686,22 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
     display(box,output,output2)
     showPlot()
 
-def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,cycle='d',output=None):
-    fig,axs = plt.subplots(2,1,figsize=(28,16),sharex=True)
+def PlotAllCategory(period,bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,cycle='d',output=None):
+    fig,axs = plt.subplots(1 if period=='d' else 2,1,figsize=(28,16),sharex=True)
     fig.subplots_adjust(hspace=0.0,wspace=0.00) #调整子图上下间距
     r = sortedCategory[0]
     dd = r[3] #date
     if pos>=len(dd):
         pos = len(dd)-1
+    axs0 = axs[0] if type(period)==int else axs
     if cycle=='d' or cycle==5:
-        axs[0].xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
+        axs0.xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
     else:
-        axs[0].xaxis.set_major_formatter(MyFormatterRT(dd,cycle))
+        axs0.xaxis.set_major_formatter(MyFormatterRT(dd,cycle))
     if top is None:
-        axs[0].set_title("%s 周期%s"%(r[1],r[0]))
+        axs0.set_title("%s 周期%s"%(r[1],r[0]))
     else:
-        axs[0].set_title("%s 周期%s Top%s"%(r[1],r[0],top))
+        axs0.set_title("%s 周期%s Top%s"%(r[1],r[0],top))
     
     xdd = np.arange(len(dd))
     def isFocusIt(focus,categoryName,i,top):
@@ -1745,18 +1755,22 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
             if i<top:
                 if focus is not None:
                     if isFocusIt(focus,r[1],i,top):
-                        axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,label = title,color=color)
-                        axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,label = title,color=color)
+                        axs0.plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,label = title,color=color)
+                        if type(period)==int:
+                            axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,label = title,color=color)
                     else:
-                        axs[0].plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,linewidth=lw,label = title,color=color)
-                        axs[1].plot(xdd[bi:ei],vk[bi:ei],alpha=0.2,linewidth=lw,label = title,color=color)
+                        axs0.plot(xdd[bi:ei],dk[bi:ei],alpha=0.2,linewidth=lw,label = title,color=color)
+                        if type(period)==int:
+                            axs[1].plot(xdd[bi:ei],vk[bi:ei],alpha=0.2,linewidth=lw,label = title,color=color)
                 else:        
-                    axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,label = title,color=color)
-                    axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,label = title,color=color)
+                    axs0.plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,label = title,color=color)
+                    if type(period)==int:
+                        axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,label = title,color=color)
             else:
                 if focus is not None and isFocusIt(focus,r[1],i,top):
-                    axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
-                    axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
+                    axs0.plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
+                    if type(period)==int:
+                        axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
 
     #绘制标记文本
     vvts = np.argsort(vts,axis=1)
@@ -1778,26 +1792,31 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
             ty = 50+i*10
             if s not in isin:
                 isin.append(s)
-                axs[0].annotate(s,xy=(x,y),xytext=(tx, ty), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                axs0.annotate(s,xy=(x,y),xytext=(tx, ty), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
                         connectionstyle="angle,angleA=0,angleB=90,rad=10"),color=color,fontsize='large')
             if s2 not in isin2:
                 isin2.append(s2)
-                axs[1].annotate(s2,xy=(x,y2),xytext=(tx, ty), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),color=color2,fontsize='large')
+                if type(period)==int:
+                    axs[1].annotate(s2,xy=(x,y2),xytext=(tx, ty), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),color=color2,fontsize='large')
 
-    axs[0].axvline(pos,color="red",linewidth=2,linestyle='--')
-    axs[1].axvline(pos,color="red",linewidth=2,linestyle='--')
+    axs0.axvline(pos,color="red",linewidth=2,linestyle='--')
+    if type(period)==int:
+        axs[1].axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
     for i in range(bi,ei):
         xticks.append(i)
     xticks.append(pos)
-    axs[0].set_xticks(xticks)
-    axs[0].grid(True)
-    axs[1].grid(True)
-    axs[0].axhline(0,color='black',linewidth=1,linestyle='--')
-    axs[1].axhline(0,color='black',linewidth=1,linestyle='--')
-    axs[0].set_xlim(bi,ei-1)
-    plt.legend(bbox_to_anchor=(1, 2),loc='upper left',fontsize='large')
+    axs0.set_xticks(xticks)
+    axs0.grid(True)
+    axs0.axhline(0,color='black',linewidth=1,linestyle='--')
+    axs0.set_xlim(bi,ei-1)
+    if type(period)==int:
+        axs[1].grid(True)
+        axs[1].axhline(0,color='black',linewidth=1,linestyle='--')
+        plt.legend(bbox_to_anchor=(1, 2),loc='upper left',fontsize='large')
+    else:
+        plt.legend(bbox_to_anchor=(1, 1),loc='upper left',fontsize='large')
     fig.autofmt_xdate()
     if output is None:
         plt.show()
@@ -1972,7 +1991,7 @@ def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
                     pervSortedCategory = getSortedCategory(period,pos-1)
                 else:
                     pervSortedCategory = None
-                PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,mark,cycle=cycle,output=output)
+                PlotAllCategory(period,bi,ei,pos,sortedCategory,pervSortedCategory,top,mark,cycle=cycle,output=output)
             else:
                 output.clear_output()
                 with output:
