@@ -1682,7 +1682,8 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
     fig.subplots_adjust(hspace=0.0,wspace=0.00) #调整子图上下间距
     r = sortedCategory[0]
     dd = r[3] #date
-
+    if pos>=len(dd):
+        pos = len(dd)-1
     if cycle=='d' or cycle==5:
         axs[0].xaxis.set_major_formatter(kline.MyFormatter(dd,cycle))
     else:
@@ -1692,7 +1693,6 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
     else:
         axs[0].set_title("%s 周期%s Top%s"%(r[1],r[0],top))
     
-    i = 0
     xdd = np.arange(len(dd))
     def isFocusIt(focus,categoryName,i,top):
         v = (i+1)/top
@@ -1722,10 +1722,20 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
     def mapLineWidth(v):
         lw = v/0.005
         return lw if lw>0.5 else 0.5
-    for r in sortedCategory:
+    #曲线的提示文字，将图像分成3个部分，每个部分的前3名将被标注
+    vti = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,.9,1]
+    vts = np.zeros((len(vti),top))
+    vts2 = np.zeros((len(vti),top))
+    for i in range(len(sortedCategory)):
+        r = sortedCategory[i]
         color = getmycolor(r[1])
         dk = r[6] #
         vk = r[8] #成交量占比变化
+        if i<top:
+            for p in range(len(vti)):
+                x = math.floor(bi+(ei-bi-1)*vti[p])
+                vts[p,i] = dk[x]
+                vts2[p,i] = vk[x]
         lw = mapLineWidth(r[9][pos]) #成交量占比,变换为线宽
         if pervSortedCategory is None:
             title = "%d %s"%(i+1,r[1])
@@ -1747,7 +1757,34 @@ def PlotAllCategory(bi,ei,pos,sortedCategory,pervSortedCategory,top,focus=None,c
                 if focus is not None and isFocusIt(focus,r[1],i,top):
                     axs[0].plot(xdd[bi:ei],dk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
                     axs[1].plot(xdd[bi:ei],vk[bi:ei],linewidth=lw,linestyle='--',label = title,color=color)
-        i+=1
+
+    #绘制标记文本
+    vvts = np.argsort(vts,axis=1)
+    vvts2 = np.argsort(vts2,axis=1)
+    isin = []
+    isin2 = []
+    for p in range(len(vti)-1,-1,-1):
+        x = math.floor(bi+(ei-bi-1)*vti[p])
+        for i in (-1,-2):
+            y = vts[p,vvts[p,i]]
+            y2 = vts2[p,vvts2[p,i]]
+            r = sortedCategory[int(vvts[p,i])]
+            r2 = sortedCategory[int(vvts2[p,i])]
+            s = r[1]
+            s2 = r2[1]
+            color = getmycolor(s)
+            color2 = getmycolor(s2)
+            tx = -30+i*20
+            ty = 50+i*10
+            if s not in isin:
+                isin.append(s)
+                axs[0].annotate(s,xy=(x,y),xytext=(tx, ty), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),color=color,fontsize='large')
+            if s2 not in isin2:
+                isin2.append(s2)
+                axs[1].annotate(s2,xy=(x,y2),xytext=(tx, ty), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),color=color2,fontsize='large')
+
     axs[0].axvline(pos,color="red",linewidth=2,linestyle='--')
     axs[1].axvline(pos,color="red",linewidth=2,linestyle='--')
     xticks=[]
@@ -1955,21 +1992,31 @@ def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
         listDropdown.value = None
 
     def on_period(e):
-        nonlocal bi,ei,pos,period,category,sortedCategory,LEN
-        period = e['new']
-        sortedCategory = getSortedCategory(period,pos)
-        LEN = len(sortedCategory[0][3])
-        bi = LEN-pagecount
-        ei = LEN
-        pos = LEN-1
-        if bi < 0:
-            bi = 0
-        setSlider(bi,ei,pos)
-        listDropdown.value = None
-        category = categoryDropdown.value
-        categoryDropdown.options = categoryListItem()
-        categoryDropdown.value = category
-        showPlot()
+        nonlocal bi,ei,pos,period,category,sortedCategory,LEN,result_cb,result,step
+
+        if period!='d' and e['new']=='d': #重新获取数据
+            step = 15
+            period = e['new']
+            update(True)
+        elif e['new']!='d' and period=='d':
+            step = 1
+            period = e['new']
+            update(True)
+        else:
+            period = e['new']
+            sortedCategory = getSortedCategory(period,pos)
+            LEN = len(sortedCategory[0][3])
+            bi = LEN-pagecount
+            ei = LEN
+            pos = LEN-1
+            if bi < 0:
+                bi = 0
+            setSlider(bi,ei,pos)
+            listDropdown.value = None
+            category = categoryDropdown.value
+            categoryDropdown.options = categoryListItem()
+            categoryDropdown.value = category
+            showPlot()
 
     periodDropdown.observe(on_period,names='value')  
     
@@ -2131,7 +2178,7 @@ def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
     lock = threading.Lock()
     def update(b):
         lock.acquire()
-        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate,sample,result_cb
+        nonlocal pos,bi,ei,LEN,result,done,sortedCategory,period,progress,mark,category,needUpdate,sample,result_cb,step
         #t0 = datetime.today()
         if b:
             progress = widgets.IntProgress(value=0,
@@ -2152,7 +2199,7 @@ def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
         elif cycle==5:
             result_cb = StrongSorted5k(N,bi=bi,ei=ei,topN=sample,progress=progressCallback,companys=companys)
         else: #实时
-            result_cb = StrongSortedRT(topN=sample,progress=progressCallback,companys=companys)
+            result_cb = StrongSortedRT(topN=sample,step=step,progress=progressCallback,companys=companys)
         result = result_cb(period)
         #log.info("1."+str(datetime.today()-t0))
         #t0 = datetime.today()
