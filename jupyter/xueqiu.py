@@ -306,9 +306,10 @@ def getRT(companys,step=1,N=100,progress=defaultProgress):
             ps = [_K]
         i = j = 0
         seqs = seqs[-N*step:]
+        ln = len(seqs)-1
         for ts in seqs:
             if ba: #如果已经存在_lastp直接跳到这个位置在开始追加
-                if j==step-1:
+                if j==step-1: #将最后一个数据加入到最后
                     j = 0
                     b,p = shared.numpyFromRedis("rt%d"%ts)
                     if b:

@@ -72,7 +72,7 @@
             "request": "launch",
             "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["BK0056","保险及其他"]
+            "args": ["BK0013","有色冶炼加工"]
         },   
         {
             "type": "node",

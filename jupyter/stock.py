@@ -866,3 +866,62 @@ def spp(k,n=60):
 """
 def index(ks):
     pass
+
+"""
+沿着v从后到前发现n个正极值点
+"""
+def extremePoint(m,n=2):
+    r = []
+    s = []
+    v = m
+    last = -1
+    for i in range(len(v)-2,0,-1):
+        if v[i+1]<v[i] and v[i]>v[i-1]:
+            a = (i,1,v[i])
+        elif v[i+1]>v[i] and v[i]<v[i-1]:
+            a = (i,-1,v[i])
+        else:
+            continue
+        if last>0 and last-i>n: #将间距小于n的放在一起
+            r.append(s)
+            s = [a]
+        else:
+            s.append(a)
+        last = i
+    if len(s)>0:
+        r.append(s)
+    """
+    如果极值太过靠近，需要对其进行合并
+    """
+    R = []
+    for s in r:
+        if len(s)==1:
+            R.append(s[0])
+        elif s[-1][1]*s[0][1]>0: #如果首尾都是顶或者底
+            if s[0][1]>0: #如果这一组首位都是顶部，取中间最大的
+                R.append(max(s,key=lambda it:it[2]))
+            else: #取最小的
+                R.append(min(s,key=lambda it:it[2]))
+        else: #如果收尾不同反向就忽略掉
+            pass
+
+    return R
+
+"""
+macd背离侦测
+返回[(顶或者底背离1或者-1,bi,ei),...]
+"""
+def macdDeviate(v,m=None,n=2):
+    if m is None:
+        m = macdV(v)
+    eps = extremePoint(m,n=n)
+    R = []
+    for i in range(len(eps)-2):
+        ep0 = eps[i]
+        ep1 = eps[i+1]
+        ep2 = eps[i+2]
+        if ep0[1]>0 and ep2[1]>0 and ep1[1]<0 and ep0[2]>0 and ep1[2]>0 and ep2[2]>0 and ep0[2]<ep2[2] and v[ep0[0]]>v[ep2[0]]: #顶背离
+            R.append((1,ep2[0],ep0[0]))
+        elif ep0[1]<0 and ep2[1]<0 and ep1[1]>0 and ep0[2]<0 and ep1[2]<0 and ep2[2]<0 and ep0[2]>ep2[2] and v[ep0[0]]<v[ep2[0]]: #低背离
+            R.append((-1,ep2[0],ep0[0]))
+    return R

@@ -1106,7 +1106,22 @@ class Plote:
                 szkmax = self._szmacd[bi:ei].max()
                 szkmin = self._szmacd[bi:ei].min()
                 axs[self._macdInx].plot(x,self._szmacd[bi:ei]*(kmax-kmin)/(szkmax-szkmin),color='black',linestyle='--')
-                
+            #macd背离点
+            eps = stock.macdDeviate(self._k[bi:ei,4],self._macd[bi:ei])
+            for i in eps:
+                x = bi+i[1]
+                axs[self._macdInx].annotate('%d'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-60, 60), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
+                x1 = bi+i[2]
+                axs[self._macdInx].annotate('%d'%(self._macd[x1]),xy=(x1,self._macd[x1]),xytext=(-60, 60), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
+            eps = stock.extremePoint(self._macd[bi:ei])
+            for i in eps:
+                x = bi+i[0]
+                axs[self._macdInx].annotate('%d'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-30, 30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
+
+
         #绘制kdj
         if self._showkdj:
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,0],label="K",color='orange')
