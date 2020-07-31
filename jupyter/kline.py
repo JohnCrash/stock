@@ -210,12 +210,15 @@ class Plote:
         self._rsi = None
         self._showflow = False
         self._gotoTrendHeandPos = False
+        self._showeps = False #显示macd背离
         self._widths = [1]
         self._heights = [3]        
         if len(self._k)==0: #完全没有数据
             return
         if 'ma' in self._config:
             self._showma = True
+        if 'eps' in self._config:
+            self._showeps = True
         if 'figure' in self._config:
             self._figureInx = []
             if type(self._config['figure'])==list:
@@ -595,6 +598,8 @@ class Plote:
                 self._config['figure'] = self._backup['figure']
         elif k=='flow':
             self._config['flow'] = True
+        elif k=='eps':
+            self._config['eps'] = True
 
     def disable(self,k):
         if k in self._config:
@@ -807,6 +812,7 @@ class Plote:
                     axb5 = None
                 axv5 = fig.add_subplot(gs[-1,-1])
                 k5s,d5s = self.getCurrentK5()
+                
                 if len(d5s)>0:
                     axk5.set_title('%s 5分钟K'%(stock.dateString(d5s[-1][0])))
                 else:
@@ -1107,20 +1113,37 @@ class Plote:
                 szkmin = self._szmacd[bi:ei].min()
                 axs[self._macdInx].plot(x,self._szmacd[bi:ei]*(kmax-kmin)/(szkmax-szkmin),color='black',linestyle='--')
             #macd背离点
-            eps = stock.macdDeviate(self._k[bi:ei,4],self._macd[bi:ei])
-            for i in eps:
-                x = bi+i[1]
-                axs[self._macdInx].annotate('%d'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-60, 60), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
-                x1 = bi+i[2]
-                axs[self._macdInx].annotate('%d'%(self._macd[x1]),xy=(x1,self._macd[x1]),xytext=(-60, 60), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
-            eps = stock.extremePoint(self._macd[bi:ei])
-            for i in eps:
-                x = bi+i[0]
-                axs[self._macdInx].annotate('%d'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-30, 30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
+            if self._showeps:
+                eps = stock.macdDeviate(self._k[bi:ei,4],self._macd[bi:ei])
+                for i in eps:
+                    x = bi+i[1]
+                    axs[self._macdInx].annotate('%.1f'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-40, 50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
+                    x1 = bi+i[2]
+                    axs[self._macdInx].annotate('%.1f'%(self._macd[x1]),xy=(x1,self._macd[x1]),xytext=(-40, 50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
+                eps = stock.extremePoint(self._macd[bi:ei])
+                for i in eps:
+                    x = bi+i[0]
+                    axs[self._macdInx].annotate('%.1f'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-30, 30 if i[1]>0 else -30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
 
+        #搜索低级别的macd背离
+        if self._showeps and self._period=='d':
+            k5s,d5s = self.getCurrentK5()
+            for p in [15,30,60,120]:
+                if p==5:
+                    k,d = k5s,d5s
+                else:
+                    k,d = stock.mergeK(k5s,d5s,p/5)
+                eps = stock.macdDeviate(k[:,4])
+                for i in eps:
+                    t = d[i[2]][0]
+                    x1 = self.date2index(date(year=t.year,month=t.month,day=t.day))
+                    if x1>=bi and x1<=ei:
+                        axsK.annotate('%s'%(p),xy=(x1,self._k[x1,2] if i[0]>0 else self._k[x1,3]),xytext=(-50, 50 if i[0]>0 else -50),
+                        textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
+                        fontsize='large',color='red' if i[0]>0 else 'green')
 
         #绘制kdj
         if self._showkdj:
@@ -1335,23 +1358,28 @@ class Plote:
                 self.enable('boll')
                 self.enable('trend')
                 self.disable('ma')
+                self.disable('eps')
             elif sel=='MA':
                 self.enable('ma')
                 self.disable('boll')
                 self.disable('trend')
                 self._config['ma'] = [5,10,20,30,60]
+                self.disable('eps')
             elif sel=='BOLL':
                 self.enable('boll')
                 self.disable('trend')
                 self.disable('ma')
+                self.disable('eps')
             elif sel=='TREND':
                 self.enable('trend')
                 self.disable('boll')
                 self.disable('ma')
+                self.disable('eps')
             elif sel=='CLEAR':
                 self.disable('boll')
                 self.disable('trend')
                 self.disable('ma')
+                self.enable('eps')
             self.config()                     
         b,main_sel = shared.fromRedis('kline.main')
         if b:
