@@ -261,7 +261,9 @@ function download_kline(lvs,done){
                     cb(err);
                 });
             }).then(usetime=>{
-                if(done)done();
+                setTimeout(()=>{
+                    if(done)done();
+                },5000);
             }).catch(err=>{
                 console.log(err);
                 if(done)done();

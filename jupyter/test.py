@@ -19,8 +19,11 @@ import config
 import subprocess
 import threading
 
-shared.delKey('company_status_last50') #清除redis中的缓存数据
-shared.delKey('company_status_date50') #清除redis中的缓存数据
+#status.saveflow2('2020-08-04','2020-07-10')
+#shared.delKey('company_status_last50') #清除redis中的缓存数据
+#shared.delKey('company_status_date50') #清除redis中的缓存数据
+shared.delKey("last_download_day")
+
 """
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []

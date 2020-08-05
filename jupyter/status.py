@@ -2366,6 +2366,19 @@ def saveflow(name=None):
                 sqlstr += ",('%s',%f,%f,%f,%f)"%(stock.timeString(v[0]),v[1],v[2],v[3],v[4])
         stock.execute("insert ignore into flow (date,larg,big,mid,tiny) values %s"%sqlstr)
 
+#如果某一天没有数据,可以使用历史上比较接近的一天进行替换
+def saveflow2(today,history):
+    history2 = stock.dateString(date.fromisoformat(history)+timedelta(days=1))
+    flow = stock.query("select date,larg,big,mid,tiny from flow where date>'%s' and date<'%s'"%(history,history2))
+    sqlstr = None
+    for v in flow:
+        t = v[0]
+        dd = "%s %s:%s:%s"%(today,t.hour,t.minute,t.second)
+        if sqlstr is None:
+            sqlstr = "('%s',%f,%f,%f,%f)"%(dd,v[1],v[2],v[3],v[4])
+        else:
+            sqlstr += ",('%s',%f,%f,%f,%f)"%(dd,v[1],v[2],v[3],v[4])
+    stock.execute("insert ignore into flow (date,larg,big,mid,tiny) values %s"%sqlstr)
 #显示资金流向
 def showflow(name=None):
     if name==None:
