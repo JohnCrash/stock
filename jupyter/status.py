@@ -620,6 +620,18 @@ def cb_volumeJ_right_buy(a,c,d=None):
 def cb_volumeJ_right_sell(a,c,d=None):
     return a[-2,6]>=95 and a[-1,6]<95
 
+#boll通道窄2.0以下，持续20以上
+def cb_bollwidth(a,c,d=None):
+    pass
+#boll通道上方附近
+def cb_boll_up(a,c,d=None):
+    pass
+#boll通道下方附近
+def cb_boll_down(a,c,d=None):
+    pass
+#成交量放出巨量当日
+def cb_volume_huge(a,c,d=None):
+    pass
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -851,8 +863,9 @@ def defaultFilter(a,c,istoday,period):
 """
 按分类列出崛起的股票的数量与列表
 """
-def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
+def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     today_but = None
+    cbs = [None,None,None]
     output = widgets.Output()
     output2 = widgets.Output()
     box_layout = Layout(display='flex',
@@ -897,7 +910,18 @@ def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
     prevClickButtonStyle = None
     #点击日期
     def onCatsList(E):
-        nonlocal progress,prevClickButton,prevClickButtonStyle
+        nonlocal progress,prevClickButton,prevClickButtonStyle,cbs
+        def combo_cb(*args):
+            r = False
+            ls = []
+            for cb in cbs:
+                if cb is not None:
+                    b,ls = cb(*args)
+                    if b:
+                        r = b
+                    else:
+                        return False,[]
+            return r,ls
         if prevClickButton is not None:
             prevClickButton.button_style = prevClickButtonStyle
         prevClickButton = E
@@ -913,9 +937,9 @@ def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
             display(progress)            
         progressCallback(0)
         if bi is None:
-            rasing,vlines = searchRasingCompanyStatusByRT(E.date,period,cb,id2companys,progressCallback)
+            rasing,vlines = searchRasingCompanyStatusByRT(E.date,period,combo_cb,id2companys,progressCallback)
         else:
-            rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,cb,id2companys,progressCallback)
+            rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,combo_cb,id2companys,progressCallback)
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -1026,14 +1050,25 @@ def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
         but.date = str(d[0])
         but.on_click(onCatsList)
         items.append(but)
-
+    methodlists = ['双崛起买点','RSI左买点','RSI右买点','volumeJ左买点','volumeJ右买点']
     methodDropdown = widgets.Dropdown(
-        options=['双崛起买点','RSI左买点','RSI右买点','volumeJ左买点','volumeJ右买点']+['自定义'] if cb is not None else [],
-        value='自定义' if cb is not None else '双崛起',
+        options=methodlists+(['自定义'] if cb is not None else []),
+        value='自定义' if cb is not None else '双崛起买点',
         description='搜索算法',
-        layout=Layout(display='block',width='296px'),
+        layout=Layout(display='block',width='196px'),
         disabled=False)
-    custom_cb = cb
+    methodDropdown1 = widgets.Dropdown(
+        options=['None']+methodlists,
+        value='None',
+        description='&&',
+        layout=Layout(display='block',width='196px'),
+        disabled=False)
+    methodDropdown2 = widgets.Dropdown(
+        options=['None']+methodlists,
+        value='None',
+        description='&&',
+        layout=Layout(display='block',width='196px'),
+        disabled=False)
     def wrap(func):
         def ccb(a,c,itd):
             if func(a,c):
@@ -1041,26 +1076,39 @@ def RasingCategoryList(period='d',cb=isRasing,name=None,bi=None,ei=None):
             else:
                 return False,[]
         return ccb
-    def on_selectmethod(e):
-        nonlocal cb,custom_cb
-        sel = e['new']
+    def selectMethod(sel,i):
+        nonlocal cbs,cb
         if sel=='双崛起买点':
-            cb = wrap(cb_macd_energy_buy)
+            cbs[i] = wrap(cb_macd_energy_buy)
         elif sel=='RSI左买点':
-            cb = wrap(cb_rsi_left_buy)
+            cbs[i] = wrap(cb_rsi_left_buy)
         elif sel=='RSI右买点':
-            cb = wrap(cb_rsi_right_buy)
+            cbs[i] = wrap(cb_rsi_right_buy)
         elif sel=='volumeJ左买点':
-            cb = wrap(cb_volumeJ_left_buy)
+            cbs[i] = wrap(cb_volumeJ_left_buy)
         elif sel=='volumeJ右买点':
-            cb = wrap(cb_volumeJ_right_buy)
+            cbs[i] = wrap(cb_volumeJ_right_buy)
         elif sel=='自定义':
-            cb = custom_cb
-
+            cbs[0] = cb
+        elif sel=='None':
+            cbs[i] = None
+    selectMethod(methodDropdown.value,0)
+    selectMethod(methodDropdown1.value,1)
+    selectMethod(methodDropdown1.value,2)
+    def on_selectmethod(e):
+        sel = e['new']
+        selectMethod(sel,0)
+    def on_selectmethod1(e):
+        sel = e['new']
+        selectMethod(sel,1)
+    def on_selectmethod2(e):
+        sel = e['new']
+        selectMethod(sel,2)
     methodDropdown.observe(on_selectmethod,names='value')
-
+    methodDropdown1.observe(on_selectmethod1,names='value')
+    methodDropdown1.observe(on_selectmethod2,names='value')
     box = Box(children=items, layout=box_layout)
-    toolbox = Box(children=[methodDropdown], layout=box_layout)
+    toolbox = Box(children=[methodDropdown,methodDropdown1,methodDropdown2], layout=box_layout)
     display(toolbox,box,output)
 
     def updatek15():

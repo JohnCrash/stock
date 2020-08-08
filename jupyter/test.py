@@ -19,10 +19,15 @@ import config
 import subprocess
 import threading
 
+def cb(a,b):
+    return a+b
+def t(*args):
+    return cb(*args)
+print(t(1,2))
 #status.saveflow2('2020-08-04','2020-07-10')
 #shared.delKey('company_status_last50') #清除redis中的缓存数据
 #shared.delKey('company_status_date50') #清除redis中的缓存数据
-shared.delKey("last_download_day")
+#shared.delKey("last_download_day")
 
 """
 companys = stock.query("select company_id,code,name,category from company_select")
@@ -51,15 +56,14 @@ for c in companys:
     id2companys[c[0]] = c
 def isRasing(a,c,istoday):
     #istoday True可以使用xueqiu数据
-    #c [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]  
-    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
-    print("%s %s [vol=%f万,vol=%f万,close=%f,energy=%f,macd=%f]"%(c[1],c[2],round(a[-2,2]/10000,2),round(a[-1,2]/10000,2),a[-1,1],a[-1,5],a[-1,4]))
+    #c [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]   
+    #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi
     dMACD = a[-1,4]-a[-2,4]
     #macd在零轴附件（预计2日穿过或者已经穿过2日）,股价涨,能量线崛起
     if dMACD>0 and a[-1,1]-a[-2,1]>0 and a[-1,5]>=3 and a[-2,5]<3:
         if (a[-1,4]<0 and a[-1,4]+2*dMACD>0) or (a[-1,4]>0 and a[-1,4]-2*dMACD<0):
             return True,[{'x':[-1],'color':'magenta','linestyle':'--','linewidth':2}]
-    return False,[]    
+    return False,[]   
 rasing,vlines = status.searchRasingCompanyStatusByRT('2020-06-05','d',isRasing,id2companys,progress)    
 """
 #xueqiu.clearAllRT()
