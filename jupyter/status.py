@@ -587,7 +587,12 @@ def get_id2companys():
             _id2companys_[c[0]] = c
     return _id2companys_,_companys_
 
-#search回调macd能量线双崛起 
+"""
+search回调macd能量线双崛起 
+a = [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw],..]
+c = [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]
+d = [[date],...]
+"""
 def cb_macd_energy_buy(a,c,d=None):
     dMACD = a[-1,4]-a[-2,4]
     #macd在零轴附件（预计2日穿过或者已经穿过2日）,股价涨,能量线崛起
@@ -611,6 +616,9 @@ def cb_volumeJ_left_sell(a,c,d=None):
 def cb_rsi_right_buy(a,c,d=None):
     return a[-2,11]<=20 and a[-1,11]>20
 
+def cb_rsi_right_buy20_30(a,c,d=None):
+    return a[-2,11]<=30 and a[-1,11]>30
+
 def cb_rsi_right_sell(a,c,d=None):
     return a[-2,11]>=80 and a[-1,11]<80
 
@@ -620,18 +628,30 @@ def cb_volumeJ_right_buy(a,c,d=None):
 def cb_volumeJ_right_sell(a,c,d=None):
     return a[-2,6]>=95 and a[-1,6]<95
 
-#boll通道窄2.0以下，持续20以上
+#boll通道窄2.0以下，持续30以上(不算最近一天)
 def cb_bollwidth(a,c,d=None):
-    pass
-#boll通道上方附近
+    for i in range(-30,-1):
+        if a[i,10]>0.2:
+            return False
+    return True
+#boll通道窄2.0以下，持续20以上
+def cb_bollwidth15(a,c,d=None):
+    for i in range(-30,-1):
+        if a[i,10]>0.15:
+            return False
+    return True    
+#boll通道上方附近（大于中线到boll顶2/3处）
 def cb_boll_up(a,c,d=None):
-    pass
+    return a[-1,1]>(a[-1,8]+(a[-1,7]-a[-1,8])*2/3)
 #boll通道下方附近
 def cb_boll_down(a,c,d=None):
-    pass
+    return a[-1,1]<(a[-1,9]+(a[-1,8]-a[-1,9])/3)
 #成交量放出巨量当日
 def cb_volume_huge(a,c,d=None):
-    pass
+    return a[-1,2]>2*a[-2,2] and a[-1,1]>a[-2,1]
+#成交量持续放大，股价持续上涨
+def cb_volume_price_grow(a,c,d=None):
+    return a[-1,2]>a[-2,2] and a[-2,2]>a[-3,2] and a[-1,1]>a[-3,1]
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -1050,24 +1070,26 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         but.date = str(d[0])
         but.on_click(onCatsList)
         items.append(but)
-    methodlists = ['双崛起买点','RSI左买点','RSI右买点','volumeJ左买点','volumeJ右买点']
+    methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
+                    'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
+                    '成交量显著放大','量价齐升']
     methodDropdown = widgets.Dropdown(
         options=methodlists+(['自定义'] if cb is not None else []),
         value='自定义' if cb is not None else '双崛起买点',
         description='搜索算法',
-        layout=Layout(display='block',width='196px'),
+        layout=Layout(display='block',width='296px'),
         disabled=False)
     methodDropdown1 = widgets.Dropdown(
         options=['None']+methodlists,
         value='None',
         description='&&',
-        layout=Layout(display='block',width='196px'),
+        layout=Layout(display='block',width='296px'),
         disabled=False)
     methodDropdown2 = widgets.Dropdown(
         options=['None']+methodlists,
         value='None',
         description='&&',
-        layout=Layout(display='block',width='196px'),
+        layout=Layout(display='block',width='296px'),
         disabled=False)
     def wrap(func):
         def ccb(a,c,itd):
@@ -1082,12 +1104,26 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
             cbs[i] = wrap(cb_macd_energy_buy)
         elif sel=='RSI左买点':
             cbs[i] = wrap(cb_rsi_left_buy)
-        elif sel=='RSI右买点':
+        elif sel=='RSI右买点(<20)':
             cbs[i] = wrap(cb_rsi_right_buy)
+        elif sel=='RSI右买点(20-30)':
+            cbs[i] = wrap(cb_rsi_right_buy20_30)
         elif sel=='volumeJ左买点':
             cbs[i] = wrap(cb_volumeJ_left_buy)
         elif sel=='volumeJ右买点':
             cbs[i] = wrap(cb_volumeJ_right_buy)
+        elif sel=='bollwidth<0.2(30)':
+            cbs[i] = wrap(cb_bollwidth)
+        elif sel=='bollwidth<0.15(30)':
+            cbs[i] = wrap(cb_bollwidth15)
+        elif sel=='boll通道顶':
+            cbs[i] = wrap(cb_boll_up)
+        elif sel=='boll通道底部':
+            cbs[i] = wrap(cb_boll_down)    
+        elif sel=='成交量显著放大':
+            cbs[i] = wrap(cb_volume_huge) 
+        elif sel=='量价齐升':                      
+            cbs[i] = wrap(cb_volume_price_grow)            
         elif sel=='自定义':
             cbs[0] = cb
         elif sel=='None':
