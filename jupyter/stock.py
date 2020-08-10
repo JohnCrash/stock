@@ -26,6 +26,9 @@ def dateString(t):
     return '%s-%s-%s'%(t.year,t.month,t.day)
 def timeString(t):
     return '%s-%s-%s %s:%s:%s'%(t.year,t.month,t.day,t.hour,t.minute,t.second)
+def timeString2(t):
+    return '%s:%s:%s'%(t.hour,t.minute,t.second)
+
 gdb = None
 
 def opendb():

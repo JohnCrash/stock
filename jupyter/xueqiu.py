@@ -344,6 +344,17 @@ def getRT(companys,step=1,N=100,progress=defaultProgress):
         _K = _K[:,-N:,:]
         _D = _D[-N:]
     setrtcach(step,_K,_D,_lastp)
+    #将最新的数据作为最后一帧
+    ts = seqs[-1]
+    if step>1 and datetime.fromtimestamp(ts/1000000)!=_D[-1][0]:
+        DD = _D.copy()
+        DD.append((datetime.fromtimestamp(ts/1000000),))
+        KK = np.empty((C,len(DD),6))
+        KK[:,:-1,:] = _K
+        b,p = shared.numpyFromRedis("rt%d"%ts)
+        if b:
+            KK[:,-1,:] = p
+            return KK,DD    
     return _K,_D
 
 #遍历全部的数据帧

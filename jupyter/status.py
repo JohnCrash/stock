@@ -2428,6 +2428,17 @@ def timeline(code,step=1,name=None,companys=None):
             axs[0].set_title("%s %s"%(companys[i][2],companys[i][1]))
             xdd = np.arange(len(D))
             axs[0].plot(xdd,K[i,:,3])
+            """
+            显示极值点
+            """
+            eps = stock.extremePoint(K[i,:,3])
+            if eps[0][0] != K.shape[1]-1:
+                eps.insert(0,(K.shape[1]-1,1 if eps[0][1]<0 else -1,K[i,-1,3]))
+            k = K[i,:,3]
+            for j in eps:
+                x = j[0]
+                axs[0].annotate('%.1f'%(k[x]),xy=(x,k[x]),xytext=(-30, 30 if j[1]>0 else -30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                        connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
             axs[0].grid(True)
             vol = np.empty(len(D))
             vol[0] = 0#K[i,0,2]
@@ -3073,37 +3084,45 @@ def Indexs():
 """
 显示大盘涨跌周期个股和分类的涨跌情况
 """
-def fluctuation():
+def fluctuation(step=1):
     output = widgets.Output()
     display(output)
     companys = stock.query("""select company_id,code,name,category from company_select""")
-    step = 1
     szi = 0
     id2com = {}
+    idd = None
     for com in companys:
         id2com[com[0]] = com
 
-    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
-    idd[:,0] = K[:,0,0]
-    for i in idd:
-        k = int(i[0])
-        if k in id2com:
-            i[1] = id2com[k][1]
-            i[2] = id2com[k][2]
-            i[3] = id2com[k][3]    
     for i in range(len(companys)):
         if companys[i][1]=='SH000001':
             szi = i
-            break
-    def plote_fluctuation(result,output):
-        fig,axs = plt.subplots(2,1,figsize=(30,14))
-        fig.subplots_adjust(hspace=0.1,wspace=0.05) #调整子图上下间距
-        axs[0].set_title("涨跌分布")
-
-        kline.output_show(output)
+            break  
+    def autolabel(axs,rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = rect.get_height()
+            axs.annotate('{}'.format(height),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')          
+    def getcols(s,c):
+        a = []
+        for v in s:
+            a.append(v[c])
+        return a
     def update_fluctuation(K,D):
+        nonlocal idd
         eps = stock.extremePoint(K[szi,:,3])
-        i0,i1,i2 = 0,0,0
+
+        if eps[0][0]!=K.shape[1]-1:
+            eps.insert(0,(K.shape[1]-1,1 if eps[0][1]<0 else -1,K[szi,-1,3]))
+        if eps[-1][0]!=0:
+            eps.append((0,1 if eps[-1][1]<0 else -1,K[szi,0,3]))
+        if len(eps)<3:
+            return
+        i0,i1,i2 = eps[2][0],eps[1][0],eps[0][0]
         dK1 = K[:,i1,3]/K[:,i0,3]-1
         dK2 = K[:,i2,3]/K[:,i1,3]-1
         result = []
@@ -3111,15 +3130,52 @@ def fluctuation():
             r = idd[:,3]==category
             r1 = dK1[r].mean()
             r2 = dK2[r].mean()
-            result.append((category,r1,r2))
+            result.append((category,r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
         with output:
-            plote_fluctuation(result,output)
+            fig,axs = plt.subplots(2,1,figsize=(30,14))
+            fig.subplots_adjust(hspace=0.2,wspace=0.05) #调整子图上下间距
+            SS = sorted(result,key=lambda it:it[3]+it[4],reverse=True)
+            for i in range(2):
+                if i==0:
+                    axs[0].set_title("%s-%s"%(stock.timeString2(D[i1][0]),stock.timeString2(D[i0][0])))
+                    r = dK1[szi]
+                    axs[0].axhline(r,color='red' if r>0 else 'green',linewidth=2,linestyle='--')
+                else:
+                    axs[1].set_title("%s-%s"%(stock.timeString2(D[i2][0]),stock.timeString2(D[i1][0])))
+                    r = dK2[szi]
+                    axs[1].axhline(r,color='red' if r>0 else 'green',linewidth=2,linestyle='--')
+                labels = getcols(SS,0)
+                x = np.arange(len(labels))
+                rects1 = axs[i].bar(x,getcols(SS,2*i+1),0.9,color='red')
+                rects2 = axs[i].bar(x,getcols(SS,2*i+2),0.9,color='green')
+                axs[i].axhline(0,color='black',linewidth=2,linestyle='--')
+                axs[i].grid(True)
+                axs[i].set_xticks(x)
+                axs[i].set_xticklabels(labels)        
+                plt.setp(axs[i].get_xticklabels(),rotation=45,horizontalalignment='right')
+                axs[i].set_xlim(-1,len(labels))
+                #autolabel(axs[0],rects)
+            kline.output_show(output)
+    lastT = None
+    isfirst = True
     def update():
-        nonlocal companys,step
+        nonlocal companys,step,idd,lastT,isfirst
+        b,ut = xueqiu.getLastUpdateTimestamp()
         t = datetime.today()
-        if stock.isTransTime(t):
+        if stock.isTransDay() and (isfirst or (b and ut!=lastT)):
+            isfirst = False
+            lastT = ut
             K,D = xueqiu.getRT(companys,step=step)
+            if idd is None:
+                idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+                idd[:,0] = K[:,0,0]
+                for i in idd:
+                    k = int(i[0])
+                    if k in id2com:
+                        i[1] = id2com[k][1]
+                        i[2] = id2com[k][2]
+                        i[3] = id2com[k][3]                  
             update_fluctuation(K,D)
         if t.hour>=6 and t.hour<15:
-            xueqiu.Timer(120,update)
+            xueqiu.Timer(1,update)
     update()

@@ -19,6 +19,7 @@ import config
 import subprocess
 import threading
 
+status.fluctuation()
 #status.saveflow2('2020-08-04','2020-07-10')
 #shared.delKey('company_status_last50') #清除redis中的缓存数据
 #shared.delKey('company_status_date50') #清除redis中的缓存数据
