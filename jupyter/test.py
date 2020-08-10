@@ -19,11 +19,6 @@ import config
 import subprocess
 import threading
 
-def cb(a,b):
-    return a+b
-def t(*args):
-    return cb(*args)
-print(t(1,2))
 #status.saveflow2('2020-08-04','2020-07-10')
 #shared.delKey('company_status_last50') #清除redis中的缓存数据
 #shared.delKey('company_status_date50') #清除redis中的缓存数据
@@ -72,6 +67,7 @@ rasing,vlines = status.searchRasingCompanyStatusByRT('2020-06-05','d',isRasing,i
 #xueqiu.sinaFlowRT()
 #print('Done')
 #status.saveflow()
+
 """
 def process(i):
     pass
@@ -79,6 +75,7 @@ print("开始更新数据库...")
 status.update_status(process)
 print("更新完成。") 
 """
+
 
 '''
 #status.showzdt(bi='2019-01-02',ei='2019-10-01')

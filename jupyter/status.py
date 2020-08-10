@@ -529,7 +529,7 @@ def get_tvol(t):
 tasks[0] = [0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw]...
 tasks[1] = [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]...
 返回的形式和输入一样，只不过是将当前的数据进行了补全
-return [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw]...,
+return [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw,11 rsi]...,
         [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]...]
 """
 def downloadRT(tasks,progress=None):
@@ -589,7 +589,7 @@ def get_id2companys():
 
 """
 search回调macd能量线双崛起 
-a = [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw],..]
+a = [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw,11 rsi],..]
 c = [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]
 d = [[date],...]
 """
@@ -707,12 +707,16 @@ def searchRasingCompanyStatusByRT(dd,period,cb,id2companys,progress):
     d,a = redisStatusCache50(db)
     progress(30)
     istoday = False
+    isNeedDownload = False
     bi = len(d)-1
     for i in range(len(d)):
         if str(d[i][0])==dd:
             bi = i
     if date.today()==date.fromisoformat(dd):
         istoday = True
+    #如果Cache50中的数据不包括当天数据，并且当天是一个交易日，则需要下载新的数据
+    if stock.isTransDay() and d[-1][0] != date.fromisoformat(dd):
+        isNeedDownload = True
 
     rasing = []
     vlines = {}
@@ -726,7 +730,7 @@ def searchRasingCompanyStatusByRT(dd,period,cb,id2companys,progress):
         #反转数组的前后顺序，反转后-1代表最近的数据
         k = c[:bi+1,:]#0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw
         if idd in id2companys:
-            if istoday and stock.isTransTime() and period=='d': #将当日数据叠加进数据中
+            if istoday and isNeedDownload and period=='d': #将当日数据叠加进数据中
                 tasks.append((k,id2companys[idd]))
             else:
                 results.append((k,id2companys[idd]))
@@ -739,7 +743,7 @@ def searchRasingCompanyStatusByRT(dd,period,cb,id2companys,progress):
         results = downloadRT(tasks,progress40_90)
     progress(90)
     for it in results:
-        b,vline = cb(it[0],it[1],istoday)
+        b,vline = cb(it[0],it[1])
         if b:
             idd = it[1][0]
             rasing.append(idd)
@@ -1092,7 +1096,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         layout=Layout(display='block',width='296px'),
         disabled=False)
     def wrap(func):
-        def ccb(a,c,itd):
+        def ccb(a,c):
             if func(a,c):
                 return True,[{'x':[-1],'color':'magenta','linestyle':'--','linewidth':2}]
             else:
@@ -1216,7 +1220,6 @@ D = [(date,)...]
 """
 def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需要的时候才处理数据
     id2com = {}
-
     for com in companys:
         id2com[com[0]] = com
 
@@ -1233,7 +1236,7 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
     """
     day = int 周期（和多少个周期前比较增长）
     day = 'd' 周期盈利将变成日盈利(和昨日收盘进行比较)
-    day = 's' 通过和大盘比较上涨和下跌周期来确定强弱
+    day = 's' 通过和大盘的上涨和下跌周期来计算
     """
     def calcCB(day):
         if day=='s':
@@ -1242,7 +1245,7 @@ def processKD2_CB(K,D,companys,topN=20): #对processKD2的优化，只有在需�
             return calcDayCB(day)
     def calcStrongCB():
         nonlocal idd,id2com,result,K,D,topN,result_passed
-
+        
     def calcDayCB(day):
         nonlocal idd,id2com,result,K,D,topN,result_passed
         
@@ -3066,3 +3069,57 @@ def Indexs():
     box = Box(children=buts,layout=box_layout)
     display(box,output)
     onClick(buts[0])
+
+"""
+显示大盘涨跌周期个股和分类的涨跌情况
+"""
+def fluctuation():
+    output = widgets.Output()
+    display(output)
+    companys = stock.query("""select company_id,code,name,category from company_select""")
+    step = 1
+    szi = 0
+    id2com = {}
+    for com in companys:
+        id2com[com[0]] = com
+
+    idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+    idd[:,0] = K[:,0,0]
+    for i in idd:
+        k = int(i[0])
+        if k in id2com:
+            i[1] = id2com[k][1]
+            i[2] = id2com[k][2]
+            i[3] = id2com[k][3]    
+    for i in range(len(companys)):
+        if companys[i][1]=='SH000001':
+            szi = i
+            break
+    def plote_fluctuation(result,output):
+        fig,axs = plt.subplots(2,1,figsize=(30,14))
+        fig.subplots_adjust(hspace=0.1,wspace=0.05) #调整子图上下间距
+        axs[0].set_title("涨跌分布")
+
+        kline.output_show(output)
+    def update_fluctuation(K,D):
+        eps = stock.extremePoint(K[szi,:,3])
+        i0,i1,i2 = 0,0,0
+        dK1 = K[:,i1,3]/K[:,i0,3]-1
+        dK2 = K[:,i2,3]/K[:,i1,3]-1
+        result = []
+        for category in allCategory():
+            r = idd[:,3]==category
+            r1 = dK1[r].mean()
+            r2 = dK2[r].mean()
+            result.append((category,r1,r2))
+        with output:
+            plote_fluctuation(result,output)
+    def update():
+        nonlocal companys,step
+        t = datetime.today()
+        if stock.isTransTime(t):
+            K,D = xueqiu.getRT(companys,step=step)
+            update_fluctuation(K,D)
+        if t.hour>=6 and t.hour<15:
+            xueqiu.Timer(120,update)
+    update()

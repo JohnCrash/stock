@@ -356,10 +356,10 @@ def foreachRT(cb):
             if b:
                 cb(ts,p)
 #返回最后一帧数据,返回plane,timestamp
-def lastRT():
+def lastRT(i=-1):
     b,seqs = shared.fromRedis('runtime_sequence')
     if b:
-        ts = seqs[-1]
+        ts = seqs[i]
         b,p = shared.numpyFromRedis("rt%d"%ts)
         if b:
             t = datetime.fromtimestamp(ts/1000000)
