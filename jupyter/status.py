@@ -22,8 +22,14 @@ import mylog
 from matplotlib.ticker import Formatter
 
 log = mylog.init('status.log',name='status')
+
+box_layout = Layout(display='flex',
+                flex_flow='wrap',
+                align_items='stretch',
+                border='solid',
+                width='100%')
 class MyFormatterRT(Formatter):
-    def __init__(self, dates,fmt='m:s'):
+    def __init__(self, dates,fmt='d h:m:s'):
         self.dates = dates
         self.fmt = fmt
 
@@ -34,8 +40,14 @@ class MyFormatterRT(Formatter):
             return ''
 
         t = self.dates[ind][0]
-        if self.fmt=='m:s':
+        if self.fmt=='d h:m:s':
             return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
+        elif self.fmt=='d h:m':
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
+        elif self.fmt=='h:m:s':
+            return '%02d:%02d:%02d'%(t.hour,t.minute,t.second)
+        elif self.fmt=='h:m':
+            return '%02d:%02d'%(t.hour,t.minute)
         else:
             return '%d %02d:%02d'%(t.day,t.hour,t.minute)
 
@@ -892,11 +904,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     cbs = [None,None,None]
     output = widgets.Output()
     output2 = widgets.Output()
-    box_layout = Layout(display='flex',
-                        flex_flow='wrap',
-                        align_items='stretch',
-                        border='solid',
-                        width='100%')
+
     progress_layout = Layout(display='flex',
                         flex_flow='wrap',
                         width='100%')                        
@@ -1598,11 +1606,7 @@ def StrongCategoryCompanyList(category,name,toplevelpos=None,period=20,periods=[
 
     butList.on_click(onListClick)
     out = widgets.Output()
-    box_layout = Layout(display='flex',
-                    flex_flow='wrap',
-                    align_items='stretch',
-                    border='solid',
-                    width='100%')    
+   
     stopUpdate = False
     def sortCompanyList():
         nonlocal pos,result,periodDropdown,stopUpdate,sortType
@@ -2347,11 +2351,7 @@ def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
     backbutton.on_click(on_prevpos)
     frontbutton.on_click(on_nextpos) 
     slider.observe(on_sliderChange,names='value')   
-    box_layout = Layout(display='flex',
-                    flex_flow='wrap',
-                    align_items='stretch',
-                    border='solid',
-                    width='100%')
+
     if LEN <= pagecount:
         box = Box(children=[backbutton,slider,frontbutton,periodDropdown,topDropdown,sampleDropdown,listDropdown,resverdDropdown,markDropdown,categoryDropdown,refreshbutton],layout=box_layout)
     else:
@@ -2414,7 +2414,7 @@ def favoriteList():
             border='solid',
             width='100%'))    
     display(box,out)
-
+    
 def timeline(code,step=1,name=None,companys=None):
     if companys is None:
         companys = stock.query("select company_id,code,name,category from company_select")
@@ -2619,11 +2619,7 @@ def showzdt(bi=None,ei=None):
     output = widgets.Output()
     output2 = widgets.Output()
     output3 = widgets.Output()
-    box_layout = Layout(display='flex',
-                    flex_flow='wrap',
-                    align_items='stretch',
-                    border='solid',
-                    width='100%')    
+    
     box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,nextDropdown,refreshbutton],layout=box_layout)
     def getData():
         nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos
@@ -2749,7 +2745,7 @@ def showzdt(bi=None,ei=None):
         with output3:
             kline.Plote(e.code,'d',config={'index':True},context="实时涨跌",mode="auto").show()
     def list_output2(names,codes,ums,dms):
-        nonlocal box_layout,output2
+        nonlocal output2
         children = []
         with output2:
             for i in range(len(names)):
@@ -2778,7 +2774,7 @@ def showzdt(bi=None,ei=None):
             for c in e.category[3]:
                 kline.Plote(c[1],'d',config={'index':True},context="实时涨跌",mode="runtime").show()
     def list_output2_category(categorys):
-        nonlocal box_layout,output2
+        nonlocal output2
         children = []
         with output2:
             for i in range(len(categorys)):
@@ -3084,9 +3080,45 @@ def Indexs():
 """
 显示大盘涨跌周期个股和分类的涨跌情况
 """
-def fluctuation(step=1):
+def fluctuation(step=15):
+    pos = 0
+    backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
+    frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+    periodDropdown = widgets.Dropdown(
+        options=['20秒','1分钟','5分钟','15分钟','30分钟'],
+        value='5分钟',
+        description='周期',
+        layout=Layout(display='block',width='196px'),
+        disabled=False)    
+    refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
+    box = Box(children=[backbutton,frontbutton,periodDropdown,refreshbutton],layout=box_layout)
     output = widgets.Output()
-    display(output)
+    display(box,output)
+    def on_period(e):
+        nonlocal step
+        v = e['new']
+        if v=='20秒':
+            step = 1
+        elif v=='1分钟':
+            step = 3
+        elif v=='5分钟':
+            step=15
+        elif v=='15分钟':
+            step=45
+        else:
+            step = 90
+        update(True)
+    periodDropdown.observe(on_period,names='value')
+    def on_prevpos(e):
+        nonlocal pos
+        pos+=1
+        update(True)
+    def on_nextpos(e):
+        nonlocal pos
+        pos-=1
+        update(True)        
+    backbutton.on_click(on_prevpos)
+    frontbutton.on_click(on_nextpos) 
     companys = stock.query("""select company_id,code,name,category from company_select""")
     szi = 0
     id2com = {}
@@ -3097,7 +3129,79 @@ def fluctuation(step=1):
     for i in range(len(companys)):
         if companys[i][1]=='SH000001':
             szi = i
-            break  
+            break
+
+    def plotflow(axs):
+        t = datetime.today()
+        name = "flow_%d_%d"%(t.month,t.day)
+        b,a = shared.fromRedis(name)
+        if not b:
+            t = datetime.today()
+            n=0
+            while n<5:
+                name = "flow_%d_%d"%(t.month,t.day)
+                b,a = shared.fromRedis(name)
+                if b:
+                    break
+                else:
+                    t = t-timedelta(days=1)
+                n+=1
+        if b:
+            axs.set_title("资金流向 %s"%(name))
+            d = np.zeros((len(a),5))
+            i = 0
+            dd = []
+            xticks=[]
+            for v in a:
+                dd.append([v[0]])
+                d[i][0] = i
+                d[i][1] = v[1]
+                d[i][2] = v[2]
+                d[i][3] = v[3]
+                d[i][4] = v[4]
+                i+=1
+            for i in range(4*60):
+                if i%10==0:
+                    xticks.append(i)
+            xticks.append(len(a)-1)
+            xticks.append(len(a)-1)
+            axs.xaxis.set_major_formatter(MyFormatterRT(dd,'h:m'))
+            axs.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(d[-1,1]/1e8))
+            axs.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(d[-1,2]/1e8))
+            axs.plot(d[:,0],d[:,3],color="cyan",label="中 %d亿"%(d[-1,3]/1e8))
+            axs.plot(d[:,0],d[:,4],color="purple",label="小 %d亿"%(d[-1,4]/1e8))
+            axs.set_xticks(xticks)
+            plt.setp(axs.get_xticklabels(),rotation=45,horizontalalignment='right')
+            axs.grid(True)
+            axs.set_xlim(0,4*60)
+            axs.axhline(y=0,color='black',linestyle='--')
+            axs.legend()
+                
+    def rtline(k,d,title,eps,mark,axsk):
+        nonlocal step
+        axsk.xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))
+        axsk.set_title(title)
+        xticks=[]
+        for i in range(len(d)):
+            if i%5==0:
+                xticks.append(i)
+        xticks.append(len(d)-1)
+        xticks.append(len(d)-1)
+
+        xdd = np.arange(len(d))
+        axsk.plot(xdd,k[:,3])
+        kk = k[:,3]
+        for j in eps:
+            x = j[0]
+            if x in mark:
+                color = 'red' if j[1]>0 else 'green'
+            else:
+                color = 'black'
+            axsk.annotate('%.1f'%(kk[x]),xy=(x,kk[x]),xytext=(-30, 30 if j[1]>0 else -30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                    connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color=color)
+        axsk.set_xticks(xticks)
+        plt.setp(axsk.get_xticklabels(),rotation=45,horizontalalignment='right')
+        axsk.grid(True)        
     def autolabel(axs,rects):
         """Attach a text label above each bar in *rects*, displaying its height."""
         for rect in rects:
@@ -3113,16 +3217,22 @@ def fluctuation(step=1):
             a.append(v[c])
         return a
     def update_fluctuation(K,D):
-        nonlocal idd
+        nonlocal idd,pos
         eps = stock.extremePoint(K[szi,:,3])
-
-        if eps[0][0]!=K.shape[1]-1:
-            eps.insert(0,(K.shape[1]-1,1 if eps[0][1]<0 else -1,K[szi,-1,3]))
+        li = K.shape[1]-1
+        if eps[0][0]!=li:
+            if li-eps[0][0]<=2:
+                a = eps[0]
+                eps[0] = (li,a[1],a[2])
+            else:
+                eps.insert(0,(li,1 if eps[0][1]<0 else -1,K[szi,-1,3]))
         if eps[-1][0]!=0:
             eps.append((0,1 if eps[-1][1]<0 else -1,K[szi,0,3]))
-        if len(eps)<3:
-            return
-        i0,i1,i2 = eps[2][0],eps[1][0],eps[0][0]
+        if len(eps)<=pos+2:
+            pos = len(eps)-3
+        if pos<0:
+            pos = 0
+        i0,i1,i2 = eps[pos+2][0],eps[pos+1][0],eps[pos][0]
         dK1 = K[:,i1,3]/K[:,i0,3]-1
         dK2 = K[:,i2,3]/K[:,i1,3]-1
         result = []
@@ -3132,9 +3242,23 @@ def fluctuation(step=1):
             r2 = dK2[r].mean()
             result.append((category,r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
         with output:
-            fig,axs = plt.subplots(2,1,figsize=(30,14))
+            gs_kw = dict(width_ratios=[1,3], height_ratios=[1,1])
+            fig,ax = plt.subplots(2,2,figsize=(32,14),gridspec_kw = gs_kw)
+            #for axx in ax[:,0]:
+            #    axx.remove()
+            #gs = ax[:,0][0].get_gridspec()
+            #axrt = fig.add_subplot(gs[:,0])
+            rtline(K[szi,:,:],D,'上证指数',eps,(i0,i1,i2),ax[0,0])
+            plotflow(ax[1,0])
+            axs = [0,0]
+            axs[0] = ax[0,-1]
+            axs[1] = ax[1,-1]
             fig.subplots_adjust(hspace=0.2,wspace=0.05) #调整子图上下间距
-            SS = sorted(result,key=lambda it:it[3]+it[4],reverse=True)
+            S = sorted(result,key=lambda it:it[3]+it[4],reverse=True)#太多忽略掉中间的1/3
+            n = math.floor(len(S)/3)
+            SS = S[:n]+S[-n:]
+            labels = getcols(SS,0)
+            x = np.arange(len(labels))
             for i in range(2):
                 if i==0:
                     axs[0].set_title("%s-%s"%(stock.timeString2(D[i1][0]),stock.timeString2(D[i0][0])))
@@ -3144,25 +3268,25 @@ def fluctuation(step=1):
                     axs[1].set_title("%s-%s"%(stock.timeString2(D[i2][0]),stock.timeString2(D[i1][0])))
                     r = dK2[szi]
                     axs[1].axhline(r,color='red' if r>0 else 'green',linewidth=2,linestyle='--')
-                labels = getcols(SS,0)
-                x = np.arange(len(labels))
                 rects1 = axs[i].bar(x,getcols(SS,2*i+1),0.9,color='red')
                 rects2 = axs[i].bar(x,getcols(SS,2*i+2),0.9,color='green')
                 axs[i].axhline(0,color='black',linewidth=2,linestyle='--')
                 axs[i].grid(True)
                 axs[i].set_xticks(x)
-                axs[i].set_xticklabels(labels)        
+                axs[i].set_xticklabels(labels)
                 plt.setp(axs[i].get_xticklabels(),rotation=45,horizontalalignment='right')
                 axs[i].set_xlim(-1,len(labels))
                 #autolabel(axs[0],rects)
             kline.output_show(output)
     lastT = None
     isfirst = True
-    def update():
+    def update(focus=False):
         nonlocal companys,step,idd,lastT,isfirst
+
         b,ut = xueqiu.getLastUpdateTimestamp()
         t = datetime.today()
-        if stock.isTransDay() and (isfirst or (b and ut!=lastT)):
+        if (stock.isTransDay() and (isfirst or (b and ut!=lastT))) or focus:
+            refreshbutton.button_style = 'success'
             isfirst = False
             lastT = ut
             K,D = xueqiu.getRT(companys,step=step)
@@ -3176,6 +3300,7 @@ def fluctuation(step=1):
                         i[2] = id2com[k][2]
                         i[3] = id2com[k][3]                  
             update_fluctuation(K,D)
+            refreshbutton.button_style = ''
         if t.hour>=6 and t.hour<15:
             xueqiu.Timer(1,update)
     update()
