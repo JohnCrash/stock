@@ -3085,8 +3085,10 @@ def fluctuation(step=15):
     switchsort = True
     liststate = False
     temp_SS = None
+    temp_SS2 = None
     select_category = None
     last_select_button = None
+    last_select_button2 = None
     backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
     frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
     periodDropdown = widgets.Dropdown(
@@ -3101,7 +3103,9 @@ def fluctuation(step=15):
     box = Box(children=[backbutton,frontbutton,periodDropdown,sortbutton,listbutton,refreshbutton],layout=box_layout)
     output = widgets.Output()
     output2 = widgets.Output()
-    display(box,output,output2)
+    output3 = widgets.Output()
+    output4 = widgets.Output()
+    display(box,output,output2,output3,output4)
     def on_period(e):
         nonlocal step
         v = e['new']
@@ -3150,18 +3154,55 @@ def fluctuation(step=15):
             list_output2(temp_SS)
     listbutton.on_click(on_list) 
     def on_companys(e):
-        nonlocal select_category,last_select_button
+        nonlocal select_category,last_select_button,output3,output4
         if e.description=='None':
             select_category = None
+            output3.clear_output()
+            output4.clear_output()            
         else:
-            select_category = e.description
+            select_category = e.description 
         if last_select_button is not None:
             last_select_button.button_style = ''
         e.button_style = 'success'
         last_select_button = e
         update(True)
+    def on_company(e):
+        nonlocal output4,last_select_button2
+        output4.clear_output(wait=True)
+        with output4:
+            code = None
+            for v in companys:
+                if v[2]==e.description:
+                    code = v[1]
+                    break
+            if code is not None:
+                if last_select_button2 is not None:
+                    last_select_button2.button_style=''
+                last_select_button2 = e
+                e.button_style = 'success'
+                kline.Plote(code,'d',config={'index':True},context="周期涨跌",mode="runtime").show()
+    def list_output3(SS):
+        nonlocal liststate,output3,output4,last_select_button2
+        if liststate:
+            output3.clear_output(wait=True)
+            children = []         
+            with output3:         
+                for v in SS:
+                    but = widgets.Button(
+                    description=v[0],
+                    disabled=False,
+                    layout=Layout(width='76px')
+                    )
+                    but.on_click(on_company)
+                    children.append(but)
+                box = Box(children=children,layout=box_layout)
+                display(box) 
+        else:
+             output3.clear_output()
+        output4.clear_output()
+        last_select_button2 = None
     def list_output2(SS):
-        nonlocal liststate,output2,temp_SS,select_category,last_select_button
+        nonlocal liststate,output2,temp_SS,select_category,last_select_button,output3,output4,last_select_button2
         if liststate:
             output2.clear_output(wait=True)
             children = []         
@@ -3187,7 +3228,10 @@ def fluctuation(step=15):
                 display(box)
         else:
             last_select_button = None
+            last_select_button2 = None
             output2.clear_output()
+            output3.clear_output()
+            output4.clear_output()
         select_category = None
         temp_SS = SS
     sortbutton.on_click(on_sort) 
@@ -3378,6 +3422,8 @@ def fluctuation(step=15):
             kline.output_show(output)
         if select_category is None:
             list_output2(SS)
+        else:
+            list_output3(SS)
     lastT = None
     isfirst = True
     def update(focus=False):
