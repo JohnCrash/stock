@@ -3082,6 +3082,11 @@ def Indexs():
 """
 def fluctuation(step=15):
     pos = 0
+    switchsort = True
+    liststate = False
+    temp_SS = None
+    select_category = None
+    last_select_button = None
     backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
     frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
     periodDropdown = widgets.Dropdown(
@@ -3091,9 +3096,12 @@ def fluctuation(step=15):
         layout=Layout(display='block',width='196px'),
         disabled=False)    
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
-    box = Box(children=[backbutton,frontbutton,periodDropdown,refreshbutton],layout=box_layout)
+    sortbutton = widgets.Button(description="上排序",layout=Layout(width='64px'))
+    listbutton = widgets.Button(description="选择列表",layout=Layout(width='96px'))
+    box = Box(children=[backbutton,frontbutton,periodDropdown,sortbutton,listbutton,refreshbutton],layout=box_layout)
     output = widgets.Output()
-    display(box,output)
+    output2 = widgets.Output()
+    display(box,output,output2)
     def on_period(e):
         nonlocal step
         v = e['new']
@@ -3119,17 +3127,88 @@ def fluctuation(step=15):
         update(True)        
     backbutton.on_click(on_prevpos)
     frontbutton.on_click(on_nextpos) 
+    def on_sort(e):
+        nonlocal switchsort,sortbutton
+        if switchsort:
+            switchsort = False
+            sortbutton.description = '下排序'
+        else:
+            switchsort = True
+            sortbutton.description = '上排序'
+        update(True)
+    def on_list(e):
+        nonlocal liststate,temp_SS
+        if liststate:
+            liststate = False
+            listbutton.button_style = ''
+        else:
+            liststate = True
+            listbutton.button_style = 'success'
+        if temp_SS is None:
+            update(True)
+        else:
+            list_output2(temp_SS)
+    listbutton.on_click(on_list) 
+    def on_companys(e):
+        nonlocal select_category,last_select_button
+        if e.description=='None':
+            select_category = None
+        else:
+            select_category = e.description
+        if last_select_button is not None:
+            last_select_button.button_style = ''
+        e.button_style = 'success'
+        last_select_button = e
+        update(True)
+    def list_output2(SS):
+        nonlocal liststate,output2,temp_SS,select_category,last_select_button
+        if liststate:
+            output2.clear_output(wait=True)
+            children = []         
+            with output2:
+                but = widgets.Button(
+                description='None',
+                disabled=False,
+                button_style='success',
+                layout=Layout(width='76px')
+                )
+                but.on_click(on_companys)   
+                children.append(but)      
+                last_select_button = but          
+                for v in SS:
+                    but = widgets.Button(
+                    description=v[0],
+                    disabled=False,
+                    layout=Layout(width='76px')
+                    )
+                    but.on_click(on_companys)
+                    children.append(but)
+                box = Box(children=children,layout=box_layout)
+                display(box)
+        else:
+            last_select_button = None
+            output2.clear_output()
+        select_category = None
+        temp_SS = SS
+    sortbutton.on_click(on_sort) 
     companys = stock.query("""select company_id,code,name,category from company_select""")
     szi = 0
-    id2com = {}
+    id2com = {} #映射id->com
+    id2i = {} #映射id->行
     idd = None
-    for com in companys:
+    for i in range(len(companys)):
+        com = companys[i]
         id2com[com[0]] = com
-
+        id2i[com[0]] = i
     for i in range(len(companys)):
         if companys[i][1]=='SH000001':
             szi = i
             break
+    tv = np.zeros(len(companys))
+    for v in stock.totalVolume():
+        iD = int(v[0])
+        if iD in id2i: 
+            tv[id2i[iD]] = v[1]
 
     def plotflow(axs):
         t = datetime.today()
@@ -3217,7 +3296,7 @@ def fluctuation(step=15):
             a.append(v[c])
         return a
     def update_fluctuation(K,D):
-        nonlocal idd,pos
+        nonlocal idd,pos,switchsort,select_category
         eps = stock.extremePoint(K[szi,:,3])
         li = K.shape[1]-1
         if eps[0][0]!=li:
@@ -3236,11 +3315,25 @@ def fluctuation(step=15):
         dK1 = K[:,i1,3]/K[:,i0,3]-1
         dK2 = K[:,i2,3]/K[:,i1,3]-1
         result = []
-        for category in allCategory():
-            r = idd[:,3]==category
-            r1 = dK1[r].mean()
-            r2 = dK2[r].mean()
-            result.append((category,r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
+        if select_category is None:
+            for category in allCategory():
+                r = idd[:,3]==category
+                """
+                #下面的算法不考虑个股市值，仅仅对涨跌幅进行平均
+                r1 = dK1[r].mean()
+                r2 = dK2[r].mean()
+                """
+                #下面的算法考虑个股的市值权重
+                r1 = (dK1[r]*tv[r]).sum()/tv[r].sum()
+                r2 = (dK2[r]*tv[r]).sum()/tv[r].sum()
+                result.append((category,r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
+        else:
+            for i in range(len(K)):
+                if idd[i,3]==select_category:
+                    r1 = dK1[i]
+                    r2 = dK2[i]
+                    result.append((idd[i,2],r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
+
         with output:
             gs_kw = dict(width_ratios=[1,3], height_ratios=[1,1])
             fig,ax = plt.subplots(2,2,figsize=(32,14),gridspec_kw = gs_kw)
@@ -3254,9 +3347,14 @@ def fluctuation(step=15):
             axs[0] = ax[0,-1]
             axs[1] = ax[1,-1]
             fig.subplots_adjust(hspace=0.2,wspace=0.05) #调整子图上下间距
-            S = sorted(result,key=lambda it:it[3]+it[4],reverse=True)#太多忽略掉中间的1/3
-            n = math.floor(len(S)/3)
-            SS = S[:n]+S[-n:]
+            if switchsort:
+                S = sorted(result,key=lambda it:it[3]+it[4],reverse=True)
+            else:
+                S = sorted(result,key=lambda it:it[1]+it[2],reverse=True)
+            if len(S)>80:
+                SS = S[:40]+S[-40:]
+            else:
+                SS = S
             labels = getcols(SS,0)
             x = np.arange(len(labels))
             for i in range(2):
@@ -3278,6 +3376,8 @@ def fluctuation(step=15):
                 axs[i].set_xlim(-1,len(labels))
                 #autolabel(axs[0],rects)
             kline.output_show(output)
+        if select_category is None:
+            list_output2(SS)
     lastT = None
     isfirst = True
     def update(focus=False):
@@ -3285,7 +3385,7 @@ def fluctuation(step=15):
 
         b,ut = xueqiu.getLastUpdateTimestamp()
         t = datetime.today()
-        if (stock.isTransDay() and (isfirst or (b and ut!=lastT))) or focus:
+        if ((isfirst or (b and ut!=lastT))) or focus:
             refreshbutton.button_style = 'success'
             isfirst = False
             lastT = ut
@@ -3301,6 +3401,6 @@ def fluctuation(step=15):
                         i[3] = id2com[k][3]                  
             update_fluctuation(K,D)
             refreshbutton.button_style = ''
-        if t.hour>=6 and t.hour<15:
+        if stock.isTransDay() and t.hour>=6 and t.hour<15:
             xueqiu.Timer(1,update)
     update()

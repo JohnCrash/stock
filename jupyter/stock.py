@@ -928,3 +928,21 @@ def macdDeviate(v,m=None,n=2):
         elif ep0[1]<0 and ep2[1]<0 and ep1[1]>0 and ep0[2]<0 and ep1[2]<0 and ep2[2]<0 and ep0[2]>ep2[2] and v[ep0[0]]<v[ep2[0]]: #低背离
             R.append((-1,ep2[0],ep0[0]))
     return R
+
+"""
+返回全部股票的总市值
+通过成交量除以还手率
+"""
+def totalVolume():
+    dd = query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
+    #做个一天的缓存
+    n = "tv%s"%(dateString(dd[0][0]))
+    b,V = shared.numpyFromRedis(n)
+    if b:
+        return V
+    v = query("""select id,volume,turnoverrate from kd_xueqiu where date='%s'"""%(dateString(dd[0][0])))
+    V = np.array(v).reshape(-1,3)
+    V[V[:,2]==0,2] = 1
+    V[:,1] = V[:,1]/V[:,2]
+    shared.numpyToRedis(V[:,:2],n,ex=24*3600)
+    return V[:,:2]
