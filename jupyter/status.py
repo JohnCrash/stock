@@ -318,14 +318,14 @@ def isRasing(a,company,istoday):
         return True,[{'x':[-1],'color':'red','linestyle':'--','linewidth':2}]
     return False,[]
 
-#最近50天的status数据
-#同时返回50天的日期数组和数据
+#最近60天的status数据
+#同时返回60天的日期数组和数据
 def redisStatusCache50(db):
     b1,a = shared.numpyFromRedis("%s_last50"%(db))
     b2,d = shared.fromRedis("%s_date50"%(db))
     if not (b1 and b2):
         #缓存中没有准备数据
-        d = stock.query("""select date from %s where id=8828 order by date desc limit 50"""%(db))
+        d = stock.query("""select date from %s where id=8828 order by date desc limit 60"""%(db))
         d = list(d)
         d.reverse()
         cs=stock.query("""select id,close,volume,volumema20,macd,energy,volumeJ,bollup,bollmid,bolldn,bollw,rsi from %s where date>='%s' and date<='%s'"""%(db,stock.dateString(d[0][0]),stock.dateString(d[-1][0])))
@@ -351,8 +351,8 @@ def redisStatusCache50(db):
                 if nc>=n:
                     break
             temp.append(c)
-        shared.numpyToRedis(a,"%s_last50"%(db))
-        shared.toRedis(d,"%s_date50"%(db))
+        shared.numpyToRedis(a,"%s_last50"%(db),ex=3*24*3600)
+        shared.toRedis(d,"%s_date50"%(db),ex=3*24*3600)
     #数据d存放的是时间，d[-1]最近的时间 d[0]最远的时间
     #数据a的时间序列和d相同,shape = (公司数,日期,数据)
     return d,a
@@ -664,6 +664,36 @@ def cb_volume_huge(a,c,d=None):
 #成交量持续放大，股价持续上涨
 def cb_volume_price_grow(a,c,d=None):
     return a[-1,2]>a[-2,2] and a[-2,2]>a[-3,2] and a[-1,1]>a[-3,1]
+#昨天涨停    
+def cb_price_y10(a,c,d=None):
+    return a[-2,1]/a[-3,1]>=1.097
+#今天增长大于0%
+def cb_price_g0(a,c,d=None):
+    return a[-1,1]/a[-2,1]>=1.0
+#今天增长大于5%
+def cb_price_g5(a,c,d=None):
+    return a[-1,1]/a[-2,1]>=1.05
+#今天增长大于8%
+def cb_price_g8(a,c,d=None):
+    return a[-1,1]/a[-2,1]>=1.08
+
+#价格回归到ma60附近
+def cb_ma_60(a,c,d=None):
+    ma60 = a[-60:,1].mean()
+    ma30 = a[-30:,1].mean()
+    return ma30>ma60 and abs(ma60-a[-1,1])<(ma30-ma60)/2
+def cb_ma_30(a,c,d=None):
+    ma30 = a[-30:,1].mean()
+    ma20 = a[-20:,1].mean()
+    return ma20>ma30 and abs(ma30-a[-1,1])<(ma20-ma30)/2
+def cb_ma_20(a,c,d=None):
+    ma20 = a[-20:,1].mean()
+    ma10 = a[-10:,1].mean()
+    return ma10>ma20 and abs(ma20-a[-1,1])<(ma10-ma20)/2
+def cb_ma_10(a,c,d=None):
+    ma10 = a[-10:,1].mean()
+    ma5 = a[-5:,1].mean()
+    return ma5>ma10 and abs(ma10-a[-1,1])<(ma5-ma10)/2
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -1084,7 +1114,8 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         items.append(but)
     methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
-                    '成交量显著放大','量价齐升']
+                    '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
+                    '回归60均线','回归30均线','回归20均线','回归10均线']
     methodDropdown = widgets.Dropdown(
         options=methodlists+(['自定义'] if cb is not None else []),
         value='自定义' if cb is not None else '双崛起买点',
@@ -1135,7 +1166,23 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         elif sel=='成交量显著放大':
             cbs[i] = wrap(cb_volume_huge) 
         elif sel=='量价齐升':                      
-            cbs[i] = wrap(cb_volume_price_grow)            
+            cbs[i] = wrap(cb_volume_price_grow)
+        elif sel=='昨天涨停':       
+            cbs[i] = wrap(cb_price_y10)
+        elif sel=='涨幅大于0%':
+            cbs[i] = wrap(cb_price_g0)
+        elif sel=='涨幅大于5%':
+            cbs[i] = wrap(cb_price_g5)
+        elif sel=='涨幅大于8%':
+            cbs[i] = wrap(cb_price_g8)
+        elif sel=='回归60均线':
+            cbs[i] = wrap(cb_ma_60)
+        elif sel=='回归30均线':
+            cbs[i] = wrap(cb_ma_30)
+        elif sel=='回归20均线':
+            cbs[i] = wrap(cb_ma_20)
+        elif sel=='回归10均线':
+            cbs[i] = wrap(cb_ma_10)                                                
         elif sel=='自定义':
             cbs[0] = cb
         elif sel=='None':

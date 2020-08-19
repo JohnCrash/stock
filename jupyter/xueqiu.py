@@ -960,7 +960,7 @@ def getK(code,period,n,provider=None):
     elif period==15:
         service = stockK15Service
     CODE = code.upper()
-    if CODE=='SZ399001' or CODE=='SH000001' or CODE=='SZ399006': #主要指数使用xueqiu数据，不同来源的数据成交量有差异
+    if CODE=='SZ399001' or CODE=='SH000001' or CODE=='SZ399006' or CODE[0]=='B': #主要指数使用xueqiu数据，不同来源的数据成交量有差异
         if period == 15:
             provider = u'雪球k15'
         else:
