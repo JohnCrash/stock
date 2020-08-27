@@ -676,24 +676,42 @@ def cb_price_g5(a,c,d=None):
 #今天增长大于8%
 def cb_price_g8(a,c,d=None):
     return a[-1,1]/a[-2,1]>=1.08
-
+#macd金叉    
+def cb_macd_gold(a,c,d=None):
+    return a[-1,4]>0 and a[-2,4]<=0
+#macd死叉
+def cb_macd_die(a,c,d=None):
+    return a[-1,4]<0 and a[-2,4]>0    
 #价格回归到ma60附近
 def cb_ma_60(a,c,d=None):
     ma60 = a[-60:,1].mean()
     ma30 = a[-30:,1].mean()
     return ma30>ma60 and abs(ma60-a[-1,1])<(ma30-ma60)/2
 def cb_ma_30(a,c,d=None):
+    ma60 = a[-60:,1].mean()
     ma30 = a[-30:,1].mean()
     ma20 = a[-20:,1].mean()
-    return ma20>ma30 and abs(ma30-a[-1,1])<(ma20-ma30)/2
+    return ma20>ma30 and ma30>ma60 and abs(ma30-a[-1,1])<(ma20-ma30)/2
 def cb_ma_20(a,c,d=None):
+    ma60 = a[-60:,1].mean()
     ma20 = a[-20:,1].mean()
     ma10 = a[-10:,1].mean()
-    return ma10>ma20 and abs(ma20-a[-1,1])<(ma10-ma20)/2
+    return ma10>ma20 and ma20>ma60 and abs(ma20-a[-1,1])<(ma10-ma20)/2
 def cb_ma_10(a,c,d=None):
+    ma30 = a[-30:,1].mean()
     ma10 = a[-10:,1].mean()
     ma5 = a[-5:,1].mean()
-    return ma5>ma10 and abs(ma10-a[-1,1])<(ma5-ma10)/2
+    return ma5>ma10 and ma10>ma30 and abs(ma10-a[-1,1])<(ma5-ma10)/2
+
+#科创板股票
+def cb_kcb(a,c,d=None):
+    return c[1][:5]=='SH688'
+#创业板股票
+def cb_cyb(a,c,d=None):
+    return c[1][:5]=='SZ300'
+#主板
+def cb_main(a,c,d=None):
+    return not (c[1][:5]=='SZ300' and c[1][:5]=='SH688')
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -1115,7 +1133,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
                     '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
-                    '回归60均线','回归30均线','回归20均线','回归10均线']
+                    '回归60均线','回归30均线','回归20均线','回归10均线','macd金叉','macd死叉','科创板','创业板','主板']
     methodDropdown = widgets.Dropdown(
         options=methodlists+(['自定义'] if cb is not None else []),
         value='自定义' if cb is not None else '双崛起买点',
@@ -1182,7 +1200,17 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         elif sel=='回归20均线':
             cbs[i] = wrap(cb_ma_20)
         elif sel=='回归10均线':
-            cbs[i] = wrap(cb_ma_10)                                                
+            cbs[i] = wrap(cb_ma_10)
+        elif sel=='macd金叉':
+            cbs[i] = wrap(cb_macd_gold)       
+        elif sel=='macd死叉':
+            cbs[i] = wrap(cb_macd_die)                      
+        elif sel=='科创板':
+            cbs[i] = wrap(cb_kcb)
+        elif sel=='创业板':
+            cbs[i] = wrap(cb_cyb)
+        elif sel=='主板':
+            cbs[i] = wrap(cb_main)
         elif sel=='自定义':
             cbs[0] = cb
         elif sel=='None':
