@@ -193,6 +193,7 @@ class Plote:
     def config(self,config={}):
         for k in config:
             self._config[k] = config[k]
+        self._gap = None
         self._axsInx = 0
         self._showma = False
         self._showmacd = False
@@ -215,6 +216,8 @@ class Plote:
         self._heights = [3]        
         if len(self._k)==0: #完全没有数据
             return
+        if self._period=='d':
+            self._gap = stock.gap(self._k)
         if 'ma' in self._config:
             self._showma = True
         if 'eps' in self._config:
@@ -990,7 +993,11 @@ class Plote:
             for v in self._maxpt:
                 if v>=bi and v<=ei:
                     plotVline(axs,v,'red',linewidth=4,linestyle='-.')
-
+        """绘制缺口"""
+        if self._gap is not None:
+            for gap in self._gap:
+                if gap[0]>=bi and gap[1]<=ei:
+                    axsK.broken_barh([(gap[0],gap[1]-gap[0])],(gap[2],gap[3]-gap[2]),facecolor='red' if gap[4]>0 else 'green',alpha=0.4)
         """绘制均线"""                
         if self._showma:
             ct = {5:"orange",10:"springgreen",20:"cornflowerblue",30:"salmon",60:"violet",242:"lime"}

@@ -65,7 +65,7 @@ def execute(s):
 """
 加载股票数据
 返回的第一个数据
-company{
+company (
     0 - id,
     1 - code,
     2 - name,
@@ -73,19 +73,15 @@ company{
     4 - done,
     5 - kbegin,
     6 - kend
-    ...
-}
-kline {
+    ...)
+kline [(
     0 - volume,
     1 - open,
     2 - high,
     3 - low,
-    4 - close,
-    5 - macd
-}
-kdate {
-    0 - [date,]
-}
+    4 - close
+    ),...]
+kdate [(date,),...]
 code 可以是代码或名称
 period = 'd','30','15','5'
 after 载入该日期之后的数据
@@ -946,3 +942,41 @@ def totalVolume():
     V[:,1] = V[:,1]/V[:,2]
     shared.numpyToRedis(V[:,:2],n,ex=24*3600)
     return V[:,:2]
+
+"""
+K线缺口
+输入标准k数据
+返回缺口数据[(bi,ei,low,high,dp),...]
+缺口开始位置bi,缺口结束位置ei,缺口大小high-low
+dp是1跳空高开缺口，-1跳空低开缺口
+"""
+def gap(k):
+    R = []
+    for i in range(len(k)-1):
+        K1 = k[i]
+        K2 = k[i+1]
+        if K1[2]<K2[3] or K1[3]>K2[2]: #存在缺口
+            bi = i
+            ei = len(k)-1
+            if K1[2]<K2[3]:
+                low = K1[2]
+                high = K2[3]
+                dp = 1
+            else:
+                low = K2[2]
+                high = K1[3]
+                dp = -1
+            for j in range(i+1,len(k)): #搜索封闭点
+                K = k[j]
+                if K[2]<high and K[2]>low:
+                    low = K[2]
+                elif K[3]<high and K[3]>low:
+                    high = K[3]
+                elif K[2]>=high and K[3]<=low: #封闭
+                    low = high+1 #使得high<low
+                    break
+                if low>=high: #封闭了
+                    break
+            if high>low:
+                R.append((bi,ei,low,high,dp))
+    return R
