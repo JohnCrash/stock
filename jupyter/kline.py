@@ -72,7 +72,7 @@ def plotK(axs,k,bi,ei):
             c = 'green'
         else:
             c = 'red'
-        axs.vlines(i,k[i,3],k[i,2],color=c,zorder=0)
+        axs.vlines(i,k[i,3],k[i,2],color=c,zorder=0,linewidth=2)
         #对涨停和跌停加粗标注
         if i>0 and abs((k[i,4]-k[i-1,4])/k[i-1,4])>=0.097:
             lw = 4
@@ -193,7 +193,7 @@ class Plote:
     def config(self,config={}):
         for k in config:
             self._config[k] = config[k]
-        self._gap = None
+
         self._axsInx = 0
         self._showma = False
         self._showmacd = False
@@ -216,8 +216,7 @@ class Plote:
         self._heights = [3]        
         if len(self._k)==0: #完全没有数据
             return
-        if self._period=='d':
-            self._gap = stock.gap(self._k)
+
         if 'ma' in self._config:
             self._showma = True
         if 'eps' in self._config:
@@ -266,7 +265,8 @@ class Plote:
                     self._gotoTrendHeandPos = True
                     break
         else:
-            self._trendHeadPos = len(self._k)-1
+            self._trendHeadPos = len(self._k)
+
         if 'energy' in self._config and self._config['energy']:
             self._energyInx = self._axsInx+1
             self._axsInx += 1
@@ -994,8 +994,9 @@ class Plote:
                 if v>=bi and v<=ei:
                     plotVline(axs,v,'red',linewidth=4,linestyle='-.')
         """绘制缺口"""
-        if self._gap is not None:
-            for gap in self._gap:
+        if self._period=='d':
+            gaps = stock.gap(self._k[:self._trendHeadPos+1])            
+            for gap in gaps:
                 if gap[0]>=bi and gap[1]<=ei:
                     axsK.broken_barh([(gap[0],gap[1]-gap[0])],(gap[2],gap[3]-gap[2]),facecolor='red' if gap[4]>0 else 'green',alpha=0.4)
         """绘制均线"""                
@@ -1049,7 +1050,7 @@ class Plote:
             drawTrendLine(axsK,self._period,self._date,bi,ei)
         if self._trendHeadPos>=0 and self._trendHeadPos<=len(self._k):
             axsK.axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
-            for i in range(self._axsInx+1):
+            for i in range(1,self._axsInx+1):
                 axs[i].axvline(self._trendHeadPos,color="red",linewidth=2,linestyle='--')
 
         if self._company is not None:

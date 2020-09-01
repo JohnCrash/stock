@@ -664,9 +664,7 @@ def cb_volume_huge(a,c,d=None):
 #成交量持续放大，股价持续上涨
 def cb_volume_price_grow(a,c,d=None):
     return a[-1,2]>a[-2,2] and a[-2,2]>a[-3,2] and a[-1,1]>a[-3,1]
-#昨天涨停    
-def cb_price_y10(a,c,d=None):
-    return a[-2,1]/a[-3,1]>=1.097
+
 #今天增长大于0%
 def cb_price_g0(a,c,d=None):
     return a[-1,1]/a[-2,1]>=1.0
@@ -702,7 +700,25 @@ def cb_ma_10(a,c,d=None):
     ma10 = a[-10:,1].mean()
     ma5 = a[-5:,1].mean()
     return ma5>ma10 and ma10>ma30 and abs(ma10-a[-1,1])<(ma5-ma10)/2
-
+#涨停板
+def cb_zt(a,c,d=None):
+    if cb_main(a,c,d):
+        return a[-1,1]/a[-2,1]>=1.098
+    else:
+        return a[-1,1]/a[-2,1]>=1.198
+#昨天涨停    
+def cb_price_y10(a,c,d=None):
+    return cb_zt(a[:-1],c,d)  
+def cb_zt2(a,c,d=None):
+    return cb_zt(a,c,d) and cb_zt(a[:-1],c,d)      
+def cb_zt3(a,c,d=None):
+    return cb_zt(a,c,d) and cb_zt(a[:-1],c,d)  and cb_zt(a[:-2],c,d)
+#跌停板        
+def cb_dzt(a,c,d=None):
+    if cb_main(a,c,d):
+        return a[-1,1]/a[-2,1]<(1.-0.098)
+    else:
+        return a[-1,1]/a[-2,1]<(1.-0.198)
 #科创板股票
 def cb_kcb(a,c,d=None):
     return c[1][:5]=='SH688'
@@ -711,7 +727,7 @@ def cb_cyb(a,c,d=None):
     return c[1][:5]=='SZ300'
 #主板
 def cb_main(a,c,d=None):
-    return not (c[1][:5]=='SZ300' and c[1][:5]=='SH688')
+    return not (c[1][:5]=='SZ300' or c[1][:5]=='SH688')
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -1133,6 +1149,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
                     '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
+                    '涨停板','二连板','三连板','跌停板',
                     '回归60均线','回归30均线','回归20均线','回归10均线','macd金叉','macd死叉','科创板','创业板','主板']
     methodDropdown = widgets.Dropdown(
         options=methodlists+(['自定义'] if cb is not None else []),
@@ -1204,7 +1221,15 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         elif sel=='macd金叉':
             cbs[i] = wrap(cb_macd_gold)       
         elif sel=='macd死叉':
-            cbs[i] = wrap(cb_macd_die)                      
+            cbs[i] = wrap(cb_macd_die)
+        elif sel=='涨停板':
+            cbs[i] = wrap(cb_zt)
+        elif sel=='二连板':
+            cbs[i] = wrap(cb_zt2)
+        elif sel=='三连板':
+            cbs[i] = wrap(cb_zt3)
+        elif sel=='跌停板':
+            cbs[i] = wrap(cb_dzt)
         elif sel=='科创板':
             cbs[i] = wrap(cb_kcb)
         elif sel=='创业板':
