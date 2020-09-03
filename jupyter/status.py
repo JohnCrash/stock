@@ -3189,18 +3189,30 @@ def fluctuation(step=15):
     select_category = None
     last_select_button = None
     last_select_button2 = None
+    all_sel = None
+    sh_sel = None
+    sz_sel = None
+    cy_sel = None
+    kc_sel = None
+    sel = None
     backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
     frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+    mainDropdown = widgets.Dropdown(
+        options=['全部','上证','深成','创业','科创'],
+        value='全部',
+        description='范围',
+        layout=Layout(display='block',width='96px'),
+        disabled=False)      
     periodDropdown = widgets.Dropdown(
         options=['20秒','1分钟','5分钟','15分钟','30分钟'],
         value='5分钟',
         description='周期',
-        layout=Layout(display='block',width='196px'),
+        layout=Layout(display='block',width='120px'),
         disabled=False)    
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
     sortbutton = widgets.Button(description="上排序",layout=Layout(width='64px'))
     listbutton = widgets.Button(description="选择列表",layout=Layout(width='96px'))
-    box = Box(children=[backbutton,frontbutton,periodDropdown,sortbutton,listbutton,refreshbutton],layout=box_layout)
+    box = Box(children=[backbutton,frontbutton,mainDropdown,periodDropdown,sortbutton,listbutton,refreshbutton],layout=box_layout)
     output = widgets.Output()
     output2 = widgets.Output()
     output3 = widgets.Output()
@@ -3221,6 +3233,21 @@ def fluctuation(step=15):
             step = 90
         update(True)
     periodDropdown.observe(on_period,names='value')
+    def on_main(e):
+        nonlocal all_sel,sh_sel,sz_sel,cy_sel,kc_sel,sel
+        v = e['new']
+        if v=='全部':
+            sel = all_sel
+        elif v=='上证':
+            sel = sh_sel
+        elif v=='深成':
+            sel = sz_sel
+        elif v=='创业':
+            sel = cy_sel
+        elif v=='科创':
+            sel = kc_sel
+        update(True)
+    mainDropdown.observe(on_main,names='value')
     def on_prevpos(e):
         nonlocal pos
         pos+=1
@@ -3440,7 +3467,7 @@ def fluctuation(step=15):
             a.append(v[c])
         return a
     def update_fluctuation(K,D):
-        nonlocal idd,pos,switchsort,select_category
+        nonlocal idd,pos,switchsort,select_category,sel
         eps = stock.extremePoint(K[szi,:,3])
         li = K.shape[1]-1
         if eps[0][0]!=li:
@@ -3461,19 +3488,21 @@ def fluctuation(step=15):
         result = []
         if select_category is None:
             for category in allCategory():
-                r = idd[:,3]==category
+                r = np.logical_and(idd[:,3]==category,sel)
                 """
                 #下面的算法不考虑个股市值，仅仅对涨跌幅进行平均
                 r1 = dK1[r].mean()
                 r2 = dK2[r].mean()
                 """
                 #下面的算法考虑个股的市值权重
-                r1 = (dK1[r]*tv[r]).sum()/tv[r].sum()
-                r2 = (dK2[r]*tv[r]).sum()/tv[r].sum()
-                result.append((category,r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
+                s = tv[r].sum()
+                if s!=0:
+                    r1 = (dK1[r]*tv[r]).sum()/s
+                    r2 = (dK2[r]*tv[r]).sum()/s
+                    result.append((category,r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
         else:
             for i in range(len(K)):
-                if idd[i,3]==select_category:
+                if sel[i] and idd[i,3]==select_category:
                     r1 = dK1[i]
                     r2 = dK2[i]
                     result.append((idd[i,2],r1 if r1>0 else 0,r1 if r1<0 else 0,r2 if r2>0 else 0,r2 if r2<0 else 0))
@@ -3527,7 +3556,7 @@ def fluctuation(step=15):
     lastT = None
     isfirst = True
     def update(focus=False):
-        nonlocal companys,step,idd,lastT,isfirst
+        nonlocal companys,step,idd,lastT,isfirst,all_sel,sh_sel,sz_sel,cy_sel,kc_sel,sel
 
         b,ut = xueqiu.getLastUpdateTimestamp()
         t = datetime.today()
@@ -3538,13 +3567,28 @@ def fluctuation(step=15):
             K,D = xueqiu.getRT(companys,step=step)
             if idd is None:
                 idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
+                all_sel = np.ones((len(K),),dtype=np.dtype('bool'))
+                sh_sel = np.zeros((len(K),),dtype=np.dtype('bool'))
+                sz_sel = np.zeros((len(K),),dtype=np.dtype('bool'))
+                cy_sel = np.zeros((len(K),),dtype=np.dtype('bool'))
+                kc_sel = np.zeros((len(K),),dtype=np.dtype('bool'))
                 idd[:,0] = K[:,0,0]
-                for i in idd:
-                    k = int(i[0])
+                for i in range(len(idd)):
+                    k = int(idd[i][0])
                     if k in id2com:
-                        i[1] = id2com[k][1]
-                        i[2] = id2com[k][2]
-                        i[3] = id2com[k][3]                  
+                        code = id2com[k][1]
+                        idd[i][1] = code
+                        idd[i][2] = id2com[k][2]
+                        idd[i][3] = id2com[k][3]
+                        if code[:5]=='SH688':
+                            kc_sel[i] = True
+                        elif code[:2]=='SH':
+                            sh_sel[i] = True
+                        if code[:5]=='SZ300':
+                            cy_sel[i] = True
+                        elif code[:2]=='SZ':
+                            sz_sel = True
+                sel = all_sel              
             update_fluctuation(K,D)
             refreshbutton.button_style = ''
         if stock.isTransDay() and t.hour>=6 and t.hour<15:
