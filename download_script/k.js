@@ -197,7 +197,7 @@ function companys_task_continue2(itemStr,n,task){
     }    
     return new Promise((resolve,reject)=>{
         let t0 = Date.now();
-        connection.query(`select ${itemStr?itemStr:"*"} from company where \`ignore\`!=${dd}`,(error, results, field)=>{
+        connection.query(`select ${itemStr?itemStr:"*"} from company where \`ignore\`!=${dd} or \`ignore\` is null`,(error, results, field)=>{
             if(error){    
                 console.error(error);
                 reject(error);

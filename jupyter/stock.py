@@ -1,7 +1,7 @@
 import MySQLdb
 import numpy as np
 import math
-from datetime import date,datetime
+from datetime import date,datetime,timedelta
 import shared
 import config
 
@@ -15,9 +15,9 @@ def isTransTime(t=None):
 def isTransDay():
     t = datetime.today()
     if t.weekday()>=0 and t.weekday()<5:
-        b,isb = shared.fromRedis('istransday_%d_%d'%(t.month,t.day))
-        if b:
-            return isb
+        #b,isb = shared.fromRedis('istransday_%d_%d'%(t.month,t.day))
+        #if b:
+        #    return isb
         return True
     else:
         return False
@@ -165,9 +165,12 @@ date {
     0 - [date,]
 }
 """
-def loadFlow(after=None):
+def loadFlow(after=None,dd=None):
     if after is None:
-        data = query("select date,larg,big,mid,tiny from flow order by date")
+        if dd is None:
+            data = query("select date,larg,big,mid,tiny from flow order by date")
+        else:
+            data = query("select date,larg,big,mid,tiny from flow where date>='%s' and date<'%s' order by date"%(dateString(dd),dateString(dd+timedelta(days=1))))
     else:
         data = query("select date,larg,big,mid,tiny from flow where date>='%s' order by date"%(after))
     flowdate = []

@@ -106,6 +106,29 @@ def plotVline(axs,v,c,linestyle='-',linewidth=1):
     for i in range(len(axs)):
         axs[i].axvline(v,color=c,linestyle=linestyle,linewidth=linewidth)
 
+class MyFormatterRT(Formatter):
+    def __init__(self, dates,fmt='d h:m:s'):
+        self.dates = dates
+        self.fmt = fmt
+
+    def __call__(self, x, pos=0):
+        'Return the label for time x at position pos'
+        ind = int(np.round(x))
+        if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
+            return ''
+
+        t = self.dates[ind][0]
+        if self.fmt=='d h:m:s':
+            return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
+        elif self.fmt=='d h:m':
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
+        elif self.fmt=='h:m:s':
+            return '%02d:%02d:%02d'%(t.hour,t.minute,t.second)
+        elif self.fmt=='h:m':
+            return '%02d:%02d'%(t.hour,t.minute)
+        else:
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
+
 class MyFormatterK5(Formatter):
     def __init__(self,times,fmt='%m:%s'):
         self.fmt = fmt
@@ -210,6 +233,7 @@ class Plote:
         self._mad = None
         self._rsi = None
         self._showflow = False
+        self._currentflow = None
         self._gotoTrendHeandPos = False
         self._showeps = False #显示macd背离
         self._widths = [1]
@@ -386,6 +410,28 @@ class Plote:
         cur = _cacheK[code][period]
         _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
         return cur[0],k,d
+    """
+    取得某一天的flow数据
+    返回值:([(larg,big,mid,tiny),..],[date,..])
+    """
+    def getCurrentFlow(self):
+        if self._trendHeadPos<=len(self._date) and self._trendHeadPos>0:
+            if self._trendHeadPos==len(self._date):
+                d = self._date[self._trendHeadPos-1]
+            else:
+                d = self._date[self._trendHeadPos]
+            name = "flow_%d_%d"%(d[0].month,d[0].day)
+            b,a = shared.fromRedis(name)
+            if b:
+                flow = ([],[])
+                for k in a:
+                    flow[0].append(k[1:])
+                    flow[1].append((k[0],))
+            else:
+                flow = stock.loadFlow(dd=d[0])
+            return flow
+        else:
+            return None            
     """
     取得资金流 ,d是k线图日期数组
     """
@@ -804,16 +850,50 @@ class Plote:
                 axs = ax[:,0]
                 gs = axs[0].get_gridspec()
                 for it in ax[:,1]:
-                    it.remove()
+                    it.remove()          
                 if self._axsInx<2:
                     axk5 = fig.add_subplot(gs[:-1,-1])
                 else:
-                    axk5 = fig.add_subplot(gs[:-2,-1])
-                if self._axsInx>=2:
-                    axb5 = fig.add_subplot(gs[-2,-1])
-                else:
+                    axk5 = fig.add_subplot(gs[:-2,-1])                          
+                if not self._showflow:
+                    if self._axsInx>=2:
+                        axb5 = fig.add_subplot(gs[-2,-1])
+                    else:
+                        axb5 = None
+                    axv5 = fig.add_subplot(gs[-1,-1])
+                    axflow = None
+                else:#显示资金流入流出
+                    if self._axsInx<2:
+                        axflow = fig.add_subplot(gs[-1,-1])
+                    else:
+                        axflow = fig.add_subplot(gs[-2:,-1])
+                    axv5 = None
                     axb5 = None
-                axv5 = fig.add_subplot(gs[-1,-1])
+                    flow = self.getCurrentFlow()
+                    if flow is not None:
+                        d = np.zeros((len(flow[0]),5))
+                        i = 0
+                        dd = []
+                        xticks=[]
+                        for i in range(len(flow[0])):
+                            v = flow[0][i]
+                            dd.append(flow[1][i])
+                            d[i][0] = i
+                            d[i][1] = v[0]
+                            d[i][2] = v[1]
+                            d[i][3] = v[2]
+                            d[i][4] = v[3]
+                            i+=1     
+
+                        axflow.xaxis.set_major_formatter(MyFormatterRT(flow[1],'h:m'))
+                        axflow.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(d[-1,1]/1e8))
+                        axflow.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(d[-1,2]/1e8))
+                        axflow.plot(d[:,0],d[:,3],color="cyan",label="中 %d亿"%(d[-1,3]/1e8))
+                        axflow.plot(d[:,0],d[:,4],color="purple",label="小 %d亿"%(d[-1,4]/1e8))
+                        #axflow.set_xticks(xticks)
+                        axflow.grid(True)
+                        axflow.set_xlim(0,60*4)
+                        axflow.legend()
                 k5s,d5s = self.getCurrentK5()
                 
                 if len(d5s)>0:
@@ -824,7 +904,7 @@ class Plote:
                 d5 = d5s[-48*20:]
                 if len(d5)<1:
                     break #确保没有数据的股票不会出错(例如摘牌的)
-                axv5.xaxis.set_major_formatter(MyFormatterK5(d5))
+                
                 todayei = len(k5)
                 if todayei<1:
                     break
@@ -855,18 +935,21 @@ class Plote:
                 for i in range(todaybi-48,todaybi):
                     yb[i] = k5[i,0]+yb[i-1]
                 axk5.set_xlim(todaybi-1,todaybi+48)
-                axv5.set_xlim(todaybi-1,todaybi+48)
                 xticks = []
                 for i in [0,5,11,17,23,29,35,41,47]:
                     xticks.append(todaybi+i)
                 xticks.append(todayei-1)
                 xticks.append(todayei-1)
                 axk5.set_xticks(xticks)
-                axv5.set_xticks(xticks)
                 axk5.axhline(y=k5yc,color='black',linestyle='--')
-                axv5.set_yscale('log')
                 axk5.grid(True)
-                axv5.grid(True)
+                if axv5 is not None:
+                    axv5.xaxis.set_major_formatter(MyFormatterK5(d5))
+                    axv5.set_xlim(todaybi-1,todaybi+48)
+                    axv5.set_xticks(xticks)
+                    axv5.set_yscale('log')
+                    axv5.grid(True)
+
                 k5x = np.linspace(todaybi,todayei-1,todayei-todaybi)
                 plotK(axk5,k5,todaybi,todayei)
                 #如果不是大盘，将大盘绘制在图表的对应位置
@@ -889,15 +972,13 @@ class Plote:
                     k5curyb = False
                 axk5.text(todayei-1,k5cury,str(k5currate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top' if not k5curyb else 'bottom',color='red' if k5currate>=0 else 'darkgreen')
                 ck5v,mad = stock.correctionVolume(k5,d5,5)
-                #axv5.step(k5x,ck5v[todaybi:todayei],where='mid',label='volume')
-                #axv5.axhline(y=ck5v[todaybi-48:todaybi].mean(),color='darkorange',linestyle='--')
-                #axv5.axhline(y=ck5v[todaybi:todayei].mean(),color='dodgerblue',linestyle='--')
-                axv5.step(k5x,k5[todaybi:todayei,0],label='volume')
-                axv5.step(k5x,mad[-1,-todayei+todaybi:],label='mad',color='orangered')
                 #绘制一条均线
                 k5ma30 = stock.maK(k5[todaybi:],60)
                 axk5.plot(k5x,k5ma30,color='darkorange',linestyle='--')
-                axv5.axhline(color='black')
+                if axv5 is not None:
+                    axv5.step(k5x,k5[todaybi:todayei,0],label='volume')
+                    axv5.step(k5x,mad[-1,-todayei+todaybi:],label='mad',color='orangered')
+                    axv5.axhline(color='black')
                 if axb5 is not None:
                     axb5.plot(k5x,tb[todaybi:todayei],color='dodgerblue',label='today')
                     axb5.plot(np.linspace(todaybi,todaybi+47,48),yb[todaybi-48:todaybi],color='darkorange',label='yesterday')

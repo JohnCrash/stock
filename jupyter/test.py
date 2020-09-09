@@ -23,9 +23,12 @@ import threading
 #print(a)
 #status.fluctuation()
 #status.saveflow2('2020-08-04','2020-07-10')
-shared.delKey('company_status_last50') #清除redis中的缓存数据
-shared.delKey('company_status_date50') #清除redis中的缓存数据
+#shared.delKey('company_status_last50') #清除redis中的缓存数据
+#shared.delKey('company_status_date50') #清除redis中的缓存数据
 #shared.delKey("last_download_day")
+ls = stock.query("select * from company where id>=9168 and id<=9190")
+for v in ls:
+    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
 
 """
 companys = stock.query("select company_id,code,name,category from company_select")

@@ -61,5 +61,32 @@ if(process.argv.length==4 || process.argv.length==5){
     else
         add_new_stock(process.argv[2],process.argv[3],process.argv[4]);
 }else{
-    console.log('node addstock.js code category');
+    ls = [
+        ["SH510050","上证50ETF"],
+        ["SH510300","沪深300ETF"],
+        ["SH518880","黄金ETF"],
+        ["SH515750","科技50ETF"],
+        ["SH515650","消费50ETF"],
+        ["SH512000","券商ETF"],
+        ["SH515000","科技ETF"],
+        ["SH512800","银行ETF"],
+        ["SH512010","医药ETF"],
+        ["SH512660","军工ETF"],
+        ["SH512170","医疗ETF"],
+        ["SH512980","传媒ETF"],
+        ["SH512690","酒ETF"],
+        ["SH510150","消费ETF"],
+        ["SZ159996","家电ETF"],
+        ["SZ159997","电子ETF"],
+        ["SZ159994","5GETF"],
+        ["SH512400","有色金属ETF"],
+        ["SH515220","煤炭ETF"],
+        ["SH515210","钢铁ETF"],
+        ["SZ159930","能源ETF"],
+        ["SH512580","环保ETF"]
+    ]
+    for( v of ls){
+        add_new_stock(v[0],v[1],null)
+    }
+    //console.log('node addstock.js code category');
 }

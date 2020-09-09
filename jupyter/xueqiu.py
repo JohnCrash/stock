@@ -514,7 +514,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     if  datetime.fromtimestamp(plane[i][1]).day == t.day:
                         #只要有今天的最新数据表示今天可以进行交易
                         n+=1
-                shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=24*3600)
+                shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=1200)
                 if n < 300:
                     #并且标记今天不是可以交易的日子
                     print("***休市*** ",str(t))

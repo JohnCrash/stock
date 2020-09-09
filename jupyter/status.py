@@ -2721,6 +2721,7 @@ def showzdt(bi=None,ei=None):
     output3 = widgets.Output()
     
     box = Box(children=[backbutton,slider,frontbutton,periodDropdown,categoryDropdown,hotsDropdown,listbutton,nextDropdown,refreshbutton],layout=box_layout)
+    #K = 0 idd,1 volume,2 close,3 yesteryday_close,4 today_open
     def getData():
         nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos
         if mode == '2分钟':
@@ -2733,10 +2734,10 @@ def showzdt(bi=None,ei=None):
                     ei=stock.dateString(date.today())
                 D,K_ = getStatusN(bi=bi,ei=ei)
             K = np.zeros((len(K_),len(D),5))
-            K[:,:,0] = K_[:,:,0]
-            K[:,:,1] = K_[:,:,2]
-            K[:,:,2] = K_[:,:,1]
-            K[:,0,3] = K_[:,0,1]
+            K[:,:,0] = K_[:,:,0] #id
+            K[:,:,1] = K_[:,:,2] #volume
+            K[:,:,2] = K_[:,:,1] #close
+            K[:,0,3] = K_[:,0,1] #
             K[:,1:,3] = K_[:,:-1,1]
         K[K[:,:,3]<=0] = 1
         #重新计算热点分类
@@ -2748,12 +2749,14 @@ def showzdt(bi=None,ei=None):
                 i[1] = id2com[k][1]
                 i[2] = id2com[k][2]
                 i[3] = id2com[k][3]            
-        r = K[:,pos,2]/K[:,pos,3]-1
+        #r = K[:,pos,2]/K[:,pos,3]-1
         S = []
         for category in allCategory():
             sr = idd[:,3]==category
-            u = np.count_nonzero(r[sr]>=0.097)
-            d = np.count_nonzero(r[sr]<=-0.097)
+            u = calczdt_count(K[sr,:,:],idd[sr],True,pos=pos)
+            d = calczdt_count(K[sr,:,:],idd[sr],False,pos=pos)
+            #u = np.count_nonzero(r[sr]>=0.097)
+            #d = np.count_nonzero(r[sr]<=-0.097)
             S.append((category,u,d))
         #涨幅榜前10
         um = sorted(S,key=lambda it:it[1],reverse=True)
@@ -2906,6 +2909,40 @@ def showzdt(bi=None,ei=None):
             listState = True
             e.button_style = 'success'
         update_zdt()
+    """
+        k = [(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open),...]
+        c = [(0 id , 1 code , 2 name , 3 category),...]
+        b = True计算涨停数量 b = False计算跌停数量
+        返回涨停停数量
+    """
+    def calczdt_count(k,c,b,pos=None,sets=None):
+        if pos is None:
+            r = k[:,:,2]/k[:,:,3]-1
+        else:
+            r = k[:,pos,2]/k[:,pos,3]-1
+        mainR = np.zeros((len(k),),dtype=np.dtype('bool'))
+        for i in range(len(c)):
+            if cb_main(None,c[i]):
+                mainR[i] = True
+        mr = r[mainR]
+        cr = r[np.logical_not(mainR)]
+        if b:
+            if sets is None:
+                return np.count_nonzero(mr>=0.097,axis=0)+np.count_nonzero(cr>=0.197,axis=0)
+            else:
+                S = np.zeros((len(k),),dtype=np.dtype('bool'))
+                S[mainR] = mr>=0.097
+                S[np.logical_not(mainR)] = cr>=0.197
+                return np.count_nonzero(mr>=0.097)+np.count_nonzero(cr>=0.197),S
+        else:
+            if sets is None:
+                return np.count_nonzero(mr<-0.097,axis=0)+np.count_nonzero(cr<-0.197,axis=0)
+            else:
+                S = np.zeros((len(k),),dtype=np.dtype('bool'))
+                S[mainR] = mr<-0.097
+                S[np.logical_not(mainR)] = cr<-0.197           
+                return np.count_nonzero(mr<-0.097)+np.count_nonzero(cr<-0.197),S
+
     listbutton.on_click(on_list)
     first = True
     def update_zdt():
@@ -2943,20 +2980,24 @@ def showzdt(bi=None,ei=None):
         xticks.append(len(D)+pos)
         xticks.append(len(D)+pos)            
         if sel=='全部':
-            r = K[:,:,2]/K[:,:,3]-1
-            um = np.count_nonzero(r>=0.097,axis=0)
-            dm = np.count_nonzero(r<=-0.097,axis=0)            
+            #r = K[:,:,2]/K[:,:,3]-1
+            #um = np.count_nonzero(r>=0.097,axis=0)
+            #dm = np.count_nonzero(r<=-0.097,axis=0) 
+            um = calczdt_count(K,idd,True)
+            dm = calczdt_count(K,idd,False)
             axs[0].plot(X,um,color="red",label="涨停%d"%(um[-1]))
             axs[0].plot(X,dm,color="green",label="跌停%d"%(dm[-1]))            
         elif sel=='涨停热点' or sel=='跌停热点':
             hots = uhots if sel=='涨停热点' else dhots
             for category in hots:
                 sr = idd[:,3]==category
-                r = K[sr,:,2]/K[sr,:,3]-1
+                #r = K[sr,:,2]/K[sr,:,3]-1
                 if sel=='涨停热点':
-                    m = np.count_nonzero(r>=0.097,axis=0)
+                    #m = np.count_nonzero(r>=0.097,axis=0)
+                    m = calczdt_count(K[sr,:,:],idd[sr],True)
                 else:
-                    m = np.count_nonzero(r<=-0.097,axis=0)
+                    #m = np.count_nonzero(r<=-0.097,axis=0)
+                    m = calczdt_count(K[sr,:,:],idd[sr],False)
                 if hot==category:
                     axs[0].plot(X,m,linewidth=3,label=category)
                 else:
@@ -2964,9 +3005,11 @@ def showzdt(bi=None,ei=None):
         else:
             #选择分类的涨停和跌停
             sr = idd[:,3]==sel
-            r = K[sr,:,2]/K[sr,:,3]-1
-            um = np.count_nonzero(r>=0.097,axis=0)
-            dm = np.count_nonzero(r<=-0.097,axis=0)            
+            #r = K[sr,:,2]/K[sr,:,3]-1
+            #um = np.count_nonzero(r>=0.097,axis=0)
+            #dm = np.count_nonzero(r<=-0.097,axis=0) 
+            um = calczdt_count(K[sr,:,:],idd[sr],True)
+            dm = calczdt_count(K[sr,:,:],idd[sr],False)
             axs[0].plot(X,um,color="red",label="涨停%d"%(um[-1]))
             axs[0].plot(X,dm,color="green",label="跌停%d"%(dm[-1]))
 
@@ -2996,10 +3039,12 @@ def showzdt(bi=None,ei=None):
         if sel=='全部':
             for category in allCategory():
                 sr = idd[:,3]==category
-                upset = dr[sr]>=0.097
-                downset = dr[sr]<=-0.097
-                uns = np.count_nonzero(upset)
-                dns = np.count_nonzero(downset)
+                #upset = dr[sr]>=0.097
+                #downset = dr[sr]<=-0.097
+                #uns = np.count_nonzero(upset)
+                #dns = np.count_nonzero(downset)
+                uns,upset = calczdt_count(K[sr,:,:],idd[sr],True,pos=pos,sets=True)
+                dns,downset = calczdt_count(K[sr,:,:],idd[sr],False,pos=pos,sets=True)
                 if uns>0 or dns>0:
                     coms = []
                     for cidd in K[sr,pos,0][upset]:
@@ -3147,6 +3192,18 @@ def Indexs():
             'BK0608', #水泥
             'BK0015', #建筑材料
             'BK0013' #有色冶炼加工
+        ],
+        "ETF":[
+            'SZ159995', #芯片
+            'SZ159994', #5GETF
+            'SH512000', #券商
+            'SH512010', #医药ETF
+            'SH512690', #酒
+            'SH510150', #消费ETF
+            'SH512980', #传媒ETF
+            'SH512400', #有色金属ETF
+            'SH515220', #煤炭
+            'SH515210' #钢铁
         ]
     }
     buts = []
@@ -3593,4 +3650,68 @@ def fluctuation(step=15):
             refreshbutton.button_style = ''
         if stock.isTransDay() and t.hour>=6 and t.hour<15:
             xueqiu.Timer(1,update)
+    update()
+
+
+#实时看盘
+def watchrt():
+    codes = ['SH000001','SZ399001','SZ399006',
+            'SZ159995', #芯片
+            'SZ159994', #5GETF
+            'SH512000', #券商
+            'SH512010', #医药ETF
+            'SH512690', #酒
+            'SH510150', #消费ETF
+            'SH512980', #传媒ETF
+            'SH512400', #有色金属ETF
+            'SH515220', #煤炭
+            'SH515210' #钢铁
+            ]
+    output = widgets.Output()
+    display(output)
+    companys = stock.query("select company_id,code,name,category from company_select")
+    code2com = {} #映射code->com
+    code2i = {} #映射code->行    
+    for i in range(len(companys)):
+        com = companys[i]
+        code2com[com[1]] = com
+        code2i[com[1]] = i
+    def showrl(K,D):
+        output.clear_output(wait=True)
+        fig,axs = plt.subplots(1,1,figsize=(32,14))
+        axs.xaxis.set_major_formatter(MyFormatterRT(D,'d h:m:s'))
+        xticks=[]
+        for i in range(len(D)):
+            if i%5==0:
+                xticks.append(i)
+        xticks.append(len(D)-1)
+        xticks.append(len(D)-1)        
+        with output:
+            x = np.arange(len(D))
+            for c in codes:
+                if c in code2com:
+                    com = code2com[c]
+                    k = K[code2i[c],:,:]
+                    plt.plot(x,k[:,3]/k[:,4],label=com[2])
+                else:
+                    print("没有发现即时数据%s"%(c))
+            axs.grid(True)
+            axs.set_xlim(0,len(D)-1)
+            axs.set_xticks(x)                    
+            plt.legend()
+            fig.autofmt_xdate()
+        kline.output_show(output)
+    lastT = None
+    isfirst = True        
+    def update(focus=False):
+        nonlocal isfirst,lastT,companys
+        t = datetime.today()
+        b,ut = xueqiu.getLastUpdateTimestamp()
+        if ((isfirst or (b and ut!=lastT))) or focus:
+            isfirst = False
+            lastT = ut         
+            K,D = xueqiu.getRT(companys,step=3*5)   
+            showrl(K,D)
+            if stock.isTransDay() and t.hour>=6 and t.hour<15:
+                xueqiu.Timer(1,update)
     update()
