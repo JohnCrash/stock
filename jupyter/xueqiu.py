@@ -356,6 +356,21 @@ def getRT(companys,step=1,N=100,progress=defaultProgress):
             KK[:,-1,:] = p
             return KK,DD    
     return _K,_D
+"""
+返回company_select中公司的全部分时数据
+companys company_select表的返回
+step     间隔多少取一个数据
+N        返回表的长度，丢弃较早的数据,0表示全部数据
+progress 进度回调
+返回K = [[[0 id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
+       ....
+     len(companys)],]
+     shape = (len(companys),len(D),6)
+D = [(datetime,),....]
+没有数据返回None,None
+"""
+def getRT2(companys,step=1,N=100,progress=defaultProgress):
+    pass
 
 #遍历全部的数据帧
 #cb是回调函数，cb(timestamp,plane)

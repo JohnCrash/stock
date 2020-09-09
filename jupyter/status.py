@@ -3158,6 +3158,38 @@ def K(code,pos=None):
     else:
         kline.Plote(code,'d',config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
 
+def indexpage(menus):
+    buts = []
+    oldbut = None
+    def onClick(e):
+        nonlocal menus,oldbut
+        if oldbut is not None:
+            oldbut.button_style = ''
+        e.button_style = 'warning'
+        output.clear_output()
+        with output:
+            for code in menus[e.description]:
+                if type(code)==str:
+                    K(code)
+                elif callable(code):
+                    code()
+        oldbut = e
+        e.button_style = 'success'
+    for m in menus:
+        but = widgets.Button(description=m)
+        buts.append(but)
+        but.on_click(onClick)
+    output = widgets.Output()
+    box_layout = Layout(display='flex',
+                    flex_flow='wrap',
+                    align_items='stretch',
+                    border='solid',
+                    width='100%')    
+    
+    box = Box(children=buts,layout=box_layout)
+    display(box,output)
+    onClick(buts[0])
+
 def Indexs():
     menus = {
         "大盘":['SH000001', #上证
@@ -3204,36 +3236,25 @@ def Indexs():
             'SH512400', #有色金属ETF
             'SH515220', #煤炭
             'SH515210' #钢铁
-        ]
+        ],
+        "关注":[favoriteList]
     }
-    buts = []
-    oldbut = None
-    def onClick(e):
-        nonlocal menus,oldbut
-        if oldbut is not None:
-            oldbut.button_style = ''
-        e.button_style = 'warning'
-        output.clear_output()
-        with output:
-            for code in menus[e.description]:
-                K(code)
-        oldbut = e
-        e.button_style = 'success'
-    for m in menus:
-        but = widgets.Button(description=m)
-        buts.append(but)
-        but.on_click(onClick)
-    output = widgets.Output()
-    box_layout = Layout(display='flex',
-                    flex_flow='wrap',
-                    align_items='stretch',
-                    border='solid',
-                    width='100%')    
-    
-    box = Box(children=buts,layout=box_layout)
-    display(box,output)
-    onClick(buts[0])
+    indexpage(menus)
 
+def watch():
+    def fc():
+        fluctuation(step=15)
+    def sc():
+        StrongCategoryList(cycle='rt')
+    def sg():
+        SearchRT('d',name='today')
+    menus = {
+        "周期涨跌":[fc],
+        "涨跌停":[showzdt],
+        "涨跌幅":[sc],
+        "选股":[sg]
+    }
+    indexpage(menus)
 """
 显示大盘涨跌周期个股和分类的涨跌情况
 """
@@ -3604,7 +3625,17 @@ def fluctuation(step=15):
                 axs[i].set_xticklabels(labels)
                 plt.setp(axs[i].get_xticklabels(),rotation=45,horizontalalignment='right')
                 axs[i].set_xlim(-1,len(labels))
+                #axs[i].set_ylim(-0.05,0.05)
                 #autolabel(axs[0],rects)
+            #这里让两个周期条等比例
+            y0 = axs[0].get_ylim()
+            y1 = axs[1].get_ylim()
+            if abs(y1[1]-y1[0])>abs(y0[1]-y0[0]):
+                z = abs(y1[1]-y1[0])/abs(y0[1]-y0[0])
+                axs[0].set_ylim(y0[0]*z,y0[1]*z)
+            else:
+                z = abs(y0[1]-y0[0])/abs(y1[1]-y1[0])
+                axs[1].set_ylim(y1[0]*z,y1[1]*z)
             kline.output_show(output)
         if select_category is None:
             list_output2(SS)
