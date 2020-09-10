@@ -1868,7 +1868,7 @@ class Plote:
                             fav['node']=fafavoriteNodeWidget.value
                             break
                     shared.toRedis(favorites,name,ex=24*3600)
-            updateFavoriteTimer = xueqiu.Timer(3,updateFavoriteText)
+            updateFavoriteTimer = xueqiu.Timer(3,updateFavoriteText,'favorite%s'%self.code())
 
         fafavoriteNodeWidget.observe(on_favoriteText,names='value')
         def update():
@@ -1896,7 +1896,7 @@ class Plote:
             else:
                 nt = 0 #xueqiu.next_k_date(self._period)
             if nt>0:
-                self._timer = xueqiu.Timer(nt+1,update)
+                self._timer = xueqiu.Timer(nt+1,update,'kline%s'%self.code())
             else:
                 self._timer = None
         startTimer()

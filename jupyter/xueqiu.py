@@ -14,15 +14,27 @@ import mylog
 import asyncio
 import config
 
+gt = {}
 class Timer:
-    def __init__(self, timeout, callback):
+    def __init__(self, timeout, callback,name=None):
         self._timeout = timeout
         self._callback = callback
         self._task = asyncio.ensure_future(self._job())
+        if name is not None:
+            global gt
+            if name in gt:
+                gt[name].cancel()
+                del gt[name]
+        gt[name] = self
 
     async def _job(self):
         await asyncio.sleep(self._timeout) 
         self._callback()
+
+    def __del__(self):
+        self._task.cancel()
+        del self._task
+        self._callback = None
 
     def cancel(self):
         self._task.cancel()
@@ -266,17 +278,9 @@ def toDayTimestramp(ts):
     t = datetime.fromtimestamp(ts/1000000)
     return int(datetime(t.year,t.month,t.day).timestamp()*1000*1000)
 #加速版本,使用全局变量
-_rtcach = {}
-def getrtcach(step):
-    if step in _rtcach:
-        return _rtcach[step]
-    else:
-        return None,None,None
-def setrtcach(step,k,d,lastp):
-    _rtcach[step] = (k,d,lastp)
-
 def defaultProgress(i):
     pass
+
 """
 返回company_select中公司的全部分时数据
 companys company_select表的返回
@@ -290,87 +294,53 @@ progress 进度回调
 D = [(datetime,),....]
 没有数据返回None,None
 """
+_K = None
+_D = None
+_N = None
 def getRT(companys,step=1,N=100,progress=defaultProgress):
-    _K,_D,_lastp = getrtcach(step)
+    global _K,_D,_N
     b,seqs = shared.fromRedis('runtime_sequence')
     C = len(companys)
     progress(0)
     if b:
         if _D is None:
-            _D = []
-        ba = False if _lastp is not None else True
-        if _K is None or len(_K) != C:
-            ps = []
-            ba = True
+            L = 60*4*3*7
+            _D = [None]*L
+            _K = np.empty((len(companys),L,6))
+            _N = 0
+            for ts in seqs:
+                b,p = shared.numpyFromRedis("rt%d"%ts)
+                if b:
+                    _K[:,_N,:] = p
+                    _D[_N] = (datetime.fromtimestamp(ts/1000000),ts)
+                    _N+=1
         else:
-            ps = [_K]
-        i = j = 0
-        seqs = seqs[-N*step:]
-        ln = len(seqs)-1
-        for ts in seqs:
-            if ba: #如果已经存在_lastp直接跳到这个位置在开始追加
-                if j==step-1: #将最后一个数据加入到最后
-                    j = 0
+            lastts = _D[_N-1][1]
+            ba = False
+            for ts in seqs:
+                if ba:
                     b,p = shared.numpyFromRedis("rt%d"%ts)
                     if b:
-                        if len(p)==C:
-                            ps.append(p)
-                        elif len(p)>C:
-                            ps.append(p[:C])
-                        else:
-                            pp = np.zeros((C,6))
-                            pp[:len(p)] = p
-                            ps.append(pp)
-                        _D.append((datetime.fromtimestamp(ts/1000000),))
-                else:
-                    j+=1
-            elif _lastp == ts:
-                ba = True
-            progress(i/len(seqs))
-            i+=1
-        if len(ps)>1: #开始进行合并
-            _K = np.empty((C,len(_D),6))
-            bi = 0
-            for col in ps:
-                if col.shape[0]==C and col.shape[1]==6:
-                    ei = bi+1
-                    _K[:,bi,:] = col
-                else:
-                    ei = bi+col.shape[1]
-                    _K[:,bi:ei,:] = col
-                bi = ei
-            _lastp = seqs[-1]
-    if type(N)==int:
-        _K = _K[:,-N:,:]
-        _D = _D[-N:]
-    setrtcach(step,_K,_D,_lastp)
-    #将最新的数据作为最后一帧
-    ts = seqs[-1]
-    if step>1 and datetime.fromtimestamp(ts/1000000)!=_D[-1][0]:
-        DD = _D.copy()
-        DD.append((datetime.fromtimestamp(ts/1000000),))
-        KK = np.empty((C,len(DD),6))
-        KK[:,:-1,:] = _K
-        b,p = shared.numpyFromRedis("rt%d"%ts)
-        if b:
-            KK[:,-1,:] = p
-            return KK,DD    
-    return _K,_D
-"""
-返回company_select中公司的全部分时数据
-companys company_select表的返回
-step     间隔多少取一个数据
-N        返回表的长度，丢弃较早的数据,0表示全部数据
-progress 进度回调
-返回K = [[[0 id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
-       ....
-     len(companys)],]
-     shape = (len(companys),len(D),6)
-D = [(datetime,),....]
-没有数据返回None,None
-"""
-def getRT2(companys,step=1,N=100,progress=defaultProgress):
-    pass
+                        _K[:,_N,:] = p
+                        _D[_N] = (datetime.fromtimestamp(ts/1000000),ts)
+                        _N+=1
+                elif ts==lastts:
+                    ba = True
+    if _K is not None:
+        if step==1:
+            bi = _N-N
+            if bi<0:
+                bi = 0
+            return _K[:,bi:_N,:],_D[bi:_N]
+        else:
+            x = np.arange(0,_N,step)
+            K = np.take(_K,x,axis=1)
+            D = np.take(_D,x)
+            if x[-1]!=_N-1:
+                K[:,-1,:] = _K[:,_N-1,:]
+            return K[:,-N:,:],D[-N:]
+    else:
+        return None,None
 
 #遍历全部的数据帧
 #cb是回调函数，cb(timestamp,plane)

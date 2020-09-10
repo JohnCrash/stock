@@ -1263,9 +1263,9 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         nonlocal today_but
         if stock.isTransTime():
             today_but.button_style = 'success' #green button
-            xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
+            xueqiu.Timer(xueqiu.nextdt15()+1,updatek15,'searchrt')
     if today_but is not None:
-        xueqiu.Timer(xueqiu.nextdt15()+1,updatek15)
+        xueqiu.Timer(xueqiu.nextdt15()+1,updatek15,'searchrt')
 
 #最近N天的status数据
 #同时返回N天的日期数组和数据
@@ -2469,10 +2469,10 @@ def StrongCategoryList(N=50,cycle='d',step=1,bi=None,ei=None):
             #update(False)
             threading.Thread(target=update,args=((False,))).start()
         if datetime.today().hour<15:
-            xueqiu.Timer(1,checkUpdate2)
+            xueqiu.Timer(1,checkUpdate2,'strongcategorylist')
     #监视实时数据
     if cycle !='d' and cycle != 5:
-        xueqiu.Timer(1,checkUpdate2)
+        xueqiu.Timer(1,checkUpdate2,'strongcategorylist')
 """
 关注
 """
@@ -2639,7 +2639,7 @@ def showflow(name=None):
             with output:
                 plotflow()
         if t.hour>=6 and t.hour<15:
-            xueqiu.Timer(60,update) #60秒更新一次
+            xueqiu.Timer(60,update,'showflow') #60秒更新一次
         first = False
     update()
 
@@ -3145,7 +3145,7 @@ def showzdt(bi=None,ei=None):
                 update_zdt()
             refreshbutton.button_style = ''
         if t.hour>=6 and t.hour<15:
-            xueqiu.Timer(120,update)
+            xueqiu.Timer(120,update,'showzdt')
         first = False
     update()        
 
@@ -3226,16 +3226,30 @@ def Indexs():
             'BK0013' #有色冶炼加工
         ],
         "ETF":[
+            'SH510300', #沪深300ETF
+            'SH510050', #上证50ETF
             'SZ159995', #芯片
             'SZ159994', #5GETF
+            'SH512660', #军工
             'SH512000', #券商
             'SH512010', #医药ETF
             'SH512690', #酒
             'SH510150', #消费ETF
+            'SH515650', #消费50ETF
             'SH512980', #传媒ETF
             'SH512400', #有色金属ETF
             'SH515220', #煤炭
             'SH515210' #钢铁
+        ],
+        "自选":[
+            "SH603986", #兆易创新
+            "SZ002371", #北方华创
+            "SH600584", #长电科技
+            "SH688981", #中芯国际-U
+            "SZ000725", #京东方A
+            "SH601633", #长城汽车
+            "SZ002594", #比亚迪
+            "SZ000625" #长安汽车
         ],
         "关注":[favoriteList]
     }
@@ -3680,7 +3694,7 @@ def fluctuation(step=15):
             update_fluctuation(K,D)
             refreshbutton.button_style = ''
         if stock.isTransDay() and t.hour>=6 and t.hour<15:
-            xueqiu.Timer(1,update)
+            xueqiu.Timer(1,update,'fluctuation')
     update()
 
 
@@ -3733,7 +3747,7 @@ def watchrt():
             fig.autofmt_xdate()
         kline.output_show(output)
     lastT = None
-    isfirst = True        
+    isfirst = True
     def update(focus=False):
         nonlocal isfirst,lastT,companys
         t = datetime.today()
@@ -3744,5 +3758,5 @@ def watchrt():
             K,D = xueqiu.getRT(companys,step=3*5)   
             showrl(K,D)
             if stock.isTransDay() and t.hour>=6 and t.hour<15:
-                xueqiu.Timer(1,update)
+                xueqiu.Timer(1,update,'watchrt')
     update()
