@@ -15,13 +15,19 @@ import asyncio
 import config
 
 gt = {}
+def clearTimer():
+    global gt
+    for v in gt:
+        gt[v].cancel()
+        del gt[v]
+    gt = {}
 class Timer:
     def __init__(self, timeout, callback,name=None):
         self._timeout = timeout
         self._callback = callback
         self._task = asyncio.ensure_future(self._job())
+        global gt
         if name is not None:
-            global gt
             if name in gt:
                 gt[name].cancel()
                 del gt[name]

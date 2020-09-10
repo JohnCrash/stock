@@ -3166,6 +3166,7 @@ def indexpage(menus):
         if oldbut is not None:
             oldbut.button_style = ''
         e.button_style = 'warning'
+        xueqiu.clearTimer() #清楚标签下的全部更新
         output.clear_output()
         with output:
             for code in menus[e.description]:
