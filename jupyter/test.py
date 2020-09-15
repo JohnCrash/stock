@@ -18,7 +18,8 @@ import math
 import config
 import subprocess
 import threading
-
+shared.delKey('kline.index')
+shared.delKey('kline.main')
 #a = stock.totalVolume()
 #print(a)
 #status.fluctuation()
@@ -26,9 +27,9 @@ import threading
 #shared.delKey('company_status_last50') #清除redis中的缓存数据
 #shared.delKey('company_status_date50') #清除redis中的缓存数据
 #shared.delKey("last_download_day")
-ls = stock.query("select * from company where id>=9168 and id<=9190")
-for v in ls:
-    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
+#ls = stock.query("select * from company where id>=9168 and id<=9190")
+#for v in ls:
+#    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
 
 """
 companys = stock.query("select company_id,code,name,category from company_select")

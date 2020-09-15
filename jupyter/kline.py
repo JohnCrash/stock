@@ -351,7 +351,7 @@ class Plote:
             self._volInx =self._axsInx+1
             self._axsInx += 1
             self._volumema20 = stock.ma(self._k[:,0],20)
-            #self._volumema5 = stock.ma(self._k[:,0],3)
+            self._volumema5 = stock.ma(self._k[:,0],5)
             self._showvolume = True
 
         #将大盘指数的收盘价显示在图表中
@@ -1167,8 +1167,10 @@ class Plote:
                 axs[self._volInx].step(x,self._mad[bi:ei],where='mid',label='mad',color='orangered') #low
             else:
                 axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
-                axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
-                #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
+                if type(self._period) == str:
+                    axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
+                    axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='green') #low
+                    #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
             axs[self._volInx].axhline(color='black')
         #绘制交易点
         if 'trans' in self._config:
@@ -1470,11 +1472,11 @@ class Plote:
                 self.disable('ma')
                 self.enable('eps')
             self.config()                     
-        b,main_sel = shared.fromRedis('kline.main')
+        b,main_sel = shared.fromRedis('kline.main%s'%str(self._period))
         if b:
             mainDropdownvalue = main_sel
             config_main(main_sel)
-        b,index_sel = shared.fromRedis('kline.index')
+        b,index_sel = shared.fromRedis('kline.index%s'%str(self._period))
         if b and indexDropdownvalue != index_sel:
             indexDropdownvalue = index_sel
             config_index(index_sel)
@@ -1706,7 +1708,7 @@ class Plote:
         zoomoutbutton.on_click(on_zoomout)
 
         def recalcRange(resetpos=True):
-            nonlocal beginPT,endPT
+            nonlocal beginPT,endPT,showRange
             endPT = len(self._k)
             beginPT = len(self._k)-self._showcount
             if beginPT<0:
@@ -1719,7 +1721,8 @@ class Plote:
 
         def on_index(e):
             sel = e['new']
-            shared.toRedis(sel,'kline.index')
+            shared.toRedis(sel,'kline.index%s'%str(self._period))
+            shared.toRedis(mainDropdown.value,'kline.main%s'%str(self._period))
             config_index(sel)
             nonlocal needRecalcRange
             if needRecalcRange:
@@ -1730,7 +1733,8 @@ class Plote:
            
         def on_main(e):
             sel = e['new']
-            shared.toRedis(sel,'kline.main')
+            shared.toRedis(indexDropdown.value,'kline.index%s'%str(self._period))
+            shared.toRedis(sel,'kline.main%s'%str(self._period))
             config_main(sel)
             showline()
 
@@ -1760,7 +1764,15 @@ class Plote:
             #日线和周线切换为MACD+,其他切换为MACD
             #日线和周线切换到BULL+,其他期货到TREND
             nonlocal needRecalcRange,skipUpdate
-            if sel[2]:
+            b1,main_sel = shared.fromRedis('kline.main%s'%str(self._period))
+            b2,index_sel = shared.fromRedis('kline.index%s'%str(self._period))
+            if b1 and b2:
+                skipUpdate = True
+                config_main(main_sel)
+                mainDropdown.value = main_sel
+                config_index(index_sel)
+                indexDropdown.value = index_sel
+            elif sel[2]:
                 if indexDropdown.value!="CLEAR":
                     skipUpdate = True
                     needRecalcRange = True

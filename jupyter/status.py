@@ -3188,6 +3188,7 @@ def indexpage(menus):
                     width='100%')    
     
     box = Box(children=buts,layout=box_layout)
+    
     display(box,output)
     onClick(buts[0])
 
@@ -3229,6 +3230,7 @@ def Indexs():
         "ETF":[
             'SH510300', #沪深300ETF
             'SH510050', #上证50ETF
+            'SZ159949', #创业板50
             'SZ159995', #芯片
             'SZ159994', #5GETF
             'SH512660', #军工

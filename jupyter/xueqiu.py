@@ -19,7 +19,6 @@ def clearTimer():
     global gt
     for v in gt:
         gt[v].cancel()
-        del gt[v]
     gt = {}
 class Timer:
     def __init__(self, timeout, callback,name=None):
