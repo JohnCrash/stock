@@ -591,16 +591,49 @@ class Plote:
         self._mode = mode
         self._day_trend = None
         self._lastday = lastday
-        if period=='d':
-            self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[5,10,20],"debug":False,"volumeprices":True}            
-        elif period==15:
-            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}
-            self._correcttionVolume = True
-        elif period==5:
-            self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}           
-            self._correcttionVolume = True
+        b,p = shared.fromRedis('kline.period')
+        if b:
+           period = p
+        b1,main_sel = shared.fromRedis('kline.main%s'%period)
+        b2,index_sel = shared.fromRedis('kline.index%s'%period)
+        if b1 and b2:
+            if index_sel=='MACD+':
+                self._config = {"macd":True,"energy":True,"volume":True}
+            elif index_sel=='KDJ+':
+                self._config = {"kdj":True,"energy":True,"volume":True}
+            elif index_sel=='MACD+Best':
+                self._config = {"macd":True,"energy":True,'best':True,"volume":True}
+            elif index_sel=='MACD+BollWidth':
+                self._config = {"macd":True,"energy":True,'bollwidth':True,"volume":True}
+            elif index_sel=='MACD':
+                self._config = {"macd":True,"volume":True}
+            elif index_sel=='FLOW':
+                self._config = {"flow":True,"volume":True}
+            elif index_sel=='CLEAR':
+                self._config = {"volume":True}
+
+            if main_sel=='BOLL+':
+                self._config["boll"] = True
+                self._config['trend'] = True
+            elif main_sel=='MA':
+                self._config["ma"] = [5,10,20,30,60]
+            elif main_sel=='BOLL':
+                self._config["boll"] = 20
+            elif main_sel=='TREND':
+                self._config["trend"] = True
+            elif main_sel=='CLEAR':
+                self._config["eps"] = True
         else:
-            self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}       
+            if period=='d':
+                self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[5,10,20],"debug":False,"volumeprices":True}            
+            elif period==15:
+                self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}
+                self._correcttionVolume = True
+            elif period==5:
+                self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}           
+                self._correcttionVolume = True
+            else:
+                self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}       
         
         self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
@@ -824,16 +857,17 @@ class Plote:
                         if isv:                
                             ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')                
             else:
-                for line in self._trend:
-                    if (line[1]>=cx0 and line[1]<=cx1) or (line[0]>=cx0 and line[0]<=cx1):
-                        x0 = line[0]
-                        x1 = line[1]
-                        k = line[2]
-                        b = line[3]
-                        if type(period)==str or self._day_trend is None:
-                            ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.')
-                        else:
-                            ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.',alpha=0.6)                
+                if self._showtrend:
+                    for line in self._trend:
+                        if (line[1]>=cx0 and line[1]<=cx1) or (line[0]>=cx0 and line[0]<=cx1):
+                            x0 = line[0]
+                            x1 = line[1]
+                            k = line[2]
+                            b = line[3]
+                            if type(period)==str or self._day_trend is None:
+                                ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.')
+                            else:
+                                ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.',alpha=0.6)                
                 #绘制平均斜率
                 if axsK is not None:
                     for line in self._day_last_line:
@@ -1374,18 +1408,28 @@ class Plote:
                 button_style='',
                 tooltip='FIGURE',
                 icon='check')
-
+ 
         if self._period=='d':
             periodDropdownvalue = '日线'
             indexDropdownvalue = 'MACD+'
             mainDropdownvalue = 'TREND'
+        elif self._period==60:
+            periodDropdownvalue = '60分钟'
+            indexDropdownvalue = 'CLEAR'
+            mainDropdownvalue = 'CLEAR'
+            self._correcttionVolume = True   
+        elif self._period==30:
+            periodDropdownvalue = '30分钟'
+            indexDropdownvalue = 'CLEAR'
+            mainDropdownvalue = 'CLEAR'            
+            self._correcttionVolume = True                     
         elif self._period==15:
-            periodDropdownvalue = '15分钟校'
+            periodDropdownvalue = '15分钟'
             indexDropdownvalue = 'MACD'
             mainDropdownvalue = 'TREND'
             self._correcttionVolume = True
         elif self._period==5:
-            periodDropdownvalue = '5分钟校'
+            periodDropdownvalue = '5分钟'
             indexDropdownvalue = 'CLEAR'
             mainDropdownvalue = 'CLEAR'            
             self._correcttionVolume = True
@@ -1541,7 +1585,11 @@ class Plote:
         
         beginPT = bi
         endPT = ei
-        showRange = ei-bi            
+        b,sr = shared.fromRedis('kline.zoom%s'%self._period)
+        if b:
+            showRange = sr
+        else:    
+            showRange = ei-bi            
         needUpdateSlider = True
         skipUpdate = False
         def showline():
@@ -1597,6 +1645,7 @@ class Plote:
         def on_zoomin(b):
             nonlocal beginPT,endPT,showRange
             showRange = math.floor(showRange*1/2)
+            shared.toRedis(showRange,'kline.zoom%s'%self._period)
             beginPT = endPT - showRange
             self._trendHeadPos = endPT
             setSlider(beginPT,endPT,endPT)
@@ -1605,6 +1654,7 @@ class Plote:
         def on_zoomout(b):
             nonlocal beginPT,endPT,showRange
             showRange = math.floor(showRange*2)
+            shared.toRedis(showRange,'kline.zoom%s'%self._period)
             beginPT = endPT - showRange
             if beginPT < 0:
                 beginPT = 0
@@ -1665,16 +1715,16 @@ class Plote:
                             self._day_b = b              
 
         def on_prev(b):
-            nonlocal needUpdateSlider,beginPT,endPT
+            nonlocal needUpdateSlider,beginPT,endPT,showRange
             self._trendHeadPos -= 1
             if self._trendHeadPos<0:
                 self._trendHeadPos = 0
             needUpdateSlider = False
             if self._trendHeadPos<beginPT-1:#向前移动移动视口
-                beginPT = self._trendHeadPos-math.floor(self._showcount/2)
+                beginPT = self._trendHeadPos-math.floor(showRange/2)
                 if beginPT<0:
                     beginPT = 0
-                endPT = beginPT+self._showcount
+                endPT = beginPT+showRange
                 if endPT>len(self._k):
                     endPT = len(self._k)
                 setSlider(beginPT,endPT,self._trendHeadPos)
@@ -1684,16 +1734,16 @@ class Plote:
             showline()
             
         def on_next(b):
-            nonlocal needUpdateSlider,beginPT,endPT
+            nonlocal needUpdateSlider,beginPT,endPT,showRange
             self._trendHeadPos += 1
             needUpdateSlider = False
             if self._trendHeadPos>len(self._k):
                 self._trendHeadPos = len(self._k)
             if self._trendHeadPos>endPT+1:#向后移动移动视口
-                endPT = self._trendHeadPos+math.floor(self._showcount/2)
+                endPT = self._trendHeadPos+math.floor(showRange/2)
                 if endPT>len(self._k):
                     endPT = len(self._k)
-                beginPT = endPT-self._showcount
+                beginPT = endPT-showRange
                 if beginPT<0:
                     beginPT=0
                 setSlider(beginPT,endPT,self._trendHeadPos)
@@ -1710,7 +1760,7 @@ class Plote:
         def recalcRange(resetpos=True):
             nonlocal beginPT,endPT,showRange
             endPT = len(self._k)
-            beginPT = len(self._k)-self._showcount
+            beginPT = len(self._k)-showRange
             if beginPT<0:
                 beginPT = 0
             if resetpos:
@@ -1721,8 +1771,8 @@ class Plote:
 
         def on_index(e):
             sel = e['new']
-            shared.toRedis(sel,'kline.index%s'%str(self._period))
-            shared.toRedis(mainDropdown.value,'kline.main%s'%str(self._period))
+            shared.toRedis(sel,'kline.index%s'%self._period)
+            shared.toRedis(mainDropdown.value,'kline.main%s'%self._period)
             config_index(sel)
             nonlocal needRecalcRange
             if needRecalcRange:
@@ -1733,8 +1783,8 @@ class Plote:
            
         def on_main(e):
             sel = e['new']
-            shared.toRedis(indexDropdown.value,'kline.index%s'%str(self._period))
-            shared.toRedis(sel,'kline.main%s'%str(self._period))
+            shared.toRedis(indexDropdown.value,'kline.index%s'%self._period)
+            shared.toRedis(sel,'kline.main%s'%self._period)
             config_main(sel)
             showline()
 
@@ -1751,8 +1801,10 @@ class Plote:
                 '5分钟校':[5,True,True]
             }
             period = e['new']
+            
             sel = name2peroid[period]
             self._period = sel[0]
+            shared.toRedis(self._period,'kline.period')
             self._correcttionVolume = sel[1]
             if e['old']:
                 old = name2peroid[e['old']]
@@ -1763,9 +1815,12 @@ class Plote:
             self.reload()
             #日线和周线切换为MACD+,其他切换为MACD
             #日线和周线切换到BULL+,其他期货到TREND
-            nonlocal needRecalcRange,skipUpdate
-            b1,main_sel = shared.fromRedis('kline.main%s'%str(self._period))
-            b2,index_sel = shared.fromRedis('kline.index%s'%str(self._period))
+            nonlocal needRecalcRange,skipUpdate,showRange
+            b,sr = shared.fromRedis('kline.zoom%s'%self._period)
+            if b:
+                showRange = sr
+            b1,main_sel = shared.fromRedis('kline.main%s'%self._period)
+            b2,index_sel = shared.fromRedis('kline.index%s'%self._period)
             if b1 and b2:
                 skipUpdate = True
                 config_main(main_sel)
