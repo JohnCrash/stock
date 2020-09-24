@@ -728,6 +728,14 @@ def cb_cyb(a,c,d=None):
 #主板
 def cb_main(a,c,d=None):
     return not (c[1][:5]=='SZ300' or c[1][:5]=='SH688')
+#macd>0
+def cb_macd_gr0(a,c,d=None):
+    return a[-1,4]>0
+#macd<0    
+def cb_macd_ls0(a,c,d=None):
+    return a[-1,4]<0
+def cb_energy_gr10(a,c,d=None):
+    return a[-1,5]>10
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -1150,7 +1158,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
                     '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
                     '涨停板','二连板','三连板','跌停板',
-                    '回归60均线','回归30均线','回归20均线','回归10均线','macd金叉','macd死叉','科创板','创业板','主板']
+                    '回归60均线','回归30均线','回归20均线','回归10均线','macd金叉','macd死叉','macd>0','macd<0','能量>10','科创板','创业板','主板']
     methodDropdown = widgets.Dropdown(
         options=methodlists+(['自定义'] if cb is not None else []),
         value='自定义' if cb is not None else '双崛起买点',
@@ -1222,6 +1230,12 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
             cbs[i] = wrap(cb_macd_gold)       
         elif sel=='macd死叉':
             cbs[i] = wrap(cb_macd_die)
+        elif sel=='macd>0':
+            cbs[i] = wrap(cb_macd_gr0)
+        elif sel=='macd<0':
+            cbs[i] = wrap(cb_macd_ls0)           
+        elif sel=='能量>10':
+            cbs[i] = wrap(cb_energy_gr10)
         elif sel=='涨停板':
             cbs[i] = wrap(cb_zt)
         elif sel=='二连板':
@@ -3162,7 +3176,7 @@ def indexpage(menus):
     buts = []
     oldbut = None
     def onClick(e):
-        nonlocal menus,oldbut
+        nonlocal menus,oldbut,output
         if oldbut is not None:
             oldbut.button_style = ''
         e.button_style = 'warning'
@@ -3190,7 +3204,10 @@ def indexpage(menus):
     box = Box(children=buts,layout=box_layout)
     
     display(box,output)
-    onClick(buts[0])
+    #onClick(buts[0])
+    def cb():
+        onClick(buts[0])
+    xueqiu.Timer(.1,cb)
 
 def Indexs():
     menus = {
@@ -3238,11 +3255,8 @@ def Indexs():
             'SH512010', #医药ETF
             'SH512690', #酒
             'SH510150', #消费ETF
-            'SH515650', #消费50ETF
             'SH512980', #传媒ETF
-            'SH512400', #有色金属ETF
-            'SH515220', #煤炭
-            'SH515210' #钢铁
+            'SH512400' #有色金属ETF
         ],
         "自选":[
             "SH603986", #兆易创新
@@ -3250,9 +3264,11 @@ def Indexs():
             "SH600584", #长电科技
             "SH688981", #中芯国际-U
             "SZ000725", #京东方A
+            "SZ002475", #立讯精密
             "SH601633", #长城汽车
             "SZ002594", #比亚迪
-            "SZ000625" #长安汽车
+            "SZ000625", #长安汽车
+            "SZ300750"  #宁德时代
         ],
         "关注":[favoriteList]
     }

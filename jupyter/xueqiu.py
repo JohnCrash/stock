@@ -30,15 +30,18 @@ class Timer:
             if name in gt:
                 gt[name].cancel()
                 del gt[name]
-        gt[name] = self
+            gt[name] = self
 
     async def _job(self):
-        await asyncio.sleep(self._timeout) 
-        self._callback()
+        try:
+            await asyncio.sleep(self._timeout) 
+            self._callback()
+        except:
+            pass
 
     def __del__(self):
-        self._task.cancel()
-        del self._task
+        #self._task.cancel()
+        #del self._task
         self._callback = None
 
     def cancel(self):

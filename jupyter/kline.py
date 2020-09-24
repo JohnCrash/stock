@@ -1413,6 +1413,11 @@ class Plote:
             periodDropdownvalue = '日线'
             indexDropdownvalue = 'MACD+'
             mainDropdownvalue = 'TREND'
+        elif self._period==120:
+            periodDropdownvalue = '120分钟'
+            indexDropdownvalue = 'CLEAR'
+            mainDropdownvalue = 'CLEAR'
+            self._correcttionVolume = True           
         elif self._period==60:
             periodDropdownvalue = '60分钟'
             indexDropdownvalue = 'CLEAR'
@@ -1644,7 +1649,7 @@ class Plote:
 
         def on_zoomin(b):
             nonlocal beginPT,endPT,showRange
-            showRange = math.floor(showRange*1/2)
+            showRange = math.floor(showRange*2/3)
             shared.toRedis(showRange,'kline.zoom%s'%self._period)
             beginPT = endPT - showRange
             self._trendHeadPos = endPT
@@ -1653,7 +1658,7 @@ class Plote:
 
         def on_zoomout(b):
             nonlocal beginPT,endPT,showRange
-            showRange = math.floor(showRange*2)
+            showRange = math.floor(showRange*3/2)
             shared.toRedis(showRange,'kline.zoom%s'%self._period)
             beginPT = endPT - showRange
             if beginPT < 0:

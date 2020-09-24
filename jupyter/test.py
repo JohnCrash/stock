@@ -18,8 +18,9 @@ import math
 import config
 import subprocess
 import threading
-shared.delKey('kline.index')
-shared.delKey('kline.main')
+
+#shared.delKey('kline.index')
+#shared.delKey('kline.main')
 #a = stock.totalVolume()
 #print(a)
 #status.fluctuation()
@@ -224,3 +225,9 @@ for i in range(len(k)):
         print(K)
 
 '''
+
+def a():
+    print('a')
+
+xueqiu.Timer(1,a)
+print('done')
