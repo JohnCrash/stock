@@ -19,7 +19,7 @@ import config
 import subprocess
 import threading
 
-#shared.delKey('kline.index')
+#shared.delKey('k5_sz159995')
 #shared.delKey('kline.main')
 #a = stock.totalVolume()
 #print(a)
@@ -225,9 +225,7 @@ for i in range(len(k)):
         print(K)
 
 '''
-
-def a():
-    print('a')
-
-xueqiu.Timer(1,a)
-print('done')
+#xueqiu.sinaFlowRT()
+b,k,d = xueqiu.K('SZ159995',5,96)
+print(k)
+print(d)

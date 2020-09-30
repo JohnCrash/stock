@@ -17,26 +17,32 @@ import config
 gt = {}
 def clearTimer():
     global gt
-    for v in gt:
-        gt[v].cancel()
+    try:
+        for v in gt:
+            gt[v].cancel()
+    except Exception as e:
+        pass
     gt = {}
 class Timer:
     def __init__(self, timeout, callback,name=None):
+        global gt
         self._timeout = timeout
         self._callback = callback
-        self._task = asyncio.ensure_future(self._job())
-        global gt
-        if name is not None:
-            if name in gt:
-                gt[name].cancel()
-                del gt[name]
-            gt[name] = self
+        try:
+            self._task = asyncio.ensure_future(self._job())
+            if name is not None:
+                if name in gt:
+                    gt[name].cancel()
+                    del gt[name]
+                gt[name] = self
+        except Exception as e:
+            pass
 
     async def _job(self):
         try:
             await asyncio.sleep(self._timeout) 
             self._callback()
-        except:
+        except Exception as e:
             pass
 
     def __del__(self):
@@ -521,6 +527,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
+                print("sinaFlowRT %s"%t)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
             time.sleep(dt)
@@ -1140,7 +1147,11 @@ def K(code,period,n):
         dn = int(15*16/period)
     else:
         dn = n
-        
+    #fixbug: 非雪球数据etf有问题，这里暂时强行改成雪球数据
+    if period==5:
+        base = '雪球k5'
+    else:    
+        base = '雪球k15'
     a,k,s = getK(code,period,dn,provider=base)
     K = []
     if a and b:

@@ -1503,7 +1503,10 @@ class Plote:
                 self.enable('ma')
                 self.disable('boll')
                 self.disable('trend')
-                self._config['ma'] = [5,10,20,30,60]
+                if self._period=='d':
+                    self._config['ma'] = [5,10,60]
+                else:
+                    self._config['ma'] = [5,10]
                 self.disable('eps')
             elif sel=='BOLL':
                 self.enable('boll')
