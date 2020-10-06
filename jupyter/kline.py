@@ -929,7 +929,6 @@ class Plote:
                         axflow.set_xlim(0,60*4)
                         axflow.legend()
                 k5s,d5s = self.getCurrentK5()
-                
                 if len(d5s)>0:
                     axk5.set_title('%s 5分钟K'%(stock.dateString(d5s[-1][0])))
                 else:
@@ -991,8 +990,8 @@ class Plote:
                     b,szk,szd = xueqiu.K('SZ399001',5,todayei-todaybi)
                     if b:
                         szkmax = szk[:,4].max()
-                        szkmin = szk[:,4].min()  
-                        if szkmax-szkmin!=0:
+                        szkmin = szk[:,4].min()
+                        if szkmax-szkmin!=0 and k5x.shape[0]==szk.shape[0]:
                             axk5.plot(k5x,(szk[:,4]-szkmin)*(maxk5close-mink5close)/(szkmax-szkmin)+mink5close,color='black',linewidth=2,linestyle='--',label='szk5')
                 if maxk5x<todayei-3:
                     axk5.text(maxk5x,maxk5close,str(k5maxrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if k5maxrate>=0 else 'darkgreen')
