@@ -1,5 +1,5 @@
-import stock
-import status
+from . import stock
+from . import status
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import Formatter

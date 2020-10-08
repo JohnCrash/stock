@@ -3,16 +3,16 @@ import time
 import math
 import numpy as np
 from datetime import date,datetime,timedelta
-import shared
+from . import shared
 import json
 import copy
 import uuid
 import random
 import threading
-import stock
-import mylog
+from . import stock
+from . import mylog
 import asyncio
-import config
+from . import config
 
 gt = {}
 def clearTimer():

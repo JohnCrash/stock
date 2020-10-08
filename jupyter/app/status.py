@@ -4,21 +4,21 @@
 算法是增量优化的，每次运行仅仅计算增加的部分
 """
 import numpy as np
-import stock
-import xueqiu
-import kline
+from . import stock
+from . import xueqiu
+from . import kline
 from IPython.display import display,Markdown
 import ipywidgets as widgets
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
 import matplotlib.pyplot as plt
 import math
-import shared
+from . import shared
 import random
 import threading
 import time
 import copy
-import mylog
+from . import mylog
 from matplotlib.ticker import Formatter
 
 log = mylog.init('status.log',name='status')

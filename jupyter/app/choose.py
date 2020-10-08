@@ -1,5 +1,5 @@
 import numpy as np
-import stock
+from . import stock
 import matplotlib.pyplot as plt
 
 #返回满足条件的范围数据

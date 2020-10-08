@@ -1,14 +1,14 @@
-import stock
-import xueqiu
-import status
+from . import stock
+from . import xueqiu
+from . import status
 from datetime import datetime
 import time
 import subprocess
 import threading
 import platform
-import config
-import shared
-import mylog
+from . import config
+from . import shared
+from . import mylog
 #import os
 log = mylog.init('runtime.log',name='runtime')
 _,download_done_day = shared.fromRedis("last_download_day")

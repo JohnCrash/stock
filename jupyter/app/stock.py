@@ -2,8 +2,8 @@ import MySQLdb
 import numpy as np
 import math
 from datetime import date,datetime,timedelta
-import shared
-import config
+from . import shared
+from . import config
 
 def isTransTime(t=None):
     if t is None:

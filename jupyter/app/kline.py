@@ -1,4 +1,4 @@
-import stock
+from . import stock
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import Formatter
@@ -11,12 +11,12 @@ from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
 import time
 import copy
-import trend
+from . import trend
 import  warnings
-import shared
-import xueqiu
+from . import shared
+from . import xueqiu
 import uuid
-import mylog
+from . import mylog
 #定制show
 from matplotlib._pylab_helpers import Gcf
 from ipykernel.pylab.backend_inline import _fetch_figure_metadata,show

@@ -1,5 +1,5 @@
 import numpy as np
-import stock
+from . import stock
 """
 基于macd的趋势
 """

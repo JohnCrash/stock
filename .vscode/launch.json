@@ -84,13 +84,13 @@
             "type": "python",
             "request": "launch",
             "name": "Debug test.py",
-            "program": "${workspaceFolder}\\jupyter\\test.py"
+            "program": "${workspaceFolder}\\jupyter\\app\\test.py"
         },       
         {
             "type": "python",
             "request": "launch",
             "name": "Debug app.py",
-            "program": "${workspaceFolder}\\jupyter\\flask\\app.py"
+            "program": "${workspaceFolder}\\jupyter\\app\\app.py"
         },                      
         {
             "type": "python",
