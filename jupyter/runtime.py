@@ -31,7 +31,7 @@ while True:
         except Exception as e:
             log.error(str(e))
             print(e)
-    elif t.hour>=15 and t.day!=download_done_day and stock.isTransDay():
+    elif t.hour>=15 and t.day!=download_done_day and stock.isTransDay() and False:
         if t.hour==15:
             print("5分钟后开始更新数据库...")
             time.sleep(5*60)

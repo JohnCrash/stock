@@ -395,7 +395,7 @@ class Plote:
             elif period == 'd':
                 after = stock.dateString(date.today()-timedelta(days=5*365 if self._lastday is None else self._lastday)) #5年数据
             else:
-                after = stock.dateString(date.today()-timedelta(days=60 if self._lastday is None else self._lastday))
+                after = stock.dateString(date.today()-timedelta(days=120 if self._lastday is None else self._lastday))
             
             if period==5 or period=='d':
                 c,k,d = stock.loadKline(code,period,after=after)
@@ -613,8 +613,9 @@ class Plote:
                 self._config = {"volume":True}
 
             if main_sel=='BOLL+':
-                self._config["boll"] = True
-                self._config['trend'] = True
+                self._config["boll"] = 20
+                #self._config['trend'] = True
+                self._config["ma"] = [5,10]
             elif main_sel=='MA':
                 self._config["ma"] = [5,10,20,30,60]
             elif main_sel=='BOLL':
@@ -1495,8 +1496,9 @@ class Plote:
         def config_main(sel):
             if sel=='BOLL+':
                 self.enable('boll')
-                self.enable('trend')
-                self.disable('ma')
+                self.disable('trend')
+                self.enable('ma')
+                self._config['ma'] = [5,10]
                 self.disable('eps')
             elif sel=='MA':
                 self.enable('ma')
