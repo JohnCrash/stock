@@ -119,7 +119,7 @@ def update_company_status_week(cid,k,macd,vma20,energy,volumeJ,boll,bollw,rsi,id
 def update_company_status_all_data(idk,idd):
     k = np.array(idk)
     #k= [0 id,1 volume,2 close]
-    macd = stock.macdV(k[:,2])
+    macd,_,_ = stock.macdV(k[:,2])
     vma20 = stock.ma(k[:,1],20)
     energy = stock.kdj(stock.volumeEnergy(k[:,1]))[:,2]
     volumeJ = stock.kdj(k[:,1])[:,2]
@@ -132,7 +132,7 @@ def update_company_status_all_data(idk,idd):
 def update_company_status_delta_data(idk,idd):
     k = np.array(idk)
     #k= [0 id,1 volume,2 close]
-    macd = stock.macdV(k[:,2])
+    macd,_,_ = stock.macdV(k[:,2])
     vma20 = stock.ma(k[:,1],20)
     energy = stock.kdj(stock.volumeEnergy(k[:,1]))[:,2]
     volumeJ = stock.kdj(k[:,1])[:,2]
@@ -287,7 +287,7 @@ def update_status_week(progress):
             wd = nwd
         #计算周macd,volumema20,energy,volumeJ,boll,bollw
         WK = np.array(wk)
-        macd = stock.macdV(WK[:,4])
+        macd,_,_ = stock.macdV(WK[:,4])
         volumema20 = stock.ma(WK[:,0],20)
         energy = stock.kdj(stock.volumeEnergy(WK[:,0]))[:,2]
         volumeJ = stock.kdj(WK[:,0])[:,2]
@@ -505,7 +505,7 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             idd = c[0]
             A = np.vstack((k,[[idd,k1[4],k1[0],0,0,0,0,0,0,0,0,0]]))
             #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
-            A[-1,4] = stock.macdV(A[:,1])[-1] #macd
+            A[-1,4],_,_ = stock.macdV(A[:,1])[-1] #macd
             A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
             A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
             boll = stock.boll(A[:,1])
@@ -569,7 +569,7 @@ def downloadRT(tasks,progress=None):
                 clos = p1[i,3]
                 A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0,0]]))
                 #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi
-                A[-1,4] = stock.macdV(A[:,1])[-1] #macd
+                A[-1,4],_,_ = stock.macdV(A[:,1])[-1] #macd
                 A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
                 A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
                 boll = stock.boll(A[:,1])
@@ -3582,6 +3582,8 @@ def fluctuation(step=15):
     def update_fluctuation(K,D):
         nonlocal idd,pos,switchsort,select_category,sel
         eps = stock.extremePoint(K[szi,:,3])
+        if len(eps)==0:
+            return
         li = K.shape[1]-1
         if eps[0][0]!=li:
             if li-eps[0][0]<=2:

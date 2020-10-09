@@ -273,7 +273,10 @@ def macd(k):
     emA[:,0] = ema9
     emA[:,1] = ema12
     emA[:,2] = ema26
-    return 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+    DIF = ema12-ema26
+    MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+    DEA = DIF-2*MACD
+    return MACD,DIF,DEA
 
 def emaV(k,n):
     m = np.empty([len(k)])
@@ -292,7 +295,10 @@ def macdV(k):
     emA[:,0] = ema9
     emA[:,1] = ema12
     emA[:,2] = ema26
-    return 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+    DIF = ema12-ema26
+    MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+    DEA = DIF-2*MACD    
+    return MACD,DIF,DEA
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
     if i-1<0:
@@ -915,7 +921,7 @@ macd背离侦测
 """
 def macdDeviate(v,m=None,n=2):
     if m is None:
-        m = macdV(v)
+        m,_,_ = macdV(v)
     eps = extremePoint(m,n=n)
     R = []
     for i in range(len(eps)-2):
@@ -983,3 +989,7 @@ def gap(k):
             if high>low:
                 R.append((bi,ei,low,high,dp))
     return R
+
+"""
+计算一组股票的指数 
+"""

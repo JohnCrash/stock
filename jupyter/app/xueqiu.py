@@ -20,7 +20,7 @@ def clearTimer():
     try:
         for v in gt:
             gt[v].cancel()
-    except Exception as e:
+    except:
         pass
     gt = {}
 class Timer:
@@ -35,14 +35,14 @@ class Timer:
                     gt[name].cancel()
                     del gt[name]
                 gt[name] = self
-        except Exception as e:
+        except:
             pass
 
     async def _job(self):
         try:
             await asyncio.sleep(self._timeout) 
             self._callback()
-        except Exception as e:
+        except:
             pass
 
     def __del__(self):

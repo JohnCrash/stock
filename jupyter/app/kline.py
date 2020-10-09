@@ -259,8 +259,7 @@ class Plote:
             self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
         if 'trend' in self._config and self._config['trend']:
-            macd = stock.macd(self._k)
-            self._macd = macd
+            self._macd,self._dif,self._dea = stock.macd(self._k)
             self._trend,last_line,b = trend.macdTrend(self._k,self._macd)
             #如果是日线的趋势线将被保存,用于小级别中绘制
             if self._period == 'd':
@@ -326,7 +325,7 @@ class Plote:
             self._axsInx += 1
             #防止计算两边macd
             if not self._showtrend:
-                self._macd = stock.macd(self._k)
+                self._macd,self._dif,self._dea = stock.macd(self._k)
             self._showmacd = True
         if 'kdj' in self._config and self._config['kdj'] is not None:
             self._kdjInx = self._axsInx+1
@@ -371,7 +370,7 @@ class Plote:
                 self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             else:
                 if not self._showtrend:
-                    self._macd = stock.macd(self._k)
+                    self._macd,self._dif,self._dea = stock.macd(self._k)
                 self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             self._showbest = True
 
@@ -553,14 +552,14 @@ class Plote:
                 self._szclose = WK[:,4]
                 self._szvolumekdj = stock.kdj(WK[:,0])[:,2]
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(WK))[:,2]
-                self._szmacd = stock.macd(WK)
+                self._szmacd,self._szdif,self._szdea = stock.macd(WK)
             else:
                 _,szk,szd = self.getKlineData(idxcode,self._period)
                 K = stock.alignK(self._date,szk,szd)
                 self._szclose = K[:,4]
                 self._szvolumekdj = stock.kdj(K[:,0])[:,2]
                 self._szvolumeenergy = stock.kdj(stock.volumeEnergyK(K))[:,2]
-                self._szmacd = stock.macd(K)
+                self._szmacd,self._szdif,self._szdea = stock.macd(K)
         else:
             self._szclose = None
 
@@ -1229,7 +1228,15 @@ class Plote:
                     axsK.text(self._minx,self._mink,str(self._minrate)+"%",linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if self._minrate>=0 else 'darkgreen')
         #绘制macd
         if self._showmacd:
-            axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
+            #axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
+            mp = np.copy(self._macd[bi:ei])
+            mp[mp<0] = 0
+            mn = np.copy(self._macd[bi:ei])
+            mn[mn>0] = 0
+            axs[self._macdInx].bar(x,mp,color='red')
+            axs[self._macdInx].bar(x,mn,color='green')
+            axs[self._macdInx].plot(x,self._dif[bi:ei],label="DIF",color='orange',linewidth=2)
+            axs[self._macdInx].plot(x,self._dea[bi:ei],label="DEA",color='cornflowerblue',linewidth=2)
             axs[self._macdInx].axhline(color='black')
             if self._szclose is not None: #绘制大盘macd
                 kmax = self._macd[bi:ei].max()
@@ -1706,7 +1713,7 @@ class Plote:
                             p = i
                             break
                     if p<len(dk):
-                        m = stock.macd(dk)
+                        m,_,_ = stock.macd(dk)
                         self._trend,last_line,b = trend.macdTrend(dk[:p+1,:],m[:p+1])
                         #如果是日线的趋势线将被保存,用于小级别中绘制
                         self._day_trend = self._trend

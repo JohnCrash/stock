@@ -34,11 +34,11 @@ def maRange(k,n1,n2):
 
 #返回macd>0的区域
 def macdIndexs(k):
-    macd = stock.macd(k)
+    macd,_,_ = stock.macd(k)
     return argWhere(macd>0)
 
 def macdRange(k):
-    macd = stock.macd(k)
+    macd,_,_ = stock.macd(k)
     return argRange(macd>0)
 
 """

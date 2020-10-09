@@ -3,19 +3,19 @@ d1是k1的日期表,将k1和日期表date对齐
 d1和date来自于loadKline的返回日期
 """
 import numpy as np
-from . import stock
-from . import status
-from . import shared
-from . import xueqiu
+from app import stock
+from app import status
+from app import shared
+from app import xueqiu
 import threading
 import queue
 import requests
 import time
 from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
-from . import kline
+from app import kline
 import math
-from . import config
+from app import config
 import subprocess
 import threading
 
