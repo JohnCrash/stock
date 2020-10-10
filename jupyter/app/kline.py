@@ -570,7 +570,8 @@ class Plote:
     
     def __del__(self):
         if self._timer is not None:
-            self._timer.cancel()
+            #self._timer.cancel()
+            xueqiu.cancelTimeout(self._timer)
 
     #company可以是kline数据，可以是code，也可以是公司名称
     #mode = 'normal','runtime','auto'
@@ -599,7 +600,7 @@ class Plote:
             if index_sel=='MACD+':
                 self._config = {"macd":True,"energy":True,"volume":True}
             elif index_sel=='KDJ+':
-                self._config = {"kdj":True,"energy":True,"volume":True}
+                self._config = {"kdj":9,"energy":True,"volume":True}
             elif index_sel=='MACD+Best':
                 self._config = {"macd":True,"energy":True,'best':True,"volume":True}
             elif index_sel=='MACD+BollWidth':
@@ -1195,15 +1196,26 @@ class Plote:
             axsK.plot(x,(self._szclose[bi:ei]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',linewidth=2,linestyle='--')
         #绘制成交量
         if self._showvolume:
-            axs[self._volInx].step(x,self._k[bi:ei,0],where='mid',label='volume')
-            if self._mad is not None: #绘制5分钟或者15分钟的碗型
-                axs[self._volInx].step(x,self._mad[bi:ei],where='mid',label='mad',color='orangered') #low
+            if type(self._period)==str:
+                #日线周线使用红绿柱
+                mp = np.copy(self._k[bi:ei,0])
+                mp[self._k[bi:ei,4]<self._k[bi:ei,1]] = 0
+                mn = np.copy(self._k[bi:ei,0])
+                mn[self._k[bi:ei,4]>self._k[bi:ei,1]] = 0
+                axs[self._volInx].bar(x,mp,color='red')
+                axs[self._volInx].bar(x,mn,color='green')
+                axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='orange') #low
+                axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='cornflowerblue') #low                
             else:
-                axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
-                if type(self._period) == str:
-                    axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
-                    axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='green') #low
-                    #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
+                axs[self._volInx].step(x,self._k[bi:ei,0],where='mid',label='volume')
+                if self._mad is not None: #绘制5分钟或者15分钟的碗型
+                    axs[self._volInx].step(x,self._mad[bi:ei],where='mid',label='mad',color='orangered') #low
+                else:
+                    axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
+                    if type(self._period) == str:
+                        axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
+                        axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='green') #low
+                        #axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='yellow') #mid
             axs[self._volInx].axhline(color='black')
         #绘制交易点
         if 'trans' in self._config:
@@ -1938,7 +1950,8 @@ class Plote:
         def on_favoriteText(e):
             nonlocal updateFavoriteTimer
             if updateFavoriteTimer is not None:
-                updateFavoriteTimer.cancel()
+                #updateFavoriteTimer.cancel()
+                xueqiu.cancelTimeout(updateFavoriteTimer)
             def updateFavoriteText():
                 today = date.today()
                 code = self.code()
@@ -1951,7 +1964,7 @@ class Plote:
                             fav['node']=fafavoriteNodeWidget.value
                             break
                     shared.toRedis(favorites,name,ex=24*3600)
-            updateFavoriteTimer = xueqiu.Timer(3,updateFavoriteText,'favorite%s'%self.code())
+            updateFavoriteTimer = xueqiu.setTimeout(3,updateFavoriteText,'favorite%s'%self.code())
 
         fafavoriteNodeWidget.observe(on_favoriteText,names='value')
         def update():
@@ -1979,7 +1992,5 @@ class Plote:
             else:
                 nt = 0 #xueqiu.next_k_date(self._period)
             if nt>0:
-                self._timer = xueqiu.Timer(nt+1,update,'kline%s'%self.code())
-            else:
-                self._timer = None
+                self._timer = xueqiu.setTimeout(nt+1,update,'kline%s'%self.code())
         startTimer()

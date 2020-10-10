@@ -14,44 +14,65 @@ from . import mylog
 import asyncio
 from . import config
 
-gt = {}
-def clearTimer():
-    global gt
-    try:
-        for v in gt:
-            gt[v].cancel()
-    except:
-        pass
-    gt = {}
 class Timer:
-    def __init__(self, timeout, callback,name=None):
-        global gt
+    def __init__(self, timeout, callback):
         self._timeout = timeout
         self._callback = callback
-        try:
-            self._task = asyncio.ensure_future(self._job())
-            if name is not None:
-                if name in gt:
-                    gt[name].cancel()
-                    del gt[name]
-                gt[name] = self
-        except:
-            pass
+        self._task = asyncio.ensure_future(self._job())
 
     async def _job(self):
-        try:
-            await asyncio.sleep(self._timeout) 
-            self._callback()
-        except:
-            pass
-
-    def __del__(self):
-        #self._task.cancel()
-        #del self._task
-        self._callback = None
+        await asyncio.sleep(self._timeout) 
+        self._callback()
 
     def cancel(self):
         self._task.cancel()
+
+gtimer = None
+
+def gtimerLoop():
+    global gtimer
+    deletes = []
+    gt = gtimer
+    for v in gt:
+        timer = gt[v]
+        if timer is not None and 't' in timer and 'func' in timer:
+            timer['t'] += 1
+            if timer['t']>= timer['dt']:
+                gt[v] = None
+                try:
+                    timer['func']()
+                except:
+                    pass
+                if gt[v] is None:
+                    deletes.append(v)
+    for v in deletes:
+        del gt[v]
+    Timer(1,gtimerLoop)
+
+if gtimer is None:
+    gtimer = {}
+    gtimerLoop()
+"""
+设置周期调用函数func,周期为dt,命名name
+当设置func=None时,则取消该周期调用
+"""
+def setTimeout(dt,func,name):
+    global gtimer
+    gtimer[name] = {
+        'name' : name,
+        'dt' : int(dt),
+        'func' : func,
+        't' : 0
+    }
+    return gtimer[name]
+
+def cancelTimeout(t):
+    global gtimer
+    if 'name' in t and t['name'] in gtimer:
+        del gtimer[t['name']]
+def clearTimer():
+    global gtimer
+    gtimer = {}
 
 log = mylog.init('download_stock.log',name='xueqiu')
 xueqiu_cookie = ""
