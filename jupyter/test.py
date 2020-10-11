@@ -32,6 +32,9 @@ import threading
 #for v in ls:
 #    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
 
+xueqiu.rebuild_k60_sequence()
+k,d = xueqiu.getK60()
+print(k.shape,len(d))
 """
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []
@@ -226,6 +229,8 @@ for i in range(len(k)):
 
 '''
 #xueqiu.sinaFlowRT()
+"""
 b,k,d = xueqiu.K('SZ159995',5,96)
 print(k)
 print(d)
+"""

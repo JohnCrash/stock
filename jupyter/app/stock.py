@@ -251,11 +251,9 @@ def createKlineCache(beginDate):
 """计算指数移动平均线ema,公式来源于baidu"""
 def ema(k,n):
     m = np.empty([len(k)])
-    for i in range(len(k)):
-        if i==0:
-            m[0] = k[i,4]
-        else:
-            m[i] = (2*k[i,4]+(n-1)*m[i-1])/(n+1)
+    m[0] = k[0,4]
+    for i in range(1,len(k)):
+        m[i] = (2*k[i,4]+(n-1)*m[i-1])/(n+1)
     return m
 
 """计算macd
@@ -269,35 +267,33 @@ def macd(k):
     ema9 = ema(k,9)
     ema12 = ema(k,12)
     ema26 = ema(k,26)
-    emA = np.empty([len(k),3])
-    emA[:,0] = ema9
-    emA[:,1] = ema12
-    emA[:,2] = ema26
+    #emA = np.empty([len(k),3])
+    #emA[:,0] = ema9
+    #emA[:,1] = ema12
+    #emA[:,2] = ema26
     DIF = ema12-ema26
     MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
-    DEA = DIF-2*MACD
+    DEA = DIF-0.5*MACD
     return MACD,DIF,DEA
 
 def emaV(k,n):
     m = np.empty([len(k)])
-    for i in range(len(k)):
-        if i==0:
-            m[0] = k[i]
-        else:
-            m[i] = (2*k[i]+(n-1)*m[i-1])/(n+1)
+    m[0] = k[0]
+    for i in range(1,len(k)):
+        m[i] = (2*k[i]+(n-1)*m[i-1])/(n+1)
     return m
 """计算一般macd"""
 def macdV(k):
     ema9 = emaV(k,9)
     ema12 = emaV(k,12)
     ema26 = emaV(k,26)
-    emA = np.empty([len(k),3])
-    emA[:,0] = ema9
-    emA[:,1] = ema12
-    emA[:,2] = ema26
+    #emA = np.empty([len(k),3])
+    #emA[:,0] = ema9
+    #emA[:,1] = ema12
+    #emA[:,2] = ema26
     DIF = ema12-ema26
     MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
-    DEA = DIF-2*MACD    
+    DEA = DIF-.5*MACD    
     return MACD,DIF,DEA
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):

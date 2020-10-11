@@ -40,7 +40,9 @@ class MyFormatterRT(Formatter):
             return ''
 
         t = self.dates[ind][0]
-        if self.fmt=='d h:m:s':
+        if self.fmt=='m-d h:m':
+            return '%02d-%02d %02d:%02d'%(t.month,t.day,t.hour,t.minute)
+        elif self.fmt=='d h:m:s':
             return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
         elif self.fmt=='d h:m':
             return '%d %02d:%02d'%(t.day,t.hour,t.minute)
@@ -405,7 +407,7 @@ K_=[[[0 idd,1 timestamp,2 volume,3 current,4 yesteryday_close,5 today_open]
 K =[[[(0 idd,1 volume,2 current,3 yesteryday_close,4 today_open)]]]
 """
 def downloadAllKFast(companys,step=1,progress=None):
-    K_,D_ = xueqiu.getRT(companys,step=step,progress=progress)
+    K_,D_ = xueqiu.getRT(step=step,progress=progress)
     if K_ is not None:
         D = D_
         K = np.ones((len(companys),len(D),11))
@@ -2534,7 +2536,7 @@ def timeline(code,step=1,name=None,companys=None):
         companys = stock.query("select company_id,code,name,category from company_select")
     for i in range(len(companys)):
         if companys[i][1]==code or companys[i][2]==name:
-            K,D = xueqiu.getRT(companys,step=step)
+            K,D = xueqiu.getRT(step=step)
             gs_kw = dict(width_ratios=[1], height_ratios=[2,1])
             fig,axs = plt.subplots(2,1,sharex=True,figsize=(28,14),gridspec_kw = gs_kw)
             fig.subplots_adjust(hspace=0.02,wspace=0.05)
@@ -2659,8 +2661,8 @@ def showflow(name=None):
 
 # D=[(timestamp,),...]
 # K=(0 idd,1 volume,2 close,3 yesteryday_close,4 today_open)
-def getRT2m(companys):
-    k,D = xueqiu.getRT(companys,step=6,N=0)
+def getRT2m():
+    k,D = xueqiu.getRT(step=6,N=0)
     K = np.empty((len(k),len(D),5))
     K[:,:,0] = k[:,:,0]
     K[:,:,1:] = k[:,:,2:]
@@ -2739,7 +2741,7 @@ def showzdt(bi=None,ei=None):
     def getData():
         nonlocal K,D,mode,companys,uhots,dhots,bi,ei,pos
         if mode == '2分钟':
-            D,K = getRT2m(companys)
+            D,K = getRT2m()
         else:
             if bi is None:
                 D,K_ = redisStatusCache50('company_status')
@@ -3689,7 +3691,7 @@ def fluctuation(step=15):
             refreshbutton.button_style = 'success'
             isfirst = False
             lastT = ut
-            K,D = xueqiu.getRT(companys,step=step)
+            K,D = xueqiu.getRT(step=step)
             if idd is None:
                 idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
                 all_sel = np.ones((len(K),),dtype=np.dtype('bool'))
@@ -3778,8 +3780,49 @@ def watchrt():
         if ((isfirst or (b and ut!=lastT))) or focus:
             isfirst = False
             lastT = ut         
-            K,D = xueqiu.getRT(companys,step=3*5)   
+            K,D = xueqiu.getRT(step=3*5)   
             showrl(K,D)
             if stock.isTransDay() and t.hour>=6 and t.hour<15:
                 xueqiu.setTimeout(1,update,'watchrt')
     update()
+
+"""
+绘制60分钟macd数量变化图
+"""
+def macd60plot():
+    def ema(k,n):
+        m = np.empty(k.shape)
+        m[:,0] = k[:,0]
+        for i in range(1,k.shape[1]):
+            m[:,i] = (2*k[:,i]+(n-1)*m[:,i-1])/(n+1)
+        return m
+    def macd(k):
+        ema9 = ema(k,9)
+        ema12 = ema(k,12)
+        ema26 = ema(k,26)
+        DIF = ema12-ema26
+        MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+        DEA = DIF-0.5*MACD
+        return MACD,DIF,DEA 
+    k,d = xueqiu.getK60()
+    m,dif,dea = macd(k)
+    output = widgets.Output()
+    display(output)
+    def update():
+        with output:
+            xticks = []
+            fig,axs = plt.subplots(figsize=(30,14))
+            axs.xaxis.set_major_formatter(MyFormatterRT(d,'m-d h:m'))
+            x = np.arange(len(d))
+            axs.plot(x[26:],np.count_nonzero(m>0,axis=0)[26:])
+            for i in range(len(d)):
+                t = d[i][0]
+                if t.hour==10:
+                    xticks.append(i)
+            axs.set_xticks(xticks)
+            axs.grid(True)
+            axs.axhline(y=0,color='black',linestyle='--')
+            fig.autofmt_xdate()
+            axs.legend()
+            kline.output_show(output)
+    xueqiu.setTimeout(0,update,'macd60plot')

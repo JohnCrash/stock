@@ -316,6 +316,123 @@ def toDayTimestramp(ts):
 def defaultProgress(i):
     pass
 
+_companys = None
+def get_company_select():
+    global _companys
+    if _companys is None:
+        companys = stock.query("""select company_id,code,name,category from company_select""")
+        _companys = companys
+    return _companys
+"""
+返回company_select中公司的全部60分钟数据
+"""
+_K60 = None
+_D60 = None
+_N60 = None
+def getK60():
+    global _K60,_D60,_N60
+    b,seqs = shared.fromRedis('k60_sequence')
+    companys = get_company_select()
+    C = len(companys)
+    if b:
+        if _D60 is None:
+            L = 250
+            _D60 = [None]*L
+            _K60 = np.empty((len(companys),L)) #company_id,close
+            _N60 = 0
+            for ts in seqs:
+                b,p = shared.numpyFromRedis("k60%d"%ts)
+                if b:
+                    _K60[:,_N60] = p
+                    _D60[_N60] = (datetime.fromtimestamp(ts),ts)
+                    _N60+=1
+        else:
+            lastts = _D60[_N60-1][1]
+            ba = False
+            for ts in seqs:
+                if ba:
+                    b,p = shared.numpyFromRedis("k60%d"%ts)
+                    if b:
+                        _K60[:,_N60] = p
+                        _D60[_N60] = (datetime.fromtimestamp(ts),ts)
+                        _N60+=1
+                elif ts==lastts:
+                    ba = True
+    if _K60 is not None:
+        bi = 0
+        return _K60[:,bi:_N60],_D60[bi:_N60]
+    else:
+        return None,None
+"""
+向k60中增加数据
+"""        
+def appendK60plane(t,plane):
+    tt = t+timedelta(minutes=1)
+    t = datetime(year=tt.year,month=tt.month,day=tt.day,hour=tt.hour,minute=tt.minute)
+    b,seqs = shared.fromRedis('k60_sequence')
+    if b:
+        ts = t.timestamp()
+        if seqs[-1]!=ts:
+            seqs.append(ts)
+            for i in range(0,len(seqs)-240,1):
+                shared.delKey("k60%d"%seqs[i])
+            seqs = seqs[-240:] #保留240个数据点
+            shared.toRedis(seqs,'k60_sequence')
+        p = np.empty(len(get_company_select())) #company_id,close
+        p[:] = plane[:,3] #close
+        shared.numpyToRedis(p,"k60%d"%ts,ex=3*30*24*3600) #3个月
+"""
+删除以前的k60 sequence数据，然后从数据库重新加载
+"""        
+def rebuild_k60_sequence():
+    #删除以前的数据
+    companys = get_company_select()
+    b,seqs = shared.fromRedis('k60_sequence')
+    if b:
+        bb,f = shared.numpyFromRedis("k60%d"%seqs[-1])
+        if bb and len(f)==len(companys):
+            return #已经有完整的加载数据了不需要重新加载
+    if b:
+        for ts in seqs:
+            shared.delKey("k60%d"%ts)
+    print("rebuild_k60_sequence...")
+    dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 60""")
+    timestamp2i = {}
+    seqs = []
+    def t60timestamp(t,h,m):
+        return datetime(year=t.year,month=t.month,day=t.day,hour=h,minute=m).timestamp()
+    for i in range(-1,-len(dd)-1,-1):
+        t = dd[i][0]
+        seqs.append(t60timestamp(t,10,30))
+        seqs.append(t60timestamp(t,11,30))
+        seqs.append(t60timestamp(t,14,0))
+        seqs.append(t60timestamp(t,15,0))
+    seqs = seqs[-240:]
+    for i in range(len(seqs)):
+        timestamp2i[seqs[i]]=i
+    plane = np.zeros((len(companys),240)) #close
+    for i in range(len(companys)):
+        c = companys[i]
+        p = stock.query("""select timestamp,close from k5_xueqiu where id=%d and ((hour(timestamp)=10 and minute(timestamp)=30) or (hour(timestamp)=11 and minute(timestamp)=30) or (hour(timestamp)=14 and minute(timestamp)=0) or (hour(timestamp)=15 and minute(timestamp)=0)) order by timestamp desc limit 240"""%c[0])
+        pp = np.flip(np.array(p),0)
+        if seqs[-1]== pp[-1][0].timestamp() and seqs[0]==pp[0][0].timestamp():
+            plane[i,:] = pp[:,1]
+        elif seqs[-1]== pp[-1][0].timestamp():
+            for j in range(len(p)):
+                ts = pp[j,0].timestamp()
+                if ts in timestamp2i:
+                    plane[i,timestamp2i[ts]] = pp[j,1]
+            last = plane[i,-1]
+            for j in range(len(p)-1,-1,-1):
+                if plane[i,j] != 0:
+                    last = plane[i,j]
+                else:
+                    plane[i,j] = last
+    for i in range(240):
+        shared.numpyToRedis(plane[:,i],"k60%d"%seqs[i],ex=3*30*24*3600)
+    shared.toRedis(seqs,'k60_sequence')
+    print("rebuild_k60_sequence done")
+
 """
 返回company_select中公司的全部分时数据
 companys company_select表的返回
@@ -332,9 +449,10 @@ D = [(datetime,),....]
 _K = None
 _D = None
 _N = None
-def getRT(companys,step=1,N=100,progress=defaultProgress):
+def getRT(step=1,N=100,progress=defaultProgress):
     global _K,_D,_N
     b,seqs = shared.fromRedis('runtime_sequence')
+    companys = get_company_select()
     C = len(companys)
     progress(0)
     if b:
@@ -450,6 +568,8 @@ def rebuild_runtime_sequence(idds,seqs):
                     k,_ = getCompanyLastK(int(idds[i]))
                     plane[i,1:] = [0,k[0],k[4],k[4],k[4]]
             shared.numpyToRedis(plane,"rt%d"%n,ex=4*24*3600)
+
+
 #清除全部实时数据
 def clearAllRT():
     b,seqs = shared.fromRedis('runtime_sequence')
@@ -504,6 +624,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
             if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
                 rebuild_runtime_sequence(idds,seqs)
+        rebuild_k60_sequence()
     except Exception as e:
         log.error("updateAllRT updateRT:"+e)
     while t.hour>=6 and t.hour<15:
@@ -545,6 +666,15 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
+            #更新k60,10:30,11:30,2:00,3:00
+            if t.hour==10 and t.minute==29:
+                appendK60plane(t,plane)
+            elif t.hour==11 and t.minute==29:
+                appendK60plane(t,plane)
+            elif t.hour==13 and t.minute==59:
+                appendK60plane(t,plane)
+            elif t.hour==14 and t.minute==59:
+                appendK60plane(t,plane)
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()

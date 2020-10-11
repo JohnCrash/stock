@@ -600,7 +600,7 @@ class Plote:
             if index_sel=='MACD+':
                 self._config = {"macd":True,"energy":True,"volume":True}
             elif index_sel=='KDJ+':
-                self._config = {"kdj":9,"energy":True,"volume":True}
+                self._config = {"kdj":9,"macd":True,"volume":True}
             elif index_sel=='MACD+Best':
                 self._config = {"macd":True,"energy":True,'best':True,"volume":True}
             elif index_sel=='MACD+BollWidth':
@@ -1470,8 +1470,8 @@ class Plote:
                 self.disable('bollwidth')
                 self.disable('flow')
             elif sel=='KDJ+':
-                self.disable('macd')
-                self.enable('energy')
+                self.enable('macd')
+                self.disable('energy')
                 self.enable('kdj')
                 self.disable('best')
                 self.disable('bollwidth')
@@ -1837,7 +1837,7 @@ class Plote:
             if e['old']:
                 old = name2peroid[e['old']]
                 if sel[2] != old[2] and self._timer is not None:
-                    self._timer.cancel()
+                    xueqiu.cancelTimeout(self._timer)
                     startTimer()
 
             self.reload()
