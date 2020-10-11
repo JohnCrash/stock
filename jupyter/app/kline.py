@@ -575,7 +575,7 @@ class Plote:
 
     #company可以是kline数据，可以是code，也可以是公司名称
     #mode = 'normal','runtime','auto'
-    def __init__(self,company,period='d',config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',lastday=None):
+    def __init__(self,company,period=None,config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',lastday=None):
         self._timer = None
         self._prefix = prefix
         self._context = context
@@ -591,9 +591,12 @@ class Plote:
         self._mode = mode
         self._day_trend = None
         self._lastday = lastday
-        b,p = shared.fromRedis('kline.period')
-        if b:
-           period = p
+        if period is None:
+            b,p = shared.fromRedis('kline.period')
+            if b:
+                period = p
+            else:
+                period = 'd'
         b1,main_sel = shared.fromRedis('kline.main%s'%period)
         b2,index_sel = shared.fromRedis('kline.index%s'%period)
         if b1 and b2:

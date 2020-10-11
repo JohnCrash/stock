@@ -10,3 +10,14 @@ jupyter/config/
 *.ipynb
 jupyter/config.py
 download_script/config.js
+jupyter/app/__pycache__/__init__.cpython-37.pyc
+jupyter/app/__pycache__/__main__.cpython-37.pyc
+jupyter/app/__pycache__/app.cpython-37.pyc
+jupyter/app/__pycache__/config.cpython-37.pyc
+jupyter/app/__pycache__/kline.cpython-37.pyc
+jupyter/app/__pycache__/mylog.cpython-37.pyc
+jupyter/app/__pycache__/shared.cpython-37.pyc
+jupyter/app/__pycache__/status.cpython-37.pyc
+jupyter/app/__pycache__/stock.cpython-37.pyc
+jupyter/app/__pycache__/trend.cpython-37.pyc
+jupyter/app/__pycache__/xueqiu.cpython-37.pyc

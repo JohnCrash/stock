@@ -323,6 +323,31 @@ def get_company_select():
         companys = stock.query("""select company_id,code,name,category from company_select""")
         _companys = companys
     return _companys
+#上证选择    
+def get_sh_selector():
+    companys = get_company_select()
+    s = np.zeros((len(companys),),dtype=np.dtype('bool'))
+    for i in range(len(companys)):
+        s[i] = companys[i][1][1]=='H'
+    return s
+def get_sz_selector():
+    companys = get_company_select()
+    s = np.zeros((len(companys),),dtype=np.dtype('bool'))
+    for i in range(len(companys)):
+        s[i] = companys[i][1][1]=='Z'
+    return s
+def get_cy_selector():
+    companys = get_company_select()
+    s = np.zeros((len(companys),),dtype=np.dtype('bool'))
+    for i in range(len(companys)):
+        s[i] = companys[i][1][1:5]=='Z300'
+    return s
+def get_kc_selector():
+    companys = get_company_select()
+    s = np.zeros((len(companys),),dtype=np.dtype('bool'))
+    for i in range(len(companys)):
+        s[i] = companys[i][1][1:5]=='Z688'
+    return s
 """
 返回company_select中公司的全部60分钟数据
 """
