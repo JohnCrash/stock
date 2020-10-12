@@ -32,7 +32,7 @@ import threading
 #for v in ls:
 #    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
 
-xueqiu.rebuild_k60_sequence()
+xueqiu.update_today_k60()
 k,d = xueqiu.getK60()
 print(k.shape,len(d))
 """

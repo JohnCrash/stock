@@ -406,6 +406,56 @@ def appendK60plane(t,plane):
         p = np.empty(len(get_company_select())) #company_id,close
         p[:] = plane[:,3] #close
         shared.numpyToRedis(p,"k60%d"%ts,ex=3*30*24*3600) #3个月
+
+"""
+每天使用xueqiu数据覆盖实时收集到的数据
+"""
+def update_today_k60():
+    b,seqs = shared.fromRedis('k60_sequence')
+    if not b:
+        rebuild_k60_sequence()
+        return
+    dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
+
+    companys = get_company_select()
+    def t60timestamp(t,h,m):
+        return datetime(year=t.year,month=t.month,day=t.day,hour=h,minute=m).timestamp()
+    t = dd[0][0]
+    for i in range(4): #删除今天的rt时间戳
+        tt = datetime.fromtimestamp(seqs[-1])
+        if tt.day==t.day and tt.month==t.month:
+            del seqs[-1]
+        else:
+            break
+    seqs.append(t60timestamp(t,10,30)) #重新加入时间戳
+    seqs.append(t60timestamp(t,11,30))
+    seqs.append(t60timestamp(t,14,0))
+    seqs.append(t60timestamp(t,15,0))
+    timestamp2i = {seqs[-4]:-4,seqs[-3]:-3,seqs[-2]:-2,seqs[-1]:-1}
+    id2i = {} 
+    for i in range(len(companys)):
+        id2i[companys[i][0]] = i
+    p = stock.query("select id,timestamp,close from k5_xueqiu where timestamp>'%02d-%02d-%02d'"%(t.year,t.month,t.day))
+    plane = np.zeros((len(companys),4))
+    for v in p:
+        cid = v[0]
+        ts = v[1].timestamp()
+        if ts in timestamp2i and cid in id2i:
+            plane[id2i[cid],timestamp2i[ts]] = v[2]
+    #检查如果close=0则使用临近的收盘价
+    for i in range(4):
+        if i<3: #正向
+            zp = plane[plane[:,i]==0,:]
+            if len(zp)>0:
+                zp[:,i]=zp[:,i+1]
+        j = 3-i
+        if j>0: #反向
+            zp = plane[plane[:,j]==0,:]
+            if len(zp)>0:
+                zp[:,j]=zp[:,j-1]
+    for i in range(4):
+        shared.numpyToRedis(plane[:,i],"k60%d"%seqs[-4+i],ex=3*30*24*3600)
+    shared.toRedis(seqs,'k60_sequence')
 """
 删除以前的k60 sequence数据，然后从数据库重新加载
 """        
