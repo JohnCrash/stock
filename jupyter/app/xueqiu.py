@@ -383,29 +383,48 @@ def getK60():
                         _N60+=1
                 elif ts==lastts:
                     ba = True
+        #将最新的帧数据刷新到_K60中去
+        b,p = shared.numpyFromRedis("k60%d"%seqs[-1])
+        if b:
+            _K60[:,_N60-1] = p
     if _K60 is not None:
         bi = 0
         return _K60[:,bi:_N60],_D60[bi:_N60]
     else:
         return None,None
+
+def clacK60time(t):
+    ts = []
+    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=10,minute=30))
+    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=11,minute=30))
+    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=14,minute=0))
+    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=15,minute=0))
+    for tt in ts:
+        if t<tt:
+            return tt
+    return None
 """
 向k60中增加数据
 """        
-def appendK60plane(t,plane):
-    tt = t+timedelta(minutes=1)
-    t = datetime(year=tt.year,month=tt.month,day=tt.day,hour=tt.hour,minute=tt.minute)
-    b,seqs = shared.fromRedis('k60_sequence')
-    if b:
-        ts = t.timestamp()
-        if seqs[-1]!=ts:
+def updateK60plane(t,plane):
+    tkey = clacK60time(t)
+    if tkey is None:
+        return
+    ts = tkey.timestamp()
+    b,_ = shared.numpyFromRedis("k60%d"%ts)
+    if not b:
+        b,seqs = shared.fromRedis('k60_sequence')
+        if b:
             seqs.append(ts)
             for i in range(0,len(seqs)-240,1):
-                shared.delKey("k60%d"%seqs[i])
+                shared.delKey("k60%d"%seqs[i])            
             seqs = seqs[-240:] #保留240个数据点
-            shared.toRedis(seqs,'k60_sequence')
-        p = np.empty(len(get_company_select())) #company_id,close
-        p[:] = plane[:,3] #close
-        shared.numpyToRedis(p,"k60%d"%ts,ex=3*30*24*3600) #3个月
+            shared.toRedis(seqs,'k60_sequence')            
+        else:
+            return
+    #p = np.empty(len(get_company_select())) #company_id,close
+    #p[:] = plane[:,3] #close
+    shared.numpyToRedis(plane[:,3],"k60%d"%ts,ex=3*30*24*3600) #3个月
 
 """
 每天使用xueqiu数据覆盖实时收集到的数据
@@ -741,15 +760,8 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             shared.toRedis(seqs,'runtime_sequence')
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
-            #更新k60,10:30,11:30,2:00,3:00
-            if t.hour==10 and t.minute==29:
-                appendK60plane(t,plane)
-            elif t.hour==11 and t.minute==29:
-                appendK60plane(t,plane)
-            elif t.hour==13 and t.minute==59:
-                appendK60plane(t,plane)
-            elif t.hour==14 and t.minute==59:
-                appendK60plane(t,plane)
+            #更新k60
+            updateK60plane(t,plane)
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
