@@ -182,7 +182,10 @@ def update_status_begin(beginday,isall,progress):
             progress(math.floor(60*count/len(idk))+40)
     else:
         for key in idk:
-            update_company_status_delta_data(idk[key],idd[key])
+            try:
+                update_company_status_delta_data(idk[key],idd[key])
+            except Exception as e:
+                print(e,key,'update_company_status_delta_data')
             count+=1
             progress(math.floor(60*count/len(idk))+40)
 
@@ -3804,7 +3807,7 @@ def macd60plot():
         MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
         DEA = DIF-0.5*MACD
         return MACD,DIF,DEA 
-    k,d = xueqiu.getK60()
+    k,d = xueqiu.get_period_k(15)
     m,dif,dea = macd(k)
     output = widgets.Output()
     display(output)
@@ -3817,7 +3820,7 @@ def macd60plot():
             axs.plot(x[26:],np.count_nonzero(m>0,axis=0)[26:])
             for i in range(len(d)):
                 t = d[i][0]
-                if t.hour==10:
+                if t.hour==9 and t.minute==45:
                     xticks.append(i)
             axs.set_xticks(xticks)
             axs.grid(True)

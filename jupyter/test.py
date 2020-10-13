@@ -32,9 +32,17 @@ import threading
 #for v in ls:
 #    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
 
-xueqiu.update_today_k60()
-k,d = xueqiu.getK60()
+#xueqiu.update_today_period([60,15])
+def process(i):
+    pass
+status.update_status(process)
+"""
+xueqiu.clear_period_sequence(15)
+xueqiu.rebuild_period_sequence(15)
+k,d = xueqiu.get_period_k(15)
 print(k.shape,len(d))
+print(k[111])
+"""
 """
 companys = stock.query("select company_id,code,name,category from company_select")
 coms = []

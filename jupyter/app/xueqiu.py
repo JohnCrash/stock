@@ -351,181 +351,201 @@ def get_kc_selector():
 """
 返回company_select中公司的全部60分钟数据
 """
-_K60 = None
-_D60 = None
-_N60 = None
-def getK60():
+_K60 = {60:None,30:None,15:None}
+_D60 = {60:None,30:None,15:None}
+_N60 = {60:None,30:None,15:None}
+def get_period_k(period):
     global _K60,_D60,_N60
-    b,seqs = shared.fromRedis('k60_sequence')
+    
+    b,seqs = shared.fromRedis('k%d_sequence'%period)
     companys = get_company_select()
     C = len(companys)
     if b:
-        if _D60 is None:
-            L = 250
-            _D60 = [None]*L
-            _K60 = np.empty((len(companys),L)) #company_id,close
-            _N60 = 0
+        if _D60[period] is None:
+            L = 252
+            _D60[period] = [None]*L
+            _K60[period] = np.empty((len(companys),L)) #company_id,close
+            _N60[period] = 0
             for ts in seqs:
-                b,p = shared.numpyFromRedis("k60%d"%ts)
+                b,p = shared.numpyFromRedis("k%d%d"%(period,ts))
                 if b:
-                    _K60[:,_N60] = p
-                    _D60[_N60] = (datetime.fromtimestamp(ts),ts)
-                    _N60+=1
+                    _K60[period][:,_N60[period]] = p
+                    _D60[period][_N60[period]] = (datetime.fromtimestamp(ts),ts)
+                    _N60[period]+=1
         else:
-            lastts = _D60[_N60-1][1]
+            lastts = _D60[period][_N60[period]-1][1]
             ba = False
             for ts in seqs:
                 if ba:
-                    b,p = shared.numpyFromRedis("k60%d"%ts)
+                    b,p = shared.numpyFromRedis("k%d%d"%(period,ts))
                     if b:
-                        _K60[:,_N60] = p
-                        _D60[_N60] = (datetime.fromtimestamp(ts),ts)
-                        _N60+=1
+                        _K60[period][:,_N60[period]] = p
+                        _D60[period][_N60[period]] = (datetime.fromtimestamp(ts),ts)
+                        _N60[period]+=1
                 elif ts==lastts:
                     ba = True
         #将最新的帧数据刷新到_K60中去
-        b,p = shared.numpyFromRedis("k60%d"%seqs[-1])
+        b,p = shared.numpyFromRedis("k%d%d"%(period,seqs[-1]))
         if b:
-            _K60[:,_N60-1] = p
-    if _K60 is not None:
+            _K60[period][:,_N60[period]-1] = p
+    if _K60[period] is not None:
         bi = 0
-        return _K60[:,bi:_N60],_D60[bi:_N60]
+        return _K60[period][:,bi:_N60[period]],_D60[period][bi:_N60[period]]
     else:
         return None,None
 
-def clacK60time(t):
-    ts = []
-    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=10,minute=30))
-    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=11,minute=30))
-    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=14,minute=0))
-    ts.append(datetime(year=t.year,month=t.month,day=t.day,hour=15,minute=0))
-    for tt in ts:
-        if t<tt:
-            return tt
+#产生一个period时间序列
+def build_timestamp_sequence(d,period):
+    seqs = []
+    bi = datetime(year=d.year,month=d.month,day=d.day,hour=9,minute=30)
+    ei = datetime(year=d.year,month=d.month,day=d.day,hour=11,minute=30)
+    delta = timedelta(minutes=period)
+    t = bi+delta
+    while t<=ei:
+        seqs.append(t.timestamp())
+        t += delta
+    bi = datetime(year=d.year,month=d.month,day=d.day,hour=13,minute=0)
+    ei = datetime(year=d.year,month=d.month,day=d.day,hour=15,minute=0)
+    delta = timedelta(minutes=period)
+    t = bi+delta
+    while t<=ei:
+        seqs.append(t.timestamp())
+        t += delta
+    return seqs
+
+def next_period_timestamp(d,period):
+    bi = datetime(year=d.year,month=d.month,day=d.day,hour=9,minute=30)
+    ei = datetime(year=d.year,month=d.month,day=d.day,hour=15,minute=0)
+    delta = timedelta(minutes=period)
+    t = bi+delta
+    while t<=ei:
+        if t>=d:
+            return t.timestamp()
+        t += delta
     return None
+
+def period_ex(period):
+    if period==60:
+        return 3*30*24*3600 #3个月
+    elif period==30:
+        return 1.5*30*24*3600 #1.5个月
+    else:
+        return 30*24*3600 #1个月
 """
 向k60中增加数据
 """        
-def updateK60plane(t,plane):
-    tkey = clacK60time(t)
-    if tkey is None:
-        return
-    ts = tkey.timestamp()
-    b,_ = shared.numpyFromRedis("k60%d"%ts)
-    if not b:
-        b,seqs = shared.fromRedis('k60_sequence')
-        if b:
-            seqs.append(ts)
-            for i in range(0,len(seqs)-240,1):
-                shared.delKey("k60%d"%seqs[i])            
-            seqs = seqs[-240:] #保留240个数据点
-            shared.toRedis(seqs,'k60_sequence')            
-        else:
-            return
-    #p = np.empty(len(get_company_select())) #company_id,close
-    #p[:] = plane[:,3] #close
-    shared.numpyToRedis(plane[:,3],"k60%d"%ts,ex=3*30*24*3600) #3个月
+def update_period_plane(t,plane,periods):
+    for period in periods:
+        ts = next_period_timestamp(t,period)
+        if ts is None:
+            continue
+        b,_ = shared.numpyFromRedis("k%d%d"%(period,ts))
+        if not b:
+            b,seqs = shared.fromRedis('k%d_sequence'%period)
+            if b:
+                seqs.append(ts)
+                for i in range(0,len(seqs)-240,1):
+                    shared.delKey("k%d%d"%(period,seqs[i]))
+                seqs = seqs[-240:] #保留240个数据点
+                shared.toRedis(seqs,'k%d_sequence'%period)            
+            else:
+                continue
+        shared.numpyToRedis(plane[:,3],"k%d%d"%(period,ts),ex=period_ex(period)) #3个月
 
+#处理plane数据，使其不存在0,如果有0就用左边或者右边的数据替代
+def nozero_plane(plane):
+    N = plane.shape[1]
+    for i in range(N):
+        if i>0: #正向
+            plane[plane[:,i]==0,i] = plane[plane[:,i]==0,i-1]
+        j = N-1-i
+        if j<N-1: #反向
+            plane[plane[:,j]==0,j] = plane[plane[:,j]==0,j+1]
 """
 每天使用xueqiu数据覆盖实时收集到的数据
 """
-def update_today_k60():
-    b,seqs = shared.fromRedis('k60_sequence')
-    if not b:
-        rebuild_k60_sequence()
-        return
+def update_today_period(periods):
     dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
-
     companys = get_company_select()
-    def t60timestamp(t,h,m):
-        return datetime(year=t.year,month=t.month,day=t.day,hour=h,minute=m).timestamp()
-    t = dd[0][0]
-    for i in range(4): #删除今天的rt时间戳
-        tt = datetime.fromtimestamp(seqs[-1])
-        if tt.day==t.day and tt.month==t.month:
-            del seqs[-1]
-        else:
-            break
-    seqs.append(t60timestamp(t,10,30)) #重新加入时间戳
-    seqs.append(t60timestamp(t,11,30))
-    seqs.append(t60timestamp(t,14,0))
-    seqs.append(t60timestamp(t,15,0))
-    timestamp2i = {seqs[-4]:-4,seqs[-3]:-3,seqs[-2]:-2,seqs[-1]:-1}
-    id2i = {} 
-    for i in range(len(companys)):
-        id2i[companys[i][0]] = i
+    t = dd[0][0]    
     p = stock.query("select id,timestamp,close from k5_xueqiu where timestamp>'%02d-%02d-%02d'"%(t.year,t.month,t.day))
-    plane = np.zeros((len(companys),4))
-    for v in p:
-        cid = v[0]
-        ts = v[1].timestamp()
-        if ts in timestamp2i and cid in id2i:
-            plane[id2i[cid],timestamp2i[ts]] = v[2]
-    #检查如果close=0则使用临近的收盘价
-    for i in range(4):
-        if i<3: #正向
-            zp = plane[plane[:,i]==0,:]
-            if len(zp)>0:
-                zp[:,i]=zp[:,i+1]
-        j = 3-i
-        if j>0: #反向
-            zp = plane[plane[:,j]==0,:]
-            if len(zp)>0:
-                zp[:,j]=zp[:,j-1]
-    for i in range(4):
-        shared.numpyToRedis(plane[:,i],"k60%d"%seqs[-4+i],ex=3*30*24*3600)
-    shared.toRedis(seqs,'k60_sequence')
+    for period in periods:
+        b,seqs = shared.fromRedis('k%d_sequence'%period)
+        if not b:
+            rebuild_period_sequence(period)
+            return
+        for i in range(96): #删除今天的rt时间戳
+            tt = datetime.fromtimestamp(seqs[-1])
+            if tt.day==t.day and tt.month==t.month:
+                del seqs[-1]
+            else:
+                break
+        seqs_today = build_timestamp_sequence(t,period)
+        timestamp2i = {}
+        for i in range(len(seqs_today)):
+            timestamp2i[seqs_today[i]] = i
+            seqs.append(seqs_today[i])
+        id2i = {} 
+        for i in range(len(companys)):
+            id2i[companys[i][0]] = i
+
+        plane = np.zeros((len(companys),len(seqs)))
+        for v in p:
+            cid = v[0]
+            ts = v[1].timestamp()
+            if ts in timestamp2i and cid in id2i:
+                plane[id2i[cid],timestamp2i[ts]] = v[2]
+        nozero_plane(plane)
+        for i in range(len(seqs_today)):
+            shared.numpyToRedis(plane[:,i],"k%d%d"%(period,seqs_today[i]),ex=period_ex(period))
+        shared.toRedis(seqs,'k%d_sequence'%period)
+
+def clear_period_sequence(period):
+    b,seqs = shared.fromRedis('k%d_sequence'%period)
+    if b:
+        for ts in seqs:
+            shared.delKey("k%d%d"%(period,ts))
+        shared.delKey('k%d_sequence'%period)
 """
 删除以前的k60 sequence数据，然后从数据库重新加载
+period = 60,30,15
 """        
-def rebuild_k60_sequence():
+def rebuild_period_sequence(period):
     #删除以前的数据
     companys = get_company_select()
-    b,seqs = shared.fromRedis('k60_sequence')
+    b,seqs = shared.fromRedis('k%d_sequence'%period)
     if b:
-        bb,f = shared.numpyFromRedis("k60%d"%seqs[-1])
+        bb,f = shared.numpyFromRedis("k%d%d"%(period,seqs[-1]))
         if bb and len(f)==len(companys):
             return #已经有完整的加载数据了不需要重新加载
     if b:
         for ts in seqs:
-            shared.delKey("k60%d"%ts)
-    print("rebuild_k60_sequence...")
+            shared.delKey("k%d%d"%(period,ts))
+    print("rebuild_k%d_sequence..."%period)
     dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 60""")
     timestamp2i = {}
     seqs = []
-    def t60timestamp(t,h,m):
-        return datetime(year=t.year,month=t.month,day=t.day,hour=h,minute=m).timestamp()
     for i in range(-1,-len(dd)-1,-1):
         t = dd[i][0]
-        seqs.append(t60timestamp(t,10,30))
-        seqs.append(t60timestamp(t,11,30))
-        seqs.append(t60timestamp(t,14,0))
-        seqs.append(t60timestamp(t,15,0))
+        for v in build_timestamp_sequence(t,period):
+            seqs.append(v)
     seqs = seqs[-240:]
     for i in range(len(seqs)):
-        timestamp2i[seqs[i]]=i
+        timestamp2i[int(seqs[i])]=i
     plane = np.zeros((len(companys),240)) #close
+    bits = stock.dateString(datetime(year=dd[-1][0].year,month=dd[-1][0].month,day=dd[-1][0].day))
     for i in range(len(companys)):
         c = companys[i]
-        p = stock.query("""select timestamp,close from k5_xueqiu where id=%d and ((hour(timestamp)=10 and minute(timestamp)=30) or (hour(timestamp)=11 and minute(timestamp)=30) or (hour(timestamp)=14 and minute(timestamp)=0) or (hour(timestamp)=15 and minute(timestamp)=0)) order by timestamp desc limit 240"""%c[0])
-        pp = np.flip(np.array(p),0)
-        if seqs[-1]== pp[-1][0].timestamp() and seqs[0]==pp[0][0].timestamp():
-            plane[i,:] = pp[:,1]
-        elif seqs[-1]== pp[-1][0].timestamp():
-            for j in range(len(p)):
-                ts = pp[j,0].timestamp()
-                if ts in timestamp2i:
-                    plane[i,timestamp2i[ts]] = pp[j,1]
-            last = plane[i,-1]
-            for j in range(len(p)-1,-1,-1):
-                if plane[i,j] != 0:
-                    last = plane[i,j]
-                else:
-                    plane[i,j] = last
+        p = stock.query("""select timestamp,close from k5_xueqiu where id=%d and timestamp>'%s'"""%(c[0],bits))
+        for k in p:
+            ts = int(k[0].timestamp())
+            if ts in timestamp2i:
+                plane[i,timestamp2i[ts]] = k[1]
+    nozero_plane(plane)
     for i in range(240):
-        shared.numpyToRedis(plane[:,i],"k60%d"%seqs[i],ex=3*30*24*3600)
-    shared.toRedis(seqs,'k60_sequence')
-    print("rebuild_k60_sequence done")
+        shared.numpyToRedis(plane[:,i],"k%d%d"%(period,seqs[i]),ex=period_ex(period))
+    shared.toRedis(seqs,'k%d_sequence'%period)
+    print("rebuild_%d_sequence done"%period)
 
 """
 返回company_select中公司的全部分时数据
@@ -718,7 +738,8 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
             if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
                 rebuild_runtime_sequence(idds,seqs)
-        rebuild_k60_sequence()
+        rebuild_period_sequence(60)
+        rebuild_period_sequence(15)
     except Exception as e:
         log.error("updateAllRT updateRT:"+e)
     while t.hour>=6 and t.hour<15:
@@ -761,7 +782,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
             #更新k60
-            updateK60plane(t,plane)
+            update_period_plane(t,plane,[60,15])
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()

@@ -55,7 +55,7 @@ if __name__=='__main__':
                     log.warning("%s下载出现问题"%(config.download_js))
             print("开始更新数据库...")
             status.update_status(process)
-            xueqiu.update_today_k60()
+            xueqiu.update_today_period([60,15])
             print("更新完成。")
             download_done_day = t.day
             shared.toRedis(download_done_day,"last_download_day")
