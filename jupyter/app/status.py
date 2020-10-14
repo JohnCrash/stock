@@ -3171,11 +3171,11 @@ def showzdt(bi=None,ei=None):
 """
 指数分类界面
 """
-def K(code,pos=None):
+def K(code,period=None,pos=None):
     if pos is None:
-        kline.Plote(code,'d',config={'index':True},mode='runtime').show()
+        kline.Plote(code,period,config={'index':True},mode='runtime').show()
     else:
-        kline.Plote(code,'d',config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
+        kline.Plote(code,period,config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
 
 def indexpage(menus):
     buts = []

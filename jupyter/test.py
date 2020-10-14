@@ -33,9 +33,11 @@ import threading
 #    stock.execute("insert ignore into company_select (company_id,code,name) values (%s,'%s','%s')"%(v[0],v[1],v[2]))
 
 #xueqiu.update_today_period([60,15])
-def process(i):
-    pass
-status.update_status(process)
+b,p = shared.fromRedis('kline.period')
+print(b,p)
+#def process(i):
+#    pass
+#status.update_status(process)
 """
 xueqiu.clear_period_sequence(15)
 xueqiu.rebuild_period_sequence(15)

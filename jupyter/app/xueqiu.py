@@ -362,7 +362,7 @@ def get_period_k(period):
     C = len(companys)
     if b:
         if _D60[period] is None:
-            L = 252
+            L = 256
             _D60[period] = [None]*L
             _K60[period] = np.empty((len(companys),L)) #company_id,close
             _N60[period] = 0
