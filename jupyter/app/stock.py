@@ -723,6 +723,38 @@ def alignK(date,k1,d1):
                 break
     return k 
 
+def date2datetime(d):
+    ts = []
+    for v in d:
+        t = v[0]
+        ts.append((datetime(year=t.year,month=t.month,day=t.day),))
+    return ts
+"""
+将k,d映射到新的时序周期中
+例如：k,d是日线数据,newd是60分钟时序
+"""
+def periodExpand(k,d,newd):
+    off = 1
+    if type(d[0][0])==date:
+        d = date2datetime(d)
+    if len(k.shape)==1:
+        newk = np.zeros((len(newd)))
+    else:
+        newk = np.zeros((len(newd),k.shape[1]))  
+
+    for i in range(len(newd)):
+        t = newd[i][0]
+        b = False
+        for j in range(off,len(d)):
+            if d[j][0]>t:
+                newk[i] = k[j-1]
+                off = j
+                b = True
+                break
+        if not b and off==len(d)-1:
+            newk[i] = k[-1]
+            
+    return newk
 """
 最小二乘法拟合直线
 y = k*x+b

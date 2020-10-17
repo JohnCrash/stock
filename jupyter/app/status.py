@@ -1159,6 +1159,12 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         but.date = str(d[0])
         but.on_click(onCatsList)
         items.append(but)
+    periodDropdown = widgets.Dropdown(
+        options=["日线","60分钟","15分钟"],
+        value='日线',
+        description='周期',
+        layout=Layout(display='block',width='126px'),
+        disabled=False)
     methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
                     '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
@@ -1274,8 +1280,16 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     methodDropdown.observe(on_selectmethod,names='value')
     methodDropdown1.observe(on_selectmethod1,names='value')
     methodDropdown1.observe(on_selectmethod2,names='value')
+    def on_selectperiod(e):
+        sel = e['new']
+        if sel=='日线':
+            pass
+        else:
+            pass
+
+    periodDropdown.observe(on_selectperiod,names='value')
     box = Box(children=items, layout=box_layout)
-    toolbox = Box(children=[methodDropdown,methodDropdown1,methodDropdown2], layout=box_layout)
+    toolbox = Box(children=[periodDropdown,methodDropdown,methodDropdown1,methodDropdown2], layout=box_layout)
     display(toolbox,box,output)
 
     def updatek15():
