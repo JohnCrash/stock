@@ -1598,7 +1598,8 @@ class Plote:
                             width='100%')
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
-        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,favoritecheckbox]
+        link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
+        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox]
         list_output = widgets.Output()
         if self.code()[0] == 'b':
             items.append(listbutton)

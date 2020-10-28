@@ -181,8 +181,13 @@ def update_status_begin(beginday,isall,progress):
             count+=1
             progress(math.floor(60*count/len(idk))+40)
     else:
+        id2com = xueqiu.get_company_select_id2com()
         for key in idk:
             try:
+                #发现大于最大值，或者小于最小值更新company_select vmax
+                if key in id2com:
+                    if idk[key][-1][3]>id2com[key][4]:
+                        stock.execute("update company_select set vmax=%f where company_id=%s"%(idk[key][-1][3],key))
                 update_company_status_delta_data(idk[key],idd[key])
             except Exception as e:
                 print(e,key,'update_company_status_delta_data')
@@ -598,7 +603,7 @@ _companys_ = None
 def get_id2companys():
     global _id2companys_,_companys_
     if _id2companys_ is None:
-        _companys_ = stock.query("""select company_id,code,name,category,ttm,pb from company_select""")
+        _companys_ = stock.query("""select company_id,code,name,category,ttm,pb,vmax from company_select""")
         _id2companys_ = {}
         for c in _companys_:
             _id2companys_[c[0]] = c
@@ -607,7 +612,7 @@ def get_id2companys():
 """
 search回调macd能量线双崛起 
 a = [[0 id , 1 close , 2 volume , 3 volumema20 , 4 macd , 5 energy ,6 volumeJ ,7 bollup ,8 bollmid,9 bolldn,10 bollw,11 rsi],..]
-c = [0 company_id,1 code,2 name,3 category,4 ttm,5 pb]
+c = [0 company_id,1 code,2 name,3 category,4 ttm,5 pb,6 vmax]
 d = [[date],...]
 """
 def cb_macd_energy_buy(a,c,d=None):
@@ -741,6 +746,15 @@ def cb_macd_ls0(a,c,d=None):
     return a[-1,4]<0
 def cb_energy_gr10(a,c,d=None):
     return a[-1,5]>10
+#历史新高高位
+def cb_history_high(a,c,d=None):
+    return a[-1,1]>=c[6]
+def cb_history_high_5(a,c,d=None):
+    return a[-1,1]>=c[6]*0.95
+def cb_history_high_10(a,c,d=None):
+    return a[-1,1]>=c[6]*0.9
+def cb_history_high_20(a,c,d=None):
+    return a[-1,1]>=c[6]*0.8
 """
 搜索符合条件的股票
 method(k,c,d) 搜索方法
@@ -1168,7 +1182,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
                     '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
-                    '涨停板','二连板','三连板','跌停板',
+                    '涨停板','二连板','三连板','跌停板','历史新高','历史高位5%内','历史高位10%内','历史高位20%内',
                     '回归60均线','回归30均线','回归20均线','回归10均线','macd金叉','macd死叉','macd>0','macd<0','能量>10','科创板','创业板','主板']
     methodDropdown = widgets.Dropdown(
         options=methodlists+(['自定义'] if cb is not None else []),
@@ -1255,6 +1269,14 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
             cbs[i] = wrap(cb_zt3)
         elif sel=='跌停板':
             cbs[i] = wrap(cb_dzt)
+        elif sel=='历史新高':
+            cbs[i] = wrap(cb_history_high)
+        elif sel=='历史高位5%内':
+            cbs[i] = wrap(cb_history_high_5)
+        elif sel=='历史高位10%内':
+            cbs[i] = wrap(cb_history_high_10)
+        elif sel=='历史高位20%内':
+            cbs[i] = wrap(cb_history_high_20)
         elif sel=='科创板':
             cbs[i] = wrap(cb_kcb)
         elif sel=='创业板':
@@ -3289,7 +3311,8 @@ def Indexs():
             "SZ000625", #长安汽车
             "SZ300750"  #宁德时代
         ],
-        "关注":[favoriteList]
+        "关注":[favoriteList],
+        "历史高位":[monitor]
     }
     indexpage(menus)
 
@@ -3843,3 +3866,117 @@ def macd60plot():
             axs.legend()
             kline.output_show(output)
     xueqiu.setTimeout(0,update,'macd60plot')
+
+"""
+搜索股价的最低和最高值填充到company_select vmax和vmin中去
+"""
+def company_maxmin():
+    companys = xueqiu.get_company_select()
+    for com in companys:
+        print("处理'%s'"%com[2])
+        r = stock.query("select max(high),min(low) from kd_xueqiu where id=%s"%com[0])
+        if len(r)>0:
+            s = "update company_select set vmax=%f,vmin=%f where company_id=%s"%(r[0][0],r[0][1],com[0])
+            stock.execute(s)
+        else:
+            print("不能发现股票%s"%com)
+
+"""
+监视器，设置条件
+"""
+def monitor():
+    s = search(cb_history_high_10)
+    companys = xueqiu.get_company_select()
+    id2i = {}
+    for i in range(len(companys)):
+        id2i[companys[i][0]] = i
+    def ema(k,n):
+        m = np.empty(k.shape)
+        m[:,0] = k[:,0]
+        for i in range(1,k.shape[1]):
+            m[:,i] = (2*k[:,i]+(n-1)*m[:,i-1])/(n+1)
+        return m
+    def macd(k):
+        ema9 = ema(k,9)
+        ema12 = ema(k,12)
+        ema26 = ema(k,26)
+        DIF = ema12-ema26
+        MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+        DEA = DIF-0.5*MACD
+        return MACD,DIF,DEA     
+
+    periodDropdown = widgets.Dropdown(
+        options=['60分钟','30分钟','15分钟'],
+        value='60分钟',
+        description='周期',
+        layout=Layout(display='block',width='120px'),
+        disabled=False)
+    nDropdown = widgets.Dropdown(
+        options=['1','2-5','6-10','>10','-1','-2-5','-6-10','->10'],
+        value='1',
+        description='持续',
+        layout=Layout(display='block',width='120px'),
+        disabled=False)        
+    box = Box(children=[periodDropdown,nDropdown],layout=box_layout)
+    output = widgets.Output()
+    display(box,output)
+    period = 60
+    n = '1'
+    def search_period():
+        nonlocal period,n
+        k,d = xueqiu.get_period_k(period)
+        m,dif,dea = macd(k)
+        output.clear_output()
+        if n[0]=='-':
+            N = n[1:]
+        else:
+            N = n
+        if N=='1':
+            bi = 1
+            ei = 1
+        elif N=='2-5':
+            bi = 2
+            ei = 3
+        elif N=='6-10':
+            bi=6
+            ei=10
+        else:
+            bi=11
+            ei=1000
+        with output:
+            for k in s:
+                for c in s[k]:
+                    i = id2i[c[0]]
+                    x = 0
+                    if n[0]=='-':
+                        for k in range(1,1000):
+                            if m[i,-k]<0:
+                                x+=1
+                            else:
+                                break                        
+                    else:
+                        for k in range(1,1000):
+                            if m[i,-k]>0:
+                                x+=1
+                            else:
+                                break
+                    if x>=bi and x<=ei:
+                        kline.Plote(c[1],period,context="历史高位",mode="runtime").show()
+    def on_period(e):
+        name = e['new']
+        nonlocal period
+        if name=='60分钟':
+            period = 60
+        elif name=='30分钟':
+            period = 30
+        else:
+            period = 15
+        search_period()
+    periodDropdown.observe(on_period,names='value')
+    def on_n(e):
+        nonlocal n
+        n = e['new']
+        search_period()
+    nDropdown.observe(on_n,names='value')
+    search_period()
+
