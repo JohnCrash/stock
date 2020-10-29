@@ -170,7 +170,7 @@ def update_status_begin(beginday,isall,progress):
         if key not in idk:
             idk[key] = []
             idd[key] = []
-        #0 id,2 volume,3 close
+        #0 id,1 volume,2 close
         idk[key].append([rs[i][0],rs[i][2],rs[i][3]])
         idd[key].append(rs[i][1])
     progress(40)
@@ -186,8 +186,8 @@ def update_status_begin(beginday,isall,progress):
             try:
                 #发现大于最大值，或者小于最小值更新company_select vmax
                 if key in id2com:
-                    if idk[key][-1][3]>id2com[key][4]:
-                        stock.execute("update company_select set vmax=%f where company_id=%s"%(idk[key][-1][3],key))
+                    if idk[key][-1][2]>id2com[key][4]:
+                        stock.execute("update company_select set vmax=%f where company_id=%s"%(idk[key][-1][2],key))
                 update_company_status_delta_data(idk[key],idd[key])
             except Exception as e:
                 print(e,key,'update_company_status_delta_data')
@@ -515,7 +515,8 @@ def downloadXueqiuK15(tasks,progress,tatoal,ThreadCount=10):
             idd = c[0]
             A = np.vstack((k,[[idd,k1[4],k1[0],0,0,0,0,0,0,0,0,0]]))
             #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw
-            A[-1,4],_,_ = stock.macdV(A[:,1])[-1] #macd
+            macdv,_,_ = stock.macdV(A[:,1]) #macd
+            A[-1,4] = macdv[-1]
             A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
             A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
             boll = stock.boll(A[:,1])
@@ -579,7 +580,8 @@ def downloadRT(tasks,progress=None):
                 clos = p1[i,3]
                 A = np.vstack((k,[[it[1][0],clos,vol,0,0,0,0,0,0,0,0,0]]))
                 #0 id ,1 close,2 volume,3 volumema20,4 macd,5 energy,6 volumeJ,7 bollup,8 bollmid,9 bolldn,10 bollw,11 rsi
-                A[-1,4],_,_ = stock.macdV(A[:,1])[-1] #macd
+                macdv,_,_ = stock.macdV(A[:,1]) #macd
+                A[-1,4] = macdv[-1]
                 A[-1,5] = stock.kdj(stock.volumeEnergy(A[:,2]))[-1,2] #energy
                 A[-1,6] = stock.kdj(A[:,2])[-1,2] #volumeJ
                 boll = stock.boll(A[:,1])
@@ -2559,7 +2561,7 @@ def favoriteList():
             out.clear_output(wait=True)
             with out:
                 for i in f:
-                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='auto').show()
+                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='runtime').show()
                     
         but.on_click(on_click)
         items.append(but)
@@ -3311,8 +3313,7 @@ def Indexs():
             "SZ000625", #长安汽车
             "SZ300750"  #宁德时代
         ],
-        "关注":[favoriteList],
-        "历史高位":[monitor]
+        "关注":[favoriteList]
     }
     indexpage(menus)
 
@@ -3327,7 +3328,8 @@ def watch():
         "周期涨跌":[fc],
         "涨跌停":[showzdt],
         "涨跌幅":[sc],
-        "选股":[sg]
+        "选股":[sg],
+        "历史高位":[history_monitor]        
     }
     indexpage(menus)
 """
@@ -3882,9 +3884,9 @@ def company_maxmin():
             print("不能发现股票%s"%com)
 
 """
-监视器，设置条件
+历史高位监视器
 """
-def monitor():
+def history_monitor():
     s = search(cb_history_high_10)
     companys = xueqiu.get_company_select()
     id2i = {}
@@ -3904,7 +3906,12 @@ def monitor():
         MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
         DEA = DIF-0.5*MACD
         return MACD,DIF,DEA     
-
+    mainDropdown = widgets.Dropdown(
+        options=['5%','10%','20%'],
+        value='10%',
+        description='历史高位',
+        layout=Layout(display='block',width='160px'),
+        disabled=False)
     periodDropdown = widgets.Dropdown(
         options=['60分钟','30分钟','15分钟'],
         value='60分钟',
@@ -3916,14 +3923,16 @@ def monitor():
         value='1',
         description='持续',
         layout=Layout(display='block',width='120px'),
-        disabled=False)        
-    box = Box(children=[periodDropdown,nDropdown],layout=box_layout)
+        disabled=False)    
+    refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))    
+    newbutton = widgets.Button(description="新高",layout=Layout(width='48px'))    
+    box = Box(children=[mainDropdown,periodDropdown,nDropdown,newbutton,refreshbutton],layout=box_layout)
     output = widgets.Output()
     display(box,output)
     period = 60
     n = '1'
     def search_period():
-        nonlocal period,n
+        nonlocal period,n,s
         k,d = xueqiu.get_period_k(period)
         m,dif,dea = macd(k)
         output.clear_output()
@@ -3978,5 +3987,34 @@ def monitor():
         n = e['new']
         search_period()
     nDropdown.observe(on_n,names='value')
+    def on_main(e):
+        nonlocal s
+        n = e['new']
+        if n=='5%':
+            s = search(cb_history_high_5)
+        elif n=='10%':
+            s = search(cb_history_high_10)
+        elif n=='20%':
+            s = search(cb_history_high_20)
+        search_period()
+        
+    mainDropdown.observe(on_main,names='value')
+
+    def on_refresh(e):
+        search_period()
+
+    refreshbutton.on_click(on_refresh)
+
+    def on_new(e):
+        nonlocal s
+        s = search(cb_history_high)
+        search_period()
+    newbutton.on_click(on_new)
     search_period()
 
+
+"""
+一浪高过一浪监视器
+"""
+def wave_moniter():
+    pass

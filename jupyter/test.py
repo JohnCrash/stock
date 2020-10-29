@@ -37,9 +37,9 @@ import threading
 #print(b,p)
 def process(i):
     pass
-#status.update_status(process)
-xueqiu.clear_period_sequence(30)
-xueqiu.rebuild_period_sequence(30)
+status.update_status(process)
+#xueqiu.clear_period_sequence(30)
+#xueqiu.rebuild_period_sequence(30)
 #status.company_maxmin()
 """
 xueqiu.clear_period_sequence(15)
