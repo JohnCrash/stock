@@ -3329,7 +3329,8 @@ def watch():
         "涨跌停":[showzdt],
         "涨跌幅":[sc],
         "选股":[sg],
-        "历史高位":[history_monitor]        
+        "历史高位":[history_monitor],
+        "波段":[wave_moniter]
     }
     indexpage(menus)
 """
@@ -3883,6 +3884,24 @@ def company_maxmin():
         else:
             print("不能发现股票%s"%com)
 
+def get_biein(n):
+    if n[0]=='-':
+        N = n[1:]
+    else:
+        N = n
+    if N=='1':
+        bi = 1
+        ei = 1
+    elif N=='2-5':
+        bi = 2
+        ei = 3
+    elif N=='6-10':
+        bi=6
+        ei=10
+    else:
+        bi=11
+        ei=1000
+    return bi,ei 
 """
 历史高位监视器
 """
@@ -3891,21 +3910,7 @@ def history_monitor():
     companys = xueqiu.get_company_select()
     id2i = {}
     for i in range(len(companys)):
-        id2i[companys[i][0]] = i
-    def ema(k,n):
-        m = np.empty(k.shape)
-        m[:,0] = k[:,0]
-        for i in range(1,k.shape[1]):
-            m[:,i] = (2*k[:,i]+(n-1)*m[:,i-1])/(n+1)
-        return m
-    def macd(k):
-        ema9 = ema(k,9)
-        ema12 = ema(k,12)
-        ema26 = ema(k,26)
-        DIF = ema12-ema26
-        MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
-        DEA = DIF-0.5*MACD
-        return MACD,DIF,DEA     
+        id2i[companys[i][0]] = i   
     mainDropdown = widgets.Dropdown(
         options=['5%','10%','20%'],
         value='10%',
@@ -3934,24 +3939,9 @@ def history_monitor():
     def search_period():
         nonlocal period,n,s
         k,d = xueqiu.get_period_k(period)
-        m,dif,dea = macd(k)
+        m,dif,dea = stock.macdMatrix(k)
         output.clear_output()
-        if n[0]=='-':
-            N = n[1:]
-        else:
-            N = n
-        if N=='1':
-            bi = 1
-            ei = 1
-        elif N=='2-5':
-            bi = 2
-            ei = 3
-        elif N=='6-10':
-            bi=6
-            ei=10
-        else:
-            bi=11
-            ei=1000
+        bi,ei = get_biein(n)
         with output:
             for k in s:
                 for c in s[k]:
@@ -4017,4 +4007,119 @@ def history_monitor():
 一浪高过一浪监视器
 """
 def wave_moniter():
-    pass
+    period = 60
+    n = '1'
+    output = widgets.Output()
+    output2= widgets.Output()
+    periodDropdown = widgets.Dropdown(
+        options=['60分钟','30分钟','15分钟'],
+        value='60分钟',
+        description='周期',
+        layout=Layout(display='block',width='120px'),
+        disabled=False)
+    nDropdown = widgets.Dropdown(
+        options=['1','2-5','6-10','>10','-1','-2-5','-6-10','->10'],
+        value='1',
+        description='持续',
+        layout=Layout(display='block',width='120px'),
+        disabled=False)     
+    refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
+    box = Box(children=[periodDropdown,nDropdown,refreshbutton],layout=box_layout)
+    display(box,output,output2)
+    companys = xueqiu.get_company_select()
+    id2i = {}
+    for i in range(len(companys)):
+        id2i[companys[i][0]] = i
+    def search_stronger_wave(m,k):
+        k0 = 99999999
+        i0 = 0
+        k1 = k0
+        i1 = 0
+        n = 0
+        for i in range(len(m)-1,-1,-1):
+            if n==0:
+                if m[i]<0:
+                    if k0>k[i]:
+                        k0 = k[i]
+                        i0 = i
+                else:
+                    n+=1
+            elif n==1:
+                if m[i]<0:
+                    n+=1
+            elif n==2:
+                if m[i]<0:
+                    if k1>k[i]:
+                        k1 = k[i]
+                        i1 = i
+                else:
+                    break
+        return k[i0]>k[i1]
+    def on_period(e):
+        name = e['new']
+        nonlocal period
+        if name=='60分钟':
+            period = 60
+        elif name=='30分钟':
+            period = 30
+        else:
+            period = 15
+        search_wave()
+    periodDropdown.observe(on_period,names='value')     
+    def on_n(e):
+        nonlocal n
+        n = e['new']
+        search_wave()  
+    nDropdown.observe(on_n,names='value')      
+    def on_list(e):
+        nonlocal period
+        output2.clear_output()
+        with output2:
+            for c in e.list:
+                kline.Plote(c[1],period,context="历史高位",mode="runtime").show()
+    def search_wave():
+        nonlocal period,n
+        bi,ei = get_biein(n)
+        k,d = xueqiu.get_period_k(period)
+        macd,_,_ = stock.macdMatrix(k)
+        cats = {}
+        output.clear_output()
+        output2.clear_output()
+        with output:
+            for i in range(len(companys)):
+                x = 0
+                if n[0]=='-':
+                    for j in range(1,1000):
+                        if macd[i,-j]<0:
+                            x+=1
+                        else:
+                            break                      
+                else:
+                    for j in range(1,1000):
+                        if macd[i,-j]>0:
+                            x+=1
+                        else:
+                            break
+                if x>=bi and x<=ei and search_stronger_wave(macd[i,:-x],k[i,:-x]):
+                    if companys[i][3] not in cats:
+                        cats[companys[i][3]] = []
+                    cats[companys[i][3]].append(companys[i])
+            children = []
+            sortedCats = sorted(cats,key=lambda it:len(cats[it]),reverse=True)
+            for cn in sortedCats:
+                but = widgets.Button(
+                description="%s(%d)"%(cn,len(cats[cn])),
+                disabled=False,
+                button_style='',
+                layout=Layout(width='120px')
+                )
+                but.list = cats[cn]
+                but.on_click(on_list)
+                children.append(but)
+            box = Box(children=children,layout=box_layout)
+            display(box)
+                    
+    def on_refresh(e):
+        search_wave()
+    refreshbutton.on_click(on_refresh)                    
+    search_wave()

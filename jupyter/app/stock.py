@@ -295,6 +295,21 @@ def macdV(k):
     MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
     DEA = DIF-.5*MACD    
     return MACD,DIF,DEA
+"""对矩阵进行批量计算"""    
+def emaMatrix(k,n):
+    m = np.empty(k.shape)
+    m[:,0] = k[:,0]
+    for i in range(1,k.shape[1]):
+        m[:,i] = (2*k[:,i]+(n-1)*m[:,i-1])/(n+1)
+    return m
+def macdMatrix(k):
+    ema9 = emaMatrix(k,9)
+    ema12 = emaMatrix(k,12)
+    ema26 = emaMatrix(k,26)
+    DIF = ema12-ema26
+    MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
+    DEA = DIF-0.5*MACD
+    return MACD,DIF,DEA    
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
     if i-1<0:
