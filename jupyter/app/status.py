@@ -4076,7 +4076,7 @@ def wave_moniter():
         output2.clear_output()
         with output2:
             for c in e.list:
-                kline.Plote(c[1],period,context="历史高位",mode="runtime").show()
+                kline.Plote(c[1],period,context="波段",mode="runtime").show()
     def search_wave():
         nonlocal period,n
         bi,ei = get_biein(n)
