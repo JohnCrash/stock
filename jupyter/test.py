@@ -16,9 +16,10 @@ from IPython.core.interactiveshell import InteractiveShell
 from app import kline
 import math
 from app import config
+from app import backtest
 import subprocess
 import threading
-
+import copy
 #shared.delKey('k5_sz159995')
 #shared.delKey('kline.main')
 #a = stock.totalVolume()
@@ -35,9 +36,54 @@ import threading
 #xueqiu.update_today_period([60,15])
 #b,p = shared.fromRedis('kline.period')
 #print(b,p)
-def process(i):
-    pass
-status.update_status(process)
+def progress(i):
+    print(i)
+#k,v,d = backtest.loadk_matrix(progress=process)
+#m = backtest.loadmax()
+#k,v,d = backtest.loadk_matrix(progress=progress)
+"""
+bi = '2019-11-19'
+qk = stock.query("select timestamp,volume close from k5_xueqiu where id=8828 and timestamp>'%s'"%bi)
+d5 = []
+for v in qk:
+    d5.append((v[0],))
+"""    
+#backtest.checkPeriod5(d)
+#result = backtest.backtest({"periods":[5,60],"macd":True},backtest.macdGoldBuy,backtest.macdDeathSell,{"period":60})
+r60,context = backtest.backtest({"periods":[5,60],"macd":True,"ma":[10,20]},backtest.maBuy,backtest.maSell,{"period":60})
+
+#修复2020-10-30日上午9:35到9:50的没有5分钟数据的bug
+"""
+company = xueqiu.get_company_select()
+for i in range(len(company)):
+    k = stock.query("select * from k5_xueqiu where id=%d and timestamp>'2020-10-30' and timestamp<'2020-10-31'"%company[i][0])
+    if len(k)==48 and k[0][1].hour==9 and k[0][1].minute==35 and k[-1][1].hour==15:
+        #print(company[i],'pass')
+        continue
+    else:
+        if len(k)>0 and k[-1][1].hour==15:
+            bi = datetime(year=2020,month=10,day=30,hour=9,minute=35)
+            ei = datetime(year=2020,month=10,day=30,hour=11,minute=30)
+            bix = datetime(year=2020,month=10,day=30,hour=13,minute=5)
+            eix = datetime(year=2020,month=10,day=30,hour=15,minute=0)
+            for j in range(len(k)-2,-1,-1):
+                if (k[j+1][1]-k[j][1]).seconds==5*60 or (k[j+1][1].hour==13 and k[j+1][1].minute==5 and k[j][1].hour==11 and k[j][1].minute==30):
+                    pass
+                else:
+                    dt = (k[j+1][1]-k[j][1]).seconds/(5*60)
+                    #print("begin",k[j+1][1])
+                    for x in range(int(dt)-1):
+                        t = k[j+1][1]-timedelta(minutes=5*(x+1))
+                        if (t>=bi and t<=ei) or (t>=bix and t<=eix):
+                            K = k[j+1]
+                            S = "insert ignore into k5_xueqiu values (%d,'%s',%f,%f,%f,%f,%f,%f)"%(K[0],t,K[2],K[3],K[3],K[3],K[3],K[7])
+                            #stock.execute(S)
+                            print(S)
+                    #print("end",k[j][1])
+        else:
+            print(company[i],len(k),'not fixed')
+"""
+#status.update_status(process)
 #xueqiu.clear_period_sequence(30)
 #xueqiu.rebuild_period_sequence(30)
 #status.company_maxmin()

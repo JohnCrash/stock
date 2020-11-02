@@ -908,7 +908,7 @@ class Plote:
                     axv5 = None
                     axb5 = None
                     flow = self.getCurrentFlow()
-                    if flow is not None:
+                    if flow is not None and len(flow)>0 and len(flow[0])>0:
                         d = np.zeros((len(flow[0]),5))
                         i = 0
                         dd = []
@@ -1354,7 +1354,7 @@ class Plote:
 
     #code2另一只股票，进行比较显示
     #pos = '2019-1-1' 直接跳转到该日期
-    def show(self,bi=None,ei=None,code2=None,figsize=(30,14),pos=None):
+    def show(self,bi=None,ei=None,code2=None,figsize=(34,14),pos=None):
         if self._gotoTrendHeandPos:
             if len(self._k)-self._trendHeadPos>math.floor(self._showcount/2):
                 bi = self._trendHeadPos-math.floor(self._showcount/2)
@@ -1822,6 +1822,7 @@ class Plote:
 
         mainDropdown.observe(on_main,names='value')           
         def on_period(e):
+            nonlocal needRecalcRange,skipUpdate,beginPT,endPT,showRange
             name2peroid = {
                 '日线':['d',False,False],
                 '周线':['w',False,False],
@@ -1834,6 +1835,7 @@ class Plote:
             }
             period = e['new']
             
+            pbi = self._date[beginPT][0]
             sel = name2peroid[period]
             self._period = sel[0]
             shared.toRedis(self._period,'kline.period')
@@ -1847,7 +1849,6 @@ class Plote:
             self.reload()
             #日线和周线切换为MACD+,其他切换为MACD
             #日线和周线切换到BULL+,其他期货到TREND
-            nonlocal needRecalcRange,skipUpdate,showRange
             b,sr = shared.fromRedis('kline.zoom%s'%self._period)
             if b:
                 showRange = sr
@@ -1881,7 +1882,21 @@ class Plote:
                     needRecalcRange = True
                     mainDropdown.value="BOLL+"                
             skipUpdate = False
-            recalcRange()
+            #recalcRange()
+            #在切换时序时保持查看日期的位置尽量不变
+            beginPT = 0
+            for i in range(len(self._date)):
+                if type(pbi) == type(self._date[i][0]):
+                    if pbi >= self._date[i][0]:
+                        beginPT = i
+                        break
+                else:
+                    if date(pbi.year,pbi.month,pbi.day) <= date(self._date[i][0].year,self._date[i][0].month,self._date[i][0].day):
+                        beginPT = i
+                        break
+            endPT = beginPT+showRange
+            if endPT>=len(self._k):
+                recalcRange()
             showline()
 
         periodDropdown.observe(on_period,names='value')

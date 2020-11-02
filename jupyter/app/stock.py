@@ -310,6 +310,20 @@ def macdMatrix(k):
     MACD = 224.*ema9/51.-16.*ema12/3.+16.*ema26/17.
     DEA = DIF-0.5*MACD
     return MACD,DIF,DEA    
+def maMatrix(k,n):
+    m = np.empty(k.shape)
+    if len(k)<=n:
+        for i in range(k.shape[1]):
+            m[:,i] = k[:,0:i+1].sum(axis=1)/(i+1)
+    else:
+        for i in range(n):
+            m[:,i] = k[:,0:i+1].sum(axis=1)/(i+1)
+        dk = (k[:,n:]-k[:,:-n])/n
+        for i in range(dk.shape[1]):
+            m[:,i+n] = m[:,i+n-1]+dk[:,i]
+    return m
+def bollMatrix(k):
+    pass
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
     if i-1<0:
