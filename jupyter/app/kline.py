@@ -314,7 +314,7 @@ class Plote:
         else:
             if self._period==5 or self._period==15:
                 volume,mad = stock.correctionVolume(self._k,self._date,self._period)
-                if self._correcttionVolume:
+                if False and self._correcttionVolume:
                     self._k = np.array(self._k,copy=True)
                     self._k[:,0] = volume
                 else:
@@ -401,7 +401,7 @@ class Plote:
             elif period == 'd':
                 after = stock.dateString(date.today()-timedelta(days=5*365 if self._lastday is None else self._lastday)) #5年数据
             else:
-                after = stock.dateString(date.today()-timedelta(days=120 if self._lastday is None else self._lastday))
+                after = stock.dateString(date.today()-timedelta(days=240 if self._lastday is None else self._lastday))
             
             if period==5 or period=='d':
                 c,k,d = stock.loadKline(code,period,after=after)
@@ -1130,6 +1130,10 @@ class Plote:
                     axsK.plot(xx,alv,label="MA"+str(m))
             if len(self._config['ma'])>1:
                 axsK.legend()
+        ma1520 = None
+        ma3020 = None
+        ma6020 = None
+        xx = None
         """绘制BOLL线"""
         if self._showboll:
             axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
@@ -1223,7 +1227,7 @@ class Plote:
                 if self._mad is not None: #绘制5分钟或者15分钟的碗型
                     axs[self._volInx].step(x,self._mad[bi:ei],where='mid',label='mad',color='orangered') #low
                 else:
-                    axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.)
+                    #axs[self._volInx].plot(x,self._k[bi:ei,0],label="volume",alpha=0.6)
                     if type(self._period) == str:
                         axs[self._volInx].plot(x,self._volumema20[bi:ei],label='vma20',color='red') #low
                         axs[self._volInx].plot(x,self._volumema5[bi:ei],label='vma5',color='green') #low
@@ -1253,36 +1257,41 @@ class Plote:
         #绘制macd
         if self._showmacd:
             #axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
-            mp = np.copy(self._macd[bi:ei])
-            mp[mp<0] = 0
-            mn = np.copy(self._macd[bi:ei])
-            mn[mn>0] = 0
-            axs[self._macdInx].bar(x,mp,color='red')
-            axs[self._macdInx].bar(x,mn,color='green')
-            axs[self._macdInx].plot(x,self._dif[bi:ei],label="DIF",color='orange',linewidth=2)
-            axs[self._macdInx].plot(x,self._dea[bi:ei],label="DEA",color='cornflowerblue',linewidth=2)
-            axs[self._macdInx].axhline(color='black')
-            if self._szclose is not None: #绘制大盘macd
-                kmax = self._macd[bi:ei].max()
-                kmin = self._macd[bi:ei].min()                  
-                szkmax = self._szmacd[bi:ei].max()
-                szkmin = self._szmacd[bi:ei].min()
-                axs[self._macdInx].plot(x,self._szmacd[bi:ei]*(kmax-kmin)/(szkmax-szkmin),color='black',linestyle='--')
-            #macd背离点
-            if self._showeps:
-                eps = stock.macdDeviate(self._k[bi:ei,4],self._macd[bi:ei])
-                for i in eps:
-                    x = bi+i[1]
-                    axs[self._macdInx].annotate('%.1f'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-40, 50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
-                    x1 = bi+i[2]
-                    axs[self._macdInx].annotate('%.1f'%(self._macd[x1]),xy=(x1,self._macd[x1]),xytext=(-40, 50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
-                eps = stock.extremePoint(self._macd[bi:ei])
-                for i in eps:
-                    x = bi+i[0]
-                    axs[self._macdInx].annotate('%.1f'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-30, 30 if i[1]>0 else -30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
+            if self._period==5 and ma6020 is not None:#小级别的直接绘制乖离率
+                axs[self._macdInx].plot(xx,ma1520-ma6020,linewidth=4)
+                axs[self._macdInx].plot(xx,self._boll[bi:ei,1]-ma6020) #mid
+                axs[self._macdInx].axhline(color='black',linestyle='--')
+            else:
+                mp = np.copy(self._macd[bi:ei])
+                mp[mp<0] = 0
+                mn = np.copy(self._macd[bi:ei])
+                mn[mn>0] = 0
+                axs[self._macdInx].bar(x,mp,color='red')
+                axs[self._macdInx].bar(x,mn,color='green')
+                axs[self._macdInx].plot(x,self._dif[bi:ei],label="DIF",color='orange',linewidth=2)
+                axs[self._macdInx].plot(x,self._dea[bi:ei],label="DEA",color='cornflowerblue',linewidth=2)
+                axs[self._macdInx].axhline(color='black')
+                if self._szclose is not None: #绘制大盘macd
+                    kmax = self._macd[bi:ei].max()
+                    kmin = self._macd[bi:ei].min()                  
+                    szkmax = self._szmacd[bi:ei].max()
+                    szkmin = self._szmacd[bi:ei].min()
+                    axs[self._macdInx].plot(x,self._szmacd[bi:ei]*(kmax-kmin)/(szkmax-szkmin),color='black',linestyle='--')
+                #macd背离点
+                if self._showeps:
+                    eps = stock.macdDeviate(self._k[bi:ei,4],self._macd[bi:ei])
+                    for i in eps:
+                        x = bi+i[1]
+                        axs[self._macdInx].annotate('%.1f'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-40, 50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                                connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
+                        x1 = bi+i[2]
+                        axs[self._macdInx].annotate('%.1f'%(self._macd[x1]),xy=(x1,self._macd[x1]),xytext=(-40, 50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                                connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='red' if i[0]>0 else 'green')
+                    eps = stock.extremePoint(self._macd[bi:ei])
+                    for i in eps:
+                        x = bi+i[0]
+                        axs[self._macdInx].annotate('%.1f'%(self._macd[x]),xy=(x,self._macd[x]),xytext=(-30, 30 if i[1]>0 else -30), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                                connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
 
         #搜索低级别的macd背离
         if self._showeps and self._period=='d':
