@@ -235,6 +235,7 @@ class Plote:
         self._showflow = False
         self._currentflow = None
         self._gotoTrendHeandPos = False
+        self._show5bigma20 = False
         self._showeps = False #显示macd背离
         self._widths = [1]
         self._heights = [3]        
@@ -258,6 +259,8 @@ class Plote:
         if 'boll' in self._config:
             self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
+            if 'bigma20' in self._config:
+                self._show5bigma20 = True
         if 'trend' in self._config and self._config['trend']:
             self._macd,self._dif,self._dea = stock.macd(self._k)
             self._trend,last_line,b = trend.macdTrend(self._k,self._macd)
@@ -580,6 +583,7 @@ class Plote:
         self._prefix = prefix
         self._context = context
         self._correcttionVolume = False
+        self._big5mode = False
         self._configarg = config
         self._comarg = company
         self._datearg = date
@@ -591,6 +595,7 @@ class Plote:
         self._mode = mode
         self._day_trend = None
         self._lastday = lastday
+        
         if period is None:
             b,p = shared.fromRedis('kline.period')
             if b:
@@ -617,8 +622,8 @@ class Plote:
 
             if main_sel=='BOLL+':
                 self._config["boll"] = 20
+                self._config['bigma20'] = True
                 #self._config['trend'] = True
-                self._config["ma"] = [5,10]
             elif main_sel=='MA':
                 self._config["ma"] = [5,10,20,30,60]
             elif main_sel=='BOLL':
@@ -686,6 +691,8 @@ class Plote:
             self._config['flow'] = True
         elif k=='eps':
             self._config['eps'] = True
+        elif k=='bigma20':
+            self._config['bigma20'] = True
 
     def disable(self,k):
         if k in self._config:
@@ -741,7 +748,7 @@ class Plote:
         return np.array([]).reshape(-1,5),[]
 
     #显示K线图
-    def showKline(self,bi=None,ei=None,figsize=(30,16)):  
+    def showKline(self,bi=None,ei=None,figsize=(32,16)):  
         if self._axsInx==0:
             return
         if bi is None:
@@ -882,7 +889,7 @@ class Plote:
                         axsK.plot([x0,x1],[k*x0+b,k*x1+b],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
 
         while True:
-            if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()): #下面的代码在右侧开辟一个区域绘制5分钟时k图
+            if not (self._period==5 and self._big5mode) and self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()): #下面的代码在右侧开辟一个区域绘制5分钟时k图
                 gs_kw = dict(width_ratios=[2,1], height_ratios=self._heights)
                 fig, ax = plt.subplots(self._axsInx+1,2,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
                 axs = ax[:,0]
@@ -1133,6 +1140,13 @@ class Plote:
             axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
             axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
             axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
+            if self._show5bigma20 and self._period==5:
+                xx,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20日均线
+                xx,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20日均线
+                xx,ma6020 = stock.maRangeK(self._k,20*12,bi,ei) #60分钟的20日均线
+                axsK.plot(xx,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
+                axsK.plot(xx,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
+                axsK.plot(xx,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
         if self._showflow:
             if self._period=='d' or self._period=='w':
                 axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
@@ -1354,7 +1368,7 @@ class Plote:
 
     #code2另一只股票，进行比较显示
     #pos = '2019-1-1' 直接跳转到该日期
-    def show(self,bi=None,ei=None,code2=None,figsize=(34,14),pos=None):
+    def show(self,bi=None,ei=None,code2=None,figsize=(32,14),pos=None):
         if self._gotoTrendHeandPos:
             if len(self._k)-self._trendHeadPos>math.floor(self._showcount/2):
                 bi = self._trendHeadPos-math.floor(self._showcount/2)
@@ -1518,13 +1532,15 @@ class Plote:
         def config_main(sel):
             if sel=='BOLL+':
                 self.enable('boll')
+                self.enable('bigma20')
                 self.disable('trend')
                 self.enable('ma')
-                self._config['ma'] = [5,10]
+                self.disable('ma')
                 self.disable('eps')
             elif sel=='MA':
                 self.enable('ma')
                 self.disable('boll')
+                self.disable('bigma20')
                 self.disable('trend')
                 if self._period=='d':
                     self._config['ma'] = [5,10,60]
@@ -1533,16 +1549,19 @@ class Plote:
                 self.disable('eps')
             elif sel=='BOLL':
                 self.enable('boll')
+                self.enable('bigma20')
                 self.disable('trend')
                 self.disable('ma')
                 self.disable('eps')
             elif sel=='TREND':
                 self.enable('trend')
+                self.disable('bigma20')
                 self.disable('boll')
                 self.disable('ma')
                 self.disable('eps')
             elif sel=='CLEAR':
                 self.disable('boll')
+                self.disable('bigma20')
                 self.disable('trend')
                 self.disable('ma')
                 self.enable('eps')
@@ -1570,7 +1589,7 @@ class Plote:
             layout=Layout(width='96px')
         )           
         periodDropdown = widgets.Dropdown(
-            options=['日线', '周线', '120分钟','60分钟','30分钟','15分钟','5分钟','5分钟校'],
+            options=['日线', '周线', '120分钟','60分钟','30分钟','15分钟','5分钟','5分钟大'],
             value=periodDropdownvalue,
             description='',
             disabled=False,
@@ -1831,15 +1850,15 @@ class Plote:
                 '30分钟':[30,False,True],
                 '15分钟':[15,False,True],
                 '5分钟':[5,False,True],
-                '5分钟校':[5,True,True]
+                '5分钟大':[5,True,True]
             }
             period = e['new']
             
-            pbi = self._date[beginPT][0]
+            pbi = self._date[endPT-1][0]
             sel = name2peroid[period]
             self._period = sel[0]
             shared.toRedis(self._period,'kline.period')
-            self._correcttionVolume = sel[1]
+            self._big5mode = sel[1]
             if e['old']:
                 old = name2peroid[e['old']]
                 if sel[2] != old[2] and self._timer is not None:
@@ -1887,7 +1906,7 @@ class Plote:
             beginPT = 0
             for i in range(len(self._date)):
                 if type(pbi) == type(self._date[i][0]):
-                    if pbi >= self._date[i][0]:
+                    if pbi <= self._date[i][0]:
                         beginPT = i
                         break
                 else:
