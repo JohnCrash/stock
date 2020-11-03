@@ -273,6 +273,38 @@ def macdDeathSell(context):
         result.append(r)
     return result
 
+"""
+对macd的买入优化
+"""
+def macdGoldBuy2(context):
+    period = context['args']
+    m = context['macd%d'%period]
+    d = context['d%d'%period]
+    result = []
+    for i in range(m.shape[0]):
+        r = []
+        for j in range(1,m.shape[1]):
+            if m[i,j-1]<0 and m[i,j]>0:
+                r.append(d[j])
+        result.append(r)
+    return result
+
+"""
+对macd的卖出优化
+"""
+def macdDeathSell2(context):
+    period = context['args']
+    m = context['macd%d'%period]
+    d = context['d%d'%period]
+    result = []
+    for i in range(m.shape[0]):
+        r = []
+        for j in range(1,m.shape[1]):
+            if m[i,j-1]>0 and m[i,j]<0:
+                r.append(d[j])
+        result.append(r)
+    return result
+
 def maBuy(context):
     period = context['args']
     ma = context['ma%d'%period]
@@ -298,6 +330,46 @@ def maSell(context):
                 r.append(d[j])
         result.append(r)
     return result
+
+"""
+选一个macd时序
+根据前两个的macd的最低点不创出新低，最近的macd<0在以前的低点附近出现连续的k线向上或者macd>0
+本次
+"""
+def qsBuy(context):
+    return result
+"""
+突破boll顶部后连续两根实体在顶部之下,macd<0减仓
+"""
+def qsBuy(context):
+    pass
+
+"""
+顺大势逆小势
+"""
+def snBuy(context):
+    return result
+"""
+顺大势逆小势
+"""
+def snBuy(context):
+    pass
+
+"""
+zs2buy
+*1.5分钟的ma240的斜率水平时,在60分钟布林底线附近买入
+3.5分钟的ma240的斜率向上时,在ma240和ma60乖离率最低点买入，买入点不破ma240下方
+"""
+def zs2Buy(context):
+    pass
+"""
+zs2Sell
+*1.5分钟的ma240的斜率水平时，在60分钟布林通道顶附近卖出
+2.5分钟的ma240的斜率向上时，在ma240和ma60乖离率最大点卖出
+3.5分钟的ma240的斜率向下时，在ma240和ma60乖离率最低卖出
+"""
+def zs2Buy(context):
+    pass
 
 def backtest(rd,buy,sell):
     context = init_context(rd)

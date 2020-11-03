@@ -322,8 +322,17 @@ def maMatrix(k,n):
         for i in range(dk.shape[1]):
             m[:,i+n] = m[:,i+n-1]+dk[:,i]
     return m
-def bollMatrix(k):
-    pass
+def bollMatrix(k,n=20):
+    MB = maMatrix(k)
+    """计算标准差"""
+    MD = np.empty(k.shape)
+    for i in range(k.shape[1]):
+        MA = MB[:,i]
+        if i-n+1>=0:
+            MD[:,i] = np.sqrt(((k[:,i-n+1:i+1]-MA)**2).sum(axis=1)/n)
+        else:
+            MD[:,i] = np.sqrt(((k[:,0:i+1]-MA)**2).sum(axis=1)/(i+1))
+    return MB,MB-2*MD,MB+2*MD
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
     if i-1<0:
@@ -531,10 +540,10 @@ def maRangeK(k,n,bi,ei):
 """
 计算m的切线斜率
 """
-def SlopeRates(m):
+def slopeRates(m):
     r = np.empty(len(m))
     r[0] = 0
-    r[1:len(m)] = m[1:len(m)]-m[0:len(m)-1]
+    r[1:len(m)] = (m[1:len(m)]-m[0:len(m)-1])/m[0:len(m)-1]
     return r
 
 """

@@ -246,16 +246,20 @@ class Plote:
             self._showma = True
         if 'eps' in self._config:
             self._showeps = True
-        if 'figure' in self._config:
+        while 'figure' in self._config:
             self._figureInx = []
             if type(self._config['figure'])==list:
                 figures = self._config['figure']
             elif callable(self._config['figure']):
                 figures = self._config['figure'](self)
-            for f in figures:
-                self._figureInx.append(self._axsInx+1)
-                self._axsInx += 1
-            self._showfigure = True
+            else:
+                break
+            if figures is not None:
+                for f in figures:
+                    self._figureInx.append(self._axsInx+1)
+                    self._axsInx += 1
+                self._showfigure = True
+            break
         if 'boll' in self._config:
             self._boll = stock.bollLineK(self._k,self._config['boll'])
             self._showboll = True
@@ -481,19 +485,10 @@ class Plote:
 
     def init(self,company,period,config,date_ = None,companyInfo=None):
         self._period = period
+        b,self._showcount = shared.fromRedis('kline.zoom%s'%self._period)
         if self._period=='d' or self._period=='w':
             if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
                 self._showcount = 80
-            else:
-                self._showcount = 120
-        elif int(self._period)==5: #48
-            self._showcount = 144
-        elif int(self._period)==15: #16
-            self._showcount = 112
-        elif int(self._period)==60: #4
-            self._showcount = 120
-        else:
-            self._showcount = 120
 
         if type(company)==np.ndarray:
             self._k = company
@@ -1317,29 +1312,33 @@ class Plote:
             axs[self._rsiInx].axhline(20,color='black',linestyle='--')
             axs[self._rsiInx].axhline(80,color='black',linestyle='--')
         #绘制额外的图表
-        if self._showfigure:
+        while self._showfigure:
             i = 0
             if type(self._config['figure'])==list:
                 figures = self._config['figure']
             elif callable(self._config['figure']):
                 figures = self._config['figure'](self)
-            for f in figures:
-                axsinx = self._figureInx[i]
-                for p in f:
-                    if 'data' in p:
-                        axs[axsinx].plot(x,p['data'][bi:ei],
-                        label=p['name'] if 'name' in p else '',
-                        color=p['color'] if 'color' in p else 'blue',
-                        linewidth=p['linewidth'] if 'linewidth' in p else 1,
-                        linestyle=p['linestyle'] if 'linestyle' in p else '-'
-                        )
-                        if 'hline' in p:
-                            axs[axsinx].axhline(p['hline']['y'] if 'y' in p['hline'] else 0,
-                            color= p['hline']['color'] if 'color' in p['hline'] else 'black',
-                            linewidth=p['hline']['linewidth'] if 'linewidth' in p['hline'] else 1,
-                            linestyle=p['hline']['linestyle'] if 'linestyle' in p['hline'] else '-'
+            else:
+                break
+            if figures is not None:
+                for f in figures:
+                    axsinx = self._figureInx[i]
+                    for p in f:
+                        if 'data' in p:
+                            axs[axsinx].plot(x,p['data'][bi:ei],
+                            label=p['name'] if 'name' in p else '',
+                            color=p['color'] if 'color' in p else 'blue',
+                            linewidth=p['linewidth'] if 'linewidth' in p else 1,
+                            linestyle=p['linestyle'] if 'linestyle' in p else '-'
                             )
-                i+=1
+                            if 'hline' in p:
+                                axs[axsinx].axhline(p['hline']['y'] if 'y' in p['hline'] else 0,
+                                color= p['hline']['color'] if 'color' in p['hline'] else 'black',
+                                linewidth=p['hline']['linewidth'] if 'linewidth' in p['hline'] else 1,
+                                linestyle=p['hline']['linestyle'] if 'linestyle' in p['hline'] else '-'
+                                )
+                    i+=1
+            break
         #一个从外部进行调整图表的手段
         if 'cb' in self._config:
             self._config['cb'](self,axs,bi,ei)
