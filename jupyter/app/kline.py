@@ -1258,8 +1258,8 @@ class Plote:
         if self._showmacd:
             #axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
             if self._period==5 and ma6020 is not None:#小级别的直接绘制乖离率
-                axs[self._macdInx].plot(xx,ma1520-ma6020,linewidth=4)
-                axs[self._macdInx].plot(xx,self._boll[bi:ei,1]-ma6020) #mid
+                axs[self._macdInx].plot(xx,(ma1520-ma6020)/self._k[bi:ei,4],linewidth=4)
+                axs[self._macdInx].plot(xx,(self._boll[bi:ei,1]-ma6020)/self._k[bi:ei,4]) #mid
                 axs[self._macdInx].axhline(color='black',linestyle='--')
             else:
                 mp = np.copy(self._macd[bi:ei])
