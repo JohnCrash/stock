@@ -19,60 +19,86 @@ from . import mylog
 
 """
 开始计算前先加载全部数据
+period 可以等于5或者'd'
+bi 矩阵加载开始时间
+ex 矩阵加载缓存保存时间
+volume 是不是加载成交量矩阵
+返回:
 k数据是一个矩阵竖向是company_select,横向是时间
 v是成交量矩阵
 d是时间戳
 """
-def loadk_matrix(period=5,bi=None,progress=None,reload=False):
+def loadk_matrix(period=5,bi=None,progress=None,reload=False,ex=24*3600,volume=False):
     if reload:
-        shared.delKey('kmatrix_%d'%period)
-        shared.delKey('vmatrix_%d'%period)
-        shared.delKey('dvector_%d'%period)
-    b,k5 = shared.numpyFromRedis('kmatrix_%d'%period)
-    b2,v5 = shared.numpyFromRedis('vmatrix_%d'%period)
-    b3,d5 = shared.fromRedis('dvector_%d'%period)    
-    if b and b2 and b3:
-        return k5,v5,d5
+        shared.delKey('kmatrix_%s'%period)
+        shared.delKey('vmatrix_%s'%period)
+        shared.delKey('dvector_%s'%period)
+    b,k5 = shared.numpyFromRedis('kmatrix_%s'%period)
+    b2,v5 = shared.numpyFromRedis('vmatrix_%s'%period)
+    b3,d5 = shared.fromRedis('dvector_%s'%period)
+    if volume: 
+        if b and b2 and b3:
+            return k5,v5,d5
+    else:
+        if b and b3:
+            return k5,None,d5
     company = xueqiu.get_company_select()
     if bi is None: #从2019-11-19日开始
-        bi = '2019-11-19'
+        if period==5:
+            bi = '2019-11-19'
+        else:
+            bi = '2012-01-01'
     #使用大盘确定时间戳数量
     if period==5:
         qk = stock.query("select timestamp,volume close from k5_xueqiu where id=8828 and timestamp>'%s'"%bi)
     else:
         qk = stock.query("select date,volume close from kd_xueqiu where id=8828 and date>'%s'"%bi)
     k5 = np.zeros((len(company),len(qk)))
-    v5 = np.zeros((len(company),len(qk)))
+    if volume:
+        v5 = np.zeros((len(company),len(qk)))
+    else:
+        v5 = None
     d5 = []
     for v in qk:
         d5.append((v[0],))
     if progress is not None:
         progress(0)
+    if volume:
+        qs = "volume,close"
+    else:
+        qs = "close"
     for i in range(len(company)):
         if period==5:
-            qk = stock.query("select timestamp,volume,close from k5_xueqiu where id=%d and timestamp>'%s'"%(company[i][0],bi))
+            qk = stock.query("select timestamp,%s from k5_xueqiu where id=%d and timestamp>'%s'"%(qs,company[i][0],bi))
         else:
-            qk = stock.query("select date,volume,close from kd_xueqiu where id=%d and date>'%s'"%(company[i][0],bi))
+            qk = stock.query("select date,%s from kd_xueqiu where id=%d and date>'%s'"%(qs,company[i][0],bi))
         d = []
         k = np.zeros(len(qk))
-        v = np.zeros(len(qk))
-        for j in range(len(qk)):
-            d.append((qk[j][0],))
-            k[j] = qk[j][2]
-            v[j] = qk[j][1]
+        if volume:
+            v = np.zeros(len(qk))
+            for j in range(len(qk)):
+                d.append((qk[j][0],))
+                k[j] = qk[j][2]
+                v[j] = qk[j][1]
+            v = stock.alignK(d5,v,d)
+            v5[i,:] = v
+        else:
+            for j in range(len(qk)):
+                d.append((qk[j][0],))
+                k[j] = qk[j][1]
         k = stock.alignK(d5,k,d)
-        v = stock.alignK(d5,v,d)
         k5[i,:] = k
-        v5[i,:] = v
-        if i%100==0 and progress is not None:
+        if i%10==0 and progress is not None:
             progress(i/len(company))
     xueqiu.nozero_plane(k5)
-    xueqiu.nozero_plane(v5)
+    if volume:
+        xueqiu.nozero_plane(v5)
     if progress is not None:
         progress(1)
-    shared.numpyToRedis(k5,'kmatrix_%d'%period,ex=24*3600) #保持一天
-    shared.numpyToRedis(v5,'vmatrix_%d'%period,ex=24*3600)
-    shared.toRedis(d5,'dvector_%d'%period,ex=24*3600)
+    shared.numpyToRedis(k5,'kmatrix_%s'%period,ex=ex) #保持一天
+    if volume:
+        shared.numpyToRedis(v5,'vmatrix_%s'%period,ex=ex)
+    shared.toRedis(d5,'dvector_%s'%period,ex=ex)
     return k5,v5,d5
 
 """
@@ -103,7 +129,7 @@ def loadmax(bi=None,ei=None,progress=None,reload=False):
     return m
 
 """
-检查loadk_matrix的日期是不是完整的时序，并且从9:35开始
+检查loadk_matrix的5分钟日期是不是完整的时序，并且从9:35开始
 """
 def checkPeriod5(d):
     if d[0][0].hour==9 and d[0][0].minute==35 and d[-1][0].hour==15 and d[-1][0].minute==0:

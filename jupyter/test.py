@@ -38,7 +38,8 @@ import copy
 #print(b,p)
 def progress(i):
     print(i)
-#k,v,d = backtest.loadk_matrix(progress=process)
+k,v,d = backtest.loadk_matrix('d',progress=progress)
+backtest.checkPeriod5(d)
 #m = backtest.loadmax()
 #k,v,d = backtest.loadk_matrix(progress=progress)
 """
@@ -50,7 +51,7 @@ for v in qk:
 """    
 #backtest.checkPeriod5(d)
 #result = backtest.backtest({"periods":[5,60],"macd":True},backtest.macdGoldBuy,backtest.macdDeathSell,{"period":60})
-r60,context = backtest.backtest({"periods":[5,60],"macd":True,"ma":[10,20]},backtest.maBuy,backtest.maSell,{"period":60})
+#r60,context = backtest.backtest({"periods":[5,60],"macd":True,"ma":[10,20]},backtest.maBuy,backtest.maSell,{"period":60})
 
 #修复2020-10-30日上午9:35到9:50的没有5分钟数据的bug
 """

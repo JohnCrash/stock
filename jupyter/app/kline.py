@@ -239,6 +239,7 @@ class Plote:
         self._showeps = False #显示macd背离
         self._widths = [1]
         self._heights = [3]        
+        self._day_last_line = None
         if len(self._k)==0: #完全没有数据
             return
 
@@ -844,24 +845,25 @@ class Plote:
                         isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
                         if isv:
                             ax.plot([X0,X1],[Y0,Y1],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.')
-                #绘制平均斜率
-                for line in self._day_last_line:
-                    line_x0_date = get_date_by_index(self._day_date,line[0])
-                    line_x1_date = get_date_by_index(self._day_date,line[1])
-                    x0 = get_date_index(line_x0_date,0)
-                    x1 = get_date_index(line_x1_date,1)                
-                    k = line[2]
-                    b = line[3]
-                    if self._day_b and x1!=x0:#对趋势线做延长处理 
-                        x2 = len(dates)-1
-                        y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
-                        isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)    
-                        if isv:
-                            ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
-                    else:
-                        isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
-                        if isv:                
-                            ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')                
+                if self._day_last_line is not None:
+                    #绘制平均斜率
+                    for line in self._day_last_line:
+                        line_x0_date = get_date_by_index(self._day_date,line[0])
+                        line_x1_date = get_date_by_index(self._day_date,line[1])
+                        x0 = get_date_index(line_x0_date,0)
+                        x1 = get_date_index(line_x1_date,1)                
+                        k = line[2]
+                        b = line[3]
+                        if self._day_b and x1!=x0:#对趋势线做延长处理 
+                            x2 = len(dates)-1
+                            y2 = k*(line[1]-line[0])*(x2-x1)/(x1-x0)+k*line[1]+b
+                            isv,X0,X1,Y0,Y1 = line_crop(x0,x2,k*line[0]+b,y2)    
+                            if isv:
+                                ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')
+                        else:
+                            isv,X0,X1,Y0,Y1 = line_crop(x0,x1,k*line[0]+b,k*line[1]+b)
+                            if isv:                
+                                ax.plot([X0,X1],[Y0,Y1],color='lightsteelblue' if k<0 else 'lightcoral',linewidth=lw,linestyle='--')                
             else:
                 if self._showtrend:
                     for line in self._trend:
@@ -875,7 +877,7 @@ class Plote:
                             else:
                                 ax.plot([x0,x1],[k*x0+b,k*x1+b],color='orangered' if k>0 else 'royalblue',linewidth=lw,linestyle='-.',alpha=0.6)                
                 #绘制平均斜率
-                if axsK is not None:
+                if axsK is not None and self._day_last_line is not None:
                     for line in self._day_last_line:
                         x0 = line[0]
                         x1 = line[1]
