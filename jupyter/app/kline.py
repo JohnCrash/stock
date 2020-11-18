@@ -1026,8 +1026,7 @@ class Plote:
                     axb5.set_xticks(xticks)
                     axb5.set_xlim(todaybi-1,todaybi+48)
                     axb5.grid(True)            
-                
-                drawTrendLine(axk5,5,d5,todaybi-1,todaybi+48,k5[todaybi-1:todaybi+48,3].min(),k5[todaybi-1:todaybi+48,2].max(),2)
+                #drawTrendLine(axk5,5,d5,todaybi-1,todaybi+48,k5[todaybi-1:todaybi+48,3].min(),k5[todaybi-1:todaybi+48,2].max(),2)
             else:
                 gs_kw = dict(width_ratios=self._widths, height_ratios=self._heights)
                 fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
@@ -1138,9 +1137,7 @@ class Plote:
         xx = None
         """绘制BOLL线"""
         if self._showboll:
-            axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
-            axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
-            axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
+
             if self._show5bigma20 and self._period==5:
                 xx,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20日均线
                 xx,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20日均线
@@ -1148,6 +1145,10 @@ class Plote:
                 axsK.plot(xx,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
                 axsK.plot(xx,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
                 axsK.plot(xx,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
+            else:
+                axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
+                axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
+                axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
         if self._showflow:
             if self._period=='d' or self._period=='w':
                 axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
