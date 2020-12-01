@@ -1139,12 +1139,14 @@ class Plote:
         if self._showboll:
 
             if self._show5bigma20 and self._period==5:
-                xx,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20日均线
-                xx,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20日均线
-                xx,ma6020 = stock.maRangeK(self._k,20*12,bi,ei) #60分钟的20日均线
+                xx,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20均线
+                xx,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20均线
+                xx,ma6020 = stock.maRangeK(self._k,20*12,bi,ei) #60分钟的20均线,相当于日线的5日均线线
+                xx,mad6080 = stock.maRangeK(self._k,20*12*4,bi,ei) #60分钟的80均线,相当于日线的20日均线线
                 axsK.plot(xx,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
                 axsK.plot(xx,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
                 axsK.plot(xx,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
+                axsK.plot(xx,mad6080,label="K60MA20",linestyle='--',linewidth=24,alpha=0.4,color='orange')
             else:
                 axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
                 axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
@@ -1608,6 +1610,7 @@ class Plote:
         )
         refreshbutton = widgets.Button(description="刷新",layout=Layout(width='64px'))
         listbutton = widgets.Button(description="列表",layout=Layout(width='64px'))
+        codetext = widgets.Text(value=self.code(),description='',layout=Layout(width='96px'))
         #output = widgets.Output()
         b,favorites = shared.fromRedis('favorite_'+str(date.today()))
         isfavorite = False
@@ -1629,7 +1632,7 @@ class Plote:
         stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
         link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
-        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox]
+        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
         list_output = widgets.Output()
         if self.code()[0] == 'b':
             items.append(listbutton)
@@ -1733,6 +1736,17 @@ class Plote:
             else:
                 self.disable(source.description.lower())
             showline()
+
+        def on_codetext(e):
+            c = e['new'].upper()
+            if len(c)==8 and c[0]=='S' and (c[1]=='Z' or c[1]=='H'):
+                self._comarg = c
+                self.reload()
+                recalcRange()
+                showline()
+                refreshbutton.button_style = ''
+
+        codetext.observe(on_codetext,names='value')
 
         def on_sliderChange(event):
             nonlocal needUpdateSlider

@@ -72,7 +72,7 @@
             "request": "launch",
             "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["SH588000","科创50ETF"]
+            "args": ["SZ159992","创新药"]
         },   
         {
             "type": "node",

@@ -2561,7 +2561,7 @@ def favoriteList():
             out.clear_output(wait=True)
             with out:
                 for i in f:
-                    kline.Plote(i[2].upper(),'d',config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='runtime').show()
+                    kline.Plote(i[2].upper(),config={'index':True,'markpos':i[1]},prefix="%s %s "%(i[4],i[5]),context='关注',mode='runtime').show()
                     
         but.on_click(on_click)
         items.append(but)
@@ -3291,12 +3291,17 @@ def Indexs():
             'SH510300', #沪深300ETF
             'SH510050', #上证50ETF
             'SZ159949', #创业板50
-            #'SH588000',#科创板50ETF
+            'SH588000', #科创板50ETF
             'SZ159995', #芯片
+            'SZ159997', #电子ETF
+            'SH515980', #人工智能
+            'SH512720', #计算机
             'SZ159994', #5GETF
             'SH512660', #军工
+            'SH515700', #新能源车ETF
             'SH512800', #银行
             'SH512000', #券商
+            'SZ159992', #创新药
             'SH512010', #医药ETF
             'SH512170', #医疗ETF
             'SH512690', #酒
@@ -3305,8 +3310,9 @@ def Indexs():
             'SH512980', #传媒ETF
             'SH512400', #有色金属ETF
             'SH512580', #环保
-            "SH515210",#钢铁
-            "SH515220" #煤炭
+            'SH512200', #房地产
+            "SH515210", #钢铁
+            "SH515220"  #煤炭
         ],
         "自选":[
             "SH603986", #兆易创新

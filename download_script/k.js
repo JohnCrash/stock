@@ -189,11 +189,14 @@ function companys_task_continue(itemStr,n,task){
 }
 
 function companys_task_continue2(itemStr,n,task){
-    let dd =(new Date()).getDate();
+    let cur = new Date();
+    let dd =cur.getDate();
     function flagit(com){
-        connection.query(`update company set \`ignore\`=${dd} where id=${com.id}`,(error, results, field)=>{
-            if(error)console.error(error);
-        });
+        if(cur.getHours()>=15){ //三点后更新才加标记
+            connection.query(`update company set \`ignore\`=${dd} where id=${com.id}`,(error, results, field)=>{
+                if(error)console.error(error);
+            });
+        }
     }    
     return new Promise((resolve,reject)=>{
         let t0 = Date.now();
