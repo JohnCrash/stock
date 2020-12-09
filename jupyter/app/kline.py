@@ -579,7 +579,11 @@ class Plote:
         self._prefix = prefix
         self._context = context
         self._correcttionVolume = False
-        self._big5mode = False
+        b,p = shared.fromRedis('kline.big5')
+        if b:
+            self._big5mode = p
+        else:
+            self._big5mode = False
         self._configarg = config
         self._comarg = company
         self._datearg = date
@@ -1209,7 +1213,7 @@ class Plote:
         #绘制k线图
         plotK(axsK,self._k,bi,ei)
         #将大盘数据绘制在K线图上
-        if self._szclose is not None:
+        if False and self._szclose is not None:
             kmax = self._k[bi:ei,1:4].max()
             kmin = self._k[bi:ei,1:4].min()  
             szkmax = self._szclose[bi:ei].max()
@@ -1264,7 +1268,7 @@ class Plote:
             #axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
             if self._period==5 and ma6020 is not None:#小级别的直接绘制乖离率
                 axs[self._macdInx].plot(xx,(ma1520-ma6020)/self._k[bi:ei,4],linewidth=4)
-                axs[self._macdInx].plot(xx,(self._boll[bi:ei,1]-ma6020)/self._k[bi:ei,4]) #mid
+                axs[self._macdInx].plot(xx,(ma1520-ma3020)/self._k[bi:ei,4]) #mid
                 axs[self._macdInx].axhline(color='black',linestyle='--')
             else:
                 mp = np.copy(self._macd[bi:ei])
@@ -1738,6 +1742,7 @@ class Plote:
             showline()
 
         def on_codetext(e):
+            nonlocal link,link2
             c = e['new'].upper()
             if len(c)==8 and c[0]=='S' and (c[1]=='Z' or c[1]=='H'):
                 self._comarg = c
@@ -1745,6 +1750,9 @@ class Plote:
                 recalcRange()
                 showline()
                 refreshbutton.button_style = ''
+                stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
+                link.value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode)
+                link2.value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:])
 
         codetext.observe(on_codetext,names='value')
 
@@ -1882,6 +1890,8 @@ class Plote:
             pbi = self._date[endPT-1][0]
             sel = name2peroid[period]
             self._period = sel[0]
+            if sel[0]==5:
+                shared.toRedis(sel[1],'kline.big5')
             shared.toRedis(self._period,'kline.period')
             self._big5mode = sel[1]
             if e['old']:
