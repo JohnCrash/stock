@@ -604,7 +604,7 @@ class Plote:
                 period = 'd'
         b1,main_sel = shared.fromRedis('kline.main%s'%period)
         b2,index_sel = shared.fromRedis('kline.index%s'%period)
-        if b1 and b2:
+        if b1 and b2 and period is None:
             if index_sel=='MACD+':
                 self._config = {"macd":True,"energy":True,"volume":True}
             elif index_sel=='KDJ+':
@@ -1559,10 +1559,10 @@ class Plote:
                 self.disable('boll')
                 self.disable('bigma20')
                 self.disable('trend')
-                if self._period=='d':
-                    self._config['ma'] = [5,10,60]
-                else:
-                    self._config['ma'] = [5,10]
+                #if self._period=='d':
+                #    self._config['ma'] = [5,10,60]
+                #else:
+                #    self._config['ma'] = [5,10]
                 self.disable('eps')
             elif sel=='BOLL':
                 self.enable('boll')
@@ -2060,7 +2060,7 @@ class Plote:
                 break
 
         def startTimer():
-            if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
+            if stock.isTransTime():
                 nt = xueqiu.next_k_date(5)
             else:
                 nt = 0 #xueqiu.next_k_date(self._period)

@@ -267,6 +267,7 @@ def combinTrans(context,buy,sell):
                 s = o[1]
                 bi = timestamp2i[b[0]]
                 si = timestamp2i[s[0]]
+                #(0买入点时间，1卖出点时间，2买入点时间索引，3卖出点时间索引，4收益率)
                 R.append((b[0],s[0],bi,si,k5[i,si]/k5[i,bi]))
                 b = None
         result.append(R)
@@ -402,7 +403,7 @@ def backtest(rd,buy,sell):
     return combinTrans(context,buy(context),sell(context))
 
 """
-收益率在时序上的分布
+全部平均收益率在时序上的分布
 """
 def period_distributed(period,context):
     N = period/5
@@ -421,7 +422,7 @@ def period_distributed(period,context):
     y[s] = y[s]/n[s]
     return x,y,D
 """
-将结果绘制在时间周期上
+将此方法的市场平均收益率绘制在时间周期上
 """
 def backtestplot(context,period):
     periodDropdown = widgets.Dropdown(
