@@ -3,6 +3,7 @@
 计算器日macd，周macd，日能量，周能量，日成交量kdJ,周成交量kdJ
 算法是增量优化的，每次运行仅仅计算增加的部分
 """
+from ipywidgets.widgets.widget_selection import Dropdown
 import numpy as np
 from . import stock
 from . import xueqiu
@@ -3271,6 +3272,7 @@ ETFs = [
     'SZ159992', #创新药
     'SH512010', #医药ETF
     'SH512170', #医疗ETF
+    "SZ159825", #农业ETF
     'SH512690', #酒
     'SH510150', #消费ETF
     'SZ159996', #家电
@@ -3398,6 +3400,13 @@ def fluctuation(step=15):
     sel = None
     backbutton = widgets.Button(description="<",layout=Layout(width='48px'))
     frontbutton = widgets.Button(description=">",layout=Layout(width='48px'))
+    dataSource = '实时'
+    dataDropdown = widgets.Dropdown(
+        options=[15,30,60,'实时'],
+        value=dataSource,
+        description='数据',
+        layout=Layout(display='block',width='120px'),
+        disabled=False)
     mainDropdown = widgets.Dropdown(
         options=['全部','上证','深成','创业','科创'],
         value='全部',
@@ -3407,8 +3416,8 @@ def fluctuation(step=15):
     periodDropdown = widgets.Dropdown(
         options=['20秒','1分钟','5分钟','15分钟','30分钟'],
         value='5分钟',
-        description='周期',
-        layout=Layout(display='block',width='120px'),
+        description='分析周期',
+        layout=Layout(display='block',width='150px'),
         disabled=False)    
     refreshbutton = widgets.Button(description="刷新",layout=Layout(width='48px'))
     sortbutton = widgets.Button(description="上排序",layout=Layout(width='64px'))
@@ -3416,12 +3425,17 @@ def fluctuation(step=15):
     link1 = widgets.HTML(value="""<a href="http://vip.stock.finance.sina.com.cn/moneyflow/#sczjlx" target="_blank" rel="noopener">资金流向</a>""")
     link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/hsgtcg/" target="_blank" rel="noopener">北向资金</a>""")
     link3 = widgets.HTML(value="""<a href="http://summary.jrj.com.cn/dpyt/" target="_blank" rel="noopener">大盘云图</a>""")
-    box = Box(children=[backbutton,frontbutton,mainDropdown,periodDropdown,sortbutton,listbutton,refreshbutton,link1,link2,link3],layout=box_layout)
+    box = Box(children=[backbutton,frontbutton,dataDropdown,mainDropdown,periodDropdown,sortbutton,listbutton,refreshbutton,link1,link2,link3],layout=box_layout)
     output = widgets.Output()
     output2 = widgets.Output()
     output3 = widgets.Output()
     output4 = widgets.Output()
     display(box,output,output2,output3,output4)
+    def on_dataSource(e):
+        nonlocal dataSource
+        dataSource = e['new']
+        update(True)
+    dataDropdown.observe(on_dataSource,names='value')    
     def on_period(e):
         nonlocal step
         v = e['new']
@@ -3772,7 +3786,7 @@ def fluctuation(step=15):
     lastT = None
     isfirst = True
     def update(focus=False):
-        nonlocal companys,step,idd,lastT,isfirst,all_sel,sh_sel,sz_sel,cy_sel,kc_sel,sel
+        nonlocal companys,step,idd,lastT,isfirst,all_sel,sh_sel,sz_sel,cy_sel,kc_sel,sel,dataSource
 
         b,ut = xueqiu.getLastUpdateTimestamp()
         t = datetime.today()
@@ -3780,7 +3794,17 @@ def fluctuation(step=15):
             refreshbutton.button_style = 'success'
             isfirst = False
             lastT = ut
-            K,D = xueqiu.getRT(step=step)
+            if dataSource=='实时':
+                K,D = xueqiu.getRT(step=step)
+            else:
+                K,D = xueqiu.get_period_k(dataSource)
+                #将数据处理的和getRT兼容
+                kk = np.ones((K.shape[0],K.shape[1],6))
+                for i in range(K.shape[1]):
+                    r = K[:,i]>0
+                    kk[r,i,3] = K[r,i]
+
+                K = kk
             if idd is None:
                 idd = np.empty((len(K),4),dtype=np.dtype('O')) #(0 id , 1 code , 2 name , 3 category)
                 all_sel = np.ones((len(K),),dtype=np.dtype('bool'))
@@ -3804,7 +3828,7 @@ def fluctuation(step=15):
                             cy_sel[i] = True
                         elif code[:2]=='SZ':
                             sz_sel = True
-                sel = all_sel              
+                sel = all_sel            
             update_fluctuation(K,D)
             refreshbutton.button_style = ''
         if stock.isTransDay() and t.hour>=6 and t.hour<15:
@@ -4178,4 +4202,64 @@ def wave_moniter():
 """
 def moniter():
     global ETFs,BCs
-    
+
+"""
+显示时间上某一刻行业的涨幅情况
+ls 股票或者板块的列表
+bi 开始时间
+mi 中间时间
+ei 结束时间
+函数将显示在bi-mi,mi-ei时间段列表中股票的涨幅柱状图
+"""
+def review(ls,bi,mi,ei):
+    """
+    准备数据
+    [
+        [代码,名称,第一段涨跌值，第二段涨跌值],
+        ...
+    ]
+    """
+    Names = []
+    R1 = []
+    R2 = []
+    mit = datetime.fromisoformat(mi)
+    for code in ls:
+        c,k,d = stock.loadKline(code,period=5,after=bi,ei=ei)
+        if len(k)>0 and len(k)==len(d):
+            r1 = 0
+            r2 = 0
+            for i in range(len(d)):
+                if d[i][0]>=mit:
+                    r1 = (k[i,4]-k[0,4])/k[0,4]
+                    r2 = (k[-1,4]-k[i,4])/k[i,4]
+                    break
+            Names.append(c[2])
+            R1.append(r1)
+            R2.append(r2)
+    output = widgets.Output()
+    display(output)
+    fig,ax = plt.subplots(figsize=(32,15))
+    x = np.arange(len(Names))
+    width = 0.45
+    rects1 = ax.bar(x - width/2, R1, width, label='周期1')
+    rects2 = ax.bar(x + width/2, R2, width, label='周期2')
+    def autolabel(rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(height),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+    #autolabel(rects1)
+    #autolabel(rects2)
+    plt.setp(ax.get_xticklabels(),rotation=45,horizontalalignment='right')
+    ax.axhline(0,color='black',linewidth=2,linestyle='--')
+    ax.grid(True)
+    ax.set_xlim(-1,len(Names))
+    ax.set_xticks(x)
+    ax.set_xticklabels(Names)
+    ax.legend()
+    fig.tight_layout()
+    kline.output_show(output)

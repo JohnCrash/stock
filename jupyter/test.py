@@ -3,23 +3,33 @@ d1是k1的日期表,将k1和日期表date对齐
 d1和date来自于loadKline的返回日期
 """
 import numpy as np
-from app import stock
-from app import status
-from app import shared
-from app import xueqiu
+import app.stock as stock
+import app.status as status
+import app.shared as shared
+import app.xueqiu as xueqiu
 import threading
 import queue
 import requests
 import time
 from datetime import datetime,date,timedelta
 from IPython.core.interactiveshell import InteractiveShell
-from app import kline
+import app.kline as kline
 import math
-from app import config
-from app import backtest
+import app.config as config
+import app.backtest as backtest
+import app.category as category
 import subprocess
 import threading
 import copy
+#tv = stock.totalVolume(date='2020-1-22')
+
+#a = xueqiu.get_category_name2category()
+#b = xueqiu.get_category_selector()
+#print(a)
+#print(b)
+#a = xueqiu.get_volume_slice('2020-11-2')
+#print(a)
+category.calcCategoryIndex5()
 #shared.delKey('k5_sz159995')
 #shared.delKey('kline.main')
 #a = stock.totalVolume()
@@ -36,10 +46,10 @@ import copy
 #xueqiu.update_today_period([60,15])
 #b,p = shared.fromRedis('kline.period')
 #print(b,p)
-def progress(i):
-    print(i)
-k,v,d = backtest.loadk_matrix('d',progress=progress)
-backtest.checkPeriod5(d)
+#def progress(i):
+#    print(i)
+#k,v,d = backtest.loadk_matrix('d',progress=progress)
+#backtest.checkPeriod5(d)
 #m = backtest.loadmax()
 #k,v,d = backtest.loadk_matrix(progress=progress)
 """

@@ -1,3 +1,4 @@
+from . import category
 import requests
 import time
 import math
@@ -329,7 +330,20 @@ def get_company_select_id2com():
     for c in companys:
         id2com[c[0]] = c
     return id2com
-
+def get_company_select_id2i():
+    companys = get_company_select()
+    id2i = {}
+    for i in range(len(companys)):
+        c = companys[i]
+        id2i[c[0]] = i
+    return id2i
+#返回名称到分类的映射    
+def get_category_name2category():
+    categorys = stock.query("""select id,name from category""")
+    name2category = {}
+    for c in categorys:
+        name2category[c[1]] = c
+    return name2category
 #上证选择    
 def get_sh_selector():
     companys = get_company_select()
@@ -355,6 +369,49 @@ def get_kc_selector():
     for i in range(len(companys)):
         s[i] = companys[i][1][1:5]=='Z688'
     return s
+"""
+返回某天的全部公司的总市值和价格
+[
+    [价格，市值]
+    ...
+]
+"""
+def get_volume_slice(date):
+    companys = get_company_select()
+    id2i = get_company_select_id2i()
+    v = stock.query("""select id,volume,turnoverrate,close from kd_xueqiu where date='%s'"""%(date))
+    V = np.array(v).reshape(-1,4)
+    V[V[:,2]==0,2] = 1
+    V[:,1] = V[:,1]/V[:,2]   
+    result = np.ones((len(companys),2))
+    for i in range(len(V)):
+        K = V[i]
+        if K[0] in id2i:
+            j = id2i[K[0]]
+            result[j,0] = K[3] #price
+            result[j,1] = K[1] #tv
+
+    return result
+"""
+返回分类的选择器表
+返回如下结构
+{
+    "category name":r #分类器选择向量
+}
+"""
+def get_category_selector():
+    companys = get_company_select()
+    result = {}
+    cc = np.empty(len(companys),dtype=np.dtype('O'))
+    for i in range(len(companys)):
+        c = companys[i]
+        if c[3] is not None:
+            if c[3] not in result:
+                result[c[3]] = np.zeros((len(companys),),dtype=np.dtype('bool'))
+            cc[i] = c[3]
+    for k in result:
+        result[k][cc==k] = True
+    return result
 """
 返回company_select中公司的全部60分钟数据
 """

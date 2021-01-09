@@ -31,6 +31,9 @@ def timeString2(t):
 
 gdb = None
 
+def escape_string(d):
+    return MySQLdb.escape_string(d)
+    
 def opendb():
     global gdb
     if gdb is None:
@@ -122,25 +125,35 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
     else:
         company = query("""select id,code,name,category from company where name='%s'"""%code)
     
+    suffix = 'xueqiu'
     if len(company)==0:
-        print('数据库中没有该股票:',code)
-        return (code,code,code),np.array([]),()
+        #加载板块k,code==板块名称
+        if period=='d':
+            print('数据库中没有该股票:',code)
+            return (code,code,code),np.array([]),()
+        company = query("""select id,code,name,name,name from category where name='%s'"""%code)
+        if len(company)==0:
+            print('数据库中没有该板块:',code)
+            return (code,code,code),np.array([]),()
+        suffix = 'category'
+        
+    db = "k%s_%s"%(str(period),suffix)
     if period=='d':
         if after is None:
-            data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
+            data = query("""select date,volume,open,high,low,close from %s where id=%s"""%(db,company[0][0]))
         else:
             if ei is None:
-                data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s'"""%(str(period),company[0][0],after))
+                data = query("""select date,volume,open,high,low,close from %s where id=%s and date>='%s'"""%(db,company[0][0],after))
             else:
-                data = query("""select date,volume,open,high,low,close from k%s_xueqiu where id=%s and date>='%s' and date<='%s"""%(str(period),company[0][0],after,ei))
+                data = query("""select date,volume,open,high,low,close from %s where id=%s and date>='%s' and date<='%s"""%(db,company[0][0],after,ei))
     else:
         if after is None:
-            data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s"""%(str(period),company[0][0]))
+            data = query("""select timestamp,volume,open,high,low,close from %s where id=%s"""%(db,company[0][0]))
         else:
             if ei is None:
-                data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and timestamp>='%s'"""%(str(period),company[0][0],after))
+                data = query("""select timestamp,volume,open,high,low,close from %s where id=%s and timestamp>='%s'"""%(db,company[0][0],after))
             else:
-                data = query("""select timestamp,volume,open,high,low,close from k%s_xueqiu where id=%s and timestamp>='%s' and timestamp<='%s'"""%(str(period),company[0][0],after,ei))
+                data = query("""select timestamp,volume,open,high,low,close from %s where id=%s and timestamp>='%s' and timestamp<='%s'"""%(db,company[0][0],after,ei))
     kdate = []
     k = []
     for i in range(len(data)):
@@ -1004,14 +1017,16 @@ def macdDeviate(v,m=None,n=2):
 返回全部股票的总市值
 通过成交量除以还手率
 """
-def totalVolume():
-    dd = query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
-    #做个一天的缓存
-    n = "tv%s"%(dateString(dd[0][0]))
+def totalVolume(date=None):
+    if date is None:
+        dd = query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
+        #做个一天的缓存
+        date = dateString(dd[0][0])
+    n = "tv%s"%date
     b,V = shared.numpyFromRedis(n)
     if b:
         return V
-    v = query("""select id,volume,turnoverrate from kd_xueqiu where date='%s'"""%(dateString(dd[0][0])))
+    v = query("""select id,volume,turnoverrate from kd_xueqiu where date='%s'"""%(date))
     V = np.array(v).reshape(-1,3)
     V[V[:,2]==0,2] = 1
     V[:,1] = V[:,1]/V[:,2]

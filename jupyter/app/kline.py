@@ -185,6 +185,7 @@ config {
     energy: True or False #能量线
     trend: True or False #趋势线
     volumeprices:True #量价关系
+    disabledate:True #关闭日期
     kdate : 日期表
     vlines : [{
         x : []
@@ -574,7 +575,7 @@ class Plote:
 
     #company可以是kline数据，可以是code，也可以是公司名称
     #mode = 'normal','runtime','auto'
-    def __init__(self,company,period=None,config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',lastday=None):
+    def __init__(self,company,period=None,config={},date=None,companyInfo=None,prefix=None,context=None,mode='normal',lastday=None,transpos=None):
         self._timer = None
         self._prefix = prefix
         self._context = context
@@ -595,7 +596,8 @@ class Plote:
         self._mode = mode
         self._day_trend = None
         self._lastday = lastday
-        
+        self._transpos = transpos
+
         if period is None:
             b,p = shared.fromRedis('kline.period')
             if b:
@@ -1039,7 +1041,8 @@ class Plote:
         fig.subplots_adjust(hspace=0.02,wspace=0.05) #调整子图上下间距
         axsK = axs if self._axsInx==0 else axs[0]
         if self._date is not None:
-            axsK.xaxis.set_major_formatter(MyFormatter(self._date,self._period))
+            if not('disabledate' in self._config and self._config['disabledate']==True):
+                axsK.xaxis.set_major_formatter(MyFormatter(self._date,self._period))
         #时间坐标网格线，天的画在星期一，其他的以天为单位
         xticks = []
         if self._period=='d' or self._period=='w':
@@ -1139,18 +1142,28 @@ class Plote:
         ma3020 = None
         ma6020 = None
         xx = None
+        xx2 = None
         """绘制BOLL线"""
         if self._showboll:
 
             if self._show5bigma20 and self._period==5:
-                xx,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20均线
-                xx,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20均线
-                xx,ma6020 = stock.maRangeK(self._k,20*12,bi,ei) #60分钟的20均线,相当于日线的5日均线线
-                xx,mad6080 = stock.maRangeK(self._k,20*12*4,bi,ei) #60分钟的80均线,相当于日线的20日均线线
+                xx2,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20均线
+                xx2,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20均线
+                xx2,ma6020 = stock.maRangeK(self._k,20*12,bi,ei) #60分钟的20均线,相当于日线的5日均线线
+                xx2,mad6080 = stock.maRangeK(self._k,20*12*4,bi,ei) #60分钟的80均线,相当于日线的20日均线线
                 axsK.plot(xx,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
                 axsK.plot(xx,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
                 axsK.plot(xx,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
                 axsK.plot(xx,mad6080,label="K60MA20",linestyle='--',linewidth=24,alpha=0.4,color='orange')
+            elif self._show5bigma20 and self._period==15:
+                xx2,ma1520 = stock.maRangeK(self._k,20,bi,ei)#15分钟的20均线
+                xx2,ma3020 = stock.maRangeK(self._k,20*2,bi,ei) #30分钟的20均线
+                xx2,ma6020 = stock.maRangeK(self._k,20*4,bi,ei) #60分钟的20均线,相当于日线的5日均线线
+                xx2,mad6080 = stock.maRangeK(self._k,20*4*4,bi,ei) #60分钟的80均线,相当于日线的20日均线线
+                axsK.plot(xx2,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
+                axsK.plot(xx2,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
+                axsK.plot(xx2,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
+                axsK.plot(xx2,mad6080,label="K60MA20",linestyle='--',linewidth=24,alpha=0.4,color='orange')
             else:
                 axsK.plot(x,self._boll[bi:ei,0],label='low',color='magenta') #low
                 axsK.plot(x,self._boll[bi:ei,1],label='mid',color='royalblue') #mid
@@ -1200,16 +1213,18 @@ class Plote:
                 p = '日线'
             else:
                 p = '%d分钟线'%(self._period)
-            if self._prefix is None:
-                if self._context is not None and len(self._context)>0:
-                    axsK.set_title('%s %s %s (%s)'%(self._company[2],self._company[1],p,self._context))
+            isgame = 'disabledate' in self._config and self._config['disabledate']
+            if not isgame:
+                if self._prefix is None:
+                    if self._context is not None and len(self._context)>0:
+                        axsK.set_title('%s %s %s (%s)'%(self._company[2],self._company[1],p,self._context))
+                    else:
+                        axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
                 else:
-                    axsK.set_title('%s %s %s'%(self._company[2],self._company[1],p))
-            else:
-                if self._context is not None and len(self._context)>0:
-                    axsK.set_title('%s%s %s %s (%s)'%(self._prefix,self._company[2],self._company[1],p,self._context))
-                else:
-                    axsK.set_title('%s%s %s %s'%(self._prefix,self._company[2],self._company[1],p))
+                    if self._context is not None and len(self._context)>0:
+                        axsK.set_title('%s%s %s %s (%s)'%(self._prefix,self._company[2],self._company[1],p,self._context))
+                    else:
+                        axsK.set_title('%s%s %s %s'%(self._prefix,self._company[2],self._company[1],p))
         #绘制k线图
         plotK(axsK,self._k,bi,ei)
         #将大盘数据绘制在K线图上
@@ -1266,9 +1281,9 @@ class Plote:
         #绘制macd
         if self._showmacd:
             #axs[self._macdInx].plot(x,self._macd[bi:ei],label="MACD",color='blue',linewidth=2)
-            if self._period==5 and ma6020 is not None:#小级别的直接绘制乖离率
-                axs[self._macdInx].plot(xx,(ma1520-ma6020)/self._k[bi:ei,4],linewidth=4)
-                axs[self._macdInx].plot(xx,(ma1520-ma3020)/self._k[bi:ei,4]) #mid
+            if (self._period==5 or self._period==15) and ma6020 is not None:#小级别的直接绘制乖离率
+                axs[self._macdInx].plot(xx2,(ma1520-ma6020)/self._k[bi:ei,4],linewidth=4)
+                axs[self._macdInx].plot(xx2,(ma1520-ma3020)/self._k[bi:ei,4]) #mid
                 axs[self._macdInx].axhline(color='black',linestyle='--')
             else:
                 mp = np.copy(self._macd[bi:ei])
@@ -1318,7 +1333,14 @@ class Plote:
                         axsK.annotate('%s'%(p),xy=(x1,self._k[x1,2] if i[0]>0 else self._k[x1,3]),xytext=(-50, 50 if i[0]>0 else -50),
                         textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
                         fontsize='large',color='red' if i[0]>0 else 'green')
-
+        #买卖点数据
+        if self._transpos is not None:
+            for p in self._transpos:
+                x1 = p[2]
+                if x1>=bi and x1<=ei:
+                    axsK.annotate('%s'%(p[0]),xy=(x1,self._k[x1,4]),xytext=(-50, -50 if p[1]==0 else 50),
+                    textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
+                    fontsize='large',color='red' if p[1]==0 else 'green')
         #绘制kdj
         if self._showkdj:
             axs[self._kdjInx].plot(x,self._kdj[bi:ei,0],label="K",color='orange')
@@ -1633,7 +1655,10 @@ class Plote:
                             align_items='stretch',
                             border='solid',
                             width='100%')
-        stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
+        if type(self._comarg)==str:
+            stockcode = self._comarg
+        else:
+            stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
         link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
         items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
