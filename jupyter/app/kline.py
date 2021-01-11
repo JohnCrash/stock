@@ -1151,10 +1151,10 @@ class Plote:
                 xx2,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20均线
                 xx2,ma6020 = stock.maRangeK(self._k,20*12,bi,ei) #60分钟的20均线,相当于日线的5日均线线
                 xx2,mad6080 = stock.maRangeK(self._k,20*12*4,bi,ei) #60分钟的80均线,相当于日线的20日均线线
-                axsK.plot(xx,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
-                axsK.plot(xx,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
-                axsK.plot(xx,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
-                axsK.plot(xx,mad6080,label="K60MA20",linestyle='--',linewidth=24,alpha=0.4,color='orange')
+                axsK.plot(xx2,ma1520,label="K15MA20",linestyle='--',linewidth=3,alpha=0.6,color='lightsteelblue')
+                axsK.plot(xx2,ma3020,label="K30MA20",linestyle='--',linewidth=6,alpha=0.6,color='lime')
+                axsK.plot(xx2,ma6020,label="K60MA20",linestyle='--',linewidth=12,alpha=0.6,color='magenta')
+                axsK.plot(xx2,mad6080,label="K60MA20",linestyle='--',linewidth=24,alpha=0.4,color='orange')
             elif self._show5bigma20 and self._period==15:
                 xx2,ma1520 = stock.maRangeK(self._k,20,bi,ei)#15分钟的20均线
                 xx2,ma3020 = stock.maRangeK(self._k,20*2,bi,ei) #30分钟的20均线

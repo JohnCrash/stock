@@ -94,7 +94,7 @@ def savegame(data):
         stock.execute("""insert into game (game) values ('%s')"""%(dj))
     shared.toRedis(data,'gamedata')
 
-def play(code=None,period=15):
+def play(code=None,period=15,figsize=(32,15)):
     random.seed()
     if code is None:
         i = random.randint(0,len(ETFs)-1)
@@ -134,6 +134,7 @@ def play(code=None,period=15):
     pass5sButton = widgets.Button(description="5",layout=Layout(width='48px')) #5秒
     passedButton = widgets.Button(description="||",layout=Layout(width='48px')) #暂定
     printButton = widgets.Button(description="print",layout=Layout(width='48px'))
+    replayButton = widgets.Button(description="重新开始",layout=Layout(width='96px'))
     buy2Button = widgets.Button(description="备买",layout=Layout(width='48px')) #备用资金买入，当前仓位一半 @该策略是为了提供战胜100%持仓的方法
     sell2Button = widgets.Button(description="备卖",layout=Layout(width='48px'))#将备用资金买入的卖出 @备用资金买入持有时间不能超过3天
     opDropdown = widgets.Dropdown(
@@ -145,7 +146,7 @@ def play(code=None,period=15):
     posLabel = widgets.HTML(value="<b>0%</b>",description='仓位:')
     rateLabel = widgets.HTML(value="<b>0%</b>",description='盈利:')
     rate2Label = widgets.HTML(value="<b>0%</b>",description='一直持有:')
-    box = Box(children=[buyButton,sellButton,opDropdown,buy2Button,sell2Button,passButton,pass2Button,passedButton,pass1sButton,pass3sButton,pass5sButton,posLabel,rateLabel,rate2Label,printButton],layout=box_layout)
+    box = Box(children=[buyButton,sellButton,opDropdown,buy2Button,sell2Button,passButton,pass2Button,passedButton,pass1sButton,pass3sButton,pass5sButton,posLabel,rateLabel,rate2Label,printButton,replayButton],layout=box_layout)
     output = widgets.Output()
     output2 = widgets.Output()
     
@@ -162,12 +163,14 @@ def play(code=None,period=15):
         nonlocal bi,ei,money,hold2,hold2price,hold2i
         n = 12*4*3*5/period
         if hold2>0 and hold2i is not None and (ei-hold2i>=n):
+            orate = 100*(hold*K._k[ei-1,4]+money-1) #当前盈利
             #备份仓位持仓超时需要平到加入的备份仓位
             money += hold2*(K._k[ei-1,4]-hold2price)
             hold2 = 0
             hold2price = 0
             hold2timestamp = None
-            transpos.append(('平',1,ei-1))
+            nrate = 100*(hold*K._k[ei-1,4]+money-1)-orate #增加的盈利
+            transpos.append(('平%.2f%%'%(nrate),1,ei-1))
         #更新按键状态
         if money==0:
             buyButton.disabled = True
@@ -191,7 +194,7 @@ def play(code=None,period=15):
             sell2Button.disabled = True
         updateValue()
         with output2:
-            K.showKline(bi,ei)    
+            K.showKline(bi,ei,figsize=figsize)    
         
     def get_opvalue():
         nonlocal opDropdown
@@ -243,12 +246,16 @@ def play(code=None,period=15):
     def onSell2(e):
         nonlocal money,hold,bi,ei,K,price,Ops,savedata,hold2,hold2price,hold2i
         if hold2>0:
+            orate = 100*(hold*K._k[ei-1,4]+money-1) #当前盈利
             money += hold2*(K._k[ei-1,4]-hold2price)
             Ops.append((stock.timeString(K._date[ei-1][0]),1,hold2)) #存盘数据
             hold2 = 0
             hold2price = 0
             hold2i = None
-            transpos.append(('备卖',1,ei-1))
+
+            #计算盈利增加或者减少的百分比
+            nrate = 100*(hold*K._k[ei-1,4]+money-1)-orate
+            transpos.append(('备卖%.2f%%'%(nrate),1,ei-1))
             savegame(savedata)
             update()
 
@@ -301,7 +308,25 @@ def play(code=None,period=15):
     def onPrint(e):
         nonlocal savedata
         print(savedata)
-
     printButton.on_click(onPrint)
+
+    def onReplay(e):
+        nonlocal bi,ei,money,hold2price,hold,hold2,hold2i,price,ttime
+        Ops.clear()
+        transpos.clear()
+        money = 1
+        hold = 0
+        hold2 = 0
+        hold2price = 0
+        hold2i = None
+        price = 0
+        if ttime is not None:
+            xueqiu.cancelTimeout(ttime)        
+        ttime = None
+        savedata['id']= random.randint(0,999999)
+        bi = random.randint(0,int(len(K._k)/3))
+        ei = bi+160
+        update()
+    replayButton.on_click(onReplay)
     display(box,output,output2)
     update()
