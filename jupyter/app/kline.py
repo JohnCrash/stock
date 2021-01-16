@@ -597,7 +597,7 @@ class Plote:
         self._day_trend = None
         self._lastday = lastday
         self._transpos = transpos
-
+        ispervsetting = True if period is None else False
         if period is None:
             b,p = shared.fromRedis('kline.period')
             if b:
@@ -606,7 +606,7 @@ class Plote:
                 period = 'd'
         b1,main_sel = shared.fromRedis('kline.main%s'%period)
         b2,index_sel = shared.fromRedis('kline.index%s'%period)
-        if b1 and b2 and period is None:
+        if b1 and b2 and ispervsetting:
             if index_sel=='MACD+':
                 self._config = {"macd":True,"energy":True,"volume":True}
             elif index_sel=='KDJ+':
@@ -645,7 +645,6 @@ class Plote:
                 self._correcttionVolume = True
             else:
                 self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[20],"debug":False,"volumeprices":True}       
-        
         self.init(company,period,config,date,companyInfo=companyInfo)
         self.config(config)
         self._backup = self._config.copy()

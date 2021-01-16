@@ -101,7 +101,11 @@ def play(code=None,period=15,figsize=(32,15)):
         code = ETFs[i]
     
     transpos = [] #交易点
-    K = kline.Plote(code,period,config={'index':True,'disabledate':True,'bigma20':True,'boll':20,'flow':True,'macd':True},mode='normal',transpos=transpos)
+    def mydraw(self,axs,bi,ei):
+        nonlocal firstBuyPrice
+        if firstBuyPrice is not None:
+            axs[0].axhline(y=firstBuyPrice,color='green',linestyle='--')
+    K = kline.Plote(code,period,config={'index':True,'disabledate':True,'bigma20':True,'boll':20,'flow':True,'macd':True,'cb':mydraw},mode='normal',transpos=transpos)
     o = K._k[0,4]
     K._k[:,1:]/=o
     bi = random.randint(0,int(len(K._k)/3))
@@ -319,6 +323,7 @@ def play(code=None,period=15,figsize=(32,15)):
         hold2 = 0
         hold2price = 0
         hold2i = None
+        firstBuyPrice = None
         price = 0
         if ttime is not None:
             xueqiu.cancelTimeout(ttime)        
