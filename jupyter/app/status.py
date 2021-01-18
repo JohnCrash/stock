@@ -3284,6 +3284,7 @@ ETFs = [
     "SH515220"  #煤炭
 ]
 BCs = [
+    "601985",#中国核电
     "SH603986", #兆易创新
     "SZ002371", #北方华创
     "SH600584", #长电科技
@@ -3359,6 +3360,11 @@ def Indexs():
             'BK0013' #有色冶炼加工
         ],
         "ETF":ETFs,
+        "新能源车":[
+            '002460', #赣锋锂业
+            '002497', #雅华集团
+            '000792', #盐湖股份
+        ],
         "自选":BCs,
         "关注":[favoriteList]
     }
@@ -4202,7 +4208,27 @@ def wave_moniter():
 """
 def moniter():
     global ETFs,BCs
+    Kdata = []
+    after = stock.dateString(date.today()-timedelta(days=240))
+    for code in ETFs:
+        c,k,d = stock.loadKline(code,5,after=after)
+        Kdata.append([c,k,d])
+    for code in BCs:
+        c,k,d = stock.loadKline(code,5,after=after)
+        Kdata.append([c,k,d])
+    """
+    如果紫线斜率~>0,橙线斜率>0
+    就是在没有坏的阶段
+    """
+    def moniterLoop():
+        for com in Kdata:
+            _,k,d = xueqiu.appendK(com[0][1],5,com[1],com[2])
+            com[1] = k
+            com[2] = d
+            #提示建仓点，加仓点，清仓点
+            
 
+        
 """
 显示时间上某一刻行业的涨幅情况
 ls 股票或者板块的列表

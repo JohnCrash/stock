@@ -1332,6 +1332,21 @@ class Plote:
                         axsK.annotate('%s'%(p),xy=(x1,self._k[x1,2] if i[0]>0 else self._k[x1,3]),xytext=(-50, 50 if i[0]>0 else -50),
                         textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
                         fontsize='large',color='red' if i[0]>0 else 'green')
+        #这里测试均线支撑算法
+        if self._period==5 or self._period==15:
+            if self._period==5:
+                nn = 240
+                mm = 960
+            else:
+                nn = 80
+                mm = 320
+            r = stock.calcHoldup(self._k,nn,mm)
+            for x1 in r:
+                if x1>bi and x1<=ei:
+                    axsK.annotate('^',xy=(x1,self._k[x1,3]),xytext=(-50, -50),
+                            textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
+                            fontsize='large',color='red')
+
         #买卖点数据
         if self._transpos is not None:
             for p in self._transpos:

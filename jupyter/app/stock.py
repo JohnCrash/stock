@@ -123,7 +123,25 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
     elif len(code)>3 and code[0]=='B' and code[1]=='K':
         company = query("""select id,code,name,category from company where code='%s'"""%code)
     else:
-        company = query("""select id,code,name,category from company where name='%s'"""%code)
+        while True:
+            #code没有SH和SZ则尝试两种前缀
+            if code[0].isnumeric():
+                b,company = shared.fromRedis('SZ%s'%code)
+                if b:
+                    break
+                b,company = shared.fromRedis('SH%s'%code)
+                if b:
+                    break
+                company = query("""select id,code,name,category from company where code='SZ%s'"""%code)
+                if len(company)>0:
+                    break
+                company = query("""select id,code,name,category from company where code='SH%s'"""%code)
+                if len(company)>0:
+                    break
+            else:
+                #尝试名称
+                company = query("""select id,code,name,category from company where name='%s'"""%code)
+            break
     
     suffix = 'xueqiu'
     if len(company)==0:
@@ -1074,3 +1092,56 @@ def gap(k):
 """
 计算一组股票的指数 
 """
+
+"""
+计算均线对股价的支撑
+n支撑均线
+m也是均线数字，且m>n,仅仅当m均线的斜率向上的时候才满足条件
+b是一个小级别均线
+返回:一个索引位置数组，将可能的支撑位置标记出来
+[
+
+]
+"""
+def calcHoldup(k,n,m=None,b=3):
+    man = maK(k,n)
+    manS = slopeRates(man)
+    manb = maK(k,b)
+    manbS = slopeRates(manb)
+    mam = None
+    mamS = None
+    result = []
+    if m is not None and m>n:
+        mam = maK(k,m)
+        mamS = slopeRates(mam)
+    dif = manb-man
+    
+    lastHighD = 0
+    lastLowD = 0
+    for i in range(3,len(k)):
+        """判断是否足够靠近支撑均线
+        1.如果过往b个k线最低点穿过，如果穿过和最近在均线上的最高点偏离值比较，要小于它的1/2
+        2.如果没有穿过，判断是否足够接近均线。小于最近在均线上的最高偏离的1/4
+        """
+        isnear = False
+        if dif[i]>0:
+            if -lastLowD > lastHighD/2:
+                lastHighD = 0
+            lastHighD = max(dif[i],lastHighD)
+        if dif[i]<0:
+            if dif[i-1]>0:
+                lastLowD = 0
+            lastLowD = min(dif[i],lastLowD) #最近一个股价低于均线的周期的最大差值
+        last3lowD = min(k[i,3]-man[i],k[i-1,3]-man[i-1],k[i-2,3]-man[i-2])
+        if last3lowD<=0 and -last3lowD < lastHighD/3:
+            isnear = True
+        elif last3lowD>0 and last3lowD < lastHighD/5:
+            isnear = True
+        if isnear:
+            if mam is not None:
+                if mamS[i]>0 and manS[i]>0 and manbS[i]>0:
+                    result.append(i)
+            elif manS[i]>0 and manbS[i]>0:
+                result.append(i)
+    return result
+    

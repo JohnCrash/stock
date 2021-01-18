@@ -78,7 +78,7 @@
             "type": "node",
             "request": "launch",
             "name": "test js",
-            "program": "${workspaceFolder}\\download_script\\test.js"
+            "program": "${workspaceFolder}\\download_script\\download_msci.js"
         },                    
         {
             "type": "python",
