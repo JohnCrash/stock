@@ -1334,18 +1334,37 @@ class Plote:
                         fontsize='large',color='red' if i[0]>0 else 'green')
         #这里测试均线支撑算法
         if self._period==5 or self._period==15:
-            if self._period==5:
-                nn = 240
-                mm = None
-            else:
-                nn = 80
-                mm = None
-            r = stock.calcHoldup(self._k,nn,mm)
-            for x1 in r:
-                if x1>bi and x1<=ei:
-                    axsK.annotate('^',xy=(x1,self._k[x1,3]),xytext=(-50, -50),
-                            textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
-                            fontsize='large',color='red')
+            for i in (60,120,240,960):
+                if self._period==5:
+                    nn = i
+                else:
+                    nn = int(i/3)
+                if i==60 or i==120:
+                    mm = nn*2
+                elif i==240:
+                    mm = nn*4
+                else:
+                    mm = None              
+                r = stock.calcHoldup(self._k,self._date,nn,mm)
+                if i==60:
+                    c = 'gray'
+                elif i==120:
+                    c = 'green'
+                elif i==240:
+                    c = 'purple'
+                else:
+                    c = 'orange'
+                for hp in r:
+                    high = hp[0]
+                    low = hp[1]
+                    x1 = hp[2]
+                    if x1>bi and x1<=ei:
+                        if high>bi:
+                            axsK.plot([high,low],[self._k[high,2],self._k[low,3]],color=c,linestyle='--')
+                            axsK.plot([low,x1],[self._k[low,2],self._k[x1,3]],color=c,linestyle='--')
+                        axsK.annotate('%s+'%(i/4),xy=(x1,self._k[x1,3]),xytext=(-50, 50 if i==60 else -50),
+                                textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
+                                fontsize='large',color=c)                            
 
         #买卖点数据
         if self._transpos is not None:

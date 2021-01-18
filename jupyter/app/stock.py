@@ -574,6 +574,8 @@ def maRangeK(k,n,bi,ei):
 def slopeRates(m):
     r = np.empty(len(m))
     r[0] = 0
+    sz = m[:]==0
+    m[sz] = 0.0000001
     r[1:len(m)] = (m[1:len(m)]-m[0:len(m)-1])/m[0:len(m)-1]
     return r
 
@@ -1099,11 +1101,9 @@ n支撑均线
 m也是均线数字，且m>n,仅仅当m均线的斜率向上的时候才满足条件
 b是一个小级别均线
 返回:一个索引位置数组，将可能的支撑位置标记出来
-[
-
-]
+[(高点，低点，支撑点),...]
 """
-def calcHoldup(k,n,m=None,b=3):
+def calcHoldup(k,date,n,m=None,b=3):
     man = maK(k,n)
     manS = slopeRates(man)
     manb = maK(k,b)
@@ -1116,41 +1116,44 @@ def calcHoldup(k,n,m=None,b=3):
         mamS = slopeRates(mam)
     dif = manb-man
     difS = slopeRates(dif)
-    lastHighD = 0
-    lastLowD = 0
-    isnear = False
-    lastI = 0
+    lastHighD = 0 #最近股价偏离均线的最高点
+    lastHighI = 0 #最高点位置
+    lastLowD = 1e10 #最近的股价最靠近均线的低点
+    lastLowI = 0 #最低点位置
+    insertLastHighI = 0
+    insertLastLowI = 0
     for i in range(3,len(k)):
         """判断是否足够靠近支撑均线
         1.如果过往b个k线最低点穿过，如果穿过和最近在均线上的最高点偏离值比较，要小于它的1/2
         2.如果没有穿过，判断是否足够接近均线。小于最近在均线上的最高偏离的1/4
         """
-        
-        if dif[i]>0:
-            if -lastLowD > lastHighD/2:
-                lastHighD = 0
-            lastHighD = max(dif[i],lastHighD)
-        if dif[i]<0:
-            if dif[i-1]>0:
-                lastLowD = 0
-            lastLowD = min(dif[i],lastLowD) #最近一个股价低于均线的周期的最大差值
-
-        last3lowD = min(k[i,3]-man[i],k[i-1,3]-man[i-1],k[i-2,3]-man[i-2])
-        if last3lowD<=0 and -last3lowD < lastHighD/3 and dif[i]>=0: #仅仅在回到均线上方才算数,减少误判概率
-            isnear = True
-        elif last3lowD>0 and last3lowD < lastHighD/6:
-            isnear = True
-        else:
-            isnear = False
-        if isnear:
+        if dif[i]>0 and dif[i]>lastHighD:
+            lastHighD = dif[i]
+            lastHighI = i
+            lastLowD = 1e10
+            lastLowI = 0
+        elif dif[i]<lastLowD:
+            lastLowD = dif[i]
+            lastLowI = i
+        if lastHighD/5>lastLowD and lastLowD!=1e10 and lastLowI>lastHighI and i>lastLowI and lastLowI-lastHighI>n/6\
+            and (lastHighD-lastLowD)/12<(dif[i]-lastLowD):#((lastLowD<0 and manb[i]>man[i]) or (lastLowD>0 and (lastHighD-lastLowD)/12<(dif[i]-lastLowD))):
             if mam is not None:
-                if mamS[i]>0 and manS[i]>0 and manbS[i]>0:
-                    if i-lastI>3: #避免连续报警
-                        result.append(i)
-                    lastI = i
-            elif manS[i]>0 and manbS[i]>0:
-                if i-lastI>3:
-                    result.append(i)
-                lastI = i
+                if mamS[i]>0 and manS[lastLowI]>0 and manbS[i]>0: #反弹最低点的时斜率要向上
+                    if lastHighI!=insertLastHighI or lastLowI!=insertLastLowI: #同一个高点和低点确保只会插入一次
+                        insertLastHighI = lastHighI
+                        insertLastLowI = lastLowI
+                        result.append((lastHighI,lastLowI,i))
+            elif manS[lastLowI]>0 and manbS[i]>0:
+                if lastHighI!=insertLastHighI or lastLowI!=insertLastLowI:
+                    insertLastHighI = lastHighI
+                    insertLastLowI = lastLowI
+                    result.append((lastHighI,lastLowI,i))
+        #print(date[lastHighI][0],date[lastLowI][0],lastHighD-lastLowD,dif[i]-lastLowD,lastHighD,lastLowD,dif[i])
+        if (lastLowD!=1e10 and ((lastHighD-lastLowD)*2/3<(dif[i]-lastLowD)) or (manS[i]<0 and  manS[i-1]<0 and  manS[i-2]<0)):#重新开始
+            lastHighD = 0
+            lastHighI = 0
+            lastLowD = 1e10
+            lastLowI = 0
+            
     return result
     
