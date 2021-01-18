@@ -1115,15 +1115,17 @@ def calcHoldup(k,n,m=None,b=3):
         mam = maK(k,m)
         mamS = slopeRates(mam)
     dif = manb-man
-    
+    difS = slopeRates(dif)
     lastHighD = 0
     lastLowD = 0
+    isnear = False
+    lastI = 0
     for i in range(3,len(k)):
         """判断是否足够靠近支撑均线
         1.如果过往b个k线最低点穿过，如果穿过和最近在均线上的最高点偏离值比较，要小于它的1/2
         2.如果没有穿过，判断是否足够接近均线。小于最近在均线上的最高偏离的1/4
         """
-        isnear = False
+        
         if dif[i]>0:
             if -lastLowD > lastHighD/2:
                 lastHighD = 0
@@ -1132,16 +1134,23 @@ def calcHoldup(k,n,m=None,b=3):
             if dif[i-1]>0:
                 lastLowD = 0
             lastLowD = min(dif[i],lastLowD) #最近一个股价低于均线的周期的最大差值
+
         last3lowD = min(k[i,3]-man[i],k[i-1,3]-man[i-1],k[i-2,3]-man[i-2])
-        if last3lowD<=0 and -last3lowD < lastHighD/3:
+        if last3lowD<=0 and -last3lowD < lastHighD/3 and dif[i]>=0: #仅仅在回到均线上方才算数,减少误判概率
             isnear = True
-        elif last3lowD>0 and last3lowD < lastHighD/5:
+        elif last3lowD>0 and last3lowD < lastHighD/6:
             isnear = True
+        else:
+            isnear = False
         if isnear:
             if mam is not None:
                 if mamS[i]>0 and manS[i]>0 and manbS[i]>0:
-                    result.append(i)
+                    if i-lastI>3: #避免连续报警
+                        result.append(i)
+                    lastI = i
             elif manS[i]>0 and manbS[i]>0:
-                result.append(i)
+                if i-lastI>3:
+                    result.append(i)
+                lastI = i
     return result
     

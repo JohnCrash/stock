@@ -1336,10 +1336,10 @@ class Plote:
         if self._period==5 or self._period==15:
             if self._period==5:
                 nn = 240
-                mm = 960
+                mm = None
             else:
                 nn = 80
-                mm = 320
+                mm = None
             r = stock.calcHoldup(self._k,nn,mm)
             for x1 in r:
                 if x1>bi and x1<=ei:
