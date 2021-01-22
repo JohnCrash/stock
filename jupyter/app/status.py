@@ -4217,12 +4217,31 @@ def moniter():
     就是在没有坏的阶段
     """
     def moniterLoop():
-        for com in Kdata:
-            _,k,d = xueqiu.appendK(com[0][1],5,com[1],com[2])
-            com[1] = k
-            com[2] = d
-            #提示建仓点，加仓点，清仓点
+        t = datetime.today()
+        if stock.isTransDay() and t.hour>=9 and t.hour<15:
+            nns = {60:"白",120:"绿",240:"紫",480:"蓝",960:"橙"}
+            for com in Kdata:
+                _,k,d = xueqiu.appendK(com[0][1],5,com[1],com[2])
+                com[1] = k
+                com[2] = d
+                #提示建仓点，加仓点，清仓点
+                for n in (240,480,960):
+                    if n==60 or n==120:
+                        m = n*2
+                    elif n== 240:
+                        m = n*4
+                    else:
+                        m = None
+                    r = stock.calcHoldup(k,d,n,m)
+                    if len(r)>0:
+                        i = r[-1][2]
+                        if d[i][0].day == t.day:
+                            print('%s %s+'%(com[0][2],nns[n]))
+        nt = xueqiu.next_k_date(5)
+        print('loop %d'%nt)
+        xueqiu.setTimeout(nt+1,moniterLoop,'moniter')
 
+    moniterLoop()
 
         
 """

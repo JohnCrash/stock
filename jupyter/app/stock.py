@@ -1115,7 +1115,6 @@ def calcHoldup(k,date,n,m=None,b=3):
         mam = maK(k,m)
         mamS = slopeRates(mam)
     dif = manb-man
-    difS = slopeRates(dif)
     lastHighD = 0 #最近股价偏离均线的最高点
     lastHighI = 0 #最高点位置
     lastLowD = 1e10 #最近的股价最靠近均线的低点
@@ -1136,7 +1135,7 @@ def calcHoldup(k,date,n,m=None,b=3):
             lastLowD = dif[i]
             lastLowI = i
         if lastHighD/5>lastLowD and lastLowD!=1e10 and lastLowI>lastHighI and i>lastLowI and lastLowI-lastHighI>n/6\
-            and (lastHighD-lastLowD)/12<(dif[i]-lastLowD):#((lastLowD<0 and manb[i]>man[i]) or (lastLowD>0 and (lastHighD-lastLowD)/12<(dif[i]-lastLowD))):
+            and (lastHighD-lastLowD)/16<(dif[i]-lastLowD):#((lastLowD<0 and manb[i]>man[i]) or (lastLowD>0 and (lastHighD-lastLowD)/12<(dif[i]-lastLowD))):
             if mam is not None:
                 if mamS[i]>0 and manS[lastLowI]>0 and manbS[i]>0: #反弹最低点的时斜率要向上
                     if lastHighI!=insertLastHighI or lastLowI!=insertLastLowI: #同一个高点和低点确保只会插入一次

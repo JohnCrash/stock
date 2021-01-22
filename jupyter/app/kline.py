@@ -1334,7 +1334,7 @@ class Plote:
                         fontsize='large',color='red' if i[0]>0 else 'green')
         #这里测试均线支撑算法
         if self._period==5 or self._period==15:
-            for i in (60,120,240,960):
+            for i in (120,240,480,960):
                 if self._period==5:
                     nn = i
                 else:
@@ -1348,12 +1348,19 @@ class Plote:
                 r = stock.calcHoldup(self._k,self._date,nn,mm)
                 if i==60:
                     c = 'gray'
+                    z = 50
                 elif i==120:
                     c = 'green'
+                    z = -25
                 elif i==240:
                     c = 'purple'
+                    z = -50
+                elif i==480:
+                    c = 'blue'
+                    z = -75
                 else:
                     c = 'orange'
+                    z = -100
                 for hp in r:
                     high = hp[0]
                     low = hp[1]
@@ -1362,7 +1369,7 @@ class Plote:
                         if high>bi:
                             axsK.plot([high,low],[self._k[high,2],self._k[low,3]],color=c,linestyle='--')
                             axsK.plot([low,x1],[self._k[low,2],self._k[x1,3]],color=c,linestyle='--')
-                        axsK.annotate('%s+'%(i/4),xy=(x1,self._k[x1,3]),xytext=(-50, 50 if i==60 else -50),
+                        axsK.annotate('%s+'%(i/4),xy=(x1,self._k[x1,3]),xytext=(-50, z),
                                 textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
                                 fontsize='large',color=c)                            
 
