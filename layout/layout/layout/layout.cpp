@@ -87,7 +87,7 @@ int launchAndPostion(LPWSTR cmd, LPCWSTR  lpWindowName, LPCWSTR  lpClassName,int
 				}
 				else {
 					Sleep(100);
-					if (count > 50) { //等待5秒
+					if (count > 100) { //等待10秒
 						MessageBox(NULL, lpWindowName, TEXT("不能定位到窗口"),MB_OK);
 						break;
 					}
@@ -109,8 +109,11 @@ int launchAndPostion(LPWSTR cmd, LPCWSTR  lpWindowName, LPCWSTR  lpClassName,int
 int wmain(int argn,LPWSTR argv[])
 {
 	int nmoniter = _wtoi(argv[4]);
+	LPCWSTR pwname = lstrlenW(argv[2]) == 0 ? NULL : argv[2];
 	LPCWSTR pwclass = lstrlenW(argv[3])==0?NULL:argv[3];
-	launchAndPostion(_wcsdup(argv[1]), argv[2], pwclass, nmoniter);
+	launchAndPostion(_wcsdup(argv[1]), pwname,pwclass, nmoniter);
+
+	//launchAndPostion(_wcsdup(TEXT("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe")), NULL,TEXT("Chrome_WidgetWin_1"), 0);
 	//launchAndPostion(_wcsdup(TEXT("F:\\apps\\同花顺远航版\\bin\\happ.exe")),TEXT("同花顺远航版"),NULL,0);
 	//launchAndPostion(_wcsdup(TEXT("F:\\pingan\\TdxW.exe")), TEXT("平安证券慧赢V8.16"), TEXT("TdxW_MainFrame_Class"), 1);
 }

@@ -1,5 +1,6 @@
 from datetime import datetime
 import time
+import sys
 import subprocess
 import threading
 import platform
@@ -13,6 +14,13 @@ from app import mylog
 
 if __name__=='__main__':
     #import os
+    t = datetime.today()
+    #如果是autorun模式仅仅在周1-5的早晨6-9点开机才有效
+    if len(sys.argv)>1 and sys.argv[1]=='autorun':
+        if t.hour>=6 and t.hour==9 and t.weekday()<5 and t.weekday()>=0:
+            pass #继续运行
+        else:
+            sys.exit() #退出
     log = mylog.init('runtime.log',name='runtime')
     _,download_done_day = shared.fromRedis("last_download_day")
     def process(i):
@@ -21,9 +29,17 @@ if __name__=='__main__':
     def jupyter():
         subprocess.run(['jupyter','lab'])
 
+    def launapp():
+        if t.hour>=6 and t.hour==9 and t.weekday()<5 and t.weekday()>=0:
+            print("启动软件并且进行多屏幕布局...")
+            subprocess.run(config.ths_app)
+            subprocess.run(config.tdx_app)
+            subprocess.run(config.chrome_app)
+
     if platform.platform()[:7]=='Windows':
         print("启动jupyter lab")
         threading.Thread(target=jupyter).start()
+        threading.Thread(target=launapp).start()
 
     while True:
         t = datetime.today()
