@@ -1155,4 +1155,7 @@ def calcHoldup(k,date,n,m=None,b=3):
             lastLowI = 0
             
     return result
-    
+
+"""
+分析股价与boll通道的关系
+"""

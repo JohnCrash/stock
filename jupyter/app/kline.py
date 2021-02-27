@@ -174,6 +174,36 @@ class MyFormatter(Formatter):
             return '%s-%s-%s'%(t.year,t.month,t.day)
         else:
             return '%s-%s-%s %s:%s'%(t.year,t.month,t.day,t.hour,t.minute)
+
+"""
+对编码进行映射，因为对于east的资金流向分类代码和雪球的不一样。
+"""
+def mapxueqiu2east(code):
+    m2e = {
+        "SH000001":"zjlx/zs000001",
+        "SZ399001":'zjlx/zs399001',
+        "SZ399006":'zjlx/zs399006',
+        "BK0057":"bkzj/BK0473",
+        "BK0055":"bkzj/BK0475",
+        "BK0056":"bkzj/BK0474",
+        "BK0033":"bkzj/BK0438",
+        "BK0040":"bkzj/BK0465",
+        "BK0044":"bkzj/BK0727",
+        "BK0031":"bkzj/BK0456",
+
+        "BK0021":"bkzj/BK0459", #电子元件
+        "BK0489":"bkzj/BK0459",
+
+        "BK0444":"bkzj/BK0447", #电子信息
+        "BK0063":"bkzj/BK0447",
+        "BK0414":"bkzj/BK0447",
+
+        "BK0066":"bkzj/BK0490"
+    }
+    if code.upper() in m2e:
+        return True,m2e[code.upper()]
+    else:
+        return False,code
 """kline 图显示"""
 """
 config {
@@ -636,7 +666,7 @@ class Plote:
                 self._config["eps"] = True
         else:
             if period=='d':
-                self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[5,10,20],"debug":False,"volumeprices":True}            
+                self._config = {"macd":True,"energy":True,"volume":True,"trend":True,"ma":[5,10,20,30,60],"debug":False,"volumeprices":True}            
             elif period==15:
                 self._config = {"macd":False,"energy":False,"volume":True,"trend":False,"ma":[],"debug":False,"volumeprices":True}
                 self._correcttionVolume = True
@@ -1333,7 +1363,7 @@ class Plote:
                         textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
                         fontsize='large',color='red' if i[0]>0 else 'green')
         #这里测试均线支撑算法
-        if self._period==5 or self._period==15:
+        if False and (self._period==5 or self._period==15):
             for i in (120,240,480,960):
                 if self._period==5:
                     nn = i
@@ -1700,7 +1730,12 @@ class Plote:
         else:
             stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
         link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
-        link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
+        b,eastname = mapxueqiu2east(stockcode)
+        if b:
+            link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(eastname))
+        else:
+            link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
+            
         items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
         list_output = widgets.Output()
         if self.code()[0] == 'b':
@@ -1817,8 +1852,12 @@ class Plote:
                 refreshbutton.button_style = ''
                 stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
                 link.value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode)
-                link2.value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:])
-
+                b,eastname = mapxueqiu2east(stockcode)
+                if b:
+                    link2.value="""<a href="http://data.eastmoney.com/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(eastname)
+                else:
+                    link2.value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:])
+                                  
         codetext.observe(on_codetext,names='value')
 
         def on_sliderChange(event):

@@ -863,6 +863,8 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
                 print("sinaFlowRT %s"%t)
+                emflowRT()
+                print("emflowRT %s"%t)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
             time.sleep(dt)
@@ -1646,3 +1648,222 @@ def xueqiuKday(code,period):
 def xueqiuList():
     uri = """https://stock.xueqiu.com/v5/stock/portfolio/stock/list.json?size=1000&pid=-1&category=1"""
     return xueqiuJson(uri)
+
+"""
+获取eastmoney资金流数据
+返回值
+{
+    "rc": 0,
+    "rt": 21,
+    "svr": 2887254207,
+    "lt": 1,
+    "full": 0,
+    "data": {
+        "code": "BK0480",
+        "market": 90,
+        "name": "航天航空",
+        "tradePeriods": {
+            "pre": null,
+            "after": null,
+            "periods": [
+                {
+                    "b": 202102240930,
+                    "e": 202102241130
+                },
+                {
+                    "b": 202102241300,
+                    "e": 202102241500
+                }
+            ]
+        },
+        "klines": [
+            "2021-02-24 09:31,-35663761.0,18244385.0,17419377.0,-27101763.0,-8561998.0",
+            "2021-02-24 09:32,-40625924.0,24647254.0,15978671.0,-32402924.0,-8223000.0",
+            "2021-02-24 09:33,-32623975.0,29256173.0,3367804.0,-24332140.0,-8291835.0",
+            ...
+        ]
+    }
+}
+"""
+def emflow(code,timeout=None):
+    t = datetime.today()
+    n = "emflow_%s_%d"%(code,t.minute)
+    b,R = shared.fromRedis(n)
+    if b:
+        return R #使用最近2分钟的缓存
+    ts = math.floor(time.time())
+    if code[0]=='B':
+        perfix = '90'
+    else:
+        if code[0]=='S' or code[0]=='s':
+            code = code[2:] #去掉前缀SH或者SZ
+        perfix = '0'
+    uri = "http://push2.eastmoney.com/api/qt/stock/fflow/kline/get?cb=jQuery112309731450462414866_%d&\
+&lmt=0&klt=1&fields1=f1%%2Cf2%%2Cf3%%2Cf7&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56%%2Cf57%%2Cf58%%2Cf59%%2Cf60%%2Cf61%%2Cf62%%2Cf63%%2Cf64%%2Cf65&ut=b2884a393a59ad64002292a3e90d46a5&\
+secid=%s.%s&_=%d"%(ts,perfix,code,ts)
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate'}
+        if timeout is None:
+            r = s.get(uri,headers=headers)
+        else:
+            r = s.get(uri,headers=headers,timeout=timeout)
+        if r.status_code==200:
+            bi = r.text.find('({"rc":')
+            if bi>0:
+                R = json.loads(r.text[bi+1:-2])
+                shared.toRedis(R,n,2*60) #保存一个2分钟的缓存
+                return True,R
+            else:
+                return False,r.text
+        else:
+            return False,r.reason
+    except Exception as e:
+        log.error("emflow:"+str(code)+"ERROR:"+str(e))
+        return False,str(e)
+
+"""
+主力净流入分布
+返回数据
+{
+    "rc": 0,
+    "rt": 6,
+    "svr": 182995714,
+    "lt": 1,
+    "full": 1,
+    "data": {
+        "total": 61,
+        "diff": [
+            {
+                "f12": "BK0451",
+                "f13": 90,
+                "f14": "房地产",
+                "f62": 3829197648
+            },
+            {
+                "f12": "BK0474",
+                "f13": 90,
+                "f14": "保险",
+                "f62": 1386839600
+            },
+            ...
+        ]
+    }
+}
+"""
+def emdistribute(timeout=None):
+    ts = math.floor(time.time())
+    uri = "http://push2.eastmoney.com/api/qt/clist/get?cb=jQuery112308140186664104734_%d&pn=1&pz=500&po=1&np=1&fields=f12%%2Cf13%%2Cf14%%2Cf62&fid=f62&fs=m%%3A90%%2Bt%%3A2&ut=b2884a393a59ad64002292a3e90d46a5&_=%d"%(ts,ts)
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate'}
+        if timeout is None:
+            r = s.get(uri,headers=headers)
+        else:
+            r = s.get(uri,headers=headers,timeout=timeout)
+        if r.status_code==200:
+            bi = r.text.find('({"rc":')
+            if bi>0:
+                R = json.loads(r.text[bi+1:-2])
+                return True,R
+            else:
+                return False,r.text
+        else:
+            return False,r.reason
+    except Exception as e:
+        log.error("emdistribute:"+"ERROR:"+str(e))
+        return False,str(e)
+
+_em_category = None
+#返回stock.flow_em_category
+def get_em_category():
+    global _em_category
+    if _em_category is None:
+        _em_category = stock.query("select name,code from flow_em_category")
+    return _em_category
+_em_code2i = None
+#返回一个映射表(给出code返回顺序i)
+def get_em_code2i():
+    global _em_code2i
+    if _em_code2i is None:
+        emls = get_em_category()
+        _em_code2i = {}
+        for i in range(len(emls)):
+            _em_code2i[emls[i][1]] = i
+    return _em_code2i
+"""
+将em上的数据存入到redis中
+仅仅保存分类的数据
+每一天对应一个2维的表
+[[,...], 和em_category顺序保持一致
+ [,...],
+ ... 每天4*60个
+]
+"""
+def emflowRT():
+    try:
+        t = datetime.today()
+        #每分钟占用一列数据
+        if t.hour==9 and t.minute>=30:
+            j = t.minute-30
+        elif t.hour==10:
+            j = t.minute+30
+        elif t.hour==11 and t.minute<=30:
+            j = t.minute+60+30
+        elif t.hour==13:
+            j = t.minute+2*60
+        elif t.hour==14:
+            j = t.minute+3*60
+        else:
+            return #不在正常时间内
+        b,r = emdistribute()
+        if b and 'data' in r:
+            k = "emflow_%d_%d"%(t.month,t.day)
+            code2i = get_em_code2i()
+            ls = r['data']['diff']
+            #使用emls的顺序重新组织数据
+            b,a = shared.numpyFromRedis(k)
+            if not b:
+                a = np.zeros((4*60,len(code2i)))
+            for it in ls:
+                code = it['f12']
+                if code in code2i:
+                    i = code2i[code]
+                    a[j][i] = it['f62']
+            shared.numpyToRedis(a,k,ex=20*24*3600) #保留1个月的数据
+    except Exception as e:
+        log.error("emflowRT:"+"ERROR:"+str(e))
+"""
+将eastmoney资金流数据存入数据库中
+"""
+def emflow2db():
+    try:
+        ls = get_em_category()
+        ELS = []
+        for j in range(3):
+            for c in ls:
+                for i in range(10): #重试9次不行就报告错误并忽略
+                    if i==9:
+                        print("emflow2db download fail %s,%s"%(c[0],c[1]))
+                        ELS.append(c)
+                        break
+                    b,R = emflow(c[1])
+                    if b and 'data' in R:
+                        klines = R['data']['klines']
+                        QS = ""
+                        for k in klines:
+                            vs = k.split(',')
+                            if len(vs)==6:
+                                QS+="('%s',%s,%s,%s,%s),"%(vs[0],vs[2],vs[3],vs[4],vs[5])
+                        stock.execute("insert ignore into flow_em (timestamp,tiny,mid,big,larg) values %s"%QS[:-1])
+                        break
+            if len(ELS)>0:
+                ls = ELS #存在错误，将错误在处理一次
+                ELS = []
+            else:
+                break
+            
+    except Exception as e:
+        log.error("emflow2db:"+"ERROR:"+str(e))

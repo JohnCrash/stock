@@ -57,7 +57,8 @@ if __name__=='__main__':
             print("保存资金流向到数据库...")
             try:
                 xueqiu.sinaFlowRT()
-                status.saveflow()      
+                status.saveflow()
+                xueqiu.emflow2db() #将emflow保存到数据库中   
             except Exception as e:
                 log.error(str(e))
                 print(e)

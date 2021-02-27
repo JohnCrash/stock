@@ -87,7 +87,7 @@ int launchAndPostion(LPWSTR cmd, LPCWSTR  lpWindowName, LPCWSTR  lpClassName,int
 				}
 				else {
 					Sleep(100);
-					if (count > 100) { //等待10秒
+					if (count > 600) { //等待60秒
 						MessageBox(NULL, lpWindowName, TEXT("不能定位到窗口"),MB_OK);
 						break;
 					}

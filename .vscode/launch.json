@@ -72,13 +72,13 @@
             "request": "launch",
             "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["SZ159825","农业ETF"]
+            "args": ["SZ159922","500ETF"]
         },   
         {
             "type": "node",
             "request": "launch",
             "name": "test js",
-            "program": "${workspaceFolder}\\download_script\\download_msci.js"
+            "program": "${workspaceFolder}\\download_script\\test.js"
         },                    
         {
             "type": "python",

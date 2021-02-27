@@ -21,6 +21,8 @@ import app.category as category
 import subprocess
 import threading
 import copy
+ 
+xueqiu.emflow2db()
 #tv = stock.totalVolume(date='2020-1-22')
 
 #a = xueqiu.get_category_name2category()
@@ -29,7 +31,7 @@ import copy
 #print(b)
 #a = xueqiu.get_volume_slice('2020-11-2')
 #print(a)
-category.calcCategoryIndex5()
+#category.calcCategoryIndex5()
 #shared.delKey('k5_sz159995')
 #shared.delKey('kline.main')
 #a = stock.totalVolume()
