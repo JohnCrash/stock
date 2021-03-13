@@ -21,8 +21,21 @@ import app.category as category
 import subprocess
 import threading
 import copy
- 
-xueqiu.emflow2db()
+
+"""
+cs = xueqiu.get_em_category()
+codes = []
+for c in cs:
+    if c[4]==3:
+        codes.append(c[2])
+R,D = xueqiu.mainflow(codes,1)
+r,d = xueqiu.mainflowrt(codes,R,D)
+print(d[-1])
+"""
+xueqiu.saveflow('')
+#xueqiu.emflow2db()
+#xueqiu.emflowRT2()
+#xueqiu.emflow2db()
 #tv = stock.totalVolume(date='2020-1-22')
 
 #a = xueqiu.get_category_name2category()

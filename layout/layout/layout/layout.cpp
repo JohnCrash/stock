@@ -57,7 +57,7 @@ int SetMonitorPosition(HWND hwnd,int a) {
 		SetWindowPlacement(hwnd, &wpl);
 	}
 	else {
-		MessageBox(NULL, TEXT("不存在指定的显示设备"), TEXT("错误"), MB_OK);
+		//MessageBox(NULL, TEXT("不存在指定的显示设备"), TEXT("错误"), MB_OK);
 	}
 	return 0;
 }
@@ -88,7 +88,7 @@ int launchAndPostion(LPWSTR cmd, LPCWSTR  lpWindowName, LPCWSTR  lpClassName,int
 				else {
 					Sleep(100);
 					if (count > 600) { //等待60秒
-						MessageBox(NULL, lpWindowName, TEXT("不能定位到窗口"),MB_OK);
+						//MessageBox(NULL, lpWindowName, TEXT("不能定位到窗口"),MB_OK);
 						break;
 					}
 				}

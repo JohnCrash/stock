@@ -740,7 +740,10 @@ def cb_cyb(a,c,d=None):
     return c[1][:5]=='SZ300'
 #主板
 def cb_main(a,c,d=None):
-    return not (c[1][:5]=='SZ300' or c[1][:5]=='SH688')
+    try:
+        return not (c[1][:5]=='SZ300' or c[1][:5]=='SH688')
+    except Exception as e:
+        return False
 #macd>0
 def cb_macd_gr0(a,c,d=None):
     return a[-1,4]>0
@@ -1062,10 +1065,13 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         with output2:
             display(progress)            
         progressCallback(0)
-        if bi is None:
-            rasing,vlines = searchRasingCompanyStatusByRT(E.date,period,combo_cb,id2companys,progressCallback)
+        if period=='d' or period=='w':
+            if bi is None:
+                rasing,vlines = searchRasingCompanyStatusByRT(E.date,period,combo_cb,id2companys,progressCallback)
+            else:
+                rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,combo_cb,id2companys,progressCallback)
         else:
-            rasing,vlines = searchRasingCompanyStatusByRedisRange(bi,ei,E.date,period,combo_cb,id2companys,progressCallback)
+            pass
         cats = {}
         rasingCompany = []
         for c in companys:
@@ -1306,11 +1312,14 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
     methodDropdown1.observe(on_selectmethod1,names='value')
     methodDropdown1.observe(on_selectmethod2,names='value')
     def on_selectperiod(e):
+        nonlocal period
         sel = e['new']
         if sel=='日线':
-            pass
-        else:
-            pass
+            period = 'd'
+        elif sel=='60分钟':
+            period = 60
+        elif sel=='15分钟':
+            period = 15
 
     periodDropdown.observe(on_selectperiod,names='value')
     box = Box(children=items, layout=box_layout)
@@ -2806,7 +2815,7 @@ def showzdt(bi=None,ei=None):
             if k in id2com:
                 i[1] = id2com[k][1]
                 i[2] = id2com[k][2]
-                i[3] = id2com[k][3]            
+                i[3] = id2com[k][3]       
         #r = K[:,pos,2]/K[:,pos,3]-1
         S = []
         for category in allCategory():
@@ -3367,6 +3376,8 @@ def Indexs():
     indexpage(menus)
 
 def watch():
+    def emf():
+        emflowplot()
     def fc():
         fluctuation(step=15)
     def sc():
@@ -3374,6 +3385,7 @@ def watch():
     def sg():
         SearchRT('d',name='today')
     menus = {
+        "资金流":[emf],
         "周期涨跌":[fc],
         "涨跌停":[showzdt],
         "涨跌幅":[sc],
@@ -4304,3 +4316,275 @@ def review(ls,bi,mi,ei):
     ax.legend()
     fig.tight_layout()
     kline.output_show(output)
+
+"""
+行业主力流向
+"""
+def emflowplot():
+    cs = xueqiu.get_em_category()
+    code2i = xueqiu.get_em_code2i()    
+    allnames = ['全部']
+
+    output = widgets.Output()
+    mainDropdown = widgets.Dropdown(
+        options=['热点','热门分类','冷门分类','风格','指数','分类概念','科技概念','消费概念'],
+        value='热点',
+        description='选择',
+        layout=Layout(display='block',width='140px'),
+        disabled=False)
+    lenDropdown = widgets.Dropdown(
+        options=['当天','1天','2天','3天','6天'],
+        value='当天',
+        description='历史',
+        layout=Layout(display='block',width='100px'),
+        disabled=False)
+    viDropdown = widgets.Dropdown(
+        options=['正常','累计'],
+        value='正常',
+        description='显示',
+        layout=Layout(display='block',width='100px'),
+        disabled=False)
+    selDropdown = widgets.Dropdown(
+        options=allnames,
+        value='全部',
+        description='加重',
+        layout=Layout(display='block',width='160px'),
+        disabled=False)
+    box = Box(children=[mainDropdown,lenDropdown,viDropdown,selDropdown],layout=box_layout)
+    display(box,output)
+    selname = '全部'
+    codes = []
+    R = None
+    D = None
+    RR = None
+    DD = None
+    mode = 0
+    mainlen = 0
+
+    def on_main(e):
+        n = e['new']
+        if n=='热点':
+            sel(-2)
+        elif n=='热门分类':
+            sel(3)
+        elif n=='冷门分类':
+            sel(1)
+        elif n=='风格':
+            sel(12)
+        elif n=='指数':
+            sel(11)  
+        elif n=='分类概念':
+            sel(13)
+        elif n=='科技概念':
+            sel(14)
+        elif n=='消费概念':
+            sel(15)
+        updateplote()
+    
+    def lenflow(n):
+        nonlocal RR,DD,mainlen,codes,code2i,cs
+        mainlen = n
+        if n==0:
+            RR = None
+            DD = None
+        else:
+            RR,DD = xueqiu.mainflow(codes,n)
+        r,d = xueqiu.mainflowrt(codes,RR,DD)
+        S = []
+        for i in range(r.shape[1]):
+            S.append((i,r[-1,i]))
+        SS = sorted(S,key=lambda it:it[1],reverse=True)
+        an = ['全部']
+        for i in range(len(SS)):
+            code = codes[SS[i][0]]
+            an.append(cs[code2i[code]][1])
+        selDropdown.options = an
+        selDropdown.value = '全部'
+    def on_len(e):
+        nonlocal mode
+        n = e['new']
+        mode = 1
+        if n=='当天':
+            mode = 0
+            lenflow(0)
+        elif n=='1天':
+            lenflow(1)
+        elif n=='2天':
+            lenflow(2)
+        elif n=='3天':
+            lenflow(3)
+        else:
+            lenflow(6)
+        viDropdown.value = '正常' if mode==0 else '累计'
+        updateplote()
+    gseln = None
+    def sel(n):
+        nonlocal codes,cs,mainlen,gseln
+        codes = []
+
+        gseln = n
+        if n==-2:
+            for c in cs:
+                if c[4]<10 and c[4]>0:
+                    codes.append(c[2])
+        elif n==-1:
+            for c in cs:
+                codes.append(c[2])
+        else:
+            for c in cs:
+                if c[4]==n:
+                    codes.append(c[2])
+        lenflow(mainlen)
+    sel(-2)
+    mainDropdown.observe(on_main,names='value')
+    lenDropdown.observe(on_len,names='value')
+
+    def on_vi(e):
+        nonlocal mode
+        n = e['new']
+        if n=='正常':
+            mode = 0
+        else:
+            mode = 1
+        updateplote()
+    viDropdown.observe(on_vi,names='value')
+    def on_sel(e):
+        nonlocal selname,allnames
+        selname = e['new']
+        updateplote()
+    selDropdown.observe(on_sel,names='value')
+    def plotflow():
+        nonlocal R,D,codes,selname,cs,gseln
+        xticks = []
+        fig,ax = plt.subplots(1,1,figsize=(32,16))
+        ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
+        for i in range(len(D)):
+            t = D[i][0]
+            if t.minute%15==0:
+                xticks.append(i)
+            if i>1 and t.day != D[i-1][0].day:
+                xticks.append(i)
+        xticks.append(len(D)-1)
+        xticks.append(len(D)-1)
+        #对最后流入数据进行排序
+        S = []
+        for i in range(R.shape[1]):
+            S.append((i,R[-1,i]))
+        SS = sorted(S,key=lambda it:it[1],reverse=True)
+        ISIN = []
+        if gseln==-2:#热点模式
+            for i in range(10):
+                s = SS[i]
+                if s[1]>0:
+                    ISIN.append(s[0])
+            for i in range(-10,-1):
+                s = SS[i]
+                if s[1]<0:
+                    ISIN.append(s[0])
+        else:
+            for s in SS:
+                ISIN.append(s[0])
+        lw = 8
+        x = np.arange(R.shape[0])
+        for j in range(R.shape[1]):
+            i = SS[j][0]
+            if i in ISIN:
+                code = codes[i]
+                #color = getmycolor(code)
+                lww = lw-j
+                if lww<=0:
+                    lww = 1
+                if selname!='全部':
+                    if cs[code2i[code]][1]==selname:
+                        lww = 4
+                        al=1
+                    else:
+                        al=0.2
+                else:
+                    al = 1
+                if R.shape[0]>2:
+                    ax.plot(x,R[:,i],linewidth=lww,linestyle='solid' if R[-1,i]>R[-2,i] else '--',
+                    label=cs[code2i[code]][1],alpha=al)
+                else:
+                    ax.plot(x,R[:,i],linewidth=lww,label=cs[code2i[code]][1])
+        ax.axhline(y=0,color='black',linestyle='--',alpha=al)
+        ax.grid(True)
+        ax.set_xlim(0,R.shape[0]-1)
+        ax.set_xticks(xticks)
+        plt.legend()
+        fig.autofmt_xdate()
+        kline.output_show(output)
+    def updateplote():
+        nonlocal R,RR,D,DD,codes,mode
+        
+        R,DT = xueqiu.mainflowrt(codes,RR,DD)
+        D = []
+        for d in DT:
+            D.append((d,))
+        if mode==1: #进行累计处理
+            acci = 0
+            for i in range(1,len(D)):
+                if D[i][0].day != D[i-1][0].day:
+                    acci = i-1
+                if acci!=0:
+                    R[i,:]+=R[acci,:]
+        plotflow()  
+    def update():
+        t = datetime.today()
+        updateplote()
+        if stock.isTransDay() and t.hour>=6 and t.hour<15:
+            xueqiu.setTimeout(60,update,'emflowplot')
+
+    xueqiu.setTimeout(0,update,'emflowplot')
+
+def testf(code='399001'):
+    codes = [code]
+    output = widgets.Output()
+    display(output)
+
+    R,DD = xueqiu.mainflow(codes,6)
+    D = []
+    for d in DD:
+        D.append((d,))  
+    acci = 0
+    for i in range(1,len(D)):
+        if D[i][0].day != D[i-1][0].day:
+            acci = i-1
+        if acci!=0:
+            R[i,:]+=R[acci,:]
+    def plotflow():
+        nonlocal R,D,codes
+        xticks = []
+        gs_kw = dict(width_ratios=[1], height_ratios=[1,1])
+        fig,axs = plt.subplots(2,1,figsize=(32,16),gridspec_kw = gs_kw)
+        fig.subplots_adjust(hspace=0.02,wspace=0.05)
+        ax = axs[0]
+        ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
+        axs[1].xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
+        for i in range(len(D)):
+            t = D[i][0]
+            if t.minute%15==0:
+                xticks.append(i)
+            if i>1 and t.day != D[i-1][0].day:
+                xticks.append(i)
+        x = np.arange(R.shape[0])
+        ax.plot(x,R[:,0])
+        ma60 = stock.ma(R[:,0],60)
+        ax.plot(x,ma60)
+        ax.axhline(y=0,color='black',linestyle='--')
+        axs[1].plot(x,R[:,0]-ma60)
+        axs[1].axhline(y=0,color='black',linestyle='--')
+        
+        
+        axs[1].grid(True)
+        axs[1].set_xlim(0,R.shape[0]-1)
+        axs[1].set_xticks(xticks)
+
+        ax.grid(True)
+        ax.set_xlim(0,R.shape[0]-1)
+        ax.set_xticks(xticks)
+        #plt.legend()
+        
+        fig.autofmt_xdate()
+        kline.output_show(output)
+    plotflow()

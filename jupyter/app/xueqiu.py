@@ -1725,6 +1725,8 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
 
 """
 主力净流入分布
+t=0 行业
+t=1 概率
 返回数据
 {
     "rc": 0,
@@ -1752,9 +1754,10 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
     }
 }
 """
-def emdistribute(timeout=None):
+def emdistribute(t=0,timeout=None):
     ts = math.floor(time.time())
-    uri = "http://push2.eastmoney.com/api/qt/clist/get?cb=jQuery112308140186664104734_%d&pn=1&pz=500&po=1&np=1&fields=f12%%2Cf13%%2Cf14%%2Cf62&fid=f62&fs=m%%3A90%%2Bt%%3A2&ut=b2884a393a59ad64002292a3e90d46a5&_=%d"%(ts,ts)
+    typeword = "3A2" if t==0 else "3A3"
+    uri = "http://push2.eastmoney.com/api/qt/clist/get?cb=jQuery112308140186664104734_%d&pn=1&pz=500&po=1&np=1&fields=f12%%2Cf13%%2Cf14%%2Cf62&fid=f62&fs=m%%3A90%%2Bt%%%s&ut=b2884a393a59ad64002292a3e90d46a5&_=%d"%(ts,typeword,ts)
     try:
         s = requests.session()
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
@@ -1778,10 +1781,11 @@ def emdistribute(timeout=None):
 
 _em_category = None
 #返回stock.flow_em_category
+#0id 1name 2code 3prefix 4watch
 def get_em_category():
     global _em_category
     if _em_category is None:
-        _em_category = stock.query("select name,code from flow_em_category")
+        _em_category = stock.query("select * from flow_em_category")
     return _em_category
 _em_code2i = None
 #返回一个映射表(给出code返回顺序i)
@@ -1791,48 +1795,59 @@ def get_em_code2i():
         emls = get_em_category()
         _em_code2i = {}
         for i in range(len(emls)):
-            _em_code2i[emls[i][1]] = i
+            _em_code2i[emls[i][2]] = i
     return _em_code2i
-"""
-将em上的数据存入到redis中
-仅仅保存分类的数据
-每一天对应一个2维的表
-[[,...], 和em_category顺序保持一致
- [,...],
- ... 每天4*60个
-]
-"""
+_em_code2id = None
+def get_em_code2id():
+    global _em_code2id
+    if _em_code2id is None:
+        emls = get_em_category()
+        _em_code2id = {}
+        for i in range(len(emls)):
+            _em_code2id[emls[i][2]] = emls[i][0]
+    return _em_code2id
+def rebuild_em_category():
+    global _em_category,_em_code2i,_em_code2id
+    _em_category = None
+    _em_code2i = None
+    _em_code2id = None
+#返回(len(timestamp),len(codes))
 def emflowRT():
     try:
         t = datetime.today()
-        #每分钟占用一列数据
-        if t.hour==9 and t.minute>=30:
-            j = t.minute-30
-        elif t.hour==10:
-            j = t.minute+30
-        elif t.hour==11 and t.minute<=30:
-            j = t.minute+60+30
-        elif t.hour==13:
-            j = t.minute+2*60
-        elif t.hour==14:
-            j = t.minute+3*60
-        else:
-            return #不在正常时间内
-        b,r = emdistribute()
-        if b and 'data' in r:
-            k = "emflow_%d_%d"%(t.month,t.day)
+        if t.hour==9 and t.minute<30:
+            return
+        n = "emflowts_%d_%d"%(t.month,t.day)
+        k = "emflownp_%d_%d"%(t.month,t.day)
+        b,D = shared.fromRedis(n)
+        if b and D[-1].minute==t.minute and D[-1].day==t.day:
+            return
+        if D is None:
+            D = []
+        b,R = shared.numpyFromRedis(k)
+        rr = []
+        b,r = emdistribute(0) #行业
+        rr.append(r)
+        b1,r = emdistribute(1) #概念
+        rr.append(r)
+        if b and b1:
             code2i = get_em_code2i()
-            ls = r['data']['diff']
-            #使用emls的顺序重新组织数据
-            b,a = shared.numpyFromRedis(k)
-            if not b:
-                a = np.zeros((4*60,len(code2i)))
-            for it in ls:
-                code = it['f12']
-                if code in code2i:
-                    i = code2i[code]
-                    a[j][i] = it['f62']
-            shared.numpyToRedis(a,k,ex=20*24*3600) #保留1个月的数据
+            a = np.zeros((len(code2i),))
+            for r in rr:
+                if 'data' in r:
+                    ls = r['data']['diff']
+                    #使用emls的顺序重新组织数据
+                    for it in ls:
+                        code = it['f12']
+                        if code in code2i:
+                            i = code2i[code]
+                            a[i] = it['f62']
+            if R is None:
+                shared.numpyToRedis(a,k,ex=1*24*3600) #保留1天
+            else:
+                shared.numpyToRedis(np.vstack((R,a)),k,ex=1*24*3600) #保留1天
+            D.append(datetime(t.year,t.month,t.day,t.hour,t.minute,0))
+            shared.toRedis(D,n,ex=1*24*3600)
     except Exception as e:
         log.error("emflowRT:"+"ERROR:"+str(e))
 """
@@ -1840,24 +1855,43 @@ def emflowRT():
 """
 def emflow2db():
     try:
+        """
+        将行业分类和概念分类放入到数据库
+        """
+        needrebuild = False
         ls = get_em_category()
+        code2id = get_em_code2id()
+        for i in range(2):
+            b,r = emdistribute(i)
+            if b and 'data' in r:
+                lss = r['data']['diff']
+                for s in lss:
+                    code = s['f12']
+                    if code not in code2id:
+                        needrebuild = True
+                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch) values ('%s','%s',%d,0)"%(s['f14'],code,s['f13']))
+        if needrebuild:
+            rebuild_em_category()
+            ls = get_em_category()
+            code2id = get_em_code2id()
         ELS = []
         for j in range(3):
             for c in ls:
+                #0id 1name 2code 3prefix 4watch
                 for i in range(10): #重试9次不行就报告错误并忽略
                     if i==9:
-                        print("emflow2db download fail %s,%s"%(c[0],c[1]))
+                        print("emflow2db download fail %s,%s"%(c[1],c[2]))
                         ELS.append(c)
                         break
-                    b,R = emflow(c[1])
+                    b,R = emflow(c[2])
                     if b and 'data' in R:
                         klines = R['data']['klines']
                         QS = ""
                         for k in klines:
                             vs = k.split(',')
                             if len(vs)==6:
-                                QS+="('%s',%s,%s,%s,%s),"%(vs[0],vs[2],vs[3],vs[4],vs[5])
-                        stock.execute("insert ignore into flow_em (timestamp,tiny,mid,big,larg) values %s"%QS[:-1])
+                                QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
+                        stock.execute("insert ignore into flow_em values %s"%QS[:-1])
                         break
             if len(ELS)>0:
                 ls = ELS #存在错误，将错误在处理一次
@@ -1867,3 +1901,59 @@ def emflow2db():
             
     except Exception as e:
         log.error("emflow2db:"+"ERROR:"+str(e))
+
+"""
+N加载N天数据
+返回一个时间戳列表，和一个numpy矩阵,shape=(len(timestamp),len(codes))
+"""
+def mainflow(codes,N=3):
+    kdd = stock.query('select date from kd_xueqiu where id=8828 order by date desc limit %d'%N)
+    after = kdd[-1][0]
+    D = []
+    R = None
+    code2id =get_em_code2id()
+    for j in range(len(codes)):
+        c = codes[j]
+        F = stock.query("select * from flow_em where timestamp>='%s' and id=%d"%(stock.dateString(after),code2id[c]))
+        if R is None:
+            for i in range(len(F)):
+                D.append(F[i][1])
+            R = np.zeros((len(D),len(codes)))
+        if len(F)<=len(D): #粗略处理，对于数据丢失没有做处理
+            for i in range(len(F)):
+                R[i,j] = F[i][4]+F[i][5]
+        else:
+            print("mainflow 第一组数据不全")
+    return R,D
+
+"""
+将历史数据叠加最新的实时数据
+"""
+def mainflowrt(codes,R=None,D=None):
+    t = datetime.today()
+    n = "emflowts_%d_%d"%(t.month,t.day)
+    k = "emflownp_%d_%d"%(t.month,t.day)
+    b,d = shared.fromRedis(n)
+    b1,r = shared.numpyFromRedis(k)
+    code2i = get_em_code2i()
+    if R is None:
+        if b and b1:
+            s = np.zeros((len(d),len(codes)))
+            for i in range(len(codes)):
+                s[:,i] = r[:,code2i[codes[i]]]
+            return s,d
+        else:
+            return np.zeros((0,0)),[]
+    #参数检查
+    if R.shape[0]!=len(D):
+       raise "R.shape[0]!=len(D)"
+    if R.shape[1]!=len(codes):
+        raise "R.shape[1]!=len(codes)"
+    
+    if b and b1 and D[-1]<d[0]:
+        s = np.zeros((len(d),len(codes)))
+        for i in range(len(codes)):
+            s[:,i] = r[:,code2i[codes[i]]]
+        return np.vstack((R,s)),D+d
+    else:
+        return np.copy(R),D

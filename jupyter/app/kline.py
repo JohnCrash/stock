@@ -1199,10 +1199,20 @@ class Plote:
                 axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
         if self._showflow:
             if self._period=='d' or self._period=='w':
-                axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
-                axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',linewidth=1,color='cyan')
-                axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',linewidth=1,color='yellow')
-                axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',linewidth=2,color='red')
+                #axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
+                #axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',linewidth=1,color='cyan')
+                #axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',linewidth=1,color='yellow')
+                #axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',linewidth=2,color='red')
+                flow = np.zeros((self._flow.shape[0],))
+                for i in range(len(flow)):
+                    if i>0:
+                        flow[i] = self._flow[i,0]+flow[i-1]
+                    else:
+                        flow[i] = self._flow[i,0]
+                fkdj = stock.kdj(flow,13)
+                axs[self._flowInx].plot(x,fkdj[bi:ei,0],label='k',linewidth=1,color='orange')
+                axs[self._flowInx].plot(x,fkdj[bi:ei,1],label='d',linewidth=1,color='blue')
+                axs[self._flowInx].plot(x,fkdj[bi:ei,2],label='j',linewidth=1,color='purple')
             else: #确保相同天是连续的，不同天是断开的
                 dss = []
                 dds = self._date
