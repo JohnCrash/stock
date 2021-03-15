@@ -22,6 +22,8 @@ import subprocess
 import threading
 import copy
 
+
+xueqiu.emflowRT()
 """
 cs = xueqiu.get_em_category()
 codes = []
@@ -32,7 +34,12 @@ R,D = xueqiu.mainflow(codes,1)
 r,d = xueqiu.mainflowrt(codes,R,D)
 print(d[-1])
 """
-xueqiu.saveflow('')
+#ls = xueqiu.get_em_category()
+#print(ls)
+#b,s = xueqiu.emflow('512000')
+#print(b)
+#print(s)
+#xueqiu.saveflow('')
 #xueqiu.emflow2db()
 #xueqiu.emflowRT2()
 #xueqiu.emflow2db()

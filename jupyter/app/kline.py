@@ -241,6 +241,7 @@ config {
     cb : function(self,axs,bi,ei)
     lightweight: True or False 如果是True仅仅加载一年的数据
     prediction:[[date,volume,open,high,low,close],...]#提前加入未来的预测k线图
+    search: function(self) 返回满足条件的索引数组
 }
 """
 class Plote:
@@ -412,6 +413,11 @@ class Plote:
                     self._macd,self._dif,self._dea = stock.macd(self._k)
                 self._minpt,self._maxpt,_ = stock.MacdBestPt(self._k,self._macd)
             self._showbest = True
+        self._keyindex = None
+        if 'search' in self._config:
+            searchfunc = self._config['search']
+            if callable(searchfunc):
+                self._keyindex = searchfunc(self)
 
     def switchweek(self):
         self._period = 'w'
@@ -1747,6 +1753,13 @@ class Plote:
             link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
             
         items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
+
+        if self._keyindex is not None:
+            keyprev = widgets.Button(description="<<",layout=Layout(width='48px'))
+            keynext = widgets.Button(description=">>",layout=Layout(width='48px'))
+            items.append(keyprev)
+            items.append(keynext)
+
         list_output = widgets.Output()
         if self.code()[0] == 'b':
             items.append(listbutton)
@@ -1952,6 +1965,47 @@ class Plote:
         nextbutton.on_click(on_nextbutton_clicked)
         prevbutton.on_click(on_prevbutton_clicked)
 
+        def gotopos(p):
+            nonlocal needUpdateSlider,beginPT,endPT,showRange
+            if p>=0 and p<len(self._k):
+                self._trendHeadPos = p
+                needUpdateSlider = False
+                if self._trendHeadPos>endPT or self._trendHeadPos<beginPT:
+                    endPT = self._trendHeadPos+math.floor(showRange/2)
+                    if endPT>len(self._k):
+                        endPT = len(self._k)
+                    beginPT = endPT-showRange
+                    if beginPT<0:
+                        beginPT=0
+                    setSlider(beginPT,endPT,self._trendHeadPos)
+                slider.value = self._trendHeadPos
+                updateTrend()
+                showline()
+
+        def on_keyprev(e):
+            previ = 0
+            for p in self._keyindex:
+                if p>=self._trendHeadPos:
+                    break
+                previ = p
+            if previ!=0:
+                gotopos(previ)
+            
+        def on_keynext(e):
+            nexti = 0
+            nx = 0
+            for p in self._keyindex:
+                if p>=self._trendHeadPos:
+                    if nx==1:
+                        nexti = p
+                        break
+                    nx = 1
+            if nexti!=0:
+                gotopos(nexti)
+            
+        if self._keyindex is not None:
+            keyprev.on_click(on_keyprev)
+            keynext.on_click(on_keynext)
         zoominbutton.on_click(on_zoomin)
         zoomoutbutton.on_click(on_zoomout)
 

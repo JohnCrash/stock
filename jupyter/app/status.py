@@ -4327,7 +4327,7 @@ def emflowplot():
 
     output = widgets.Output()
     mainDropdown = widgets.Dropdown(
-        options=['热点','热门分类','冷门分类','风格','指数','分类概念','科技概念','消费概念'],
+        options=['热点','ETF','热门分类','冷门分类','风格','指数','分类概念','科技概念','消费概念'],
         value='热点',
         description='选择',
         layout=Layout(display='block',width='140px'),
@@ -4369,6 +4369,8 @@ def emflowplot():
             sel(3)
         elif n=='冷门分类':
             sel(1)
+        elif n=='ETF':
+            sel(9)
         elif n=='风格':
             sel(12)
         elif n=='指数':
@@ -4389,6 +4391,7 @@ def emflowplot():
             DD = None
         else:
             RR,DD = xueqiu.mainflow(codes,n)
+        
         r,d = xueqiu.mainflowrt(codes,RR,DD)
         S = []
         for i in range(r.shape[1]):
@@ -4486,6 +4489,7 @@ def emflowplot():
                 ISIN.append(s[0])
         lw = 8
         x = np.arange(R.shape[0])
+        al=1
         for j in range(R.shape[1]):
             i = SS[j][0]
             if i in ISIN:

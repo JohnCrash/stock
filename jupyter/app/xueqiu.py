@@ -1696,8 +1696,15 @@ def emflow(code,timeout=None):
         perfix = '90'
     else:
         if code[0]=='S' or code[0]=='s':
+            if code[1]=='H' or code[1]=='h':
+                perfix = '1'
+            else:
+                perfix = '0'
             code = code[2:] #去掉前缀SH或者SZ
-        perfix = '0'
+        elif code=='399001' or code[0]=='1':
+            perfix = '0'
+        else:
+            perfix = '1'
     uri = "http://push2.eastmoney.com/api/qt/stock/fflow/kline/get?cb=jQuery112309731450462414866_%d&\
 &lmt=0&klt=1&fields1=f1%%2Cf2%%2Cf3%%2Cf7&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56%%2Cf57%%2Cf58%%2Cf59%%2Cf60%%2Cf61%%2Cf62%%2Cf63%%2Cf64%%2Cf65&ut=b2884a393a59ad64002292a3e90d46a5&\
 secid=%s.%s&_=%d"%(ts,perfix,code,ts)
@@ -1779,6 +1786,47 @@ def emdistribute(t=0,timeout=None):
         log.error("emdistribute:"+"ERROR:"+str(e))
         return False,str(e)
 
+def emdistribute2(codes,timeout=None):
+    ts = math.floor(time.time())
+    codelists = ""
+    for c in codes:
+        perfix = '1'
+        code = c
+        if c[0]=='S' or c[0]=='s':
+            if c[1]=='H' or c[1]=='h':
+                perfix = '1'
+            else:
+                perfix = '0'
+            code = c[2:]
+        elif c=='399001' or c[0]=='1':
+            perfix = '0'
+        else:
+            perfix = '1'
+        codelists += "%s.%s,"%(perfix,code)
+    codelists = codelists[:-1]
+    n = len(codes)
+    uri="https://push2.eastmoney.com/api/qt/ulist/get?cb=jQuery1124046041648531999235_%d&invt=3&pi=0&pz=%d&mpi=2000&secids=%s&ut=6d2ffaa6a585d612eda28417681d58fb&fields=f12,f13,f14,f62&po=1&_=%d"%(ts,n,codelists,ts)
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate'}
+        if timeout is None:
+            r = s.get(uri,headers=headers)
+        else:
+            r = s.get(uri,headers=headers,timeout=timeout)
+        if r.status_code==200:
+            bi = r.text.find('({"rc":')
+            if bi>0:
+                R = json.loads(r.text[bi+1:-2])
+                return True,R
+            else:
+                return False,r.text
+        else:
+            return False,r.reason
+    except Exception as e:
+        log.error("emdistribute:"+"ERROR:"+str(e))
+        return False,str(e)    
+
 _em_category = None
 #返回stock.flow_em_category
 #0id 1name 2code 3prefix 4watch
@@ -1842,14 +1890,42 @@ def emflowRT():
                         if code in code2i:
                             i = code2i[code]
                             a[i] = it['f62']
+            
+            #对那些不是个股进行数据单独下载
+            alls = get_em_category()
+            codes = []
+            for c in alls:
+                if c[2][0] != 'B':
+                    codes.append(c[2])
+            b,r = emdistribute2(codes)
+            if b:
+                if 'data' in r:
+                    ls = r['data']['diff']
+                    #使用emls的顺序重新组织数据
+                    for it in ls:
+                        v = ls[it]
+                        code = v['f12']
+                        if code in code2i:
+                            i = code2i[code]
+                            a[i] = v['f62']
+
             if R is None:
-                shared.numpyToRedis(a,k,ex=1*24*3600) #保留1天
+                RR = a
             else:
-                shared.numpyToRedis(np.vstack((R,a)),k,ex=1*24*3600) #保留1天
+                RR = np.vstack((R,a))
             D.append(datetime(t.year,t.month,t.day,t.hour,t.minute,0))
+
+            shared.numpyToRedis(RR,k,ex=1*24*3600) #保留1天
             shared.toRedis(D,n,ex=1*24*3600)
     except Exception as e:
         log.error("emflowRT:"+"ERROR:"+str(e))
+
+"""
+对flow_em_category中个股数据进行更新
+采用变频更新，早晨9:30-10是每分钟1次，上午是5分钟一次，下午是
+"""        
+def emflowRT2(R,D,t):
+    pass
 """
 将eastmoney资金流数据存入数据库中
 """
@@ -1884,7 +1960,7 @@ def emflow2db():
                         ELS.append(c)
                         break
                     b,R = emflow(c[2])
-                    if b and 'data' in R:
+                    if b and 'data' in R and R['data'] is not None:
                         klines = R['data']['klines']
                         QS = ""
                         for k in klines:
@@ -1892,6 +1968,9 @@ def emflow2db():
                             if len(vs)==6:
                                 QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
                         stock.execute("insert ignore into flow_em values %s"%QS[:-1])
+                        break
+                    else:
+                        print("emflow2db 下载的数据存在问题, %s"%(str(c)))
                         break
             if len(ELS)>0:
                 ls = ELS #存在错误，将错误在处理一次
@@ -1936,7 +2015,8 @@ def mainflowrt(codes,R=None,D=None):
     b,d = shared.fromRedis(n)
     b1,r = shared.numpyFromRedis(k)
     code2i = get_em_code2i()
-    if R is None:
+
+    if R is None: #当天数据
         if b and b1:
             s = np.zeros((len(d),len(codes)))
             for i in range(len(codes)):
