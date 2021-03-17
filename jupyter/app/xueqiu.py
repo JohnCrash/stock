@@ -1786,6 +1786,35 @@ def emdistribute(t=0,timeout=None):
         log.error("emdistribute:"+"ERROR:"+str(e))
         return False,str(e)
 
+"""
+批量获取em数据,注意返回字段可以任意定制
+返回数据
+{
+    "rc": 0,
+    "rt": 6,
+    "svr": 182995714,
+    "lt": 1,
+    "full": 1,
+    "data": {
+        "total": 61,
+        "diff": [
+            {
+                "f12": "BK0451",
+                "f13": 90,
+                "f14": "房地产",
+                "f62": 3829197648
+            },
+            {
+                "f12": "BK0474",
+                "f13": 90,
+                "f14": "保险",
+                "f62": 1386839600
+            },
+            ...
+        ]
+    }
+}
+"""
 def emdistribute2(codes,timeout=None):
     ts = math.floor(time.time())
     codelists = ""
@@ -1897,17 +1926,19 @@ def emflowRT():
             for c in alls:
                 if c[2][0] != 'B':
                     codes.append(c[2])
-            b,r = emdistribute2(codes)
-            if b:
-                if 'data' in r:
-                    ls = r['data']['diff']
-                    #使用emls的顺序重新组织数据
-                    for it in ls:
-                        v = ls[it]
-                        code = v['f12']
-                        if code in code2i:
-                            i = code2i[code]
-                            a[i] = v['f62']
+            #每一个批量不要多于100个
+            for i in range(0,len(codes),100):
+                b,r = emdistribute2(codes[i:i+100])
+                if b:
+                    if 'data' in r:
+                        ls = r['data']['diff']
+                        #使用emls的顺序重新组织数据
+                        for it in ls:
+                            v = ls[it]
+                            code = v['f12']
+                            if code in code2i:
+                                i = code2i[code]
+                                a[i] = v['f62']
 
             if R is None:
                 RR = a
@@ -2020,7 +2051,9 @@ def mainflowrt(codes,R=None,D=None):
         if b and b1:
             s = np.zeros((len(d),len(codes)))
             for i in range(len(codes)):
-                s[:,i] = r[:,code2i[codes[i]]]
+                j = code2i[codes[i]]
+                if j<r.shape[1]:
+                    s[:,i] = r[:,j]
             return s,d
         else:
             return np.zeros((0,0)),[]

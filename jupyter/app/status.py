@@ -692,7 +692,13 @@ def cb_macd_gold(a,c,d=None):
     return a[-1,4]>0 and a[-2,4]<=0
 #macd死叉
 def cb_macd_die(a,c,d=None):
-    return a[-1,4]<0 and a[-2,4]>0    
+    return a[-1,4]<0 and a[-2,4]>0   
+#macd即将金叉
+def cb_macd_progold(a,c,d=None):
+    if a[-1,4]<0 and a[-1,4]>a[-2,4]:
+        return (3*a[-1,4]-2*a[-2,4])>=0
+    else:
+        return False
 #价格回归到ma60附近
 def cb_ma_60(a,c,d=None):
     ma60 = a[-60:,1].mean()
@@ -1188,7 +1194,7 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
         description='周期',
         layout=Layout(display='block',width='126px'),
         disabled=False)
-    methodlists = ['双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
+    methodlists = ['macd将金','双崛起买点','RSI左买点','RSI右买点(<20)','RSI右买点(20-30)','volumeJ左买点',
                     'volumeJ右买点','bollwidth<0.2(30)','bollwidth<0.15(30)','boll通道顶','boll通道底部',
                     '成交量显著放大','量价齐升','昨天涨停','涨幅大于0%','涨幅大于5%','涨幅大于8%',
                     '涨停板','二连板','三连板','跌停板','历史新高','历史高位5%内','历史高位10%内','历史高位20%内',
@@ -1260,6 +1266,8 @@ def SearchRT(period='d',cb=None,name=None,bi=None,ei=None):
             cbs[i] = wrap(cb_ma_20)
         elif sel=='回归10均线':
             cbs[i] = wrap(cb_ma_10)
+        elif sel=='macd将金':
+            cbs[i] = wrap(cb_macd_progold)       
         elif sel=='macd金叉':
             cbs[i] = wrap(cb_macd_gold)       
         elif sel=='macd死叉':
@@ -4327,7 +4335,7 @@ def emflowplot():
 
     output = widgets.Output()
     mainDropdown = widgets.Dropdown(
-        options=['热点','ETF','热门分类','冷门分类','风格','指数','分类概念','科技概念','消费概念'],
+        options=['热点','ETF','行业龙头','热门分类','冷门分类','风格','指数','分类概念','科技概念','消费概念'],
         value='热点',
         description='选择',
         layout=Layout(display='block',width='140px'),
@@ -4371,6 +4379,8 @@ def emflowplot():
             sel(1)
         elif n=='ETF':
             sel(9)
+        elif n=='行业龙头':
+            sel(8)
         elif n=='风格':
             sel(12)
         elif n=='指数':

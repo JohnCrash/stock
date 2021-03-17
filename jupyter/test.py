@@ -21,9 +21,83 @@ import app.category as category
 import subprocess
 import threading
 import copy
-
-
-xueqiu.emflowRT()
+"""
+lss = stock.query("select * from flow_em_category where watch=8")
+codes = []
+for c in lss:
+    codes.append(c[2])
+b,R = xueqiu.emdistribute2(codes)
+print(R)
+"""
+"""  
+codes=[
+    '600031',
+    '603160',
+    '000425',
+    '000568',
+    '000858',
+    '000063',
+    '002475',
+    '603501',
+    '300122',
+    '600196',
+    '300015',
+    '600588',
+    '300760',
+    '000333',
+    '000651',
+    '601088',
+    '601899',
+    '002594',
+    '600104',
+    '601633',
+    '300750',
+    '601012',
+    '600660',
+    '600585',
+    '600900',
+    '603986',
+    '002049',
+    '002049',
+    '000725',
+    '002241',
+    '600745',
+    '600887',
+    '601318',
+    '688981',
+    '600893',
+    '601888',
+    '601766',
+    '600036',
+    '600999',
+    '603993',
+    '000002',
+    '600809',
+    '000547',
+    '002230',
+    '002352',
+    '300413',
+    '600309',
+    '600519',
+    '601989'
+]
+companys = stock.query("select code,name from company")
+code2com = {}
+for c in companys:
+    code2com[c[0][2:]]=c
+for c in codes:
+    if c in code2com:
+        print(code2com[c])
+        code = code2com[c]
+        prefix = 0
+        if code[0][1]=='Z':
+            prefix = 0
+        else:
+            prefix = 1
+        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch) values ('%s','%s',%d,8)"%(code[1],code[0],prefix))
+    else:
+        print("not found "+c)
+"""        
 """
 cs = xueqiu.get_em_category()
 codes = []
@@ -36,11 +110,11 @@ print(d[-1])
 """
 #ls = xueqiu.get_em_category()
 #print(ls)
-#b,s = xueqiu.emflow('512000')
+#b,s = xueqiu.emflow('SZ000725')
 #print(b)
 #print(s)
 #xueqiu.saveflow('')
-#xueqiu.emflow2db()
+xueqiu.emflow2db()
 #xueqiu.emflowRT2()
 #xueqiu.emflow2db()
 #tv = stock.totalVolume(date='2020-1-22')
