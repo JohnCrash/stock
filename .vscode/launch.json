@@ -72,7 +72,7 @@
             "request": "launch",
             "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["SZ159922","500ETF"]
+            "args": ["SH515260","电子2ETF"]
         },   
         {
             "type": "node",
@@ -85,7 +85,7 @@
             "request": "launch",
             "name": "Debug test.py",
             "program": "${workspaceFolder}\\jupyter\\test.py"
-        },       
+        },            
         {
             "type": "python",
             "request": "launch",

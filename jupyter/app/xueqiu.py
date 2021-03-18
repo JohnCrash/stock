@@ -322,6 +322,7 @@ def get_company_select():
     global _companys
     if _companys is None:
         companys = stock.query("""select company_id,code,name,category,vmax,vmin from company_select""")
+        #companys = stock.query("""select id,code,name,category from company where msci=1 or msci=2 or msci=3""") #1msci 2etf 3大盘指数
         _companys = companys
     return _companys
 def get_company_select_id2com():
@@ -1814,6 +1815,21 @@ def emdistribute(t=0,timeout=None):
         ]
     }
 }
+可以在个股资金流页面get?cb查找到详细字段
+f2 f2/1000当前价格 
+f3 f3/100当日涨跌
+f5 当日成交量
+f6 当日成交额
+f8 f6/100换手率 
+f9 市盈率
+f12 代码
+f13 代码前缀 90 板块 1 SH 0 SZ
+f14 名称
+f62 主力净流入
+f66 超大单
+f72 大单
+f78 中单
+f84 小单
 """
 def emdistribute2(codes,timeout=None):
     ts = math.floor(time.time())
@@ -1936,10 +1952,15 @@ def emflowRT():
                         for it in ls:
                             v = ls[it]
                             code = v['f12']
-                            if code in code2i:
+                            if 'SH'+code in code2i:
+                                i = code2i['SH'+code]
+                                a[i] = v['f62']
+                            elif 'SZ'+code in code2i:
+                                i = code2i['SZ'+code]
+                                a[i] = v['f62']
+                            elif code in code2i:
                                 i = code2i[code]
                                 a[i] = v['f62']
-
             if R is None:
                 RR = a
             else:
@@ -1998,6 +2019,7 @@ def emflow2db():
                             vs = k.split(',')
                             if len(vs)==6:
                                 QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
+                        print("%s insert flow"%(c[2]))
                         stock.execute("insert ignore into flow_em values %s"%QS[:-1])
                         break
                     else:
@@ -2008,8 +2030,8 @@ def emflow2db():
                 ELS = []
             else:
                 break
-            
     except Exception as e:
+        print('emflow2db error :'+str(e))
         log.error("emflow2db:"+"ERROR:"+str(e))
 
 """
@@ -2070,3 +2092,7 @@ def mainflowrt(codes,R=None,D=None):
         return np.vstack((R,s)),D+d
     else:
         return np.copy(R),D
+
+"""
+将em的分类和概念的kd,k5下载存入到kd_em,k5_em
+"""

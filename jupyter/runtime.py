@@ -54,25 +54,36 @@ if __name__=='__main__':
             if t.hour==15:
                 print("5分钟后开始更新数据库...")
                 time.sleep(5*60)
-            print("保存资金流向到数据库...")
+            
             try:
+                print("保存sina资金流向到数据库...")
                 xueqiu.sinaFlowRT()
                 status.saveflow()
-                xueqiu.emflow2db() #将emflow保存到数据库中   
             except Exception as e:
                 log.error(str(e))
                 print(e)
-            print("开始从雪球下载数据")
-            for i in range(3):
-                r = subprocess.run(['node',config.download_js])
-                if r.returncode==0:
-                    log.info("done")
-                    break
-                else:
-                    log.warning("%s下载出现问题"%(config.download_js))
-            print("开始更新数据库...")
-            status.update_status(process)
-            xueqiu.update_today_period([60,30,15])
+            try:                
+                print("将EM资金流存入数据库...")
+                xueqiu.emflow2db() #将emflow保存到数据库中
+            except Exception as e:
+                log.error(str(e))
+                print(e)
+            try:
+                print("开始从雪球下载数据")
+                for i in range(3):
+                    r = subprocess.run(['node',config.download_js])
+                    if r.returncode==0:
+                        log.info("done")
+                        break
+                    else:
+                        log.warning("%s下载出现问题"%(config.download_js))
+            except Exception as e:
+                log.error(str(e))
+                print(e)                    
+            #新版本仅仅跟踪msci个股
+            #print("开始更新数据库...")
+            #status.update_status(process)
+            #xueqiu.update_today_period([60,30,15])
             print("更新完成。")
             download_done_day = t.day
             shared.toRedis(download_done_day,"last_download_day")

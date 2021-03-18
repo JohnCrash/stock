@@ -18,9 +18,20 @@ import math
 import app.config as config
 import app.backtest as backtest
 import app.category as category
+import app.tool as tool
 import subprocess
 import threading
 import copy
+"""
+xueqiu.emflowRT()
+
+codess = stock.query("select * from flow_em_category where watch=8")
+codes = []
+for c in codess:
+    codes.append(c[2])
+R,D = xueqiu.mainflowrt(codes)
+print(D)
+"""
 """
 lss = stock.query("select * from flow_em_category where watch=8")
 codes = []
@@ -29,7 +40,7 @@ for c in lss:
 b,R = xueqiu.emdistribute2(codes)
 print(R)
 """
-"""  
+"""
 codes=[
     '600031',
     '603160',
@@ -81,12 +92,21 @@ codes=[
     '600519',
     '601989'
 ]
+
+codess = stock.query("select code from company where msci=1")
+fef = stock.query("select code from flow_em_category")
+fefcode2c = {}
+for c in fef:
+    fefcode2c[c[0]] = c
+codes = []
+for c in codess:
+    codes.append(c[0])
 companys = stock.query("select code,name from company")
 code2com = {}
 for c in companys:
-    code2com[c[0][2:]]=c
+    code2com[c[0]]=c
 for c in codes:
-    if c in code2com:
+    if c in code2com and not (c in fefcode2c):
         print(code2com[c])
         code = code2com[c]
         prefix = 0
@@ -94,10 +114,10 @@ for c in codes:
             prefix = 0
         else:
             prefix = 1
-        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch) values ('%s','%s',%d,8)"%(code[1],code[0],prefix))
+        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch) values ('%s','%s',%d,6)"%(code[1],code[0],prefix))
     else:
         print("not found "+c)
-"""        
+"""
 """
 cs = xueqiu.get_em_category()
 codes = []
@@ -114,7 +134,7 @@ print(d[-1])
 #print(b)
 #print(s)
 #xueqiu.saveflow('')
-xueqiu.emflow2db()
+#xueqiu.emflow2db()
 #xueqiu.emflowRT2()
 #xueqiu.emflow2db()
 #tv = stock.totalVolume(date='2020-1-22')

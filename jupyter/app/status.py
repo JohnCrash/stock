@@ -4327,6 +4327,7 @@ def review(ls,bi,mi,ei):
 
 """
 行业主力流向
+watch -1大盘,0概念或者分类冷门的 1-5分类,6MSCI,8热门，9ETF,10-20概念
 """
 def emflowplot():
     cs = xueqiu.get_em_category()
@@ -4341,7 +4342,7 @@ def emflowplot():
         layout=Layout(display='block',width='140px'),
         disabled=False)
     lenDropdown = widgets.Dropdown(
-        options=['当天','1天','2天','3天','6天'],
+        options=['当天','1天','2天','3天','6天','12天','24天'],
         value='当天',
         description='历史',
         layout=Layout(display='block',width='100px'),
@@ -4426,8 +4427,12 @@ def emflowplot():
             lenflow(2)
         elif n=='3天':
             lenflow(3)
-        else:
+        elif n=='6天':
             lenflow(6)
+        elif n=='12天':
+            lenflow(12)
+        else:
+            lenflow(20)
         viDropdown.value = '正常' if mode==0 else '累计'
         updateplote()
     gseln = None
@@ -4471,12 +4476,17 @@ def emflowplot():
         xticks = []
         fig,ax = plt.subplots(1,1,figsize=(32,16))
         ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
+        if (D[-1][0]-D[0][0]).days<5:
+            isdd = True
+        else:
+            isdd = False
         for i in range(len(D)):
             t = D[i][0]
-            if t.minute%15==0:
+            if isdd and t.minute%15==0:
                 xticks.append(i)
             if i>1 and t.day != D[i-1][0].day:
                 xticks.append(i)
+
         xticks.append(len(D)-1)
         xticks.append(len(D)-1)
         #对最后流入数据进行排序
