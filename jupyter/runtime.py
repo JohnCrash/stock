@@ -68,6 +68,12 @@ if __name__=='__main__':
             except Exception as e:
                 log.error(str(e))
                 print(e)
+            try:                
+                print("将EM分类概念K存入数据库...")
+                xueqiu.emkline2db() 
+            except Exception as e:
+                log.error(str(e))
+                print(e)                
             try:
                 print("开始从雪球下载数据")
                 for i in range(3):

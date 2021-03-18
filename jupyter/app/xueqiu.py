@@ -1732,6 +1732,98 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
         return False,str(e)
 
 """
+获取eastmoney kline数据
+kd
+http://push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery112406067857018266605_1616059436272&secid=90.BK0465&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58&klt=101&fqt=0&beg=19900101&end=20220101&_=1616059436273
+{
+    "rc": 0,
+    "rt": 6,
+    "svr": 182995714,
+    "lt": 1,
+    "full": 1,    
+    "data": {
+        "klines:[
+            "2000-01-04,999.64,1028.18,1037.04,987.60,336585,391487000.00,4.94"
+            ...
+        ]
+    },
+
+}
+k5
+http://push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery112406067857018266605_1616059436301&secid=90.BK0465&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58&klt=5&fqt=0&beg=19900101&end=20220101&_=1616059436339
+{
+    "rc": 0,
+    "rt": 6,
+    "svr": 182995714,
+    "lt": 1,
+    "full": 1,    
+    "data": {
+        "klines:[
+            "2021-01-27 09:35,25782.87,25711.66,25854.86,25711.66,1458100,3826018928.00,0.55"
+            ...
+        ]
+    },
+
+}
+"""
+def emkline(code,period='d',begin='19900101',end='20250101',timeout=None):
+    ts = math.floor(time.time())
+    if code[0]=='B':
+        perfix = '90'
+    else:
+        if code[0]=='S' or code[0]=='s':
+            if code[1]=='H' or code[1]=='h':
+                perfix = '1'
+            else:
+                perfix = '0'
+            code = code[2:] #去掉前缀SH或者SZ
+        elif code=='399001' or code[0]=='1':
+            perfix = '0'
+        else:
+            perfix = '1'
+
+    if period=='d':
+        period = 101
+    uri = "http://push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery112406067857018266605_1616059436301&secid=%s.%s&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%%2Cf2%%2Cf3%%2Cf4%%2Cf5&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56&klt=%d&fqt=0&beg=%s&end=%s&_=%d"%(perfix,code,period,begin,end,ts)
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate'}
+        if timeout is None:
+            r = s.get(uri,headers=headers)
+        else:
+            r = s.get(uri,headers=headers,timeout=timeout)
+        if r.status_code==200:
+            bi = r.text.find('({"rc":')
+            if bi>0:
+                R = json.loads(r.text[bi+1:-2])
+                K = []
+                D = []
+                if 'data' in R and 'klines' in R['data']:
+                    klines = R['data']['klines']
+                    if period == 101:
+                        for k in klines:#"2000-01-04,999.64,1028.18,1037.04,987.60,336585,391487000.00,4.94"
+                            #0date 1open 2close 3high 4low 5volume
+                            vs = k.split(',')
+                            if len(vs)==6:
+                                D.append((datetime.fromisoformat(vs[0]),))
+                                K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
+                    else:
+                        for k in klines:#"2021-01-27 09:35,25782.87,25711.66,25854.86,25711.66,1458100,3826018928.00"
+                            #0date 1open 2close 3high 4low 5volume
+                            vs = k.split(',')
+                            if len(vs)==6:
+                                D.append((datetime.fromisoformat(vs[0]),))
+                                K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
+                return True,K,D
+            else:
+                return False,r.text
+        else:
+            return False,r.reason
+    except Exception as e:
+        log.error("emflow:"+str(code)+"ERROR:"+str(e))
+        return False,str(e)
+"""
 主力净流入分布
 t=0 行业
 t=1 概率
@@ -2093,6 +2185,44 @@ def mainflowrt(codes,R=None,D=None):
     else:
         return np.copy(R),D
 
+#将单个em kline下载并保存到db中
+def emk2db(db,id,code,period):
+    try:
+        if db=='k5_em':
+            twords = 'timestamp'
+            t2s = stock.dateString
+        else:
+            twords = 'date'
+            t2s = stock.timeString
+        lss = stock.query("select * from %s where id=%d order by %s desc limit 1"%(db,id,twords))
+        if len(lss)==0:
+            begin = '19900101'
+        else:
+            t = lss[0][1]
+            begin = "%s%02d%02d"%(t.year,t.month,t.day)
+        b,K,D = emkline(code,period,begin)
+        if b:
+            print('emk2db %s %s'%(code,period))
+            wd = "id,%s,volume,open,high,low,close"%twords
+            for j in range(0,len(D),100): #每次刷入100个数据
+                s = ""
+                for i in range(j,j+100):
+                    if i<len(K):
+                        k = K[i]
+                        t = t2s(D[i][0])
+                        s += "(%d,'%s',%f,%f,%f,%f,%f),"%(id,t,k[0],k[1],k[2],k[3],k[4])
+                if len(s)>0:
+                    stock.execute("insert ignore into %s (%s) values %s"%(db,wd,s[:-1]))
+        else:
+            print('emk2db %s %s 下载失败'%(code,period))
+    except Exception as e:
+        print('emk2db %s %s %s %s'%(db,code,period,str(e)))
 """
 将em的分类和概念的kd,k5下载存入到kd_em,k5_em
 """
+def emkline2db():
+    #保存BK开头的全部
+    lss = stock.query("select * from flow_em_category where code like'BK%'")
+    for c in lss:
+        emk2db('kd_em',c[5],c[2],'d')
+        emk2db('k5_em',c[5],c[2],5)

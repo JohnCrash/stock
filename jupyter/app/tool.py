@@ -6,6 +6,7 @@ import json
 from . import mylog
 from . import config
 from . import shared
+from . import xueqiu
 from . import stock
 
 log = mylog.init('tool.log',name='tool')
@@ -78,8 +79,50 @@ def flowemcategoryshsz():
     for c in lss:
         if c[2][0]!='B' and c[2][0]!='S':
             if c[2] in code2c:
-                stock.execute("update flow_em_category set code='%s'"%code2c[c[2]][1])
+                stock.execute("update flow_em_category set code='%s' where code='%s'"%code2c[c[2]][1],c[2])
             else:
                 print("not find "+c[2])
 
-flowemcategoryshsz()
+#数据库flow_em_category的code丢失，回复
+def flowemcategoryre():
+    #先回复分类和概念
+    for i in range(2):
+        b,r = xueqiu.emdistribute(i)
+        if b and 'data' in r:
+            lss = r['data']['diff']
+            for s in lss:
+                code = s['f12']
+                name = s['f14']
+                stock.execute("update flow_em_category set code='%s' where name='%s'"%(code,name))
+def flowemcategoryre2():
+    #回复公司代码
+    lss = stock.query("select * from flow_em_category where code=''")
+    company = stock.query("select * from company")
+    name2c = {}
+    for c in company:
+        name2c[c[2]] = c
+    for c in lss:
+        name = c[1]
+        if name in name2c:
+            code = name2c[c[1]][1]
+            stock.execute("update flow_em_category set code='%s' where name='%s'"%(code,name))
+
+
+#给flow_em_category BK开头的代码安排id
+def flowemaid():
+    lss = stock.query("select * from flow_em_category where code like 'BK%'")
+    id = 90000
+    for c in lss:
+        id = id+1
+        stock.execute("update flow_em_category set company_id=%d where code='%s'"%(id,c[2]))
+
+#将flow_em_category 中的非BK开头的id设置号
+def flowemaid2():
+    lss = stock.query("select * from flow_em_category where code not like 'BK%'")
+    for c in lss:
+        idds = stock.query("select id from company where code='%s'"%(c[2]))
+        if len(idds)==1:
+            id = idds[0][0]
+            stock.execute("update flow_em_category set company_id=%d where code='%s'"%(id,c[2]))
+          
+xueqiu.emkline2db()
