@@ -4443,8 +4443,8 @@ def emflowplot():
         gseln = n
         if n==-2:
             for c in cs:
-                if c[4]<10 and c[4]>0:
-                    codes.append(c[2])
+                #if c[4]<10 and c[4]>0:
+                codes.append(c[2])
         elif n==-1:
             for c in cs:
                 codes.append(c[2])
@@ -4476,7 +4476,7 @@ def emflowplot():
         xticks = []
         fig,ax = plt.subplots(1,1,figsize=(32,16))
         ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
-        if (D[-1][0]-D[0][0]).days<5:
+        if len(D)>0 and (D[-1][0]-D[0][0]).days<5:
             isdd = True
         else:
             isdd = False
@@ -4510,6 +4510,7 @@ def emflowplot():
         lw = 8
         x = np.arange(R.shape[0])
         al=1
+
         for j in range(R.shape[1]):
             i = SS[j][0]
             if i in ISIN:

@@ -124,5 +124,18 @@ def flowemaid2():
         if len(idds)==1:
             id = idds[0][0]
             stock.execute("update flow_em_category set company_id=%d where code='%s'"%(id,c[2]))
-          
-xueqiu.emkline2db()
+
+#排除flow中代码相同的          
+def flowempc():
+    lss = stock.query("select * from flow_em_category")
+    R = {}
+    print("--")
+    for c in lss:
+        if c[2] in R:
+            print('重复的：'+c[2])
+        else:
+            R[c[2]] = c
+
+#将etf持仓加入到资金跟踪里面
+def etfcc():
+    pass

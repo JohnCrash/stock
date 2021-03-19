@@ -2044,15 +2044,19 @@ def emflowRT():
                         for it in ls:
                             v = ls[it]
                             code = v['f12']
+
                             if 'SH'+code in code2i:
                                 i = code2i['SH'+code]
-                                a[i] = v['f62']
+                                if i<len(code2i):
+                                    a[i] = v['f62']
                             elif 'SZ'+code in code2i:
                                 i = code2i['SZ'+code]
-                                a[i] = v['f62']
+                                if i<len(code2i):
+                                    a[i] = v['f62']
                             elif code in code2i:
                                 i = code2i[code]
-                                a[i] = v['f62']
+                                if i<len(code2i):
+                                    a[i] = v['f62']
             if R is None:
                 RR = a
             else:
@@ -2135,6 +2139,7 @@ def mainflow(codes,N=3):
     after = kdd[-1][0]
     D = []
     R = None
+    t2i = {}
     code2id =get_em_code2id()
     for j in range(len(codes)):
         c = codes[j]
@@ -2142,10 +2147,15 @@ def mainflow(codes,N=3):
         if R is None:
             for i in range(len(F)):
                 D.append(F[i][1])
+                t2i[F[i][1]] = i
             R = np.zeros((len(D),len(codes)))
-        if len(F)<=len(D): #粗略处理，对于数据丢失没有做处理
+        if len(F)==len(D): #粗略处理，对于数据丢失没有做处理
             for i in range(len(F)):
                 R[i,j] = F[i][4]+F[i][5]
+        elif len(F)<len(D):
+            for i in range(len(F)):
+                if F[i][1] in t2i:
+                    R[t2i[F[i][1]],j] = F[i][4]+F[i][5]
         else:
             print("mainflow 第一组数据不全")
     return R,D
