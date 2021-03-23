@@ -164,7 +164,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
                                 
                                 if(head_date && date.getTime()===head_date.getTime()){
                                     //接头部分需要覆盖
-                                    console.log(code,`update k${lv}: `,dateString);
+                                    //console.log(code,`update k${lv}: `,dateString);
                                     sqlStr = `update k${lv}_xueqiu set ${str_pairs(lv,it)} where id=${id} and ${lv=='d'?'date':'timestamp'}='${dateString}'`;
                                     connection.query(sqlStr,(error, results, field)=>{
                                         if(error){
@@ -182,7 +182,7 @@ function company_kline(id,code,lv,callback,uctable=ucount){
                              * 批量插入数据
                              */
                             if(datas.length>0){
-                                console.log(code,`insert k${lv}: `,datas.length);
+                                //console.log(code,`insert k${lv}: `,datas.length);
                                 connection.query(`insert ignore into k${lv}_xueqiu values ${datas.join(',')}`,(error, results, field)=>{
                                     if(error){
                                         console.error(code,error);
@@ -243,8 +243,10 @@ function company_kline(id,code,lv,callback,uctable=ucount){
 function download_kline(lvs,done){
     initXueqiuCookie((b,c)=>{
         if(b){
+            let count = 0
             companys_task_continue2('id,code',1,(com,flagit)=>cb=>{
                 let task = [];
+                count++;
                 for(let lv of lvs){
                     task.push(
                         (callback)=>{
@@ -262,6 +264,7 @@ function download_kline(lvs,done){
                 });
             }).then(usetime=>{
                 setTimeout(()=>{
+                    console.log(`更新了${count}只股票的数据`)
                     if(done)done();
                 },5000);
             }).catch(err=>{

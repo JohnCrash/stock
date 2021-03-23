@@ -110,6 +110,8 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
             return company[0],kline,kdate
     if expire is not None: #如果使用缓存则加载全部数据
         after = None
+
+    suffix = 'xueqiu'
     """
     这里对code到id的映射进行缓存
     """
@@ -122,6 +124,11 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
             shared.toRedis(company,code)
     elif len(code)>3 and code[0]=='B' and code[1]=='K':
         company = query("""select id,code,name,category from company where code='%s'"""%code)
+        if len(company)==0:#尝试flow_em_catory
+            em = query("""select * from flow_em_category where code='%s'"""%code)
+            if len(em)>0:
+                company = [(em[0][5],em[0][2],em[0][1],'')]
+                suffix = 'em'
     else:
         while True:
             #code没有SH和SZ则尝试两种前缀
@@ -143,7 +150,7 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
                 company = query("""select id,code,name,category from company where name='%s'"""%code)
             break
     
-    suffix = 'xueqiu'
+    
     if len(company)==0:
         #加载板块k,code==板块名称
         if period=='d':
@@ -211,6 +218,27 @@ def loadFlow(after=None,dd=None):
         flow.append(data[i][1:])
     flowk = np.array(flow).reshape(-1,4)
     return flowk,flowdate
+
+def loademFlow(code,after=None,dd=None):
+    qs = query("select id from flow_em_category where code='%s' and watch!=-1"%(code))
+    if len(qs)==1:
+        id = int(qs[0][0])
+        if after is None:
+            if dd is None:
+                data = query("select timestamp,larg,big,mid,tiny from flow_em order by timestamp where id=%d"%(id))
+            else:
+                data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' and timestamp<'%s' order by timestamp"%(id,dateString(dd),dateString(dd+timedelta(days=1))))
+        else:
+            data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' order by timestamp"%(id,after))
+        flowdate = []
+        flow = []
+        for i in range(len(data)):
+            flowdate.append((data[i][0],))
+            flow.append(data[i][1:])
+        flowk = np.array(flow).reshape(-1,4)
+        return True,flowk,flowdate
+    else:
+        return False,None,None
 """
 从共享内存加载k线数据
 """

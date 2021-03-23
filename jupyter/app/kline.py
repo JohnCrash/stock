@@ -25,7 +25,7 @@ log = mylog.init('kline.log',name='kline')
 warnings.filterwarnings("ignore", module="matplotlib")
 
 _cacheK = {}
-_flow = None
+
 def plt_show(display_id,isupdate):
     try:
         for figure_manager in Gcf.get_all_fig_managers():
@@ -464,41 +464,21 @@ class Plote:
                 d = self._date[self._trendHeadPos-1]
             else:
                 d = self._date[self._trendHeadPos]
-            name = "flow_%d_%d"%(d[0].month,d[0].day)
-            b,a = shared.fromRedis(name)
-            if b:
-                flow = ([],[])
-                for k in a:
-                    flow[0].append(k[1:])
-                    flow[1].append((k[0],))
-            else:
-                flow = stock.loadFlow(dd=d[0])
+            
+            flowk,flowd = xueqiu.getFlow(self.code(),self._lastday)
+            flow = ([],[])
+            for i in range(len(flowd)):
+                if flowd[i][0].year==d[0].year and flowd[i][0].month==d[0].month and flowd[i][0].day==d[0].day:
+                    flow[0].append(flowk[i])
+                    flow[1].append(flowd[i])
             return flow
-        else:
-            return None            
+        return None
     """
     取得资金流 ,d是k线图日期数组
     """
     def getFlow(self,d):
-        global _flow
-        if _flow is None:
-            #一般只加载最多一年的数据
-            after = stock.dateString(date.today()-timedelta(days=365 if self._lastday is None else self._lastday)) #1年数据
-            _flow = stock.loadFlow(after)
-        if stock.isTransDay():
-            today = datetime.today()
-            b,a = shared.fromRedis("flow_%d_%d"%(today.month,today.day))
-            if b:
-                offset = len(_flow[0])
-                flow = (np.zeros((offset+len(a),4)),copy.copy(_flow[1]))
-                flow[0][:offset,:] = _flow[0]
-                for i in range(len(a)):
-                    flow[0][i+offset] = a[i][1:]
-                    flow[1].append((a[i][0],))
-            else:
-                flow = _flow
-        else:
-            flow = _flow
+        flowk,flowd = xueqiu.getFlow(self.code(),self._lastday)
+        flow = (flowk,flowd)
         J = 0
         k = np.zeros((len(d),4))
         b = False
@@ -629,6 +609,8 @@ class Plote:
         self._isupdate = False
         self._rate = None
         self._macd = None
+        self._flow = None
+        self._flowdata = None
         self._mode = mode
         self._day_trend = None
         self._lastday = lastday
@@ -977,6 +959,7 @@ class Plote:
                         axflow.grid(True)
                         axflow.set_xlim(0,60*4)
                         axflow.legend()
+                    axflow.axhline(y=0,color='black',linestyle='--')
                 k5s,d5s = self.getCurrentK5()
                 if len(d5s)>0:
                     axk5.set_title('%s 5分钟K'%(stock.dateString(d5s[-1][0])))
@@ -1205,20 +1188,23 @@ class Plote:
                 axsK.plot(x,self._boll[bi:ei,2],label='upper',color='orange') #upper
         if self._showflow:
             if self._period=='d' or self._period=='w':
-                #axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
-                #axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',linewidth=1,color='cyan')
-                #axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',linewidth=1,color='yellow')
-                #axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',linewidth=2,color='red')
-                flow = np.zeros((self._flow.shape[0],))
-                for i in range(len(flow)):
-                    if i>0:
-                        flow[i] = self._flow[i,0]+flow[i-1]
-                    else:
-                        flow[i] = self._flow[i,0]
-                fkdj = stock.kdj(flow,13)
-                axs[self._flowInx].plot(x,fkdj[bi:ei,0],label='k',linewidth=1,color='orange')
-                axs[self._flowInx].plot(x,fkdj[bi:ei,1],label='d',linewidth=1,color='blue')
-                axs[self._flowInx].plot(x,fkdj[bi:ei,2],label='j',linewidth=1,color='purple')
+                c = self.code()
+                if c[2:]=='000001' or c[2:]=='399001':
+                    flow = np.zeros((self._flow.shape[0],))
+                    for i in range(len(flow)):
+                        if i>0:
+                            flow[i] = self._flow[i,0]+flow[i-1]
+                        else:
+                            flow[i] = self._flow[i,0]
+                    fkdj = stock.kdj(flow,13)
+                    axs[self._flowInx].plot(x,fkdj[bi:ei,0],label='k',linewidth=1,color='orange')
+                    axs[self._flowInx].plot(x,fkdj[bi:ei,1],label='d',linewidth=1,color='blue')
+                    axs[self._flowInx].plot(x,fkdj[bi:ei,2],label='j',linewidth=1,color='purple')
+                else:
+                    axs[self._flowInx].plot(x,self._flow[bi:ei,3],label='ting',linewidth=1,color='purple')
+                    axs[self._flowInx].plot(x,self._flow[bi:ei,2],label='mid',linewidth=1,color='cyan')
+                    axs[self._flowInx].plot(x,self._flow[bi:ei,1],label='big',linewidth=1,color='yellow')
+                    axs[self._flowInx].plot(x,self._flow[bi:ei,0],label='larg',linewidth=2,color='red')
             else: #确保相同天是连续的，不同天是断开的
                 dss = []
                 dds = self._date

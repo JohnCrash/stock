@@ -136,6 +136,53 @@ def flowempc():
         else:
             R[c[2]] = c
 
+#取得基金持仓和占比
+def getetfcc(code):
+    uri = "https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=%s&topline=10&year=2020&month=&rt=0.5556118613867067"%(code[2:])
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                'Accept-Encoding': 'gzip, deflate'}
+        r = s.get(uri,headers=headers)
+        qs = 'quote.eastmoney.com/'
+        qslen = len(qs)
+        if r.status_code==200:
+            i = 0
+            result = []
+            R = {}
+            while True:
+                i = r.text.find(qs,i)
+                if i>0:
+                    #print(i,r.text[i+qslen:i+qslen+8])
+                    C = r.text[i+qslen:i+qslen+8].upper()
+                    if C not in R:
+                        R[C] = C
+                        result.append(C)
+                    i = i+qslen
+                else:
+                    return result
+        else:
+            print('getetfcc:'+str(r.reason))
+    except Exception as e:
+        print("getetfcc:"+str(e))
+    return []
+
 #将etf持仓加入到资金跟踪里面
 def etfcc():
-    pass
+    etfs = stock.query("select * from flow_em_category where name like '%%ETF'")
+    companys = stock.query("select * from company")
+    code2c = {}
+    for c in companys:
+        code2c[c[1]] = c
+    for c in etfs:
+        #使用em数据将ETF持仓加入到flow_em_category中去
+        print("处理%s %s:"%(c[1],c[2]))
+        codes = getetfcc(c[2])
+        for c in codes:
+            lss = stock.query("select * from flow_em_category where code='%s'"%c)
+            if len(lss)==0:
+                prefix = 0 if c[1]=='Z' else 1
+                qs = "insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s',%d,6,%d)"%(code2c[c][2],c,prefix,code2c[c][0])
+                print(qs)
+                stock.execute(qs)
+

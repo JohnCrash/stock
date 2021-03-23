@@ -268,7 +268,23 @@ def sinaFlowRT():
             shared.toRedis(a,k,ex=5*24*3600)
     except Exception as e:
         log.error("sinaFlowRT ERROR:"+str(e))
-#新浪财经数据
+
+#返回当前的sinaflow
+def sinaFlow(t=None):
+    if t is None:
+        t = datetime.today()
+    name = "flow_%d_%d"%(t.month,t.day)
+    b,a = shared.fromRedis(name)
+    if b:
+        F = []
+        D = []
+        for k in a:
+            F.append(k[1:]) #(larg,big,mid,ting)
+            D.append((k[0],))
+        return K,D
+    else:
+        return None,None
+
 # True , [(0 timesramp,1 volume,2 open,3 high,4 low,5 close),...]
 # False, "Error infomation"
 def sinaK(code,period,n):
@@ -864,7 +880,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
                 print("sinaFlowRT %s"%t)
-                emflowRT()
+                emflowRT2()
                 print("emflowRT %s"%t)
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
@@ -1568,6 +1584,11 @@ def isValidKDate(d,period):
 
 #将下载数据附加在k,d数据上
 def appendK(code,period,k,d):
+    if code[0]=='B': #看看是不是em分类和概念
+        code2i = get_em_code2i()
+        if code[0] in code2i:
+            return appendEMK(code,period,k,d)
+
     if period==5 or period==15:
         b,nk,nd = K(code,period,32 if period==15 else 96)
     elif type(period)==int:
@@ -1923,7 +1944,7 @@ f72 大单
 f78 中单
 f84 小单
 """
-def emdistribute2(codes,timeout=None):
+def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None):
     ts = math.floor(time.time())
     codelists = ""
     for c in codes:
@@ -1937,12 +1958,14 @@ def emdistribute2(codes,timeout=None):
             code = c[2:]
         elif c=='399001' or c[0]=='1':
             perfix = '0'
+        elif c[0]=='B' or c[0]=='b':
+            perfix = '90'
         else:
             perfix = '1'
         codelists += "%s.%s,"%(perfix,code)
     codelists = codelists[:-1]
     n = len(codes)
-    uri="https://push2.eastmoney.com/api/qt/ulist/get?cb=jQuery1124046041648531999235_%d&invt=3&pi=0&pz=%d&mpi=2000&secids=%s&ut=6d2ffaa6a585d612eda28417681d58fb&fields=f12,f13,f14,f62&po=1&_=%d"%(ts,n,codelists,ts)
+    uri="https://push2.eastmoney.com/api/qt/ulist/get?cb=jQuery1124046041648531999235_%d&invt=3&pi=0&pz=%d&mpi=2000&secids=%s&ut=6d2ffaa6a585d612eda28417681d58fb&fields=%s&po=1&_=%d"%(ts,n,codelists,field,ts)
     try:
         s = requests.session()
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
@@ -1964,6 +1987,8 @@ def emdistribute2(codes,timeout=None):
         log.error("emdistribute:"+"ERROR:"+str(e))
         return False,str(e)    
 
+def emdistribute3(codes,timeout=None):
+    pass
 _em_category = None
 #返回stock.flow_em_category
 #0id 1name 2code 3prefix 4watch
@@ -2066,19 +2091,77 @@ def emflowRT():
             shared.numpyToRedis(RR,k,ex=1*24*3600) #保留1天
             shared.toRedis(D,n,ex=1*24*3600)
     except Exception as e:
-        log.error("emflowRT:"+"ERROR:"+str(e))
+        log.error("emflowRT:"+str(e))
 
 """
-对flow_em_category中个股数据进行更新
-采用变频更新，早晨9:30-10是每分钟1次，上午是5分钟一次，下午是
-"""        
-def emflowRT2(R,D,t):
-    pass
+对emflowRT进行改进,对flow_em_category中的全部进行监控
+"""
+def emflowRT2():
+    try:
+        t = datetime.today()
+        if not (stock.isTransTime() and stock.isTransDay()):
+            return
+        n = "emflowts2_%d_%d"%(t.month,t.day)
+        k = "emflownp2_%d_%d"%(t.month,t.day)
+        b,D = shared.fromRedis(n)
+        if b and D[-1].minute==t.minute and D[-1].day==t.day:
+            return
+        if D is None:
+            D = []
+        b,R = shared.numpyFromRedis(k)
+            #对那些不是个股进行数据单独下载
+        alls = get_em_category()
+        code2i = {}
+        codes = []
+        for i in range(len(alls)):
+            c = alls[i]
+            if c[2][1]=='H' or c[2][1]=='Z':
+                code2i[c[2][2:]] = i
+            else:
+                code2i[c[2]] = i
+            codes.append(c[2])
+        #每一个批量不要多于100个
+        a = np.zeros((len(code2i),1,7))
+        for i in range(0,len(codes),100):
+            b,r = emdistribute2(codes[i:i+100],'f12,f2,f3,f5,f66,f72,f78,f84')
+            if b:
+                if 'data' in r:
+                    ls = r['data']['diff']
+                    #使用emls的顺序重新组织数据
+                    for it in ls:
+                        v = ls[it]
+                        code = v['f12']
+                        if code in code2i:
+                            #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
+                            j = code2i[code]
+                            if j<len(code2i):
+                                a[j,0,0] = v['f2']
+                                a[j,0,1] = v['f3']
+                                a[j,0,2] = v['f5']
+                                a[j,0,3] = v['f66']
+                                a[j,0,4] = v['f72']
+                                a[j,0,5] = v['f78']
+                                a[j,0,6] = v['f84']
+                        else:
+                            print("没有成功获取数据 %s"%(code))
+        if R is None:
+            RR = a
+        else:
+            RR = np.hstack((R,a))
+        D.append(datetime(t.year,t.month,t.day,t.hour,t.minute,0))
+
+        shared.numpyToRedis(RR,k,ex=3*24*3600) #保留3天
+        shared.toRedis(D,n,ex=3*24*3600)
+    except Exception as e:
+        print(str(e))
+        log.error("emflowRT2:"+str(e))
 """
 将eastmoney资金流数据存入数据库中
 """
 def emflow2db():
     try:
+        print("将资金流数据下载保存到数据库`")
+        count = 0
         """
         将行业分类和概念分类放入到数据库
         """
@@ -2099,6 +2182,7 @@ def emflow2db():
             ls = get_em_category()
             code2id = get_em_code2id()
         ELS = []
+
         for j in range(3):
             for c in ls:
                 #0id 1name 2code 3prefix 4watch
@@ -2114,8 +2198,9 @@ def emflow2db():
                         for k in klines:
                             vs = k.split(',')
                             if len(vs)==6:
+                                count=count+1
                                 QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
-                        print("%s insert flow"%(c[2]))
+                        #print("%s insert flow"%(c[2]))
                         stock.execute("insert ignore into flow_em values %s"%QS[:-1])
                         break
                     else:
@@ -2126,6 +2211,7 @@ def emflow2db():
                 ELS = []
             else:
                 break
+        print("emflow2db %d"%count)
     except Exception as e:
         print('emflow2db error :'+str(e))
         log.error("emflow2db:"+"ERROR:"+str(e))
@@ -2165,8 +2251,8 @@ def mainflow(codes,N=3):
 """
 def mainflowrt(codes,R=None,D=None):
     t = datetime.today()
-    n = "emflowts_%d_%d"%(t.month,t.day)
-    k = "emflownp_%d_%d"%(t.month,t.day)
+    n = "emflowts2_%d_%d"%(t.month,t.day)
+    k = "emflownp2_%d_%d"%(t.month,t.day)
     b,d = shared.fromRedis(n)
     b1,r = shared.numpyFromRedis(k)
     code2i = get_em_code2i()
@@ -2176,8 +2262,8 @@ def mainflowrt(codes,R=None,D=None):
             s = np.zeros((len(d),len(codes)))
             for i in range(len(codes)):
                 j = code2i[codes[i]]
-                if j<r.shape[1]:
-                    s[:,i] = r[:,j]
+                if j<r.shape[0]:
+                    s[:,i] = r[j,:,3]+r[j,:,4]
             return s,d
         else:
             return np.zeros((0,0)),[]
@@ -2190,7 +2276,7 @@ def mainflowrt(codes,R=None,D=None):
     if b and b1 and D[-1]<d[0]:
         s = np.zeros((len(d),len(codes)))
         for i in range(len(codes)):
-            s[:,i] = r[:,code2i[codes[i]]]
+            s[:,i] = r[code2i[codes[i]],:,3]+r[code2i[codes[i]],:,4]
         return np.vstack((R,s)),D+d
     else:
         return np.copy(R),D
@@ -2212,7 +2298,7 @@ def emk2db(db,id,code,period):
             begin = "%s%02d%02d"%(t.year,t.month,t.day)
         b,K,D = emkline(code,period,begin)
         if b:
-            print('emk2db %s %s'%(code,period))
+            #print('emk2db %s %s'%(code,period))
             wd = "id,%s,volume,open,high,low,close"%twords
             for j in range(0,len(D),100): #每次刷入100个数据
                 s = ""
@@ -2232,7 +2318,119 @@ def emk2db(db,id,code,period):
 """
 def emkline2db():
     #保存BK开头的全部
+    print("将EM分类和概念的k线数据保存到数据库")
     lss = stock.query("select * from flow_em_category where code like'BK%'")
     for c in lss:
         emk2db('kd_em',c[5],c[2],'d')
         emk2db('k5_em',c[5],c[2],5)
+    print("emkline2db %d"%len(lss))
+
+"""
+返回当天的资金流数据
+"""
+def getTodayFlow(code):
+    code2i = get_em_code2i()
+    t = datetime.today()
+    if code in code2i:
+        n = "emflowts2_%d_%d"%(t.month,t.day)
+        k = "emflownp2_%d_%d"%(t.month,t.day)
+        b,D = shared.fromRedis(n)
+        b1,R = shared.numpyFromRedis(k)
+        if b and b1:
+            f = []
+            d = []
+            j = code2i[code]
+            for i in range(len(D)):
+                d.append((D[i],))
+                f.append(R[j,i,3:])
+            return True,f,d
+    else:
+        name = "flow_%d_%d"%(t.month,t.day) #sinaFlow
+        b,a = shared.fromRedis(name)
+        if b:
+           f = []
+           d = []
+           for k in a:
+               f.append(k[1:])
+               d.append((k[0],))
+           return True,f,d
+    return False,None,None
+
+"""
+返回code的资金流数据
+如果没有发现code就使用sinaFlow数据
+"""
+_getflowcache = {}
+def getFlow(code,lastday=None):
+    #这里对数据进行缓存避免多次操作数据库
+    global _getflowcache
+    if code not in _getflowcache:
+        after = stock.dateString(date.today()-timedelta(days=365 if lastday is None else lastday))
+        b,flowk,flowd = stock.loademFlow(code,after)
+        if not b:
+            flowk,flowd = stock.loadFlow(after)
+        _getflowcache[code] = (flowk,flowd)
+    
+    flowk,flowd = _getflowcache[code]
+    b,k,d = getTodayFlow(code)
+    if b and d[-1][0]>flowd[-1][0]:#叠加
+        endt = flowd[-1][0]
+        for i in range(len(d)):
+            if d[i][0]>endt:
+                flowk.append(k[i])
+                flowd.append(d[i])
+    return flowk,flowd
+
+#k5时序迭代器 (时间，开始位置，结束位置)
+class period5Iterator:
+    def __init__(self,d):
+        self._d = d
+        self._i = 0 #处理的当前位置
+        self._e = len(d) #处理的结束位置
+    def __iter__(self):
+        return self
+    def __next__(self):
+        bi = self._i
+        t = next_k_timestamp(self._d[self._i])
+        for i in range(bi,self._e):
+            if self._d[i]>t:
+                self._i = i
+                return t,bi,self._i
+        raise StopIteration
+"""
+appendK在处理EM分类和概念时实时的从emflowts2中取得k线数据
+"""
+def appendEMK(code,period,k,d):
+    code2i = get_em_code2i()
+    if code in code2i:
+        t = datetime.today()
+        nname = "emflowts2_%d_%d"%(t.month,t.day)
+        kname = "emflownp2_%d_%d"%(t.month,t.day)
+        b,D = shared.fromRedis(nname)
+        b1,R = shared.numpyFromRedis(kname)
+        if b and b1:
+            j = code2i[code]
+            DD = copy.copy(d)
+            if period=='d':
+                DD.append((date.today(),))
+                open1 = R[j,0,0]
+                high = np.max(R[j,:,0])
+                low = np.min(R[j,:,0])
+                close1 = R[j,-1,0]
+                volume = np.sum(R[j,:,2])
+                nk = (volume,open1,high,low,close1)
+                return True,np.vstack((k,nk)),DD
+            elif period==5:
+                nk = []
+                for t,bi,ei in period5Iterator(D):
+                    DD.append((t,))
+                    open1 = R[j,bi,0]
+                    high = np.max(R[j,bi:ei,0])
+                    low = np.min(R[j,bi:ei,0])
+                    close1 = R[j,ei,0]
+                    volume = np.sum(R[j,bi:ei,2])
+                    nk.append((volume,open1,high,low,close1))
+                return True,np.vstack((k,nk)),DD
+            else:
+                return True,k,d
+    return False,k,d
