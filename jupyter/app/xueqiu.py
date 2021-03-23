@@ -498,14 +498,17 @@ def build_timestamp_sequence(d,period):
     return seqs
 
 def next_period_timestamp(d,period):
-    bi = datetime(year=d.year,month=d.month,day=d.day,hour=9,minute=30)
-    ei = datetime(year=d.year,month=d.month,day=d.day,hour=15,minute=0)
-    delta = timedelta(minutes=period)
-    t = bi+delta
-    while t<=ei:
-        if t>=d:
-            return t.timestamp()
-        t += delta
+    if period==240:
+        return datetime(year=d.year,month=d.month,day=d.day)
+    else:
+        bi = datetime(year=d.year,month=d.month,day=d.day,hour=9,minute=30)
+        ei = datetime(year=d.year,month=d.month,day=d.day,hour=15,minute=0)
+        delta = timedelta(minutes=period)
+        t = bi+delta
+        while t<=ei:
+            if t>=d:
+                return t.timestamp()
+            t += delta
     return None
 
 def period_ex(period):
@@ -548,45 +551,80 @@ def nozero_plane(plane):
 """
 每天使用xueqiu数据覆盖实时收集到的数据
 """
-def update_today_period(periods):
+def update_today_period(periods_args):
     dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
     companys = get_company_select()
     t = dd[0][0]
     
     if t==date.today():
-        p = stock.query("select id,timestamp,close from k5_xueqiu where timestamp>'%02d-%02d-%02d'"%(t.year,t.month,t.day))
-        for period in periods:
+        periods = []
+        isdd = False
+        for p in periods_args:
+            if p<240:
+                periods.append(p)
+            else:
+                isdd = True
+        if isdd: #使用kd_xueqiu数据来产生日线级别的数据
+            period=240
+            p = stock.query("select id,date,close from kd_xueqiu where date='%02d-%02d-%02d'"%(t.year,t.month,t.day))
             b,seqs = shared.fromRedis('k%d_sequence'%period)
             if not b:
                 rebuild_period_sequence(period)
                 return
             for i in range(96): #删除今天的rt时间戳
                 tt = datetime.fromtimestamp(seqs[-1])
-                if tt.day==t.day and tt.month==t.month:
+                if tt.day==t.day and tt.month==t.month and tt.year==t.year:
                     del seqs[-1]
                 else:
                     break
-            seqs_today = build_timestamp_sequence(t,period)
-            timestamp2i = {}
-            for i in range(len(seqs_today)):
-                timestamp2i[seqs_today[i]] = i
-                seqs.append(seqs_today[i])
-            id2i = {} 
+            seqs.append(detetimestamp(t))
+            id2i = {}
             for i in range(len(companys)):
                 id2i[companys[i][0]] = i
 
-            plane = np.zeros((len(companys),len(seqs)))
+            plane = np.zeros((len(companys),))
             for v in p:
                 cid = v[0]
-                ts = v[1].timestamp()
-                if ts in timestamp2i and cid in id2i:
-                    plane[id2i[cid],timestamp2i[ts]] = v[2]
+                ts = detetimestamp(v[1])
+                if cid in id2i:
+                    plane[id2i[cid]] = v[2]
             nozero_plane(plane)
-            for i in range(len(seqs_today)):
-                shared.numpyToRedis(plane[:,i],"k%d%d"%(period,seqs_today[i]),ex=period_ex(period))
+            shared.numpyToRedis(plane[:],"k%d%d"%(period,seqs[-1]),ex=period_ex(period))
             shared.toRedis(seqs,'k%d_sequence'%period)
+        else:
+            p = stock.query("select id,timestamp,close from k5_xueqiu where timestamp>'%02d-%02d-%02d'"%(t.year,t.month,t.day))
+            for period in periods:
+                b,seqs = shared.fromRedis('k%d_sequence'%period)
+                if not b:
+                    rebuild_period_sequence(period)
+                    return
+                for i in range(96): #删除今天的rt时间戳
+                    tt = datetime.fromtimestamp(seqs[-1])
+                    if tt.day==t.day and tt.month==t.month:
+                        del seqs[-1]
+                    else:
+                        break
+                seqs_today = build_timestamp_sequence(t,period)
+                timestamp2i = {}
+                for i in range(len(seqs_today)):
+                    timestamp2i[seqs_today[i]] = i
+                    seqs.append(seqs_today[i])
+                id2i = {} 
+                for i in range(len(companys)):
+                    id2i[companys[i][0]] = i
+
+                plane = np.zeros((len(companys),len(seqs_today)))
+                for v in p:
+                    cid = v[0]
+                    ts = v[1].timestamp()
+                    if ts in timestamp2i and cid in id2i:
+                        plane[id2i[cid],timestamp2i[ts]] = v[2]
+                nozero_plane(plane)
+                for i in range(len(seqs_today)):
+                    shared.numpyToRedis(plane[:,i],"k%d%d"%(period,seqs_today[i]),ex=period_ex(period))
+                shared.toRedis(seqs,'k%d_sequence'%period)
     else:
-        print("今天的数据还没有更新完成，不能k%d_sequence数据"%periods)
+        print("今天的数据还没有更新完成，不能k%d_sequence数据"%periods_args)
 
 def clear_period_sequence(period):
     b,seqs = shared.fromRedis('k%d_sequence'%period)
@@ -594,6 +632,9 @@ def clear_period_sequence(period):
         for ts in seqs:
             shared.delKey("k%d%d"%(period,ts))
         shared.delKey('k%d_sequence'%period)
+
+def detetimestamp(d):
+    return int(datetime(year=d.year,month=d.month,day=d.day).timestamp())
 """
 删除以前的k60 sequence数据，然后从数据库重新加载
 period = 60,30,15
@@ -610,25 +651,44 @@ def rebuild_period_sequence(period):
         for ts in seqs:
             shared.delKey("k%d%d"%(period,ts))
     print("rebuild_k%d_sequence..."%period)
-    dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 60""")
-    timestamp2i = {}
-    seqs = []
-    for i in range(-1,-len(dd)-1,-1):
-        t = dd[i][0]
-        for v in build_timestamp_sequence(t,period):
-            seqs.append(v)
-    seqs = seqs[-240:]
-    for i in range(len(seqs)):
-        timestamp2i[int(seqs[i])]=i
-    plane = np.zeros((len(companys),240)) #close
-    bits = stock.dateString(datetime(year=dd[-1][0].year,month=dd[-1][0].month,day=dd[-1][0].day))
-    for i in range(len(companys)):
-        c = companys[i]
-        p = stock.query("""select timestamp,close from k5_xueqiu where id=%d and timestamp>'%s'"""%(c[0],bits))
-        for k in p:
-            ts = int(k[0].timestamp())
-            if ts in timestamp2i:
-                plane[i,timestamp2i[ts]] = k[1]
+    if period==240: #使用kd_xueqiu数据来产生日线级别的数据
+        dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 240""")
+        timestamp2i = {}
+        seqs = []
+        for i in range(len(dd)):
+            d = dd[i][0]
+            seqs.append(detetimestamp(d))
+        for i in range(len(seqs)):
+            timestamp2i[seqs[i]]=i
+        plane = np.zeros((len(companys),240)) #close
+        bits = stock.dateString(dd[-1][0])
+        for i in range(len(companys)):
+            c = companys[i]
+            p = stock.query("""select date,close from kd_xueqiu where id=%d and date>='%s'"""%(c[0],bits))
+            for k in p:
+                ts = detetimestamp(k[0])
+                if ts in timestamp2i:
+                    plane[i,timestamp2i[ts]] = k[1]        
+    else:
+        dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 60""")
+        timestamp2i = {}
+        seqs = []
+        for i in range(-1,-len(dd)-1,-1):
+            t = dd[i][0]
+            for v in build_timestamp_sequence(t,period):
+                seqs.append(v)
+        seqs = seqs[-240:]
+        for i in range(len(seqs)):
+            timestamp2i[int(seqs[i])]=i
+        plane = np.zeros((len(companys),240)) #close
+        bits = stock.dateString(datetime(year=dd[-1][0].year,month=dd[-1][0].month,day=dd[-1][0].day))
+        for i in range(len(companys)):
+            c = companys[i]
+            p = stock.query("""select timestamp,close from k5_xueqiu where id=%d and timestamp>'%s'"""%(c[0],bits))
+            for k in p:
+                ts = int(k[0].timestamp())
+                if ts in timestamp2i:
+                    plane[i,timestamp2i[ts]] = k[1]
     nozero_plane(plane)
     print(plane.shape,len(seqs))
     for i in range(240):
