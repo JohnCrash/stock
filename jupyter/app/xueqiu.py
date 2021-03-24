@@ -657,7 +657,10 @@ def rebuild_period_sequence(period):
     b,seqs = shared.fromRedis('k%d_sequence'%period)
     if b:
         bb,f = shared.numpyFromRedis("k%d%d"%(period,seqs[-1]))
-        if bb and len(f)==len(companys):
+        dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
+        t = datetime.fromtimestamp(seqs[-1])
+        lastdate = date(year=t.year,month=t.month,day=t.day)
+        if bb and len(f)==len(companys) and dd[0][0]==lastdate:
             return #已经有完整的加载数据了不需要重新加载
     if b:
         for ts in seqs:
@@ -868,32 +871,10 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
         idds.append(c[0])
         coms.append(c[1])
     t = datetime.today()
-    lock = threading.Lock()
-    count = 0
-    firstRow = True
     print('开始实时更新全部数据...')
-    def updateRT(cs,r,batch):
-        nonlocal count
-        for i in range(10):
-            try:
-                if (batch+i)%3==0:
-                    ret = xueqiuRT(cs,r)
-                elif (batch+i)%3==1:
-                    ret = sinaRT(cs,r)
-                else:
-                    ret = qqRT(cs,r)
-                if ret:
-                    break
-            except Exception as e:
-                mylog.printe(e)
-        if ThreadCount>1:
-            lock.acquire()
-            count-=1
-            lock.release()
     b,seqs = shared.fromRedis('runtime_sequence')
     if not b:
         seqs = []
-    plane = np.zeros((len(companys),6),dtype=float)
     lastUpdateFlow = -1
     #如果company_select中的公司数量改变了确保过往的临时数据也做相应的改变
     try:
@@ -909,51 +890,13 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
         mylog.printe(e)
     while t.hour>=6 and t.hour<15:
         if stock.isTransTime():
-            #[0 companys_id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
-            seqs.append(math.floor(time.time()*1000*1000))
-            for i in range(0,len(coms),100):
-                l = i+100
-                if l>len(coms):
-                    l = len(coms)
-                plane[i:l,0] = idds[i:l]
-                if ThreadCount>1:
-                    threading.Thread(target=updateRT,args=((coms[i:l],plane[i:l,1:],math.floor(i/100)))).start()
-                    lock.acquire()
-                    count+=1
-                    lock.release()
-                    while count>=ThreadCount:
-                        time.sleep(.1)
-                else:
-                    updateRT(coms[i:l],plane[i:l,1:],math.floor(i/100))
-            while count>0:
-                time.sleep(.1)
-            #如果今天第一次下载数据，这里检查看看今天是不是交易日
-            if firstRow:
-                firstRow = False
-                n = 0
-                for i in range(len(plane)):
-                    if  datetime.fromtimestamp(plane[i][1]).day == t.day:
-                        #只要有今天的最新数据表示今天可以进行交易
-                        n+=1
-                shared.toRedis(n>300,'istransday_%d_%d'%(t.month,t.day),ex=1200)
-                if n < 300:
-                    #并且标记今天不是可以交易的日子
-                    print("***休市*** ",str(t))
-                    return 'closed'
-            checkFrame(plane)
-            shared.numpyToRedis(plane,"rt%d"%seqs[-1],ex=6*24*3600)
-            seqs = seqs[-6*60*4*3:] #6*60*4*10 每分钟3次，保存6天的
-            shared.toRedis(seqs,'runtime_sequence')
-            print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
-            shared.toRedis(datetime.today(),'runtime_update',ex=60)
-            #更新k60
-            update_period_plane(t,plane,[240,60,30,15])
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
                 print("sinaFlowRT %s"%str(t))
                 emflowRT2()
                 print("emflowRT %s"%str(t))
+            shared.toRedis(datetime.today(),'runtime_update',ex=60)                
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
             time.sleep(dt)

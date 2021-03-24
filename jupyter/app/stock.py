@@ -16,9 +16,6 @@ def isTransTime(t=None):
 def isTransDay():
     t = datetime.today()
     if t.weekday()>=0 and t.weekday()<5:
-        b,isb = shared.fromRedis('istransday_%d_%d'%(t.month,t.day))
-        if b:
-            return isb
         return True
     else:
         return False

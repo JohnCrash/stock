@@ -271,7 +271,3 @@ def deletecompany(code):
         stock.execute("delete from company where code='%s'"%code)
     else:
         print("不存在公司 %s"%code)
-
-K,D = xueqiu.get_period_k(30)
-print(len(K))
-print(len(D))

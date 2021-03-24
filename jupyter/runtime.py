@@ -83,9 +83,8 @@ if __name__=='__main__':
             except Exception as e:
                 mylog.printe(e)                 
             #新版本仅仅跟踪msci个股
-            #print("开始更新数据库...")
-            #status.update_status(process)
-            #xueqiu.update_today_period([60,30,15])
+            print("开始更新缓存...")
+            xueqiu.update_today_period([240,60,30,15])
             print("更新完成。")
             download_done_day = t.day
             shared.toRedis(download_done_day,"last_download_day")
