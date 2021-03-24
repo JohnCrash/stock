@@ -8,6 +8,7 @@ from . import config
 from . import shared
 from . import xueqiu
 from . import stock
+from . import status
 
 log = mylog.init('tool.log',name='tool')
 """
@@ -186,3 +187,9 @@ def etfcc():
                 print(qs)
                 stock.execute(qs)
 
+
+xueqiu.sinaFlowRT()
+t = datetime.today()
+name = "flow_%d_%d"%(t.month,t.day)
+b,a = shared.fromRedis(name)
+print(b,a)

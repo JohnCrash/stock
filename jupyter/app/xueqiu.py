@@ -222,7 +222,7 @@ def qqK15(code,n=32):
 #新浪资金流向,数据间隔2分钟
 #返回数据结构
 #[[date,larg,big,mid,tiny],...]
-def sinaFlow():
+def getSinaFlow():
     try: 
         s = requests.session()
         headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
@@ -261,7 +261,7 @@ def sinaFlow():
 #将资金流向放入到redis中去
 def sinaFlowRT():
     try:
-        b,a = sinaFlow()
+        b,a = getSinaFlow()
         if b and len(a)>0:
             t=a[0][0]
             k = """flow_%d_%d"""%(t.month,t.day)
@@ -2429,16 +2429,21 @@ def getFlow(code,lastday=None):
         b,flowk,flowd = stock.loademFlow(code,after)
         if not b:
             flowk,flowd = stock.loadFlow(after)
-        _getflowcache[code] = (flowk,flowd)
+        _getflowcache[code] = [flowk,flowd]
     
     flowk,flowd = _getflowcache[code]
+
     b,k,d = getTodayFlow(code)
     if b and d[-1][0]>flowd[-1][0]:#叠加
         endt = flowd[-1][0]
+        nfk = []
         for i in range(len(d)):
             if d[i][0]>endt:
-                flowk.append(k[i])
+                nfk.append(k[i])
                 flowd.append(d[i])
+
+        flowk = np.vstack((flowk,nfk))
+        _getflowcache[code][0] = flowk
     return flowk,flowd
 
 #k5时序迭代器 (时间，开始位置，结束位置)
