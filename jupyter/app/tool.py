@@ -187,9 +187,3 @@ def etfcc():
                 print(qs)
                 stock.execute(qs)
 
-
-xueqiu.sinaFlowRT()
-t = datetime.today()
-name = "flow_%d_%d"%(t.month,t.day)
-b,a = shared.fromRedis(name)
-print(b,a)

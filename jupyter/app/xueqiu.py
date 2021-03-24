@@ -432,9 +432,9 @@ def get_category_selector():
 """
 返回company_select中公司的全部60分钟数据
 """
-_K60 = {60:None,30:None,15:None}
-_D60 = {60:None,30:None,15:None}
-_N60 = {60:None,30:None,15:None}
+_K60 = {240:None,60:None,30:None,15:None}
+_D60 = {240:None,60:None,30:None,15:None}
+_N60 = {240:None,60:None,30:None,15:None}
 def get_period_k(period):
     global _K60,_D60,_N60
     
@@ -890,6 +890,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
             if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
                 rebuild_runtime_sequence(idds,seqs)
+        rebuild_period_sequence(240)    #'d'            
         rebuild_period_sequence(60)
         rebuild_period_sequence(30)
         rebuild_period_sequence(15)
@@ -935,7 +936,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             print('updateAllRT:%s %f'%(datetime.today(),(datetime.today()-t).seconds))
             shared.toRedis(datetime.today(),'runtime_update',ex=60)
             #更新k60
-            update_period_plane(t,plane,[60,30,15])
+            update_period_plane(t,plane,[240,60,30,15])
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
@@ -1644,9 +1645,9 @@ def isValidKDate(d,period):
 
 #将下载数据附加在k,d数据上
 def appendK(code,period,k,d):
-    if code[0]=='B': #看看是不是em分类和概念
+    if code[0]=='B' or code[0]=='b': #看看是不是em分类和概念
         code2i = get_em_code2i()
-        if code[0] in code2i:
+        if code in code2i:
             return appendEMK(code,period,k,d)
 
     if period==5 or period==15:
@@ -2195,8 +2196,8 @@ def emflowRT2():
                             #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
                             j = code2i[code]
                             if j<len(code2i):
-                                a[j,0,0] = v['f2']
-                                a[j,0,1] = v['f3']
+                                a[j,0,0] = v['f2']/1000
+                                a[j,0,1] = v['f3']/100
                                 a[j,0,2] = v['f5']
                                 a[j,0,3] = v['f66']
                                 a[j,0,4] = v['f72']
@@ -2344,12 +2345,12 @@ def mainflowrt(codes,R=None,D=None):
 #将单个em kline下载并保存到db中
 def emk2db(db,id,code,period):
     try:
-        if db=='k5_em':
+        if period==5:
             twords = 'timestamp'
-            t2s = stock.dateString
+            t2s = stock.timeString
         else:
             twords = 'date'
-            t2s = stock.timeString
+            t2s = stock.dateString
         lss = stock.query("select * from %s where id=%d order by %s desc limit 1"%(db,id,twords))
         if len(lss)==0:
             begin = '19900101'
