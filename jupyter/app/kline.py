@@ -2200,17 +2200,17 @@ class Plote:
                 try:
                     self.reload(all=False)
                 except Exception as e:
-                    log.error("reload %s"%str(e))
+                    mylog.printe(e)
                 recalcRange(False)
                 try:    
                     showline()
                 except Exception as e:
-                    log.error("showline %s"%str(e))
+                    mylog.printe(e)
                 refreshbutton.button_style = ''
                 try:
                     startTimer()
                 except Exception as e:
-                    log.error("startTimer %s"%str(e))
+                    mylog.printe(e)
                 break
 
         def startTimer():

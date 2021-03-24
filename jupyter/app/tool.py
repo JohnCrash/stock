@@ -1,6 +1,7 @@
 import numpy as np
 import requests
 import time
+import subprocess
 from datetime import date,datetime,timedelta
 import json
 from . import mylog
@@ -187,3 +188,90 @@ def etfcc():
                 print(qs)
                 stock.execute(qs)
 
+"""
+检查数据库k5_xueqiu,kd_xueqiu,k5_em,kd_em看看最近那些没有正常更新
+同时检查flow,flow_em
+s = 'all' 检查全部
+s = 'xueqiu' 仅仅检查xueqiu
+s = 'em' 仅仅检查em
+reupdate = True,删除错误数据重新下载
+reupdate = False,不做重新下载操作
+"""
+def checkdb(s='all',reupdate=False):
+    t = datetime.today()
+    if stock.isTransDay() and t.hour>=15:
+        d = stock.dateString(t)
+    else:
+        lss = stock.query("select date from kd_xueqiu where id=8828 order by date desc limit 1")
+        d = stock.dateString(lss[0][0])
+    def setupdate(id):
+        if reupdate:
+            stock.execute("update company set `ignore`=0 where id=%d"%(id))
+    if s=='all' or s=='xueqiu':
+        companys = stock.query("select id,code,name from company")
+        print("检查k5_xueqiu和kd_xueqiu...")
+        for c in companys:
+            try:
+                id = c[0]
+                lss = stock.query("select date from kd_xueqiu where id=%d and date='%s'"%(id,d))
+                if len(lss)==0:
+                    qs = stock.query("select date from kd_xueqiu where id=%d order by date desc limit 1"%(id))
+                    print('kd_xueqiu最后更新 %s %s'%(str(c),str(qs)))
+                    setupdate(id)
+                lss = stock.query("select timestamp from k5_xueqiu where id=%d and timestamp>'%s'"%(id,d))
+                if len(lss)==0:
+                    qs = stock.query("select timestamp from k5_xueqiu where id=%d order by timestamp desc limit 1"%(id))
+                    if len(qs)>0:
+                        print('k5_xueqiu最后更新 %s %s'%(str(c),str(qs)))
+                    else:
+                        print('k5_xueqiu中没有 %s'%(str(c)))
+                    setupdate(id)
+                elif len(lss)!=48:
+                    print('k5更新数量错误 %s %d'%(str(c),len(lss)))
+                    if reupdate: #重新更新
+                        stock.execute("delete from k5_xueqiu where id=%d and timestamp>'%s'"%(id,d))
+                    setupdate(id)
+            except Exception as e:
+                mylog.printe(e)
+                print(str(c))
+        if reupdate:
+            r = subprocess.run(['node',config.download_js])
+    if s=='all' or s=='em':
+        print("检查k5_em和kd_em...")
+        ems = stock.query("select company_id,code,name from flow_em_category where code like'BK%'") #kd_em或者k5_em中仅仅存放em的分类和概念
+        for c in ems:
+            try:
+                id = c[0]
+                lss = stock.query("select date from kd_em where id=%d and date='%s'"%(id,d))
+                if len(lss)==0:
+                    qs = stock.query("select date from kd_em where id=%d order by date desc limit 1"%(id))
+                    print('kd_em最后更新 %s %s'%(str(c),str(qs)))
+                lss = stock.query("select timestamp from k5_em where id=%d and timestamp>'%s'"%(id,d))
+                if len(lss)==0:
+                    qs = stock.query("select timestamp from k5_em where id=%d order by timestamp desc limit 1"%(id))
+                    if len(qs)>0:
+                        print('k5_em最后更新 %s %s'%(str(c),str(qs)))
+                    else:
+                        print('k5_em中没有 %s'%(str(c)))
+                elif len(lss)!=48:
+                    print('k5_em更新数量错误 %s %d'%(str(c),len(lss)))
+            except Exception as e:
+                mylog.printe(e)
+                print(str(c))
+
+"""
+删除一个退市的公司
+"""
+def deletecompany(code):
+    com = stock.query("select id,code,name from company where code='%s'"%code)
+    if len(com)>0:
+        c = com[0]
+        print("删除公司 %s"%str(c))
+        stock.execute("insert ignore into company_delisting (id,code,name) values (%d,'%s','%s')"%(c[0],c[1],c[2]))
+        stock.execute("delete from company where code='%s'"%code)
+    else:
+        print("不存在公司 %s"%code)
+
+K,D = xueqiu.get_period_k(30)
+print(len(K))
+print(len(D))

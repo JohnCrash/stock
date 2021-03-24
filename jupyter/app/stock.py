@@ -4,6 +4,7 @@ import math
 from datetime import date,datetime,timedelta
 from . import shared
 from . import config
+from . import mylog
 
 def isTransTime(t=None):
     if t is None:
@@ -62,7 +63,7 @@ def execute(s):
         cursor.execute(s)
         gdb.commit()
     except Exception as e:
-        print(e,s)
+        mylog.printe(e)
         gdb.rollback()
 
 """

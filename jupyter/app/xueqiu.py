@@ -186,7 +186,7 @@ def qqK5(code,n=96):
         else:
             return False,r.reason
     except Exception as e:
-        log.error("qqK5:"+str(code)+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)
 
 #通过调用qqK5转换而来
@@ -255,7 +255,7 @@ def getSinaFlow():
         else:
             return False,r.reason
     except Exception as e:
-        log.error("sinaFlow ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)
 
 #将资金流向放入到redis中去
@@ -267,7 +267,7 @@ def sinaFlowRT():
             k = """flow_%d_%d"""%(t.month,t.day)
             shared.toRedis(a,k,ex=5*24*3600)
     except Exception as e:
-        log.error("sinaFlowRT ERROR:"+str(e))
+        mylog.printe(e)
 
 #返回当前的sinaflow
 def sinaFlow(t=None):
@@ -318,7 +318,7 @@ def sinaK(code,period,n):
         else:
             return False,r.reason
     except Exception as e:
-        log.error("sinaK15:"+str(code)+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)
 
 def sinaK15(code,n=32):
@@ -337,8 +337,8 @@ _companys = None
 def get_company_select():
     global _companys
     if _companys is None:
-        companys = stock.query("""select company_id,code,name,category,vmax,vmin from company_select""")
-        #companys = stock.query("""select id,code,name,category from company where msci=1 or msci=2 or msci=3""") #1msci 2etf 3大盘指数
+        #companys = stock.query("""select company_id,code,name,category,vmax,vmin from "company_select"")
+        companys = stock.query("""select company_id,code,name,name from flow_em_category""")
         _companys = companys
     return _companys
 def get_company_select_id2com():
@@ -549,7 +549,8 @@ def nozero_plane(plane):
         if j<N-1: #反向
             plane[plane[:,j]==0,j] = plane[plane[:,j]==0,j+1]
 """
-每天使用xueqiu数据覆盖实时收集到的数据
+每天使用xueqiu数据覆盖实时收集到的数据,确保数据的准确一致
+函数在每天下载完数据后调用
 """
 def update_today_period(periods_args):
     dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
@@ -566,7 +567,13 @@ def update_today_period(periods_args):
                 isdd = True
         if isdd: #使用kd_xueqiu数据来产生日线级别的数据
             period=240
-            p = stock.query("select id,date,close from kd_xueqiu where date='%02d-%02d-%02d'"%(t.year,t.month,t.day))
+            S = ""
+            for c in companys:
+                if c[1][0]!='B':
+                    S += '%d,'%c[0]
+            p1 = stock.query("select id,date,close from kd_xueqiu where date='%02d-%02d-%02d' and id in (%s)"%(t.year,t.month,t.day,S[:-1]))
+            p2 = stock.query("select id,date,close from kd_em where date='%02d-%02d-%02d'"%(t.year,t.month,t.day))
+            p = p1+p2
             b,seqs = shared.fromRedis('k%d_sequence'%period)
             if not b:
                 rebuild_period_sequence(period)
@@ -588,11 +595,16 @@ def update_today_period(periods_args):
                 ts = detetimestamp(v[1])
                 if cid in id2i:
                     plane[id2i[cid]] = v[2]
-            nozero_plane(plane)
             shared.numpyToRedis(plane[:],"k%d%d"%(period,seqs[-1]),ex=period_ex(period))
             shared.toRedis(seqs,'k%d_sequence'%period)
-        else:
-            p = stock.query("select id,timestamp,close from k5_xueqiu where timestamp>'%02d-%02d-%02d'"%(t.year,t.month,t.day))
+        if len(periods)>0:
+            S = ""
+            for c in companys:
+                if c[1][0]!='B':
+                    S += '%d,'%c[0]
+            p1 = stock.query("select id,timestamp,close from k5_xueqiu where timestamp='%02d-%02d-%02d' and id in (%s)"%(t.year,t.month,t.day,S[:-1]))
+            p2 = stock.query("select id,timestamp,close from k5_em where timestamp='%02d-%02d-%02d'"%(t.year,t.month,t.day))
+            p = p1+p2            
             for period in periods:
                 b,seqs = shared.fromRedis('k%d_sequence'%period)
                 if not b:
@@ -663,8 +675,8 @@ def rebuild_period_sequence(period):
         plane = np.zeros((len(companys),240)) #close
         bits = stock.dateString(dd[-1][0])
         for i in range(len(companys)):
-            c = companys[i]
-            p = stock.query("""select date,close from kd_xueqiu where id=%d and date>='%s'"""%(c[0],bits))
+            c = companys[i] #0 company_id,1 code,2 name,3 name
+            p = stock.query("""select date,close from %s where id=%d and date>='%s'"""%('kd_em' if c[1][0]=='B' else 'kd_xueqiu',c[0],bits)) #B开头的存放在kd_em中分类和概念
             for k in p:
                 ts = detetimestamp(k[0])
                 if ts in timestamp2i:
@@ -684,18 +696,17 @@ def rebuild_period_sequence(period):
         bits = stock.dateString(datetime(year=dd[-1][0].year,month=dd[-1][0].month,day=dd[-1][0].day))
         for i in range(len(companys)):
             c = companys[i]
-            p = stock.query("""select timestamp,close from k5_xueqiu where id=%d and timestamp>'%s'"""%(c[0],bits))
+            p = stock.query("""select timestamp,close from %s where id=%d and timestamp>'%s'"""%('k5_em' if c[1][0]=='B' else 'k5_xueqiu',c[0],bits))
             for k in p:
                 ts = int(k[0].timestamp())
                 if ts in timestamp2i:
                     plane[i,timestamp2i[ts]] = k[1]
     nozero_plane(plane)
-    print(plane.shape,len(seqs))
     for i in range(240):
         try:
             shared.numpyToRedis(plane[:,i],"k%d%d"%(period,seqs[i]),ex=period_ex(period))
-        except:
-            print(i)
+        except Exception as e:
+           mylog.printe(e)
     shared.toRedis(seqs,'k%d_sequence'%period)
     print("rebuild_%d_sequence done"%period)
 
@@ -874,7 +885,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                 if ret:
                     break
             except Exception as e:
-                log.error("updateAllRT updateRT:"+e)
+                mylog.printe(e)
         if ThreadCount>1:
             lock.acquire()
             count-=1
@@ -895,7 +906,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
         rebuild_period_sequence(30)
         rebuild_period_sequence(15)
     except Exception as e:
-        log.error("updateAllRT updateRT:"+e)
+        mylog.printe(e)
     while t.hour>=6 and t.hour<15:
         if stock.isTransTime():
             #[0 companys_id,1 timestamp,2 volume,3 current,4 yesterday_close,5 today_open]
@@ -940,9 +951,9 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
             if t.minute!=lastUpdateFlow: #每1分钟更新一次
                 lastUpdateFlow = t.minute
                 sinaFlowRT()
-                print("sinaFlowRT %s"%t)
+                print("sinaFlowRT %s"%str(t))
                 emflowRT2()
-                print("emflowRT %s"%t)
+                print("emflowRT %s"%str(t))
         dt = 20-(datetime.today()-t).seconds #20秒更新一次
         if dt>0:
             time.sleep(dt)
@@ -1095,14 +1106,13 @@ def xueqiuRT(codes,result=None):
                             else:
                                 result[i] = [d['timestamp']/1000,vol,current,yesterday_close,today_open]
                     except Exception as e:
-                        log.error("xueqiuRT:"+str(d))
-                        log.error("xueqiuRT:"+str(e))
+                        mylog.printe(e)
                         return False
                 return True
         log.error('xueqiuRT:'+str(js))
         return False
     except Exception as e:
-        log.error("xueqiuRT:"+str(e))
+        mylog.printe(e)
         return False    
     return False        
 #http://hq.sinajs.cn/rn=oablq&list=sh601872,sh601696,...
@@ -1170,7 +1180,7 @@ def sinaRT(codes,result=None):
             log.error('sinaRT:'+str(r.reason))
             return False
     except Exception as e:
-        log.error('sinaRT:'+str(e))
+        mylog.printe(e)
         return False
     return False
 #http://qt.gtimg.cn/q=sh601872,sh600370,sh600312,sh603559,sh600302,sh600252,sh600798&r=573645421
@@ -1232,7 +1242,7 @@ def qqRT(codes,result=None):
             log.error('qqRT:'+str(r.reason))
             return False
     except Exception as e:
-        log.error('qqRT:'+str(e))
+        mylog.printe(e)
         return False
     return False
 
@@ -1291,7 +1301,7 @@ def xueqiuK(code,period,n):
         else:
             return b,dd
     except Exception as e:
-        log.error("xueqiuK15:"+str(code)+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e) 
 #返回标准格式
 # True , ((timesramp,volume,open,high,low,close),...)
@@ -1810,7 +1820,7 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
         else:
             return False,r.reason
     except Exception as e:
-        log.error("emflow:"+str(code)+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)
 
 """
@@ -1903,7 +1913,7 @@ def emkline(code,period='d',begin='19900101',end='20250101',timeout=None):
         else:
             return False,r.reason
     except Exception as e:
-        log.error("emflow:"+str(code)+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)
 """
 主力净流入分布
@@ -1958,7 +1968,7 @@ def emdistribute(t=0,timeout=None):
         else:
             return False,r.reason
     except Exception as e:
-        log.error("emdistribute:"+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)
 
 """
@@ -2045,7 +2055,7 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None):
         else:
             return False,r.reason
     except Exception as e:
-        log.error("emdistribute:"+"ERROR:"+str(e))
+        mylog.printe(e)
         return False,str(e)    
 
 def emdistribute3(codes,timeout=None):
@@ -2152,7 +2162,7 @@ def emflowRT():
             shared.numpyToRedis(RR,k,ex=1*24*3600) #保留1天
             shared.toRedis(D,n,ex=1*24*3600)
     except Exception as e:
-        log.error("emflowRT:"+str(e))
+        mylog.printe(e)
 
 """
 对emflowRT进行改进,对flow_em_category中的全部进行监控
@@ -2196,8 +2206,8 @@ def emflowRT2():
                             #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
                             j = code2i[code]
                             if j<len(code2i):
-                                a[j,0,0] = v['f2']/1000
-                                a[j,0,1] = v['f3']/100
+                                a[j,0,0] = int(v['f2'])/1000.0
+                                a[j,0,1] = int(v['f3'])/100.0
                                 a[j,0,2] = v['f5']
                                 a[j,0,3] = v['f66']
                                 a[j,0,4] = v['f72']
@@ -2214,8 +2224,7 @@ def emflowRT2():
         shared.numpyToRedis(RR,k,ex=3*24*3600) #保留3天
         shared.toRedis(D,n,ex=3*24*3600)
     except Exception as e:
-        print(str(e))
-        log.error("emflowRT2:"+str(e))
+        mylog.printe(e)
 """
 将eastmoney资金流数据存入数据库中
 """
@@ -2237,7 +2246,9 @@ def emflow2db():
                     code = s['f12']
                     if code not in code2id:
                         needrebuild = True
-                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch) values ('%s','%s',%d,0)"%(s['f14'],code,s['f13']))
+                        qss = stock.query("select max(company_id) from flow_em_category")
+                        company_id = qss[0]+1
+                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s',%d,0)"%(s['f14'],code,s['f13'],company_id))
         if needrebuild:
             rebuild_em_category()
             ls = get_em_category()
@@ -2256,10 +2267,10 @@ def emflow2db():
                     if b and 'data' in R and R['data'] is not None:
                         klines = R['data']['klines']
                         QS = ""
+                        count=count+1
                         for k in klines:
                             vs = k.split(',')
                             if len(vs)==6:
-                                count=count+1
                                 QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
                         #print("%s insert flow"%(c[2]))
                         stock.execute("insert ignore into flow_em values %s"%QS[:-1])
@@ -2274,8 +2285,7 @@ def emflow2db():
                 break
         print("emflow2db %d"%count)
     except Exception as e:
-        print('emflow2db error :'+str(e))
-        log.error("emflow2db:"+"ERROR:"+str(e))
+        mylog.printe(e)
 
 """
 N加载N天数据
@@ -2373,9 +2383,11 @@ def emk2db(db,id,code,period):
         else:
             print('emk2db %s %s 下载失败'%(code,period))
     except Exception as e:
-        print('emk2db %s %s %s %s'%(db,code,period,str(e)))
+        mylog.printe(e)
 """
 将em的分类和概念的kd,k5下载存入到kd_em,k5_em
+
+kd_em或者k5_em中仅仅存放em的分类和概念
 """
 def emkline2db():
     #保存BK开头的全部

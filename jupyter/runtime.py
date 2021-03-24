@@ -60,20 +60,17 @@ if __name__=='__main__':
                 xueqiu.sinaFlowRT()
                 status.saveflow()
             except Exception as e:
-                log.error(str(e))
-                print(e)
+                mylog.printe(e)
             try:                
                 print("将EM资金流存入数据库...")
                 xueqiu.emflow2db() #将emflow保存到数据库中
             except Exception as e:
-                log.error(str(e))
-                print(e)
+                mylog.printe(e)
             try:                
                 print("将EM分类概念K存入数据库...")
                 xueqiu.emkline2db() 
             except Exception as e:
-                log.error(str(e))
-                print(e)                
+                mylog.printe(e)             
             try:
                 print("开始从雪球下载数据")
                 for i in range(3):
@@ -84,8 +81,7 @@ if __name__=='__main__':
                     else:
                         log.warning("%s下载出现问题"%(config.download_js))
             except Exception as e:
-                log.error(str(e))
-                print(e)                    
+                mylog.printe(e)                 
             #新版本仅仅跟踪msci个股
             #print("开始更新数据库...")
             #status.update_status(process)
