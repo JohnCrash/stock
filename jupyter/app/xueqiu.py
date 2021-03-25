@@ -499,7 +499,7 @@ def build_timestamp_sequence(d,period):
 
 def next_period_timestamp(d,period):
     if period==240:
-        return datetime(year=d.year,month=d.month,day=d.day)
+        return datetime(year=d.year,month=d.month,day=d.day).timestamp()
     else:
         bi = datetime(year=d.year,month=d.month,day=d.day,hour=9,minute=30)
         ei = datetime(year=d.year,month=d.month,day=d.day,hour=15,minute=0)
@@ -537,7 +537,7 @@ def update_period_plane(t,plane,periods):
                 shared.toRedis(seqs,'k%d_sequence'%period)            
             else:
                 continue
-        shared.numpyToRedis(plane[:,3],"k%d%d"%(period,ts),ex=period_ex(period)) #3个月
+        shared.numpyToRedis(plane[:,0,0],"k%d%d"%(period,ts),ex=period_ex(period)) #3个月
 
 #处理plane数据，使其不存在0,如果有0就用左边或者右边的数据替代
 def nozero_plane(plane):
@@ -660,7 +660,7 @@ def rebuild_period_sequence(period):
         dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
         t = datetime.fromtimestamp(seqs[-1])
         lastdate = date(year=t.year,month=t.month,day=t.day)
-        if bb and len(f)==len(companys) and dd[0][0]==lastdate:
+        if bb and len(f)==len(companys) and dd[0][0]<=lastdate:
             return #已经有完整的加载数据了不需要重新加载
     if b:
         for ts in seqs:
@@ -889,18 +889,23 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     except Exception as e:
         mylog.printe(e)
     while t.hour>=6 and t.hour<15:
-        if stock.isTransTime():
-            if t.minute!=lastUpdateFlow: #每1分钟更新一次
-                lastUpdateFlow = t.minute
-                sinaFlowRT()
-                print("sinaFlowRT %s"%str(t))
-                emflowRT2()
-                print("emflowRT %s"%str(t))
-            shared.toRedis(datetime.today(),'runtime_update',ex=60)                
-        dt = 20-(datetime.today()-t).seconds #20秒更新一次
-        if dt>0:
-            time.sleep(dt)
-        t = datetime.today()
+        try:
+            if stock.isTransTime():
+                if t.minute!=lastUpdateFlow: #每1分钟更新一次
+                    lastUpdateFlow = t.minute
+                    sinaFlowRT()
+                    print("sinaFlowRT %s"%str(t))
+                    plane = emflowRT2()
+                    if plane is not None:
+                        update_period_plane(t,plane,[240,60,30,15])
+                    print("emflowRT %s"%str(t))
+                shared.toRedis(datetime.today(),'runtime_update',ex=60)                
+            dt = 20-(datetime.today()-t).seconds #20秒更新一次
+            if dt>0:
+                time.sleep(dt)
+            t = datetime.today()
+        except Exception as e:
+            mylog.printe(e)
     return 'done'
 
 #(0 code,1 timesramp,2 volume,3 open,4 high,5 low,6 close)
@@ -2109,6 +2114,8 @@ def emflowRT():
 
 """
 对emflowRT进行改进,对flow_em_category中的全部进行监控
+返回当前的数据plane
+[[0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting]]
 """
 def emflowRT2():
     try:
@@ -2129,27 +2136,28 @@ def emflowRT2():
         codes = []
         for i in range(len(alls)):
             c = alls[i]
-            if c[2][1]=='H' or c[2][1]=='Z':
-                code2i[c[2][2:]] = i
-            else:
-                code2i[c[2]] = i
+            code2i[c[2]] = i
             codes.append(c[2])
         #每一个批量不要多于100个
-        a = np.zeros((len(code2i),1,7))
+        a = np.zeros((len(alls),1,7))
         for i in range(0,len(codes),100):
-            b,r = emdistribute2(codes[i:i+100],'f12,f2,f3,f5,f66,f72,f78,f84')
+            b,r = emdistribute2(codes[i:i+100],'f12,f13,f2,f3,f5,f66,f72,f78,f84')
             if b:
                 if 'data' in r:
                     ls = r['data']['diff']
                     #使用emls的顺序重新组织数据
                     for it in ls:
                         v = ls[it]
-                        code = v['f12']
+                        perfix = v['f13']
+                        if perfix==90:
+                            code = v['f12']
+                        else:
+                            code = ('SH'+v['f12']) if perfix==1 else ('SZ'+v['f12'])
                         if code in code2i:
                             #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
                             j = code2i[code]
-                            if j<len(code2i):
-                                a[j,0,0] = int(v['f2'])/1000.0
+                            if j<len(code2i) and v['f2'] is not None:
+                                a[j,0,0] = int(v['f2'])/100.0
                                 a[j,0,1] = int(v['f3'])/100.0
                                 a[j,0,2] = v['f5']
                                 a[j,0,3] = v['f66']
@@ -2166,8 +2174,10 @@ def emflowRT2():
 
         shared.numpyToRedis(RR,k,ex=3*24*3600) #保留3天
         shared.toRedis(D,n,ex=3*24*3600)
+        return a
     except Exception as e:
         mylog.printe(e)
+    return None
 """
 将eastmoney资金流数据存入数据库中
 """

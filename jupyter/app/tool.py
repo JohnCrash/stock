@@ -271,3 +271,38 @@ def deletecompany(code):
         stock.execute("delete from company where code='%s'"%code)
     else:
         print("不存在公司 %s"%code)
+
+#xueqiu.emflowRT2()
+
+
+"""
+K,D = xueqiu.get_period_k(240)
+K15,D15 = xueqiu.get_period_k(15)
+
+alls = xueqiu.get_em_category()
+code2i = xueqiu.get_em_code2i()
+for c in alls:
+    if c[2]=='SH000001':
+        i = code2i[c[2]]
+        print(K[i,:])
+        print(K15[i,:])
+        
+print(D[-1])
+print(D15[-1])
+"""
+"""
+t = datetime.today()
+n = "emflowts2_%d_%d"%(t.month,t.day)
+k = "emflownp2_%d_%d"%(t.month,t.day)
+b,D = shared.fromRedis(n)
+b1,R = shared.numpyFromRedis(k)
+print(len(D))
+print(D[0],'----',D[-1])
+alls = xueqiu.get_em_category()
+code2i = xueqiu.get_em_code2i()
+for c in alls:
+    if c[2]=='SZ399001':
+        i = code2i[c[2]]
+        print(R[i])
+"""
+xueqiu.updateAllRT()
