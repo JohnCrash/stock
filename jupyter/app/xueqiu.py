@@ -2216,21 +2216,26 @@ def emflow2db():
                         print("emflow2db download fail %s,%s"%(c[1],c[2]))
                         ELS.append(c)
                         break
-                    b,R = emflow(c[2])
-                    if b and 'data' in R and R['data'] is not None:
-                        klines = R['data']['klines']
-                        QS = ""
-                        count=count+1
-                        for k in klines:
-                            vs = k.split(',')
-                            if len(vs)==6:
-                                QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
-                        #print("%s insert flow"%(c[2]))
-                        stock.execute("insert ignore into flow_em values %s"%QS[:-1])
-                        break
-                    else:
-                        print("emflow2db 下载的数据存在问题, %s"%(str(c)))
-                        break
+                    try:
+                        b,R = emflow(c[2])
+                        if b and 'data' in R and R['data'] is not None:
+                            klines = R['data']['klines']
+                            QS = ""
+                            count=count+1
+                            for k in klines:
+                                vs = k.split(',')
+                                if len(vs)==6:
+                                    QS+="(%d,'%s',%s,%s,%s,%s),"%(code2id[c[2]],vs[0],vs[2],vs[3],vs[4],vs[5])
+                            #print("%s insert flow"%(c[2]))
+                            if len(QS)>0:
+                                stock.execute("insert ignore into flow_em values %s"%QS[:-1])
+                            break
+                        else:
+                            print("emflow2db 下载的数据存在问题, %s"%(str(c)))
+                            break
+                    except Exception as e:
+                        print(c)
+                        mylog.printe(e)
             if len(ELS)>0:
                 ls = ELS #存在错误，将错误在处理一次
                 ELS = []
@@ -2433,8 +2438,12 @@ appendK在处理EM分类和概念时实时的从emflowts2中取得k线数据
 """
 def appendEMK(code,period,k,d):
     code2i = get_em_code2i()
+    t = datetime.today()
+    if len(d)>0:
+        #已经是最新的数据了不需要更新
+        if d[-1][0].year==t.year and d[-1][0].month==t.month and d[-1][0].day==t.day:
+            return True,k,d
     if code in code2i:
-        t = datetime.today()
         nname = "emflowts2_%d_%d"%(t.month,t.day)
         kname = "emflownp2_%d_%d"%(t.month,t.day)
         b,D = shared.fromRedis(nname)

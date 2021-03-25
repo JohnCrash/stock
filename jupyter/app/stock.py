@@ -62,6 +62,7 @@ def execute(s):
     except Exception as e:
         mylog.printe(e)
         gdb.rollback()
+        print(s)
 
 """
 加载股票数据
