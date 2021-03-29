@@ -338,7 +338,7 @@ def get_company_select():
     global _companys
     if _companys is None:
         #companys = stock.query("""select company_id,code,name,category,vmax,vmin from "company_select"")
-        companys = stock.query("""select company_id,code,name,name from flow_em_category""")
+        companys = stock.query("""select company_id,code,name,prefix from flow_em_category""")
         _companys = companys
     return _companys
 def get_company_select_id2com():
@@ -670,7 +670,7 @@ def rebuild_period_sequence(period):
         dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 240""")
         timestamp2i = {}
         seqs = []
-        for i in range(len(dd)):
+        for i in range(len(dd)-1,-1,-1):
             d = dd[i][0]
             seqs.append(detetimestamp(d))
         for i in range(len(seqs)):
@@ -2201,7 +2201,7 @@ def emflow2db():
                         needrebuild = True
                         qss = stock.query("select max(company_id) from flow_em_category")
                         company_id = qss[0]+1
-                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s',%d,0)"%(s['f14'],code,s['f13'],company_id))
+                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s',%d,0)"%(s['f14'],code,s['f13']+i,company_id))
         if needrebuild:
             rebuild_em_category()
             ls = get_em_category()
@@ -2417,6 +2417,21 @@ def getFlow(code,lastday=None):
         _getflowcache[code][0] = flowk
     return flowk,flowd
 
+"""
+取得今天的分时
+[[0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting]]
+"""
+def getTodayRT(t=None):
+    if t is None:
+        t = datetime.today()
+    nname = "emflowts2_%d_%d"%(t.month,t.day)
+    kname = "emflownp2_%d_%d"%(t.month,t.day)
+    b,D = shared.fromRedis(nname)
+    b1,R = shared.numpyFromRedis(kname)
+    if b and b1:
+        return True,R,D
+    else:
+        return False,None,None
 #k5时序迭代器 (时间，开始位置，结束位置)
 class period5Iterator:
     def __init__(self,d):

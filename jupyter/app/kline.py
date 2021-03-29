@@ -448,6 +448,7 @@ class Plote:
             else:
                 c,k,d = stock.loadKline(code,5,after=after)
                 k,d = stock.mergeK(k,d,period/5)
+            
             if code is not _cacheK:
                 _cacheK[code] = {}
             _cacheK[code][period] = (c,k,d,after)
@@ -504,10 +505,12 @@ class Plote:
     def init(self,company,period,config,date_ = None,companyInfo=None):
         self._period = period
         b,self._showcount = shared.fromRedis('kline.zoom%s'%self._period)
+        if not b:
+            self._showcount = 80
         if self._period=='d' or self._period=='w':
             if self._mode=='runtime' or (self._mode=='auto' and self.isWatchTime()):
                 self._showcount = 80
-
+        
         if type(company)==np.ndarray:
             self._k = company
             self._company = companyInfo
@@ -1129,7 +1132,7 @@ class Plote:
         #绘制bollwidth
         if self._showbollwidth:
             axs[self._bollwidthInx].plot(x,self._bollwidth[bi:ei],color='red',linewidth=2)
-            axs[self._bollwidthInx].axhline(self._config['bollwidth'],color='black') 
+            #axs[self._bollwidthInx].axhline(self._config['bollwidth'],color='black') 
             axs[self._bollwidthInx].axhline(0.1,color='green') 
         #绘制macd最佳买卖点
         if self._showbest:
@@ -1731,12 +1734,16 @@ class Plote:
             stockcode = self._comarg
         else:
             stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
-        link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
-        b,eastname = mapxueqiu2east(stockcode)
-        if b:
-            link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(eastname))
+        if self._company is not None and len(self._company)>2 and self._company[3]=='EM':
+            link = widgets.HTML(value="""<a href="http://quote.eastmoney.com/bk/90.%s.html" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
+            link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/bkzj/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode))
         else:
-            link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
+            link = widgets.HTML(value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
+            b,eastname = mapxueqiu2east(stockcode)
+            if b:
+                link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(eastname))
+            else:
+                link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
             
         items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
 

@@ -1,3 +1,4 @@
+
 import numpy as np
 import requests
 import time
@@ -11,6 +12,7 @@ from . import xueqiu
 from . import stock
 from . import status
 from . import kline
+from . import monitor
 
 log = mylog.init('tool.log',name='tool')
 """
@@ -272,3 +274,67 @@ def deletecompany(code):
         stock.execute("delete from company where code='%s'"%code)
     else:
         print("不存在公司 %s"%code)
+
+#将概念设置为prefix=91
+def setglian():
+    b,r = xueqiu.emdistribute(1)
+    if b:
+        lss = r['data']['diff']
+        for s in lss:
+            code = s['f12']
+            stock.execute("update flow_em_category set prefix=91 where code='%s'"%code)    
+
+"""            
+#a = monitor.getMaRise()
+#print(a)
+"""
+"""
+A = monitor.getTodayTop('90')
+B = monitor.getTodayTop('91',15)
+print(A)
+print(B)
+print(monitor.getDTop('90',3))
+print(monitor.getDTop('91',15))
+"""
+def moniterLoop():
+    companys = xueqiu.get_company_select()
+    code2c = {}
+    for c in companys:
+        code2c[c[1]] = c
+    E = None
+    #b,r,d = xueqiu.getTodayRT()
+    #for i in range(1,r.shape[1]):
+    if True:
+        #print(d[i])
+        e,E = monitor.moniter_loop()#(E,i)
+        m2s = {
+            'fl_top':'分类榜',
+            'gn_top':'概念榜',
+            'fl_topup':'上分类榜',
+            'gn_topup':'上概念榜',
+            'bollup':'boll打开',
+            'maclose':'冲高回落',
+            'highup':'高开',
+            'fastup':'快速上涨'
+        }
+        for it in e.items():
+            com = code2c[it[0]]
+            s = "'%s' "%com[2]
+            for x in it[1]:
+                ty = x[0]
+                pr = x[1]
+                t = x[2]
+                s += '%s '%(m2s[ty])
+            print(s)
+    print(E['bollopen'])
+    print("=====================")
+    print(E['maclose'])
+    #xueqiu.Timer(60,moniterLoop)
+
+"""
+companys = xueqiu.get_company_select()
+_,K,D = stock.loadKline('SH000001','d')#xueqiu.get_period_k(240)
+b,a = monitor.bollwayex(K[:,4])
+print(b,a)
+"""
+moniterLoop()

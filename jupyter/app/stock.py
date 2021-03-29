@@ -126,7 +126,7 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
         if len(company)==0:#尝试flow_em_catory
             em = query("""select * from flow_em_category where code='%s'"""%code)
             if len(em)>0:
-                company = [(em[0][5],em[0][2],em[0][1],'')]
+                company = [(em[0][5],em[0][2],em[0][1],'EM')]
                 suffix = 'em'
     else:
         while True:
@@ -391,6 +391,15 @@ def bollMatrix(k,n=20):
         else:
             MD[:,i] = np.sqrt(((k[:,0:i+1]-MA)**2).sum(axis=1)/(i+1))
     return MB,MB-2*MD,MB+2*MD
+def slopeRatesMatrix(m):
+    r = np.empty(m.shape)
+    r[:,0] = 0
+    sz = m[:,0]==0
+    m[sz,:] = 0.0000001
+    Len = m.shape[1]
+    r[:,1:Len] = (m[:,1:Len]-m[:,0:Len-1])/m[:,0:Len-1]
+    return r
+
 #k 代表k数组, m 代表macd数组 mm这里也是macd数组, i代表当前位置,n这里无意义
 def macdPrediction(k,m,emA,i,n):
     if i-1<0:
