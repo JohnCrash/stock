@@ -10,6 +10,11 @@ from . import stock
 from . import xueqiu
 from . import kline
 
+box_layout = Layout(display='flex',
+                flex_flow='wrap',
+                align_items='stretch',
+                border='solid',
+                width='100%')
 ETFs = [ 
     'SZ159919', #沪深300ETF
     'SH510050', #上证50ETF
@@ -432,18 +437,19 @@ E = {
 }
 E 和 offset用于模拟
 """
-def moniter_loop(E=None,offset=None,periods=[15,30,60,240]):
+def moniter_loop(periods=[15,30,60,240]):
     t = datetime.today()
+    ename = 'event%d%d'%(t.month,t.day)
+    #if not stock.isTransTime():
+    #    b,E = shared.fromRedis(ename)
+    #    return E
+    
     companys = xueqiu.get_company_select()
     K = {}
     D = {}    
     for period in periods:
         K[period],D[period] = xueqiu.get_period_k(period)
-    ename = 'event%d%d'%(t.month,t.day)
-    if E is None:
-        b,E = shared.fromRedis(ename)
-    else:
-        b = True
+    b,E = shared.fromRedis(ename)
     def add(es,com,period,arg=None):
         nonlocal t
         if es not in E:
@@ -472,7 +478,7 @@ def moniter_loop(E=None,offset=None,periods=[15,30,60,240]):
         ma20 = stock.maMatrix(k,20)
         for i in range(len(companys)):
             if k[i,-1]>ma20[i,-1] and bollopenk(k[i,:],period): #对于在20均线上的才做检查
-                add('bollopen',companys[i],period)
+                add('bollopen',companys[i][1],period)
     #2.触碰重要均线向上(5日,10日,20日,60日)
     cma = [
         [30,40,5],#使用period=30的40均线,就是5日线做检查
@@ -485,7 +491,7 @@ def moniter_loop(E=None,offset=None,periods=[15,30,60,240]):
         ma = stock.maMatrix(k,p[1])
         for i in range(len(companys)):
             if k[i,-1]>=ma[i,-1] and maclose(k[i,:],ma[i,:]):
-                add('maclose',companys[i],p[2])
+                add('maclose',companys[i][1],p[2])
     #3.涨幅排名(首次进入排名，n次进入排名)
     event = {}
     for it in [('90',3,'fl_top3','fl_topup'),('91',15,'gn_top3','gn_topup')]:
@@ -499,8 +505,6 @@ def moniter_loop(E=None,offset=None,periods=[15,30,60,240]):
             event[it[3]] = news
         E[it[2]] = new_top3
     b,r,d = xueqiu.getTodayRT()
-    if offset is not None:
-        r = r[:,:offset,:]
     if b:
     #4.快速上涨(使用分时图进行检查)
         if r.shape[1]==1:
@@ -517,11 +521,151 @@ def moniter_loop(E=None,offset=None,periods=[15,30,60,240]):
                     fastup.append(companys[i][1])
             if len(fastup)>0:
                 event['fastup'] = fastup
-    #5.平静到快速上涨
+    event['timestamp'] = t
     E['event'].append(event) #将E保存
     #shared.toRedis(E,ename,ex=7*24*3600)
-    return combo_event(E),E
+    return E
+
+def timesplitEvent():
+    t = datetime.today()
+    E = moniter_loop()
+    companys = xueqiu.get_company_select()
+    code2c = {}
+    for c in companys:
+        code2c[c[1]] = c
+    result = []
+    for es in [('bollopen','通道打开'),('maclose','三角整理')]:
+        if es[0] in E:
+            for e in E[es[0]].items():
+                code = e[0]
+                for c in e[1].items():
+                    period = c[0]
+                    tim = c[1]
+                    if tim.hour==t.hour:
+                        name = code2c[code][2]
+                        result.append(("'%s'周期%d%s"%(name,period,es[1]),es[0],code,period))
+
+    events = E['event']
+    for event in events:
+        tim = event['timestamp']
+        if tim.hour==t.hour:
+            for es in [('highup','高开'),('fastup','快速上涨'),('fl_topup','上分类榜'),('gn_topup','上概念榜')]:
+                if es[0] in event:
+                    for code in event[es[0]]:
+                        name = code2c[code][2]
+                        result.append(("%d:%d'%s'%s"%(tim.hour,tim.minute,name,es[1]),es[0],code,0))
+    return result
+            
 """
 """
 def monitor():
-    pass
+    toolbar_output = widgets.Output()
+    kline_output = widgets.Output()
+    event_output = widgets.Output()
+    """
+    fltopDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='分类榜',
+        disabled=False,
+        layout=Layout(width='196px')
+    )
+    gltopDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='概念榜',
+        disabled=False,
+        layout=Layout(width='196px')
+    )     
+    bollupDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='通道开',
+        disabled=False,
+        layout=Layout(width='196px')
+    )
+    triangleDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='三角整理',
+        disabled=False,
+        layout=Layout(width='196px')
+    ) 
+    highupDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='高开',
+        disabled=False,
+        layout=Layout(width='196px')
+    )
+    fastupDropdown = widgets.Dropdown(
+        options=[],
+        value=None,
+        description='快速上涨',
+        disabled=False,
+        layout=Layout(width='196px')
+    )
+    
+    box = Box(children=[fltopDropdown,gltopDropdown,triangleDropdown,highupDropdown,fastupDropdown],layout=box_layout)
+    """
+    currentEventList=None
+    checktable = {'bollopen':True,'maclose':False,'highup':True,'fastup':True,'fl_topup':True,'gn_topup':True}
+    box = Box(children=[],layout=box_layout)
+    def onkline(e):
+        #kline_output.clear_output(wait=True)
+        with kline_output:
+            if e.event[1]=='maclose':
+                period = 'd'
+                #e.event[3] 代表均线
+            else:
+                if e.event[3]==240 or e.event[3]==0:
+                    period = 'd'
+                else:
+                    period = e.event[3]
+            K(e.event[2],period)
+    def updateeventtable():
+        nonlocal checktable,currentEventList
+        items = []
+        for event in currentEventList: #(0描述,1type,2code,3period)
+            if checktable[event[1]]:
+                but = widgets.Button(
+                    description=event[0],
+                    disabled=False,
+                    button_style='',
+                    layout=Layout(width='196px'))
+                but.event = event
+                but.on_click(onkline)
+                items.append(but)
+        box.children = items
+
+    def loop():
+        nonlocal currentEventList
+        #if stock.isTransTime() and stock.isTransDay():
+        currentEventList = timesplitEvent()
+        updateeventtable()
+        xueqiu.setTimeout(60,loop,'monitor.loop')
+    loop()
+    def oncheck(e):
+        nonlocal checktable
+        checktable[e['owner'].event] = e['new']
+        updateeventtable()
+    toolitem = []
+    for it in [('通道打开','bollopen'),('三角整理','maclose'),('高开','highup'),('快速上涨','fastup'),('分类上榜','fl_topup'),('概念上榜','gn_topup')]:
+        check = widgets.Checkbox(value=checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
+        check.event = it[1]
+        check.observe(oncheck,names='value')
+        toolitem.append(check)
+    clearbut = widgets.Button(
+                description="清除",
+                disabled=False,
+                button_style='')
+    def on_clear(e):
+        kline_output.clear_output()
+    clearbut.on_click(on_clear)
+    toolitem.append(clearbut)    
+    checkbox = Box(children=toolitem,layout=box_layout)
+    event_output.clear_output(wait=True)
+    with event_output:
+        display(checkbox,box)  
+ 
+    display(toolbar_output,kline_output,event_output)

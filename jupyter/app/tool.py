@@ -337,4 +337,4 @@ _,K,D = stock.loadKline('SH000001','d')#xueqiu.get_period_k(240)
 b,a = monitor.bollwayex(K[:,4])
 print(b,a)
 """
-moniterLoop()
+print(monitor.timesplitEvent())
