@@ -204,7 +204,8 @@ def getMaRise(prefix='90',period=240,mas=[5,10,20,30,60]):
 def getDTop(perfix='90',top=3,nday=20,K=None):
     companys = xueqiu.get_company_select()
     if K is None:
-        K,D = xueqiu.get_period_k(240)    
+        K,D = xueqiu.get_period_k(240)
+    K[K==0] = 1
     dk = (K[:,1:]-K[:,0:-1])/K[:,0:-1]
 
     result = {}
@@ -284,7 +285,7 @@ def bollwayex(k,n=16,jcn=3):
         b,a = bollway(k,i,jcn)
         if b:
             return b,a
-    return False,(0,0,0)
+    return False,(0,0,0,0,0)
 """
 从尾部向前搜索中枢
 方法:先确定一个高点范围，和低点范围，然后如果k在高点和低点之间交替超过2次
@@ -293,8 +294,10 @@ def bollwayex(k,n=16,jcn=3):
 def bollway(k,n=16,jcn=3):
     if len(k)>n:
         argv = k[-n-1:-1].mean()
-        maxv = np.amax(k[-n-1:-1])
-        minv = np.amin(k[-n-1:-1])
+        real_maxv = np.amax(k[-n-1:-1])
+        real_minv = np.amin(k[-n-1:-1])
+        maxv = real_maxv
+        minv = real_minv
         if maxv-argv>argv-minv: #取离平均数较近的作为通道宽度的一半
             maxv = 2*argv-minv
         else:
@@ -321,15 +324,15 @@ def bollway(k,n=16,jcn=3):
                 if it[1]!=zfc:
                     zfn+=1
                     zfc = it[1]
-            return zfn>jcn,(N,minv,maxv) #最少要交替3次
-    return False,(0,0,0)
+            return zfn>jcn,(N,minv,maxv,real_minv,real_maxv) #(通道底，通道顶，通道最小值，通道最大值)
+    return False,(0,0,0,0,0)
 """
 boll通道由平直到打开返回True,否则返回False
 通道检查n个点，通道宽度都要小于p
 """
 def bollopenk(k,period=240,n=16):
     if len(k)>n and k[-1]>k[-2] and k[-1]>k[-3] and k[-1]>k[-4]: #快速过滤掉大部分的
-        b,(N,minv,maxv)=bollwayex(k[:-1],n)
+        b,(N,up,down,minv,maxv)=bollwayex(k[:-1],n)
         return b and k[-1]>maxv
     return False
 
@@ -440,9 +443,9 @@ E 和 offset用于模拟
 def moniter_loop(periods=[15,30,60,240]):
     t = datetime.today()
     ename = 'event%d%d'%(t.month,t.day)
-    #if not stock.isTransTime():
-    #    b,E = shared.fromRedis(ename)
-    #    return E
+    if not stock.isTransTime():
+        b,E = shared.fromRedis(ename)
+        return E
     
     companys = xueqiu.get_company_select()
     K = {}
@@ -523,7 +526,7 @@ def moniter_loop(periods=[15,30,60,240]):
                 event['fastup'] = fastup
     event['timestamp'] = t
     E['event'].append(event) #将E保存
-    #shared.toRedis(E,ename,ex=7*24*3600)
+    shared.toRedis(E,ename,ex=7*24*3600)
     return E
 
 def timesplitEvent():
@@ -626,21 +629,21 @@ def monitor():
     def updateeventtable():
         nonlocal checktable,currentEventList
         items = []
-        for event in currentEventList: #(0描述,1type,2code,3period)
-            if checktable[event[1]]:
-                but = widgets.Button(
-                    description=event[0],
-                    disabled=False,
-                    button_style='',
-                    layout=Layout(width='196px'))
-                but.event = event
-                but.on_click(onkline)
-                items.append(but)
+        if currentEventList is not None:
+            for event in currentEventList: #(0描述,1type,2code,3period)
+                if checktable[event[1]] and event[2][0]=='B':
+                    but = widgets.Button(
+                        description=event[0],
+                        disabled=False,
+                        button_style='',
+                        layout=Layout(width='196px'))
+                    but.event = event
+                    but.on_click(onkline)
+                    items.append(but)
         box.children = items
 
     def loop():
         nonlocal currentEventList
-        #if stock.isTransTime() and stock.isTransDay():
         currentEventList = timesplitEvent()
         updateeventtable()
         xueqiu.setTimeout(60,loop,'monitor.loop')
@@ -659,6 +662,7 @@ def monitor():
                 description="清除",
                 disabled=False,
                 button_style='')
+    
     def on_clear(e):
         kline_output.clear_output()
     clearbut.on_click(on_clear)
@@ -669,3 +673,134 @@ def monitor():
         display(checkbox,box)  
  
     display(toolbar_output,kline_output,event_output)
+
+"""
+返回当前监控的全部boll通道
+"""
+def bolltrench():
+    companys = xueqiu.get_company_select()
+    bolls = {}
+    t = datetime.today()
+    ename = 'bolls'
+    b,bolls = shared.fromRedis(ename)
+    if not b:
+        bolls = {}
+    isupdate = False
+    for period in [15,30,60,240]:
+        if period not in bolls or t-bolls[period] > timedelta(minutes=period):
+            bolls[period] = t
+            isupdate = True
+            K,D = xueqiu.get_period_k(period)
+            for i in range(len(companys)):
+                for j in range(-3,-10,-1): #最后3根k线不参与通道的产生
+                    b,(n,up,down,mink,maxk) = bollwayex(K[i,:j],20,4)
+                    if b:
+                        if companys[i][1] not in bolls:
+                            bolls[companys[i][1]] = []
+                        bls = bolls[companys[i][1]]
+                        isexist=False
+                        for i in range(len(bls)):
+                            if bls[i][1]==period: #已经存在就
+                                bls[i] = (D[-1][0],period,n,up,down,mink,maxk)
+                                isexist = True
+                                break
+                        if not isexist:
+                            bls.append((D[-1][0],period,n,up,down,mink,maxk))
+                        break
+    if isupdate:
+        shared.toRedis(bolls,ename,ex=3*24*3600)
+    return bolls
+
+def BollK(code,period=None,pos=None):
+    def cb(self,axs,bi,ei):
+        offset = self._trendHeadPos
+        while offset>bi:
+            b,(n,down,up,minv,maxv) = bollwayex(self._k[:offset,4],20,4)
+            axK = axs[0]
+            if b:
+                axK.broken_barh([(offset-n,n)], (minv,up-down),alpha=0.1,facecolor='red')
+                offset-=n
+            elif down>0 and up>0:    
+                offset-=1
+            else:
+                offset-=1
+    kline.Plote(code,period,config={'index':True,'cb':cb},mode='runtime').show()
+"""
+通道突破监控
+"""
+def monitor_bollup():
+    kline_output = widgets.Output()
+    bollup_output = widgets.Output()    
+    box = Box(children=[],layout=box_layout)
+    prefix_checktable = {'90':True,'91':True,'0':False,'1':False}
+    peroid_checktable = {15:True,30:True,60:True,240:True}    
+    companys = xueqiu.get_company_select()
+    code2com = xueqiu.get_company_code2com()
+
+    def onkline(e):
+        #kline_output.clear_output(wait=True)
+        with kline_output:
+            if e.event[0]=='bollup':
+                BollK(e.event[1][1])
+
+    def update_bollupbuttons():
+        bos = bolltrench()
+        b,k,d = xueqiu.getTodayRT()
+        if not b:
+            return
+        items = []
+        for i in range(len(companys)):
+            code = companys[i][1]
+            if code in bos:
+                periods = []
+                for bo in bos[code]:
+                    #最近股价要大于通道顶，同时要大于通道里面的全部k线
+                    #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk)
+                    if k[i,-1,0] > bo[6] and companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]: #向上突破
+                        periods.append(bo[1])
+                if len(periods)>0:
+                    but = widgets.Button(
+                        description=companys[i][2]+str(periods),
+                        disabled=False,
+                        button_style='',
+                        layout=Layout(width='196px'))
+                    but.event = ('bollup',companys[i],periods)
+                    but.on_click(onkline)
+                    items.append(but)
+        box.children = items
+
+    def on_perfixcheck(e):
+        nonlocal prefix_checktable
+        prefix_checktable[e['owner'].it] = e['new']
+        update_bollupbuttons()
+    def on_peroidcheck(e):
+        nonlocal peroid_checktable
+        peroid_checktable[e['owner'].it] = e['new']
+        update_bollupbuttons()        
+    checkitem = []
+    for it in [('分类','90'),('概念','91'),('SH','1'),('SZ','0')]:
+        check = widgets.Checkbox(value=prefix_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
+        check.it = it[1]
+        check.observe(on_perfixcheck,names='value')
+        checkitem.append(check)
+    for it in [('15',15),('30',30),('60',60),('240',240)]:
+        check = widgets.Checkbox(value=peroid_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
+        check.it = it[1]
+        check.observe(on_peroidcheck,names='value')
+        checkitem.append(check)        
+    def on_clear(e):
+        kline_output.clear_output()
+    clearbut = widgets.Button(
+                description="清除",
+                disabled=False,
+                button_style='')
+    clearbut.on_click(on_clear)
+    checkitem.append(clearbut)
+    
+    update_bollupbuttons()
+    checkbox = Box(children=checkitem,layout=box_layout)
+    bollup_output.clear_output(wait=True)
+    with bollup_output:
+        display(checkbox,box)
+ 
+    display(kline_output,bollup_output)

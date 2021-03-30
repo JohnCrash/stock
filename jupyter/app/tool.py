@@ -337,4 +337,21 @@ _,K,D = stock.loadKline('SH000001','d')#xueqiu.get_period_k(240)
 b,a = monitor.bollwayex(K[:,4])
 print(b,a)
 """
-print(monitor.timesplitEvent())
+"""
+for p in [60,30,15]:
+    xueqiu.clear_period_sequence(p)
+    xueqiu.rebuild_period_sequence(p)    #'d'            
+"""
+#print(monitor.timesplitEvent())
+#shared.delKey('bolls')
+#monitor.monitor_bollup()
+#xueqiu.update_today_period([240,60,30,15])
+companys = xueqiu.get_company_select()
+K,D = xueqiu.get_period_k(240)
+b,k,d = xueqiu.getTodayRT()
+j = 0
+for i in range(len(companys)):
+    if k[i,-1,0] > 1.3*K[i,-1]:
+        print(companys[i],k[i,-1,0],K[i,-1])
+        j+=1
+print(j)

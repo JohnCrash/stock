@@ -341,6 +341,12 @@ def get_company_select():
         companys = stock.query("""select company_id,code,name,prefix from flow_em_category""")
         _companys = companys
     return _companys
+def get_company_code2com():
+    companys = get_company_select()
+    code2com = {}
+    for c in companys:
+        code2com[c[1]] = c
+    return code2com
 def get_company_select_id2com():
     companys = get_company_select()
     id2com = {}
@@ -599,12 +605,12 @@ def update_today_period(periods_args):
             shared.toRedis(seqs,'k%d_sequence'%period)
         if len(periods)>0:
             S = ""
+            p1 = []
             for c in companys:
                 if c[1][0]!='B':
-                    S += '%d,'%c[0]
-            p1 = stock.query("select id,timestamp,close from k5_xueqiu where timestamp='%02d-%02d-%02d' and id in (%s)"%(t.year,t.month,t.day,S[:-1]))
-            p2 = stock.query("select id,timestamp,close from k5_em where timestamp='%02d-%02d-%02d'"%(t.year,t.month,t.day))
-            p = p1+p2            
+                    p1 += stock.query("select id,timestamp,close from k5_xueqiu where id=%d and timestamp>'%02d-%02d-%02d'"%(c[0],t.year,t.month,t.day))
+            p2 = stock.query("select id,timestamp,close from k5_em where timestamp>'%02d-%02d-%02d'"%(t.year,t.month,t.day))
+            p = p1+list(p2)
             for period in periods:
                 b,seqs = shared.fromRedis('k%d_sequence'%period)
                 if not b:
@@ -2134,10 +2140,13 @@ def emflowRT2():
         alls = get_em_category()
         code2i = {}
         codes = []
+        etfs = []
         for i in range(len(alls)):
             c = alls[i]
             code2i[c[2]] = i
             codes.append(c[2])
+            if c[3]=='2':
+                etfs.append(c[2])
         #每一个批量不要多于100个
         a = np.zeros((len(alls),1,7))
         for i in range(0,len(codes),100):
@@ -2157,7 +2166,10 @@ def emflowRT2():
                             #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
                             j = code2i[code]
                             if j<len(code2i) and v['f2'] is not None:
-                                a[j,0,0] = int(v['f2'])/100.0
+                                if code in etfs:
+                                    a[j,0,0] = int(v['f2'])/1000.0
+                                else:
+                                    a[j,0,0] = int(v['f2'])/100.0
                                 a[j,0,1] = int(v['f3'])/100.0
                                 a[j,0,2] = v['f5']
                                 a[j,0,3] = v['f66']
@@ -2172,8 +2184,8 @@ def emflowRT2():
             RR = np.hstack((R,a))
         D.append(datetime(t.year,t.month,t.day,t.hour,t.minute,0))
 
-        shared.numpyToRedis(RR,k,ex=3*24*3600) #保留3天
-        shared.toRedis(D,n,ex=3*24*3600)
+        shared.numpyToRedis(RR,k,ex=7*24*3600) #保留7天
+        shared.toRedis(D,n,ex=7*24*3600)
         return a
     except Exception as e:
         mylog.printe(e)
