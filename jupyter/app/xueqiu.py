@@ -1969,7 +1969,7 @@ f72 大单
 f78 中单
 f84 小单
 """
-def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None):
+def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=1):
     ts = math.floor(time.time())
     codelists = ""
     for c in codes:
@@ -1992,22 +1992,19 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None):
     n = len(codes)
     uri="https://push2.eastmoney.com/api/qt/ulist/get?cb=jQuery1124046041648531999235_%d&invt=3&pi=0&pz=%d&mpi=2000&secids=%s&ut=6d2ffaa6a585d612eda28417681d58fb&fields=%s&po=1&_=%d"%(ts,n,codelists,field,ts)
     try:
-        s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate'}
-        if timeout is None:
-            r = s.get(uri,headers=headers)
-        else:
-            r = s.get(uri,headers=headers,timeout=timeout)
-        if r.status_code==200:
-            bi = r.text.find('({"rc":')
-            if bi>0:
-                R = json.loads(r.text[bi+1:-2])
-                return True,R
+        for i in range(tryn):
+            s = requests.session()
+            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                    'Accept-Encoding': 'gzip, deflate'}
+            if timeout is None:
+                r = s.get(uri,headers=headers)
             else:
-                return False,r.text
-        else:
-            return False,r.reason
+                r = s.get(uri,headers=headers,timeout=timeout)
+            if r.status_code==200:
+                bi = r.text.find('({"rc":')
+                if bi>0:
+                    R = json.loads(r.text[bi+1:-2])
+                    return True,R
     except Exception as e:
         mylog.printe(e)
         return False,str(e)    
@@ -2150,7 +2147,7 @@ def emflowRT2():
         #每一个批量不要多于100个
         a = np.zeros((len(alls),1,7))
         for i in range(0,len(codes),100):
-            b,r = emdistribute2(codes[i:i+100],'f12,f13,f2,f3,f5,f66,f72,f78,f84')
+            b,r = emdistribute2(codes[i:i+100],'f12,f13,f2,f3,f5,f66,f72,f78,f84',tryn=10)
             if b:
                 if 'data' in r:
                     ls = r['data']['diff']
@@ -2172,6 +2169,8 @@ def emflowRT2():
                                     a[j,0,0] = int(v['f2'])/100.0
                                 if a[j,0,0]==0:
                                     a[j,0,0] = R[j,-1,0]
+                                if a[j,0,1]==0:
+                                    a[j,0,1] = R[j,-1,1]
                                 a[j,0,1] = int(v['f3'])/100.0
                                 a[j,0,2] = v['f5']
                                 a[j,0,3] = v['f66']
@@ -2180,6 +2179,9 @@ def emflowRT2():
                                 a[j,0,6] = v['f84']
                         else:
                             print("没有成功获取数据 %s"%(code))
+            else:
+                print("%s emflowRT2数据加装失败..."%str(t))
+                return
         if R is None:
             RR = a
         else:

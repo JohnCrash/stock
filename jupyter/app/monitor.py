@@ -3,8 +3,10 @@ from IPython.display import display,Markdown
 import ipywidgets as widgets
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
+import matplotlib.pyplot as plt
+from matplotlib.ticker import Formatter
+import math
 import numpy as np
-from requests.models import codes
 from . import shared
 from . import stock
 from . import xueqiu
@@ -15,6 +17,30 @@ box_layout = Layout(display='flex',
                 align_items='stretch',
                 border='solid',
                 width='100%')
+class MyFormatterRT(Formatter):
+    def __init__(self, dates,fmt='d h:m:s'):
+        self.dates = dates
+        self.fmt = fmt
+
+    def __call__(self, x, pos=0):
+        'Return the label for time x at position pos'
+        ind = int(np.round(x))
+        if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
+            return ''
+
+        t = self.dates[ind][0]
+        if self.fmt=='m-d h:m':
+            return '%02d-%02d %02d:%02d'%(t.month,t.day,t.hour,t.minute)
+        elif self.fmt=='d h:m:s':
+            return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)
+        elif self.fmt=='d h:m':
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
+        elif self.fmt=='h:m:s':
+            return '%02d:%02d:%02d'%(t.hour,t.minute,t.second)
+        elif self.fmt=='h:m':
+            return '%02d:%02d'%(t.hour,t.minute)
+        else:
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)                
 ETFs = [ 
     'SZ159919', #沪深300ETF
     'SH510050', #上证50ETF
@@ -692,7 +718,7 @@ def bolltrench():
             isupdate = True
             K,D = xueqiu.get_period_k(period)
             for i in range(len(companys)):
-                for j in range(-3,-10,-1): #最后3根k线不参与通道的产生
+                for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
                     b,(n,up,down,mink,maxk) = bollwayex(K[i,:j],16,3)
                     if b:
                         tbi = D[j-n][0]
@@ -739,23 +765,24 @@ def BollK(code,bolls):
                     ei = i
                     break
         return bi,ei
-    period2c = {15:'green',30:'blue',60:'yellow',240:'red'}
+    period2c = {15:(2,'forestgreen'),30:(3,'royalblue'),60:(4,'darkorange'),240:(5,'red')}
     def cb(self,axs,bi,ei):
         axK = axs[0]
         for bo in bolls:
             bbi,bei = getx(self._date,bo[2],bo[3])
             if bei-bbi>0:
-                axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),alpha=0.1,facecolor=period2c[bo[0]])
+                axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),facecolor='None',edgecolor=period2c[bo[0]][1],linewidth=period2c[bo[0]][0],linestyle='--')
     period = 0
     for bo in bolls:
         period = max(period,bo[0])
     if period==240:
         period = 'd'
-    kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'CLEAR','index':False,'cb':cb},mode='auto').show()
+    kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'CLEAR','index':False,'cb':cb},mode='auto').show(figsize=(36,16))
 """
 通道突破监控
 """
 def monitor_bollup():
+    monitor_output = widgets.Output()
     kline_output = widgets.Output()
     bollup_output = widgets.Output()    
     box = Box(children=[],layout=box_layout)
@@ -764,6 +791,7 @@ def monitor_bollup():
     companys = xueqiu.get_company_select()
     code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
+    switch = 1
     def onkline(e):
         #kline_output.clear_output(wait=True)
         with kline_output:
@@ -771,9 +799,9 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS
+        nonlocal ALLBOLLS,switch,monitor_output
         bos = bolltrench()
-        b,k,d = xueqiu.getTodayRT()
+        b,k,d = xueqiu.getTodayRT()#datetime(year=2021,month=3,day=31))
         if not b:
             return
         ALLBOLLS = []
@@ -787,24 +815,75 @@ def monitor_bollup():
                 for bo in bos[code]:
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
                     #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei)
-                    if k[i,-1,0] > bo[6] and companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]: #向上突破
-                        if k[i,-1,0] <= bo[6]:#最新的数据，直接列出来，并且标记
-                            BollK(companys[i][1])
-                            isnew = True
-                        periods.append(bo[1])
-                        bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                    if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]:
+                        H = bo[6]-bo[5]
+                        if switch==1: #突破向上
+                            if k[i,-1,0] > bo[6]:
+                                periods.append(bo[1])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                        elif switch==2: #通道顶部
+                            if k[i,-1,0] > bo[5]+2*H/3 and k[i,-1,0] < bo[6]:
+                                periods.append(bo[1])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                        elif switch==3: #通道中部
+                            if k[i,-1,0] < bo[5]+2*H/3 and k[i,-1,0] > bo[5]+H/3:
+                                periods.append(bo[1])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                        elif switch==4: #通道底部
+                            if k[i,-1,0] < bo[5]+H/3 and k[i,-1,0] > bo[5]:
+                                periods.append(bo[1])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                        else: #底部向下
+                            if k[i,-1,0] < bo[5]:
+                                periods.append(bo[1])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
                 if len(bolls)>0:
+                    bstyle = ''
+                    if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
+                        bstyle = 'danger'
+                    elif k[i,-1,3]+k[i,-1,4]>0:
+                        bstyle = 'warning'
+                    elif k[i,-1,3]+k[i,-1,4]<0 and k[i,-1,6]>0:
+                        bstyle = 'success'
                     but = widgets.Button(
-                        description=companys[i][2]+str(periods),
+                        description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
                         disabled=False,
-                        button_style='danger' if isnew else '',
+                        button_style=bstyle,
+                        icon='check' if isnew else '',
                         layout=Layout(width='196px'))
                     but.event = ('bollup',companys[i],periods)
                     but.bolls = bolls
-                    ALLBOLLS.append((companys[i],bolls))
+                    ALLBOLLS.append((companys[i],bolls,i,k[i,-1,1]))
                     but.on_click(onkline)
-                    items.append(but)
+                    items.append((k[i,-1,1],but))
+        sorteditems = sorted(items,key=lambda it:it[0],reverse=True)
+        items = []
+        for it in sorteditems:
+            items.append(it[1])
         box.children = items
+        xticks = []
+        D = []
+        for i in range(len(d)):
+            t = d[i]
+            D.append((t,))
+            if t.minute%15==0:
+                xticks.append(i)
+        xticks.append(len(d)-1)
+        xticks.append(len(d)-1)        
+        fig,ax = plt.subplots(1,1,figsize=(36,16))
+        ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
+        x = np.arange(len(d))
+        ALLBOLLS = sorted(ALLBOLLS,key=lambda it:it[3],reverse=True)
+        for c in ALLBOLLS:
+            ax.plot(x,k[c[2],:,1],label=c[0][2])
+        ax.axhline(y=0,color='black',linestyle='--')
+        ax.grid(True)
+        ax.set_xlim(0,len(d)-1)
+        ax.set_xticks(xticks)
+        if len(ALLBOLLS)>0:
+            plt.legend()
+        fig.autofmt_xdate()
+        kline.output_show(monitor_output)
 
     def on_perfixcheck(e):
         nonlocal prefix_checktable
@@ -813,15 +892,29 @@ def monitor_bollup():
     def on_peroidcheck(e):
         nonlocal peroid_checktable
         peroid_checktable[e['owner'].it] = e['new']
-        update_bollupbuttons()        
-    checkitem = []
+        update_bollupbuttons()       
+    switch2name = {1:'向上突破',2:'通道上部',3:'通道中部',4:'通道下部',5:'向下突破'}
+    switchname2switch = {'向上突破':1,'通道上部':2,'通道中部':3,'通道下部':4,'向下突破':5}
+    switchDropdown = widgets.Dropdown(
+        options=['向上突破','通道上部','通道中部','通道下部','向下突破'],
+        value=switch2name[switch],
+        description='',
+        disabled=False,
+        layout=Layout(width='96px')
+    ) 
+    def on_switch(e):
+        nonlocal switch
+        switch = switchname2switch[e['new']]
+        update_bollupbuttons()
+    switchDropdown.observe(on_switch,names='value')
+    checkitem = [switchDropdown]
     for it in [('分类','90'),('概念','91'),('SH','1'),('SZ','0'),('ETF','2')]:
-        check = widgets.Checkbox(value=prefix_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
+        check = widgets.Checkbox(value=prefix_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='72px'))
         check.it = it[1]
         check.observe(on_perfixcheck,names='value')
         checkitem.append(check)
     for it in [('15',15),('30',30),('60',60),('240',240)]:
-        check = widgets.Checkbox(value=peroid_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
+        check = widgets.Checkbox(value=peroid_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='72px'))
         check.it = it[1]
         check.observe(on_peroidcheck,names='value')
         checkitem.append(check)        
@@ -857,4 +950,4 @@ def monitor_bollup():
     with bollup_output:
         display(checkbox,box)
  
-    display(kline_output,bollup_output)
+    display(monitor_output,bollup_output,kline_output)
