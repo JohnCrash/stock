@@ -2170,6 +2170,8 @@ def emflowRT2():
                                     a[j,0,0] = int(v['f2'])/1000.0
                                 else:
                                     a[j,0,0] = int(v['f2'])/100.0
+                                if a[j,0,0]==0:
+                                    a[j,0,0] = R[j,-1,0]
                                 a[j,0,1] = int(v['f3'])/100.0
                                 a[j,0,2] = v['f5']
                                 a[j,0,3] = v['f66']
@@ -2479,14 +2481,21 @@ def appendEMK(code,period,k,d):
             j = code2i[code]
             DD = copy.copy(d)
             if period=='d':
-                DD.append((date.today(),))
-                open1 = R[j,0,0]
-                high = np.max(R[j,:,0])
-                low = np.min(R[j,:,0])
-                close1 = R[j,-1,0]
-                volume = np.sum(R[j,:,2])
-                nk = (volume,open1,high,low,close1)
-                return True,np.vstack((k,nk)),DD
+                bi = 0
+                for bi in range(len(D)):#排除掉开盘前的数据
+                    if (D[bi].hour==9 and D[bi].minute>=30) or D[bi].hour>9:
+                        break
+                if bi!=len(D)-1:
+                    DD.append((date.today(),))
+                    open1 = R[j,bi,0]
+                    high = np.max(R[j,bi:,0])
+                    low = np.min(R[j,bi:,0])
+                    close1 = R[j,-1,0]
+                    volume = np.sum(R[j,:,2])
+                    nk = (volume,open1,high,low,close1)
+                    return True,np.vstack((k,nk)),DD
+                else:
+                    return True,k,d
             elif period==5:
                 nk = []
                 for t,bi,ei in period5Iterator(D):
@@ -2497,7 +2506,8 @@ def appendEMK(code,period,k,d):
                     close1 = R[j,ei,0]
                     volume = np.sum(R[j,bi:ei,2])
                     nk.append((volume,open1,high,low,close1))
-                return True,np.vstack((k,nk)),DD
+                if len(nk)>0:
+                    return True,np.vstack((k,nk)),DD
             else:
                 return True,k,d
     return False,k,d

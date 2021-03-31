@@ -332,7 +332,7 @@ boll通道由平直到打开返回True,否则返回False
 """
 def bollopenk(k,period=240,n=16):
     if len(k)>n and k[-1]>k[-2] and k[-1]>k[-3] and k[-1]>k[-4]: #快速过滤掉大部分的
-        b,(N,up,down,minv,maxv)=bollwayex(k[:-1],n)
+        b,(N,up,down,minv,maxv,real_minv,real_maxv)=bollwayex(k[:-1],n)
         return b and k[-1]>maxv
     return False
 
@@ -693,38 +693,65 @@ def bolltrench():
             K,D = xueqiu.get_period_k(period)
             for i in range(len(companys)):
                 for j in range(-3,-10,-1): #最后3根k线不参与通道的产生
-                    b,(n,up,down,mink,maxk) = bollwayex(K[i,:j],20,4)
+                    b,(n,up,down,mink,maxk) = bollwayex(K[i,:j],16,3)
                     if b:
+                        tbi = D[j-n][0]
+                        tei = D[j][0]
                         if companys[i][1] not in bolls:
                             bolls[companys[i][1]] = []
                         bls = bolls[companys[i][1]]
                         isexist=False
                         for i in range(len(bls)):
                             if bls[i][1]==period: #已经存在就
-                                bls[i] = (D[-1][0],period,n,up,down,mink,maxk)
+                                bls[i] = (D[-1][0],period,n,up,down,mink,maxk,tbi,tei)
                                 isexist = True
                                 break
                         if not isexist:
-                            bls.append((D[-1][0],period,n,up,down,mink,maxk))
+                            bls.append((D[-1][0],period,n,up,down,mink,maxk,tbi,tei))
                         break
     if isupdate:
         shared.toRedis(bolls,ename,ex=3*24*3600)
     return bolls
 
-def BollK(code,period=None,pos=None):
+"""
+向上通道突破
+bolls = [(0 period,1 price,2 tbi,3 tei,4 top,5 bottom),...]
+"""
+def BollK(code,bolls):
+    def getx(d,b,e):
+        bi = 0
+        ei = 0
+        if type(d[0][0])==datetime:
+            for i in range(len(d)):
+                t = d[i][0]
+                if bi==0 and t>=b:
+                    bi = i
+                if ei==0 and t>=e:
+                    ei = i
+                    break
+        else:
+            for i in range(len(d)):
+                t = d[i][0]
+                t = datetime(year=t.year,month=t.month,day=t.day)
+                if bi==0 and t>=b:
+                    bi = i
+                if ei==0 and t>=e:
+                    ei = i
+                    break
+        return bi,ei
+    period2c = {15:'green',30:'blue',60:'yellow',240:'red'}
     def cb(self,axs,bi,ei):
-        offset = self._trendHeadPos
-        while offset>bi:
-            b,(n,down,up,minv,maxv) = bollwayex(self._k[:offset,4],20,4)
-            axK = axs[0]
-            if b:
-                axK.broken_barh([(offset-n,n)], (minv,up-down),alpha=0.1,facecolor='red')
-                offset-=n
-            elif down>0 and up>0:    
-                offset-=1
-            else:
-                offset-=1
-    kline.Plote(code,period,config={'index':True,'cb':cb},mode='runtime').show()
+        axK = axs[0]
+        for bo in bolls:
+            bbi,bei = getx(self._date,bo[2],bo[3])
+            if bei-bbi>0:
+                axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),alpha=0.1,facecolor=period2c[bo[0]])
+    period = 0
+    for bo in bolls:
+        period = max(period,bo[0])
+    if period==240:
+        period = 'd'
+    kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'CLEAR','index':False,'cb':cb},mode='auto').show()
 """
 通道突破监控
 """
@@ -732,39 +759,49 @@ def monitor_bollup():
     kline_output = widgets.Output()
     bollup_output = widgets.Output()    
     box = Box(children=[],layout=box_layout)
-    prefix_checktable = {'90':True,'91':True,'0':False,'1':False}
+    prefix_checktable = {'90':True,'91':True,'0':False,'1':False,'2':True}
     peroid_checktable = {15:True,30:True,60:True,240:True}    
     companys = xueqiu.get_company_select()
     code2com = xueqiu.get_company_code2com()
-
+    ALLBOLLS = []
     def onkline(e):
         #kline_output.clear_output(wait=True)
         with kline_output:
             if e.event[0]=='bollup':
-                BollK(e.event[1][1])
+                BollK(e.event[1][1],e.bolls)
 
     def update_bollupbuttons():
+        nonlocal ALLBOLLS
         bos = bolltrench()
         b,k,d = xueqiu.getTodayRT()
         if not b:
             return
+        ALLBOLLS = []
         items = []
         for i in range(len(companys)):
             code = companys[i][1]
             if code in bos:
+                isnew = False
+                bolls = []
                 periods = []
                 for bo in bos[code]:
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
-                    #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk)
+                    #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei)
                     if k[i,-1,0] > bo[6] and companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]: #向上突破
+                        if k[i,-1,0] <= bo[6]:#最新的数据，直接列出来，并且标记
+                            BollK(companys[i][1])
+                            isnew = True
                         periods.append(bo[1])
-                if len(periods)>0:
+                        bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                if len(bolls)>0:
                     but = widgets.Button(
                         description=companys[i][2]+str(periods),
                         disabled=False,
-                        button_style='',
+                        button_style='danger' if isnew else '',
                         layout=Layout(width='196px'))
                     but.event = ('bollup',companys[i],periods)
+                    but.bolls = bolls
+                    ALLBOLLS.append((companys[i],bolls))
                     but.on_click(onkline)
                     items.append(but)
         box.children = items
@@ -778,7 +815,7 @@ def monitor_bollup():
         peroid_checktable[e['owner'].it] = e['new']
         update_bollupbuttons()        
     checkitem = []
-    for it in [('分类','90'),('概念','91'),('SH','1'),('SZ','0')]:
+    for it in [('分类','90'),('概念','91'),('SH','1'),('SZ','0'),('ETF','2')]:
         check = widgets.Checkbox(value=prefix_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
         check.it = it[1]
         check.observe(on_perfixcheck,names='value')
@@ -797,7 +834,24 @@ def monitor_bollup():
     clearbut.on_click(on_clear)
     checkitem.append(clearbut)
     
-    update_bollupbuttons()
+    def on_list(e):
+        nonlocal ALLBOLLS
+        kline_output.clear_output()
+        with kline_output:
+            for bo in ALLBOLLS:
+                BollK(bo[0][1],bo[1])
+        
+    allbut = widgets.Button(
+                description="全列",
+                disabled=False,
+                button_style='')
+    allbut.on_click(on_list)
+    checkitem.append(allbut)
+
+    def loop():
+        update_bollupbuttons()
+        xueqiu.setTimeout(60,loop,'monitor.bollup')
+    loop()    
     checkbox = Box(children=checkitem,layout=box_layout)
     bollup_output.clear_output(wait=True)
     with bollup_output:

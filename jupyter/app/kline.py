@@ -627,6 +627,13 @@ class Plote:
                 period = 'd'
         b1,main_sel = shared.fromRedis('kline.main%s'%period)
         b2,index_sel = shared.fromRedis('kline.index%s'%period)
+        if 'main_menu' in config and 'index_menu' in config:
+            b1 = True
+            b2 = True
+            ispervsetting = True
+            main_sel = config['main_menu']
+            index_sel = config['index_menu']
+            
         if b1 and b2 and ispervsetting:
             if index_sel=='MACD+':
                 self._config = {"macd":True,"energy":True,"volume":True}
@@ -1352,6 +1359,7 @@ class Plote:
                                 connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large')
 
         #搜索低级别的macd背离
+        """
         if self._showeps and self._period=='d':
             k5s,d5s = self.getCurrentK5()
             for p in [15,30,60,120]:
@@ -1367,6 +1375,7 @@ class Plote:
                         axsK.annotate('%s'%(p),xy=(x1,self._k[x1,2] if i[0]>0 else self._k[x1,3]),xytext=(-50, 50 if i[0]>0 else -50),
                         textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),
                         fontsize='large',color='red' if i[0]>0 else 'green')
+        """
         #这里测试均线支撑算法
         if False and (self._period==5 or self._period==15):
             for i in (120,240,480,960):
@@ -1682,12 +1691,17 @@ class Plote:
             self.config()                     
         b,main_sel = shared.fromRedis('kline.main%s'%str(self._period))
         if b:
-            mainDropdownvalue = main_sel
+            if 'main_menu' in self._config:
+                main_sel = self._config['main_menu']
             config_main(main_sel)
+            mainDropdownvalue = main_sel
         b,index_sel = shared.fromRedis('kline.index%s'%str(self._period))
         if b and indexDropdownvalue != index_sel:
-            indexDropdownvalue = index_sel
+            
+            if 'index_menu' in self._config:
+                index_sel = self._config['index_menu']
             config_index(index_sel)
+            indexDropdownvalue = index_sel
         mainDropdown = widgets.Dropdown(
             options=['BOLL+','MA','BOLL','TREND','CLEAR'],
             value=mainDropdownvalue,
@@ -2071,6 +2085,10 @@ class Plote:
             b2,index_sel = shared.fromRedis('kline.index%s'%self._period)
             if b1 and b2:
                 skipUpdate = True
+                if 'main_menu' in self._config:
+                    main_sel = self._config['main_menu']
+                if 'index_menu' in self._config:
+                    index_sel = self._config['index_menu']
                 config_main(main_sel)
                 mainDropdown.value = main_sel
                 config_index(index_sel)
@@ -2109,6 +2127,8 @@ class Plote:
                     if date(pbi.year,pbi.month,pbi.day) <= date(self._date[i][0].year,self._date[i][0].month,self._date[i][0].day):
                         beginPT = i
                         break
+            if beginPT==0:
+                beginPT = len(self._k)-showRange
             endPT = beginPT+showRange
             if endPT>=len(self._k):
                 recalcRange()
