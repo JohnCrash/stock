@@ -655,7 +655,7 @@ class Plote:
                 self._config['bigma20'] = True
                 #self._config['trend'] = True
             elif main_sel=='MA':
-                self._config["ma"] = [5,10,20,30,60]
+                self._config["ma"] = [5,10,20,30,60] if 'ma' not in config else config['ma']
             elif main_sel=='BOLL':
                 self._config["boll"] = 20
             elif main_sel=='TREND':

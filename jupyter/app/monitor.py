@@ -295,12 +295,6 @@ def Indexs():
     }
     indexpage(menus)
 
-def Monitor():
-    menus = {
-        "机会":[moniter]
-    }
-    indexpage(menus)
-
 """
 从尾部向前搜索中枢
 方法:通过加大搜索范围来
@@ -766,6 +760,8 @@ def BollK(code,bolls):
                     break
         return bi,ei
     period2c = {15:(2,'forestgreen'),30:(3,'royalblue'),60:(4,'darkorange'),240:(5,'red')}
+    style = (('5日','magenta',1),('10日','orange',3))
+    period2ma = {15:(160,320,0,1),15:(80,160,0,1),30:(40,80,0,1),60:(20,40,0,1),120:(10,20,0,1),'d':(5,10,0,1)}
     def cb(self,axs,bi,ei):
         axK = axs[0]
         for bo in bolls:
@@ -774,11 +770,19 @@ def BollK(code,bolls):
                 bei = ei-3
             if bei-bbi>0:
                 axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),facecolor='None',edgecolor=period2c[bo[0]][1],linewidth=period2c[bo[0]][0],linestyle='--')
+        #绘制5日和10日均线
+        m = period2ma[self._period]
+        xx,alv = stock.maRangeK(self._k,m[0],bi,ei)
+        axK.plot(xx,alv,label=style[m[2]][0],color=style[m[2]][1],linewidth=style[m[2]][2])
+        xx,alv = stock.maRangeK(self._k,m[1],bi,ei)
+        axK.plot(xx,alv,label=style[m[3]][0],color=style[m[3]][1],linewidth=style[m[3]][2])            
+
     period = 0
     for bo in bolls:
         period = max(period,bo[0])
     if period==240:
         period = 'd'
+
     kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'CLEAR','index':False,'cb':cb},mode='auto').show(figsize=(36,16))
 
 """
@@ -794,6 +798,7 @@ def monitor_bollup():
     companys = xueqiu.get_company_select()
     code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
+    FILTERCOLORS = []
     switch = 1
     news = 1 #0 持续 ，1 最新 ，2 昨日
     tf = 0 #时间过滤
@@ -815,7 +820,7 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS,switch,monitor_output,news
+        nonlocal ALLBOLLS,FILTERCOLORS,switch,monitor_output,news
         bos = bolltrench()
         b,k,d = xueqiu.getTodayRT()
         if not b:
@@ -828,6 +833,7 @@ def monitor_bollup():
             if b1:
                 break
         ALLBOLLS = []
+        FILTERCOLORS = []
         items = []
         for i in range(len(companys)):
             code = companys[i][1]
@@ -883,20 +889,14 @@ def monitor_bollup():
                     but.bolls = bolls
                     ALLBOLLS.append((companys[i],bolls,i,k[i,-1,1]))
                     but.on_click(onkline)
-                    items.append((k[i,-1,1],but))
+                    items.append((k[i,-1,1],but,companys[i][1]))
         """
         上面的算法对当前通道进行搜索，返回ALLBOLLS,和满足条件的公司对应的按钮列表items
         bolls = [(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型up,top...,8 bo),...]
         ALLBOLLS = [
             (0 company,1 bolls,2 i公司在companys中的序号,3 检查成功的涨幅),...
         ]
-        下面对按钮对应公司的日涨幅进行排序，将涨幅大的放置在列表的前面
         """                    
-        sorteditems = sorted(items,key=lambda it:it[0],reverse=True)
-        items = []
-        for it in sorteditems:
-            items.append(it[1])
-        box.children = items
         """
         返回第一个达到条件的点
         """
@@ -939,6 +939,7 @@ def monitor_bollup():
             if isd:
                 ln+=1
                 ax.plot(x,k[c[2],:,1],label=c[0][2])
+                FILTERCOLORS.append(c[0][1])
         ax.axhline(y=0,color='black',linestyle='--')
         ax.grid(True)
         ax.set_xlim(0,len(d)-1)
@@ -947,6 +948,15 @@ def monitor_bollup():
             plt.legend()
         fig.autofmt_xdate()
         kline.output_show(monitor_output)
+        """
+        下面对按钮对应公司的日涨幅进行排序，将涨幅大的放置在列表的前面        
+        """
+        sorteditems = sorted(items,key=lambda it:it[0],reverse=True)
+        items = []
+        for it in sorteditems:
+            if it[2] in FILTERCOLORS:
+                items.append(it[1])
+        box.children = items        
 
     def on_perfixcheck(e):
         nonlocal prefix_checktable
@@ -1035,11 +1045,12 @@ def monitor_bollup():
     checkitem.append(clearbut)
     
     def on_list(e):
-        nonlocal ALLBOLLS
+        nonlocal ALLBOLLS,FILTERCOLORS
         kline_output.clear_output()
         with kline_output:
             for bo in ALLBOLLS:
-                BollK(bo[0][1],bo[1])
+                if bo[0][1] in FILTERCOLORS:
+                    BollK(bo[0][1],bo[1])
         
     allbut = widgets.Button(
                 description="全列",

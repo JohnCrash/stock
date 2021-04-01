@@ -45,10 +45,14 @@ def closedb():
 
 def query(s):
     global gdb
-    if gdb is None:
-        opendb()
-    gdb.query(s)
-    r = gdb.store_result()
+    try:
+        if gdb is None:
+            opendb()
+        gdb.query(s)
+        r = gdb.store_result()
+    except Exception as e:
+        mylog.printe(e)
+        print(s)
     return r.fetch_row(r.num_rows())
 
 def execute(s):
