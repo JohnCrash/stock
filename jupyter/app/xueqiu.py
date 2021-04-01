@@ -1863,12 +1863,12 @@ def emkline(code,period='d',begin='19900101',end='20250101',timeout=None):
                                 K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
                 return True,K,D
             else:
-                return False,r.text
+                return False,r.text,None
         else:
-            return False,r.reason
+            return False,r.reason,None
     except Exception as e:
         mylog.printe(e)
-        return False,str(e)
+        return False,str(e),None
 """
 主力净流入分布
 t=0 行业

@@ -794,6 +794,7 @@ def monitor_bollup():
     code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
     switch = 1
+    news = 1 #0 持续 ，1 最新 ，2 昨日
     def onkline(e):
         #kline_output.clear_output(wait=True)
         with kline_output:
@@ -801,11 +802,18 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS,switch,monitor_output
+        nonlocal ALLBOLLS,switch,monitor_output,news
         bos = bolltrench()
-        b,k,d = xueqiu.getTodayRT()#datetime(year=2021,month=3,day=31))
+        b,k,d = xueqiu.getTodayRT()
         if not b:
             return
+        #使用昨天的k,d数据
+        t = date.today()
+        b1,ky,dy = False,None,None
+        for i in range(7):
+            b1,ky,dy = xueqiu.getTodayRT(t-timedelta(days=1))
+            if b1:
+                break
         ALLBOLLS = []
         items = []
         for i in range(len(companys)):
@@ -816,30 +824,35 @@ def monitor_bollup():
                 periods = []
                 for bo in bos[code]:
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
-                    #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei)
+                    #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei,9 isnew今天新的)
                     if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]:
                         H = bo[6]-bo[5]
                         if switch==1: #突破向上
                             if k[i,-1,0] > bo[6]:
                                 periods.append(bo[1])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                                isnew = b1 and (ky[i,-1,0] < bo[6])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
                         elif switch==2: #通道顶部
                             if k[i,-1,0] > bo[5]+2*H/3 and k[i,-1,0] < bo[6]:
                                 periods.append(bo[1])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                                isnew = b1 and (ky[i,-1,0] > bo[5]+2*H/3 and ky[i,-1,0] < bo[6])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
                         elif switch==3: #通道中部
                             if k[i,-1,0] < bo[5]+2*H/3 and k[i,-1,0] > bo[5]+H/3:
                                 periods.append(bo[1])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                                isnew = b1 and (ky[i,-1,0] < bo[5]+2*H/3 and ky[i,-1,0] > bo[5]+H/3)
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
                         elif switch==4: #通道底部
                             if k[i,-1,0] < bo[5]+H/3 and k[i,-1,0] > bo[5]:
                                 periods.append(bo[1])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
+                                isnew = b1 and (ky[i,-1,0] < bo[5]+H/3 and ky[i,-1,0] > bo[5])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
                         else: #底部向下
                             if k[i,-1,0] < bo[5]:
                                 periods.append(bo[1])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4]))
-                if len(bolls)>0:
+                                isnew = b1 and (ky[i,-1,0] < bo[5])
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
+                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew) or (news==1 and not isnew)):
                     bstyle = ''
                     if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
                         bstyle = 'danger'
@@ -852,7 +865,7 @@ def monitor_bollup():
                         disabled=False,
                         button_style=bstyle,
                         icon='check' if isnew else '',
-                        layout=Layout(width='196px'))
+                        layout=Layout(width='220px'))
                     but.event = ('bollup',companys[i],periods)
                     but.bolls = bolls
                     ALLBOLLS.append((companys[i],bolls,i,k[i,-1,1]))
@@ -920,7 +933,22 @@ def monitor_bollup():
         check = widgets.Checkbox(value=peroid_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='72px'))
         check.it = it[1]
         check.observe(on_peroidcheck,names='value')
-        checkitem.append(check)        
+        checkitem.append(check)
+    new2name = {0:'持续',1:'最新',2:'昨日'}
+    newname2new = {'持续':0,'最新':1,'昨日':2}
+    def on_news(e):
+        nonlocal news
+        news = newname2new[e['new']]
+        update_bollupbuttons()
+    newdrop =  widgets.Dropdown(
+        options=['最新','持续','昨日'],
+        value=new2name[news],
+        description='',
+        disabled=False,
+        layout=Layout(width='96px')
+    ) 
+    checkitem.append(newdrop)
+    newdrop.observe(on_news,names='value')
     def on_clear(e):
         kline_output.clear_output()
     clearbut = widgets.Button(
