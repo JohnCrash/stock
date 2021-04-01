@@ -2167,9 +2167,9 @@ def emflowRT2():
                                     a[j,0,0] = int(v['f2'])/1000.0
                                 else:
                                     a[j,0,0] = int(v['f2'])/100.0
-                                if a[j,0,0]==0:
+                                if a[j,0,0]==0 and R is not None:
                                     a[j,0,0] = R[j,-1,0]
-                                if a[j,0,1]==0:
+                                if a[j,0,1]==0 and R is not None:
                                     a[j,0,1] = R[j,-1,1]
                                 a[j,0,1] = int(v['f3'])/100.0
                                 a[j,0,2] = v['f5']

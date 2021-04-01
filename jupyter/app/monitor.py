@@ -770,6 +770,8 @@ def BollK(code,bolls):
         axK = axs[0]
         for bo in bolls:
             bbi,bei = getx(self._date,bo[2],bo[3])
+            if bei==0:
+                bei = ei-3
             if bei-bbi>0:
                 axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),facecolor='None',edgecolor=period2c[bo[0]][1],linewidth=period2c[bo[0]][0],linestyle='--')
     period = 0
@@ -861,6 +863,7 @@ def monitor_bollup():
         for it in sorteditems:
             items.append(it[1])
         box.children = items
+        #绘制当前选择的股票集合的监控窗口
         xticks = []
         D = []
         for i in range(len(d)):

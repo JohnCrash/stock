@@ -357,3 +357,6 @@ for i in range(len(companys)):
         j+=1
 print(j)
 """
+b,k,d = xueqiu.getTodayRT()
+
+print(d[-1])
