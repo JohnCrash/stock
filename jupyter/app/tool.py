@@ -344,7 +344,7 @@ for p in [60,30,15]:
 """
 #print(monitor.timesplitEvent())
 #shared.delKey('bolls')
-#monitor.monitor_bollup()
+monitor.monitor_bollup()
 #xueqiu.update_today_period([240,60,30,15])
 """
 companys = xueqiu.get_company_select()
@@ -357,6 +357,3 @@ for i in range(len(companys)):
         j+=1
 print(j)
 """
-b,k,d = xueqiu.getTodayRT()
-
-print(d[-1])

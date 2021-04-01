@@ -780,6 +780,7 @@ def BollK(code,bolls):
     if period==240:
         period = 'd'
     kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'CLEAR','index':False,'cb':cb},mode='auto').show(figsize=(36,16))
+
 """
 通道突破监控
 """
@@ -788,13 +789,25 @@ def monitor_bollup():
     kline_output = widgets.Output()
     bollup_output = widgets.Output()    
     box = Box(children=[],layout=box_layout)
-    prefix_checktable = {'90':True,'91':True,'0':False,'1':False,'2':True}
+    prefix_checktable = {'90':True,'91':False,'0':False,'1':False,'2':False}
     peroid_checktable = {15:True,30:True,60:True,240:True}    
     companys = xueqiu.get_company_select()
     code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
     switch = 1
     news = 1 #0 持续 ，1 最新 ，2 昨日
+    tf = 0 #时间过滤
+    def tf2range():
+        nonlocal tf
+        if tf==0:
+            t = datetime.today()
+            return (t.hour*60,t.hour*60+60)
+        elif tf==1:
+            return 9*60,9*60+30
+        elif tf==2:
+            return (9*60+30,11*60+30)
+        else:
+            return (13*60,15*60)
     def onkline(e):
         #kline_output.clear_output(wait=True)
         with kline_output:
@@ -819,39 +832,39 @@ def monitor_bollup():
         for i in range(len(companys)):
             code = companys[i][1]
             if code in bos:
-                isnew = False
+                isnew = False #和昨天比
                 bolls = []
                 periods = []
                 for bo in bos[code]:
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
-                    #(0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei,9 isnew今天新的)
+                    #bo (0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei)
                     if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]:
                         H = bo[6]-bo[5]
                         if switch==1: #突破向上
                             if k[i,-1,0] > bo[6]:
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[6])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'up',bo)) #,(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型up,top...,8 bo)
                         elif switch==2: #通道顶部
                             if k[i,-1,0] > bo[5]+2*H/3 and k[i,-1,0] < bo[6]:
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] > bo[5]+2*H/3 and ky[i,-1,0] < bo[6])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'top',bo))
                         elif switch==3: #通道中部
                             if k[i,-1,0] < bo[5]+2*H/3 and k[i,-1,0] > bo[5]+H/3:
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5]+2*H/3 and ky[i,-1,0] > bo[5]+H/3)
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'mid',bo))
                         elif switch==4: #通道底部
                             if k[i,-1,0] < bo[5]+H/3 and k[i,-1,0] > bo[5]:
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5]+H/3 and ky[i,-1,0] > bo[5])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'bottom',bo))
                         else: #底部向下
                             if k[i,-1,0] < bo[5]:
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5])
-                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew))
+                                bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'down',bo))
                 if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew) or (news==1 and not isnew)):
                     bstyle = ''
                     if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
@@ -871,12 +884,34 @@ def monitor_bollup():
                     ALLBOLLS.append((companys[i],bolls,i,k[i,-1,1]))
                     but.on_click(onkline)
                     items.append((k[i,-1,1],but))
+        """
+        上面的算法对当前通道进行搜索，返回ALLBOLLS,和满足条件的公司对应的按钮列表items
+        bolls = [(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型up,top...,8 bo),...]
+        ALLBOLLS = [
+            (0 company,1 bolls,2 i公司在companys中的序号,3 检查成功的涨幅),...
+        ]
+        下面对按钮对应公司的日涨幅进行排序，将涨幅大的放置在列表的前面
+        """                    
         sorteditems = sorted(items,key=lambda it:it[0],reverse=True)
         items = []
         for it in sorteditems:
             items.append(it[1])
         box.children = items
-        #绘制当前选择的股票集合的监控窗口
+        """
+        返回第一个达到条件的点
+        """
+        def get_breakpt(k,bos):
+            r = []
+            for bo in bos:
+                for i in range(len(k)):
+                    if bo[7]=='up':
+                        if k[i]>bo[8][6]:
+                            r.append((i,bo[0]))
+                            break
+            return r
+        """
+        将ALLBOLLS中的公司绘制出价格走势图表，并且标记出突破点的价格和周期
+        """
         xticks = []
         D = []
         for i in range(len(d)):
@@ -890,13 +925,25 @@ def monitor_bollup():
         ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
         x = np.arange(len(d))
         ALLBOLLS = sorted(ALLBOLLS,key=lambda it:it[3],reverse=True)
+        tfr = tf2range()
+        ln = 0
         for c in ALLBOLLS:
-            ax.plot(x,k[c[2],:,1],label=c[0][2])
+            bptxs = get_breakpt(k[c[2],:,0],c[1])
+            isd = False
+            for bp in bptxs:
+                tt = d[bp[0]].hour*60+d[bp[0]].minute
+                if tt>=tfr[0] and tt<=tfr[1]:
+                    isd = True
+                    ax.annotate('%d.%s'%(bp[1],c[0][2]),xy=(bp[0],k[c[2],bp[0],1]),xytext=(-50*(-1 if ln%4>1 else 1),60*(-1 if ln%2 else 1)), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                    connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')
+            if isd:
+                ln+=1
+                ax.plot(x,k[c[2],:,1],label=c[0][2])
         ax.axhline(y=0,color='black',linestyle='--')
         ax.grid(True)
         ax.set_xlim(0,len(d)-1)
         ax.set_xticks(xticks)
-        if len(ALLBOLLS)>0:
+        if ln>0:
             plt.legend()
         fig.autofmt_xdate()
         kline.output_show(monitor_output)
@@ -934,6 +981,12 @@ def monitor_bollup():
         check.it = it[1]
         check.observe(on_peroidcheck,names='value')
         checkitem.append(check)
+    """
+    对突破进行过滤
+    0 持续:昨天已经突破，今天还在突破位置
+    1 最新:昨天没有突破，今天突破的
+    2 昨日:昨日突破，今日回落的(目前没有实现)
+    """
     new2name = {0:'持续',1:'最新',2:'昨日'}
     newname2new = {'持续':0,'最新':1,'昨日':2}
     def on_news(e):
@@ -949,6 +1002,29 @@ def monitor_bollup():
     ) 
     checkitem.append(newdrop)
     newdrop.observe(on_news,names='value')
+    """
+    时序过滤
+    0 当前:最近一个小时突破的
+    1 盘前:开盘前发生突破
+    2 10点中之前
+    """
+
+    tf2name = {0:'最近',1:'盘前',2:'上午',3:'下午'}
+    name2tf = {'最近':0,'盘前':1,'上午':2,'下午':3}
+    tfdrop = widgets.Dropdown(
+        options=['最近','盘前','上午','下午'],
+        value=tf2name[tf],
+        description='',
+        disabled=False,
+        layout=Layout(width='96px')
+    )
+    def on_tf(e):
+        nonlocal tf
+        tf = name2tf[e['new']]
+        update_bollupbuttons()        
+    checkitem.append(tfdrop)
+    tfdrop.observe(on_tf,names='value')
+
     def on_clear(e):
         kline_output.clear_output()
     clearbut = widgets.Button(
