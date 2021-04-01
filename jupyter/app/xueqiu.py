@@ -2481,27 +2481,26 @@ def appendEMK(code,period,k,d):
         b1,R = shared.numpyFromRedis(kname)
         if b and b1:
             j = code2i[code]
-            DD = copy.copy(d)
             if period=='d':
                 bi = 0
                 for bi in range(len(D)):#排除掉开盘前的数据
                     if (D[bi].hour==9 and D[bi].minute>=30) or D[bi].hour>9:
                         break
                 if bi!=len(D)-1:
-                    DD.append((date.today(),))
                     open1 = R[j,bi,0]
                     high = np.max(R[j,bi:,0])
                     low = np.min(R[j,bi:,0])
                     close1 = R[j,-1,0]
                     volume = np.sum(R[j,:,2])
                     nk = (volume,open1,high,low,close1)
-                    return True,np.vstack((k,nk)),DD
+                    return True,np.vstack((k,nk)),d+[(date.today(),)]
                 else:
                     return True,k,d
-            elif period==5:
+            else:
                 nk = []
+                nd = []
                 for t,bi,ei in period5Iterator(D):
-                    DD.append((t,))
+                    nd.append((t,))
                     open1 = R[j,bi,0]
                     high = np.max(R[j,bi:ei,0])
                     low = np.min(R[j,bi:ei,0])
@@ -2509,7 +2508,8 @@ def appendEMK(code,period,k,d):
                     volume = np.sum(R[j,bi:ei,2])
                     nk.append((volume,open1,high,low,close1))
                 if len(nk)>0:
-                    return True,np.vstack((k,nk)),DD
-            else:
-                return True,k,d
+                    if period!=5:
+                        nk = np.array(nk).reshape(-1,5)
+                        nk,nd = stock.mergeK(nk,nd,int(period/5))
+                    return True,np.vstack((k,nk)),d+nd
     return False,k,d

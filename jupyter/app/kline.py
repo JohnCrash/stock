@@ -447,7 +447,7 @@ class Plote:
                 c,k,d = stock.loadKline(code,'d',after=after)
             else:
                 c,k,d = stock.loadKline(code,5,after=after)
-                k,d = stock.mergeK(k,d,period/5)
+                k,d = stock.mergeK(k,d,int(period/5))
             
             if code is not _cacheK:
                 _cacheK[code] = {}
