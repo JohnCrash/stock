@@ -2183,6 +2183,8 @@ def emflowRT2():
                 print("%s emflowRT2数据加装失败..."%str(t))
                 return
         if R is None:
+            if np.count_nonzero(a[:,0,0])<a.shape[0]*0.95: #大部分下载失败
+                return None
             RR = a
         else:
             RR = np.hstack((R,a))
