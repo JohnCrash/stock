@@ -438,9 +438,9 @@ def get_category_selector():
 """
 返回company_select中公司的全部60分钟数据
 """
-_K60 = {240:None,60:None,30:None,15:None}
-_D60 = {240:None,60:None,30:None,15:None}
-_N60 = {240:None,60:None,30:None,15:None}
+_K60 = {240:None,60:None,30:None,15:None,5:None}
+_D60 = {240:None,60:None,30:None,15:None,5:None}
+_N60 = {240:None,60:None,30:None,15:None,5:None}
 def get_period_k(period):
     global _K60,_D60,_N60
     
@@ -892,6 +892,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
         rebuild_period_sequence(60)
         rebuild_period_sequence(30)
         rebuild_period_sequence(15)
+        rebuild_period_sequence(5)
     except Exception as e:
         mylog.printe(e)
     while t.hour>=6 and t.hour<15:
@@ -903,7 +904,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     print("sinaFlowRT %s"%str(t))
                     plane = emflowRT2()
                     if plane is not None:
-                        update_period_plane(t,plane,[240,60,30,15])
+                        update_period_plane(t,plane,[240,60,30,15,5])
                     print("emflowRT %s"%str(t))
                 shared.toRedis(datetime.today(),'runtime_update',ex=60)                
             dt = 20-(datetime.today()-t).seconds #20秒更新一次

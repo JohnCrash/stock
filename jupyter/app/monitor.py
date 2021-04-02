@@ -287,8 +287,8 @@ def Indexs():
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业
-        "上榜分类":getDTop('90',3)[5:],
-        "上榜概念":getDTop('91',15)[10:],
+        "上榜分类":getDTop('90',3)[:10],
+        "上榜概念":getDTop('91',15)[:20],
         "ETF":ETFs,
         "自选":BCs,
         "关注":[favoriteList]
@@ -706,7 +706,7 @@ def bolltrench():
     if not b:
         bolls = {}
     isupdate = False
-    for period in [15,30,60,240]:
+    for period in [5,15,30,60,240]:
         if period not in bolls or t-bolls[period] > timedelta(minutes=period):
             bolls[period] = t
             isupdate = True
@@ -759,7 +759,7 @@ def BollK(code,bolls):
                     ei = i
                     break
         return bi,ei
-    period2c = {15:(2,'forestgreen'),30:(3,'royalblue'),60:(4,'darkorange'),240:(5,'red')}
+    period2c = {5:(1,'forestgreen'),15:(2,'forestgreen'),30:(3,'royalblue'),60:(4,'darkorange'),240:(5,'red')}
     style = (('5日','magenta',1),('10日','orange',3))
     period2ma = {5:(320,640,0,1),15:(160,320,0,1),15:(80,160,0,1),30:(40,80,0,1),60:(20,40,0,1),120:(10,20,0,1),'d':(5,10,0,1)}
     def cb(self,axs,bi,ei):
@@ -794,7 +794,7 @@ def monitor_bollup():
     bollup_output = widgets.Output()    
     box = Box(children=[],layout=box_layout)
     prefix_checktable = {'90':True,'91':False,'0':False,'1':False,'2':False}
-    peroid_checktable = {15:True,30:True,60:True,240:True}    
+    peroid_checktable = {5:True,15:True,30:True,60:True,240:True}    
     companys = xueqiu.get_company_select()
     code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
@@ -986,7 +986,7 @@ def monitor_bollup():
         check.it = it[1]
         check.observe(on_perfixcheck,names='value')
         checkitem.append(check)
-    for it in [('15',15),('30',30),('60',60),('240',240)]:
+    for it in [('5',5),('15',15),('30',30),('60',60),('240',240)]:
         check = widgets.Checkbox(value=peroid_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='72px'))
         check.it = it[1]
         check.observe(on_peroidcheck,names='value')

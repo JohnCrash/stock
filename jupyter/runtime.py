@@ -84,7 +84,7 @@ if __name__=='__main__':
                 mylog.printe(e)                 
             #新版本仅仅跟踪msci个股
             print("开始更新缓存...")
-            xueqiu.update_today_period([240,60,30,15])
+            xueqiu.update_today_period([240,60,30,15,5])
             print("更新完成。")
             download_done_day = t.day
             shared.toRedis(download_done_day,"last_download_day")

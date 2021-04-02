@@ -343,8 +343,8 @@ for p in [60,30,15]:
     xueqiu.rebuild_period_sequence(p)    #'d'            
 """
 #print(monitor.timesplitEvent())
-#shared.delKey('bolls')
-#monitor.monitor_bollup()
+shared.delKey('bolls')
+monitor.monitor_bollup()
 #xueqiu.update_today_period([240,60,30,15])
 """
 companys = xueqiu.get_company_select()
@@ -357,4 +357,7 @@ for i in range(len(companys)):
         j+=1
 print(j)
 """
-kline.Plote('BK0436',5,mode='auto').show()
+#kline.Plote('BK0436',5,mode='auto').show()
+
+#k,d = xueqiu.get_period_k(5)
+#print(k.shape,len(d),d[-1])
