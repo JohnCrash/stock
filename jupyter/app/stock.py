@@ -124,14 +124,14 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
         b,company = shared.fromRedis(code)
         if not b or len(company)==0:
             company = query("""select id,code,name,category from company where code='%s'"""%code)
-            shared.toRedis(company,code)
+            shared.toRedis(company,code,ex=24*3600)
     elif len(code)>3 and code[0]=='B' and code[1]=='K':
-        company = query("""select id,code,name,category from company where code='%s'"""%code)
-        if len(company)==0:#尝试flow_em_catory
-            em = query("""select * from flow_em_category where code='%s'"""%code)
-            if len(em)>0:
-                company = [(em[0][5],em[0][2],em[0][1],'EM')]
-                suffix = 'em'
+        em = query("""select * from flow_em_category where code='%s'"""%code) #代码重复优先em
+        if len(em)>0:
+            company = [(em[0][5],em[0][2],em[0][1],'EM')]
+            suffix = 'em'
+        else:
+            company = query("""select id,code,name,category from company where code='%s'"""%code)
     else:
         while True:
             #code没有SH和SZ则尝试两种前缀

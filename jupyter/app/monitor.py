@@ -287,8 +287,8 @@ def Indexs():
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业
-        "上榜分类":getDTop('90',3),
-        "上榜概念":getDTop('91',15),
+        "上榜分类":getDTop('90',3)[5:],
+        "上榜概念":getDTop('91',15)[10:],
         "ETF":ETFs,
         "自选":BCs,
         "关注":[favoriteList]
@@ -761,7 +761,7 @@ def BollK(code,bolls):
         return bi,ei
     period2c = {15:(2,'forestgreen'),30:(3,'royalblue'),60:(4,'darkorange'),240:(5,'red')}
     style = (('5日','magenta',1),('10日','orange',3))
-    period2ma = {15:(160,320,0,1),15:(80,160,0,1),30:(40,80,0,1),60:(20,40,0,1),120:(10,20,0,1),'d':(5,10,0,1)}
+    period2ma = {5:(320,640,0,1),15:(160,320,0,1),15:(80,160,0,1),30:(40,80,0,1),60:(20,40,0,1),120:(10,20,0,1),'d':(5,10,0,1)}
     def cb(self,axs,bi,ei):
         axK = axs[0]
         for bo in bolls:
@@ -1069,3 +1069,12 @@ def monitor_bollup():
         display(checkbox,box)
  
     display(monitor_output,bollup_output,kline_output)
+
+"""
+分屏多窗口监控分时图
+分类,概念,ETF资金面前n名,分类,概念,ETF涨幅榜前n名,异动榜
+"""
+def muti_monitor():
+    #f flow
+    def plotk(ax,k,d,f,title):
+        pass

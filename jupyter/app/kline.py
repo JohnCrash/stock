@@ -175,6 +175,8 @@ class MyFormatter(Formatter):
         else:
             return '%s-%s-%s %s:%s'%(t.year,t.month,t.day,t.hour,t.minute)
 
+def volume2str(v):
+    return "%.2f亿"%(v/1e8)
 """
 对编码进行映射，因为对于east的资金流向分类代码和雪球的不一样。
 """
@@ -468,8 +470,9 @@ class Plote:
             
             flowk,flowd = xueqiu.getFlow(self.code(),self._lastday)
             flow = ([],[])
+            tbi = datetime(year=d[0].year,month=d[0].month,day=d[0].day,hour=9,minute=30)
             for i in range(len(flowd)):
-                if flowd[i][0].year==d[0].year and flowd[i][0].month==d[0].month and flowd[i][0].day==d[0].day:
+                if flowd[i][0]>tbi:
                     flow[0].append(flowk[i])
                     flow[1].append(flowd[i])
             return flow
@@ -958,13 +961,12 @@ class Plote:
                             d[i][2] = v[1]
                             d[i][3] = v[2]
                             d[i][4] = v[3]
-                            i+=1     
-
-                        axflow.xaxis.set_major_formatter(MyFormatterRT(flow[1],'h:m'))
-                        axflow.plot(d[:,0],d[:,1],color="red",label="巨 %d亿"%(d[-1,1]/1e8))
-                        axflow.plot(d[:,0],d[:,2],color="yellow",label="大 %d亿"%(d[-1,2]/1e8))
-                        axflow.plot(d[:,0],d[:,3],color="cyan",label="中 %d亿"%(d[-1,3]/1e8))
-                        axflow.plot(d[:,0],d[:,4],color="purple",label="小 %d亿"%(d[-1,4]/1e8))
+                            i+=1
+                        axflow.xaxis.set_major_formatter(MyFormatterRT(dd,'h:m'))
+                        axflow.plot(d[:,0],d[:,1],color="red",label="巨 %s"%(volume2str(d[-1,1])))
+                        axflow.plot(d[:,0],d[:,2],color="yellow",label="大 %s"%(volume2str(d[-1,2])))
+                        axflow.plot(d[:,0],d[:,3],color="cyan",label="中 %s"%(volume2str(d[-1,3])))
+                        axflow.plot(d[:,0],d[:,4],color="purple",label="小 %s"%(volume2str(d[-1,4])))
                         #axflow.set_xticks(xticks)
                         axflow.grid(True)
                         axflow.set_xlim(0,60*4)
