@@ -900,14 +900,33 @@ def monitor_bollup():
         """
         返回第一个达到条件的点
         """
-        def get_breakpt(k,bos):
+        def get_breakpt(k,d,bos):
             r = []
-            for bo in bos:
+            for b in bos:
+                bo = b[8]
+                H = bo[6]-bo[5]
                 for i in range(len(k)):
-                    if bo[7]=='up':
-                        if k[i]>bo[8][6]:
-                            r.append((i,bo[0]))
-                            break
+                    if d[i]>bo[8]: #监测点时间必须大于通道结尾的时间
+                        if b[7]=='up':
+                            if k[i]>bo[6]:
+                                r.append((i,b[0]))
+                                break
+                        elif b[7]=='down':
+                            if k[i]<bo[5]:
+                                r.append((i,b[0]))
+                                break                            
+                        elif b[7]=='top':
+                            if k[i] > bo[5]+2*H/3 and k[i] < bo[6]:
+                                r.append((i,b[0]))
+                                break                            
+                        elif b[7]=='bottom':
+                            if k[i] < bo[5]+H/3 and k[i] > bo[5]:
+                                r.append((i,b[0]))
+                                break                            
+                        elif b[7]=='mid':
+                            if k[i] < bo[5]+2*H/3 and k[i] > bo[5]+H/3:
+                                r.append((i,b[0]))
+                                break                            
             return r
         """
         将ALLBOLLS中的公司绘制出价格走势图表，并且标记出突破点的价格和周期
@@ -928,7 +947,7 @@ def monitor_bollup():
         tfr = tf2range()
         ln = 0
         for c in ALLBOLLS:
-            bptxs = get_breakpt(k[c[2],:,0],c[1])
+            bptxs = get_breakpt(k[c[2],:,0],d,c[1])
             isd = False
             for bp in bptxs:
                 tt = d[bp[0]].hour*60+d[bp[0]].minute
