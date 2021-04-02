@@ -1732,7 +1732,7 @@ def xueqiuList():
     }
 }
 """
-def emflow(code,timeout=None):
+def emflow(code,timeout=None,tryn=3):
     t = datetime.today()
     n = "emflow_%s_%d"%(code,t.minute)
     b,R = shared.fromRedis(n)
@@ -1755,27 +1755,24 @@ def emflow(code,timeout=None):
     uri = "http://push2.eastmoney.com/api/qt/stock/fflow/kline/get?cb=jQuery112309731450462414866_%d&\
 &lmt=0&klt=1&fields1=f1%%2Cf2%%2Cf3%%2Cf7&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56%%2Cf57%%2Cf58%%2Cf59%%2Cf60%%2Cf61%%2Cf62%%2Cf63%%2Cf64%%2Cf65&ut=b2884a393a59ad64002292a3e90d46a5&\
 secid=%s.%s&_=%d"%(ts,perfix,code,ts)
-    try:
-        s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate'}
-        if timeout is None:
-            r = s.get(uri,headers=headers)
-        else:
-            r = s.get(uri,headers=headers,timeout=timeout)
-        if r.status_code==200:
-            bi = r.text.find('({"rc":')
-            if bi>0:
-                R = json.loads(r.text[bi+1:-2])
-                shared.toRedis(R,n,2*60) #保存一个2分钟的缓存
-                return True,R
+    for i in range(tryn):
+        try:
+            s = requests.session()
+            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                    'Accept-Encoding': 'gzip, deflate'}
+            if timeout is None:
+                r = s.get(uri,headers=headers)
             else:
-                return False,r.text
-        else:
-            return False,r.reason
-    except Exception as e:
-        mylog.printe(e)
-        return False,str(e)
+                r = s.get(uri,headers=headers,timeout=timeout)
+            if r.status_code==200:
+                bi = r.text.find('({"rc":')
+                if bi>0:
+                    R = json.loads(r.text[bi+1:-2])
+                    shared.toRedis(R,n,2*60) #保存一个2分钟的缓存
+                    return True,R
+        except Exception as e:
+            mylog.printe(e)
+    return False,None
 
 """
 获取eastmoney kline数据
@@ -1812,7 +1809,7 @@ http://push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery112406067857018266
 
 }
 """
-def emkline(code,period='d',begin='19900101',end='20250101',timeout=None):
+def emkline(code,period='d',begin='19900101',end='20250101',timeout=None,tryn=3):
     ts = math.floor(time.time())
     if code[0]=='B':
         perfix = '90'
@@ -1831,44 +1828,41 @@ def emkline(code,period='d',begin='19900101',end='20250101',timeout=None):
     if period=='d':
         period = 101
     uri = "http://push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery112406067857018266605_1616059436301&secid=%s.%s&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%%2Cf2%%2Cf3%%2Cf4%%2Cf5&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56&klt=%d&fqt=0&beg=%s&end=%s&_=%d"%(perfix,code,period,begin,end,ts)
-    try:
-        s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate'}
-        if timeout is None:
-            r = s.get(uri,headers=headers)
-        else:
-            r = s.get(uri,headers=headers,timeout=timeout)
-        if r.status_code==200:
-            bi = r.text.find('({"rc":')
-            if bi>0:
-                R = json.loads(r.text[bi+1:-2])
-                K = []
-                D = []
-                if 'data' in R and 'klines' in R['data']:
-                    klines = R['data']['klines']
-                    if period == 101:
-                        for k in klines:#"2000-01-04,999.64,1028.18,1037.04,987.60,336585,391487000.00,4.94"
-                            #0date 1open 2close 3high 4low 5volume
-                            vs = k.split(',')
-                            if len(vs)==6:
-                                D.append((datetime.fromisoformat(vs[0]),))
-                                K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
-                    else:
-                        for k in klines:#"2021-01-27 09:35,25782.87,25711.66,25854.86,25711.66,1458100,3826018928.00"
-                            #0date 1open 2close 3high 4low 5volume
-                            vs = k.split(',')
-                            if len(vs)==6:
-                                D.append((datetime.fromisoformat(vs[0]),))
-                                K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
-                return True,K,D
+    for i in range(tryn):
+        try:
+            s = requests.session()
+            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+                    'Accept-Encoding': 'gzip, deflate'}
+            if timeout is None:
+                r = s.get(uri,headers=headers)
             else:
-                return False,r.text,None
-        else:
-            return False,r.reason,None
-    except Exception as e:
-        mylog.printe(e)
-        return False,str(e),None
+                r = s.get(uri,headers=headers,timeout=timeout)
+            if r.status_code==200:
+                bi = r.text.find('({"rc":')
+                if bi>0:
+                    R = json.loads(r.text[bi+1:-2])
+                    K = []
+                    D = []
+                    if 'data' in R and 'klines' in R['data']:
+                        klines = R['data']['klines']
+                        if period == 101:
+                            for k in klines:#"2000-01-04,999.64,1028.18,1037.04,987.60,336585,391487000.00,4.94"
+                                #0date 1open 2close 3high 4low 5volume
+                                vs = k.split(',')
+                                if len(vs)==6:
+                                    D.append((datetime.fromisoformat(vs[0]),))
+                                    K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
+                        else:
+                            for k in klines:#"2021-01-27 09:35,25782.87,25711.66,25854.86,25711.66,1458100,3826018928.00"
+                                #0date 1open 2close 3high 4low 5volume
+                                vs = k.split(',')
+                                if len(vs)==6:
+                                    D.append((datetime.fromisoformat(vs[0]),))
+                                    K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
+                    return True,K,D
+        except Exception as e:
+            mylog.printe(e)
+    return False,None,None
 """
 主力净流入分布
 t=0 行业
@@ -1969,7 +1963,7 @@ f72 大单
 f78 中单
 f84 小单
 """
-def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=1):
+def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=3):
     ts = math.floor(time.time())
     codelists = ""
     for c in codes:
@@ -1991,8 +1985,8 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=1):
     codelists = codelists[:-1]
     n = len(codes)
     uri="https://push2.eastmoney.com/api/qt/ulist/get?cb=jQuery1124046041648531999235_%d&invt=3&pi=0&pz=%d&mpi=2000&secids=%s&ut=6d2ffaa6a585d612eda28417681d58fb&fields=%s&po=1&_=%d"%(ts,n,codelists,field,ts)
-    try:
-        for i in range(tryn):
+    for i in range(tryn):
+        try:
             s = requests.session()
             headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
                     'Accept-Encoding': 'gzip, deflate'}
@@ -2005,9 +1999,9 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=1):
                 if bi>0:
                     R = json.loads(r.text[bi+1:-2])
                     return True,R
-    except Exception as e:
-        mylog.printe(e)
-        return False,str(e)    
+        except Exception as e:
+            mylog.printe(e)
+    return False,None
 
 def emdistribute3(codes,timeout=None):
     pass
@@ -2147,7 +2141,7 @@ def emflowRT2():
         #每一个批量不要多于100个
         a = np.zeros((len(alls),1,7))
         for i in range(0,len(codes),100):
-            b,r = emdistribute2(codes[i:i+100],'f12,f13,f2,f3,f5,f66,f72,f78,f84',tryn=10)
+            b,r = emdistribute2(codes[i:i+100],'f12,f13,f2,f3,f5,f66,f72,f78,f84')
             if b:
                 if 'data' in r:
                     ls = r['data']['diff']
@@ -2182,9 +2176,10 @@ def emflowRT2():
             else:
                 print("%s emflowRT2数据加装失败..."%str(t))
                 return
+        if np.count_nonzero(a[:,0,0])<a.shape[0]*0.95: #超过一定比率下载失败就不更新数据了
+            print("%s emflowRT2数据更新出现较多的数据错误 %d/%d"%(str(t),np.count_nonzero(a[:,0,0]),a.shape[0]))
+            return None
         if R is None:
-            if np.count_nonzero(a[:,0,0])<a.shape[0]*0.95: #大部分下载失败
-                return None
             RR = a
         else:
             RR = np.hstack((R,a))
