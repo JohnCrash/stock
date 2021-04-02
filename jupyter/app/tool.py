@@ -357,11 +357,3 @@ for i in range(len(companys)):
         j+=1
 print(j)
 """
-b,k,d = xueqiu.getTodayRT()
-t = datetime.today()
-nn = "emflowts2_%d_%d"%(t.month,t.day)
-kn = "emflownp2_%d_%d"%(t.month,t.day)
-K = np.array(k)
-K[:,0,:] = k[:,1,:]
-shared.numpyToRedis(K,kn,ex=7*24*3600) #保留7天
-shared.toRedis(d,nn,ex=7*24*3600)

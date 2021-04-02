@@ -871,7 +871,7 @@ def monitor_bollup():
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5])
                                 bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'down',bo))
-                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew) or (news==1 and not isnew)):
+                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)):
                     bstyle = ''
                     if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
                         bstyle = 'danger'
