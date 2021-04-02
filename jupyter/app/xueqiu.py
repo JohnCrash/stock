@@ -2493,7 +2493,7 @@ def appendEMK(code,period,k,d):
                     high = np.max(R[j,bi:,0])
                     low = np.min(R[j,bi:,0])
                     close1 = R[j,-1,0]
-                    volume = np.sum(R[j,:,2])
+                    volume = R[j,-1,2]
                     nk = (volume,open1,high,low,close1)
                     return True,np.vstack((k,nk)),d+[(date.today(),)]
                 else:
@@ -2506,8 +2506,8 @@ def appendEMK(code,period,k,d):
                     open1 = R[j,bi,0]
                     high = np.max(R[j,bi:ei,0])
                     low = np.min(R[j,bi:ei,0])
-                    close1 = R[j,ei,0]
-                    volume = np.sum(R[j,bi:ei,2])
+                    close1 = R[j,ei-1,0]
+                    volume = R[j,ei-1,2]-R[j,bi,2]
                     nk.append((volume,open1,high,low,close1))
                 if len(nk)>0:
                     if period!=5:

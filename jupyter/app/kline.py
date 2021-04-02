@@ -744,7 +744,7 @@ class Plote:
         code = self._company[1]
         if len(code)>3 and code[2]==':':
             code = code.replace(':','')
-        return code.lower()
+        return code.upper()
     def name(self):
         return self._company[2]
     #当前时间,周1~周5 9:00-15:00返回True

@@ -357,3 +357,5 @@ for i in range(len(companys)):
         j+=1
 print(j)
 """
+f,d = xueqiu.getFlow('BK0428')
+print(d[-1])
