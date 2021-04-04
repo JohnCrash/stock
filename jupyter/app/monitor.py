@@ -841,6 +841,8 @@ def monitor_bollup():
     ALLBOLLS = []
     FILTERCOLORS = []
     FILTERCURRENT = []
+    npage = 0
+    page = 0
     switch = 1
     news = 1 #0 持续 ，1 最新 ，2 昨日
     tf = 0 #时间过滤
@@ -933,10 +935,11 @@ def monitor_bollup():
                         description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
                         disabled=False,
                         button_style=bstyle,
-                        icon='check' if isnew else '',
+                        icon='',
                         layout=Layout(width='220px'))
                     but.event = ('bollup',companys[i],periods)
                     but.bolls = bolls
+                    but.code = companys[i][1]
                     ALLBOLLS.append((companys[i],bolls,i,k[i,-1,1]))
                     but.on_click(onkline)
                     items.append((k[i,-1,1],but,companys[i][1]))
@@ -1008,17 +1011,51 @@ def monitor_bollup():
         box.children = items
         update_current_plot(k,d)      
 
-    def update_current_plot(k,d):
-        nonlocal FILTERCURRENT,monitor_output
+    def update_current_plot(k=None,d=None):
+        nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup,box
+        if k is None: #如果k,d没有传递过来
+            t = date.today()
+            b,k,d = xueqiu.getTodayRT()
+            t2 = t
+            if not b:
+                for i in range(1,7):
+                    t2 = t-timedelta(days=i)
+                    b,k,d = xueqiu.getTodayRT(t2)
+                    if b:
+                        break
+                    if i==6:
+                        return            
+        N = len(FILTERCURRENT)
+        npage = int(N/8.)+(0 if N%8==0 else 1)
+        if page>=npage:
+            page = npage-1
+        if page>=npage-1:
+            pagedown.disabled = True
+        else:
+            pagedown.disabled = False
+        if page<0:
+            page = 0
+        if page<=0:
+            pageup.disabled = True
+        else:
+            pageup.disabled = False
+
         gs_kw = dict(width_ratios=[1,1,1,1], height_ratios=[2,1,2,1])
         fig,axs = plt.subplots(4,4,figsize=(36,16),gridspec_kw = gs_kw)
-        for i in range(len(FILTERCURRENT)):
+        views = []
+        for i in range(8*page,N):
             c = FILTERCURRENT[i][0]
-            x = 2*int(i/4)
-            y = i%4
+            x = 2*int((i-8*page)/4.)
+            y = (i-8*page)%4
             if x<3:
                 ax = [axs[x,y],axs[x+1,y]]
+                views.append(c[0][1])
                 plotfs(ax,k[c[2],:,:],d,c[0][2])
+        for item in box.children:
+            if item.code in views:
+                item.icon = 'check'
+            else:
+                item.icon = ''
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(monitor_output)
 
@@ -1122,6 +1159,31 @@ def monitor_bollup():
                 button_style='')
     allbut.on_click(on_list)
     checkitem.append(allbut)
+    def on_pagedown(e):
+        nonlocal page,npage
+        page+=1
+        if page>=npage:
+            page = npage-1     
+        update_current_plot()   
+    pagedown = widgets.Button(
+                description="下一页",
+                disabled=False,
+                button_style='')
+    pagedown.on_click(on_pagedown)
+    
+    def on_pageup(e):
+        nonlocal page,npage
+        page-=1
+        if page<0:
+            page = 0
+        update_current_plot()
+    pageup = widgets.Button(
+                description="上一页",
+                disabled=False,
+                button_style='')
+    pageup.on_click(on_pageup)
+    checkitem.append(pagedown)
+    checkitem.append(pageup)
 
     def loop():
         update_bollupbuttons()
