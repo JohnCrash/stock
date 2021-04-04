@@ -1,4 +1,5 @@
 
+import matplotlib.pyplot as plt
 import numpy as np
 import requests
 import time
@@ -343,7 +344,7 @@ for p in [60,30,15]:
     xueqiu.rebuild_period_sequence(p)    #'d'            
 """
 #print(monitor.timesplitEvent())
-shared.delKey('bolls')
+#shared.delKey('bolls')
 monitor.monitor_bollup()
 #xueqiu.update_today_period([240,60,30,15])
 """
@@ -361,3 +362,29 @@ print(j)
 
 #k,d = xueqiu.get_period_k(5)
 #print(k.shape,len(d),d[-1])
+
+"""
+def testplotfs():
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    b,k,d = xueqiu.getTodayRT(datetime(year=2021,month=4,day=2))
+    if b:
+        companys = xueqiu.get_company_select()
+        for i in range(len(companys)):
+            monitor.plotfs(axs,k[i,:,:],d,companys[i][2])
+            break
+    fig.subplots_adjust(hspace=0,wspace=0.05)
+    plt.show()
+
+#testplotfs()
+fig,axs = plt.subplots(4,2)
+print(axs[0,0])
+print(axs[1,0])
+print(axs[2,0])
+print(axs[3,0])
+print(axs[0,1])
+print(axs[1,1])
+print(axs[2,1])
+print(axs[3,1])
+
+plt.show()
+"""

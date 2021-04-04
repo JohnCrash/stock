@@ -28,7 +28,9 @@ class MyFormatterRT(Formatter):
         if ind >= len(self.dates) or ind < 0 or math.ceil(x)!=math.floor(x):
             return ''
 
-        t = self.dates[ind][0]
+        t = self.dates[ind]
+        if type(t)!=datetime:
+            t = t[0]
         if self.fmt=='m-d h:m':
             return '%02d-%02d %02d:%02d'%(t.month,t.day,t.hour,t.minute)
         elif self.fmt=='d h:m:s':
@@ -40,7 +42,46 @@ class MyFormatterRT(Formatter):
         elif self.fmt=='h:m':
             return '%02d:%02d'%(t.hour,t.minute)
         else:
-            return '%d %02d:%02d'%(t.day,t.hour,t.minute)                
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)      
+
+"""
+绘制分时图
+ax 绘制句柄数组,k (),d 日期,title 标题,style绘制风格
+"""
+defaultPlotfsStyle = {
+    'pcolor':'steelblue',
+    'klinewidth':2,
+    'ma60color':'darkorange',
+    'ma60linewidth':1,
+    'ma60linestyle':'dashed',
+    'maincolor':'fuchsia',
+    'tingcolor':'cornflowerblue'
+}
+def plotfs(ax,k,d,title,style=defaultPlotfsStyle):
+    ax[0].set_title(title,y=0.93)
+    x = np.arange(k.shape[0])
+    xticks = [0,60,2*60,3*60,4*60]
+    ax[0].axhline(y=0,color='black',linestyle='dotted')
+    ax[0].plot(x,k[:,1],color=style['pcolor'])
+    m60 = stock.ma(k[:,1],60)
+    ax[0].plot(x,m60,color=style['ma60color'],linestyle=style['ma60linestyle'])#分时均线
+    if len(ax)==2:
+        ax[1].axhline(y=0,color='black',linestyle='dotted')
+        ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
+        ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
+        ax[1].set_xlim(0,4*60)
+        ax[1].set_xticks(xticks)
+        ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
+        bottom,top = ax[1].get_ylim()
+        ax[1].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)    
+    else:
+        ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
+    ax[0].set_xticks(xticks)
+    ax[0].set_xlim(0,4*60)
+    bottom,top = ax[0].get_ylim()
+    ax[0].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)    
+    #ax[0].set_ylim(-10,10)
+
 ETFs = [ 
     'SZ159919', #沪深300ETF
     'SH510050', #上证50ETF
@@ -759,7 +800,7 @@ def BollK(code,bolls):
                     ei = i
                     break
         return bi,ei
-    period2c = {5:(1,'forestgreen'),15:(2,'forestgreen'),30:(3,'royalblue'),60:(4,'darkorange'),240:(5,'red')}
+    period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),240:(5,'red','dotted')}
     style = (('5日','magenta',1),('10日','orange',3))
     period2ma = {5:(320,640,0,1),15:(160,320,0,1),15:(80,160,0,1),30:(40,80,0,1),60:(20,40,0,1),120:(10,20,0,1),'d':(5,10,0,1)}
     def cb(self,axs,bi,ei):
@@ -769,7 +810,7 @@ def BollK(code,bolls):
             if bei==0:
                 bei = ei-3
             if bei-bbi>0:
-                axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),facecolor='None',edgecolor=period2c[bo[0]][1],linewidth=period2c[bo[0]][0],linestyle='--')
+                axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),facecolor='None',edgecolor=period2c[bo[0]][1],linewidth=period2c[bo[0]][0],linestyle=period2c[bo[0]][2])
         #绘制5日和10日均线
         m = period2ma[self._period]
         xx,alv = stock.maRangeK(self._k,m[0],bi,ei)
@@ -783,7 +824,7 @@ def BollK(code,bolls):
     if period==240:
         period = 'd'
 
-    kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'CLEAR','index':False,'cb':cb},mode='auto').show(figsize=(36,16))
+    kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='auto').show(figsize=(36,16))
 
 """
 通道突破监控
@@ -799,6 +840,7 @@ def monitor_bollup():
     code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
     FILTERCOLORS = []
+    FILTERCURRENT = []
     switch = 1
     news = 1 #0 持续 ，1 最新 ，2 昨日
     tf = 0 #时间过滤
@@ -820,20 +862,28 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS,FILTERCOLORS,switch,monitor_output,news
+        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news
         bos = bolltrench()
-        b,k,d = xueqiu.getTodayRT()
-        if not b:
-            return
-        #使用昨天的k,d数据
         t = date.today()
+        b,k,d = xueqiu.getTodayRT()
+        t2 = t
+        if not b:
+            for i in range(1,7):
+                t2 = t-timedelta(days=i)
+                b,k,d = xueqiu.getTodayRT(t2)
+                if b:
+                    break
+                if i==6:
+                    return
+        #使用昨天的k,d数据
         b1,ky,dy = False,None,None
-        for i in range(7):
-            b1,ky,dy = xueqiu.getTodayRT(t-timedelta(days=1))
+        for i in range(1,7):
+            b1,ky,dy = xueqiu.getTodayRT(t2-timedelta(days=i))
             if b1:
                 break
         ALLBOLLS = []
         FILTERCOLORS = []
+        
         items = []
         for i in range(len(companys)):
             code = companys[i][1]
@@ -930,22 +980,10 @@ def monitor_bollup():
             return r
         """
         将ALLBOLLS中的公司绘制出价格走势图表，并且标记出突破点的价格和周期
-        """
-        xticks = []
-        D = []
-        for i in range(len(d)):
-            t = d[i]
-            D.append((t,))
-            if t.minute%15==0:
-                xticks.append(i)
-        xticks.append(len(d)-1)
-        xticks.append(len(d)-1)        
-        fig,ax = plt.subplots(1,1,figsize=(36,16))
-        ax.xaxis.set_major_formatter(MyFormatterRT(D,'m-d h:m'))
-        x = np.arange(len(d))
+        """      
         ALLBOLLS = sorted(ALLBOLLS,key=lambda it:it[3],reverse=True)
         tfr = tf2range()
-        ln = 0
+        FILTERCURRENT = []
         for c in ALLBOLLS:
             bptxs = get_breakpt(k[c[2],:,0],d,c[1])
             isd = False
@@ -953,20 +991,12 @@ def monitor_bollup():
                 tt = d[bp[0]].hour*60+d[bp[0]].minute
                 if tt>=tfr[0] and tt<=tfr[1]:
                     isd = True
-                    ax.annotate('%d.%s'%(bp[1],c[0][2]),xy=(bp[0],k[c[2],bp[0],1]),xytext=(-50*(-1 if ln%4>1 else 1),60*(-1 if ln%2 else 1)), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                    connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')
+                    #ax.annotate('%d.%s'%(bp[1],c[0][2]),xy=(bp[0],k[c[2],bp[0],1]),xytext=(-50*(-1 if ln%4>1 else 1),60*(-1 if ln%2 else 1)), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+                    #connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')
             if isd:
-                ln+=1
-                ax.plot(x,k[c[2],:,1],label=c[0][2])
+                FILTERCURRENT.append((c,bptxs))
                 FILTERCOLORS.append(c[0][1])
-        ax.axhline(y=0,color='black',linestyle='--')
-        ax.grid(True)
-        ax.set_xlim(0,len(d)-1)
-        ax.set_xticks(xticks)
-        if ln>0:
-            plt.legend()
-        fig.autofmt_xdate()
-        kline.output_show(monitor_output)
+
         """
         下面对按钮对应公司的日涨幅进行排序，将涨幅大的放置在列表的前面        
         """
@@ -975,7 +1005,22 @@ def monitor_bollup():
         for it in sorteditems:
             if it[2] in FILTERCOLORS:
                 items.append(it[1])
-        box.children = items        
+        box.children = items
+        update_current_plot(k,d)      
+
+    def update_current_plot(k,d):
+        nonlocal FILTERCURRENT,monitor_output
+        gs_kw = dict(width_ratios=[1,1,1,1], height_ratios=[2,1,2,1])
+        fig,axs = plt.subplots(4,4,figsize=(36,16),gridspec_kw = gs_kw)
+        for i in range(len(FILTERCURRENT)):
+            c = FILTERCURRENT[i][0]
+            x = 2*int(i/4)
+            y = i%4
+            if x<3:
+                ax = [axs[x,y],axs[x+1,y]]
+                plotfs(ax,k[c[2],:,:],d,c[0][2])
+        fig.subplots_adjust(hspace=0,wspace=0.08)
+        kline.output_show(monitor_output)
 
     def on_perfixcheck(e):
         nonlocal prefix_checktable

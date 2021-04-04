@@ -961,13 +961,16 @@ class Plote:
                             d[i][2] = v[1]
                             d[i][3] = v[2]
                             d[i][4] = v[3]
+                            t = dd[-1][0]
+                            if t.minute%30==0 and not (t.hour==13 and t.minute==0):
+                                xticks.append(i)
                             i+=1
                         axflow.xaxis.set_major_formatter(MyFormatterRT(dd,'h:m'))
                         axflow.plot(d[:,0],d[:,1],color="red",label="巨 %s"%(volume2str(d[-1,1])))
                         axflow.plot(d[:,0],d[:,2],color="yellow",label="大 %s"%(volume2str(d[-1,2])))
                         axflow.plot(d[:,0],d[:,3],color="cyan",label="中 %s"%(volume2str(d[-1,3])))
                         axflow.plot(d[:,0],d[:,4],color="purple",label="小 %s"%(volume2str(d[-1,4])))
-                        #axflow.set_xticks(xticks)
+                        axflow.set_xticks(xticks)
                         axflow.grid(True)
                         axflow.set_xlim(0,60*4)
                         axflow.legend()
@@ -1068,7 +1071,7 @@ class Plote:
                 fig, axs = plt.subplots(self._axsInx+1,1,sharex=True,figsize=figsize,gridspec_kw = gs_kw)
             break #while True
 
-        fig.subplots_adjust(hspace=0.02,wspace=0.05) #调整子图上下间距
+        fig.subplots_adjust(hspace=0,wspace=0.05) #调整子图上下间距
         axsK = axs if self._axsInx==0 else axs[0]
         if self._date is not None:
             if not('disabledate' in self._config and self._config['disabledate']==True):
@@ -1345,7 +1348,7 @@ class Plote:
                     szkmin = self._szmacd[bi:ei].min()
                     axs[self._macdInx].plot(x,self._szmacd[bi:ei]*(kmax-kmin)/(szkmax-szkmin),color='black',linestyle='--')
                 #macd背离点
-                if self._showeps:
+                if False and self._showeps:
                     eps = stock.macdDeviate(self._k[bi:ei,4],self._macd[bi:ei])
                     for i in eps:
                         x = bi+i[1]
