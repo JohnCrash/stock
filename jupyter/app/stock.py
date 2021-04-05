@@ -14,6 +14,7 @@ def isTransTime(t=None):
 
 #判断今天是不是可以交易
 def isTransDay():
+    return False
     t = datetime.today()
     if t.weekday()>=0 and t.weekday()<5:
         return True

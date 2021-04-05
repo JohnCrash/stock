@@ -344,19 +344,19 @@ for p in [60,30,15]:
     xueqiu.rebuild_period_sequence(p)    #'d'            
 """
 #print(monitor.timesplitEvent())
-#shared.delKey('bolls')
-monitor.monitor_bollup()
+shared.delKey('bolls')
+#monitor.monitor_bollup()
 #xueqiu.update_today_period([240,60,30,15])
 """
 companys = xueqiu.get_company_select()
-K,D = xueqiu.get_period_k(240)
+t = datetime.today()
+n = "emflowts2_%d_%d"%(t.month,t.day)
+k = "emflownp2_%d_%d"%(t.month,t.day)
+shared.delKey(n)
+shared.delKey(k)
+xueqiu.emflowRT2()
 b,k,d = xueqiu.getTodayRT()
-j = 0
-for i in range(len(companys)):
-    if k[i,-1,0] > 1.3*K[i,-1]:
-        print(companys[i],k[i,-1,0],K[i,-1])
-        j+=1
-print(j)
+print(b)
 """
 #kline.Plote('BK0436',5,mode='auto').show()
 

@@ -57,7 +57,7 @@ defaultPlotfsStyle = {
     'maincolor':'fuchsia',
     'tingcolor':'cornflowerblue'
 }
-def plotfs(ax,k,d,title,style=defaultPlotfsStyle):
+def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
     ax[0].set_title(title,y=0.93)
     x = np.arange(k.shape[0])
     xticks = [0,60,2*60,3*60,4*60]
@@ -81,6 +81,22 @@ def plotfs(ax,k,d,title,style=defaultPlotfsStyle):
     bottom,top = ax[0].get_ylim()
     ax[0].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)    
     #ax[0].set_ylim(-10,10)
+    """
+    bolls = [(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型(up,top,mid,bottom,down),8 bo),...]
+    bo = (0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei,9 zfn)
+    绘制和突破点的关系标注
+    """
+    if bolls is not None:
+        openp = k[-1,0]/(1.+k[-1,1]/100.)
+        period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),240:(5,'red','dotted')}
+        for boll in bolls:
+            if boll[7]=='up':
+                y = 100.*(boll[4]-openp)/openp
+            elif boll[7]=='down':
+                y=100.*(boll[5]-openp)/openp
+            ax[0].axhline(y=y,linestyle=period2c[boll[0]][2],linewidth=period2c[boll[0]][0],color=period2c[boll[0]][1])
+            ax[0].annotate('%d'%(boll[8][9]),xy=(240-2*boll[8][9],y),xytext=(20,20 if boll[8][9]%2 else -20), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')                
 
 ETFs = [ 
     'SZ159919', #沪深300ETF
@@ -346,7 +362,7 @@ def bollwayex(k,n=16,jcn=3):
         b,a = bollway(k,i,jcn)
         if b:
             return b,a
-    return False,(0,0,0,0,0)
+    return False,(0,0,0,0,0,0)
 """
 从尾部向前搜索中枢
 方法:先确定一个高点范围，和低点范围，然后如果k在高点和低点之间交替超过2次
@@ -385,15 +401,15 @@ def bollway(k,n=16,jcn=3):
                 if it[1]!=zfc:
                     zfn+=1
                     zfc = it[1]
-            return zfn>jcn,(N,minv,maxv,real_minv,real_maxv) #(通道底，通道顶，通道最小值，通道最大值)
-    return False,(0,0,0,0,0)
+            return zfn>jcn,(N,minv,maxv,real_minv,real_maxv,zfn) #(通道底，通道顶，通道最小值，通道最大值)
+    return False,(0,0,0,0,0,0)
 """
 boll通道由平直到打开返回True,否则返回False
 通道检查n个点，通道宽度都要小于p
 """
 def bollopenk(k,period=240,n=16):
     if len(k)>n and k[-1]>k[-2] and k[-1]>k[-3] and k[-1]>k[-4]: #快速过滤掉大部分的
-        b,(N,up,down,minv,maxv,real_minv,real_maxv)=bollwayex(k[:-1],n)
+        b,(N,up,down,minv,maxv,real_minv,real_maxv,zfn)=bollwayex(k[:-1],n)
         return b and k[-1]>maxv
     return False
 
@@ -754,7 +770,7 @@ def bolltrench():
             K,D = xueqiu.get_period_k(period)
             for i in range(len(companys)):
                 for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
-                    b,(n,up,down,mink,maxk) = bollwayex(K[i,:j],16,3)
+                    b,(n,down,up,mink,maxk,zfn) = bollwayex(K[i,:j],16,3)
                     if b:
                         tbi = D[j-n][0]
                         tei = D[j][0]
@@ -764,11 +780,11 @@ def bolltrench():
                         isexist=False
                         for i in range(len(bls)):
                             if bls[i][1]==period: #已经存在就
-                                bls[i] = (D[-1][0],period,n,up,down,mink,maxk,tbi,tei)
+                                bls[i] = (D[-1][0],period,n,up,down,mink,maxk,tbi,tei,zfn)
                                 isexist = True
                                 break
                         if not isexist:
-                            bls.append((D[-1][0],period,n,up,down,mink,maxk,tbi,tei))
+                            bls.append((D[-1][0],period,n,up,down,mink,maxk,tbi,tei,zfn))
                         break
     if isupdate:
         shared.toRedis(bolls,ename,ex=3*24*3600)
@@ -895,7 +911,7 @@ def monitor_bollup():
                 periods = []
                 for bo in bos[code]:
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
-                    #bo (0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei)
+                    #bo (0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei,9 zfn)
                     if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]:
                         H = bo[6]-bo[5]
                         if switch==1: #突破向上
@@ -994,8 +1010,6 @@ def monitor_bollup():
                 tt = d[bp[0]].hour*60+d[bp[0]].minute
                 if tt>=tfr[0] and tt<=tfr[1]:
                     isd = True
-                    #ax.annotate('%d.%s'%(bp[1],c[0][2]),xy=(bp[0],k[c[2],bp[0],1]),xytext=(-50*(-1 if ln%4>1 else 1),60*(-1 if ln%2 else 1)), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-                    #connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')
             if isd:
                 FILTERCURRENT.append((c,bptxs))
                 FILTERCOLORS.append(c[0][1])
@@ -1010,7 +1024,9 @@ def monitor_bollup():
                 items.append(it[1])
         box.children = items
         update_current_plot(k,d)      
-
+    """
+    绘制更新选择的分时图表
+    """
     def update_current_plot(k=None,d=None):
         nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup,box
         if k is None: #如果k,d没有传递过来
@@ -1050,7 +1066,7 @@ def monitor_bollup():
             if x<3:
                 ax = [axs[x,y],axs[x+1,y]]
                 views.append(c[0][1])
-                plotfs(ax,k[c[2],:,:],d,c[0][2])
+                plotfs(ax,k[c[2],:,:],d,c[0][2],bolls=c[1])
         for item in box.children:
             if item.code in views:
                 item.icon = 'check'
@@ -1182,8 +1198,8 @@ def monitor_bollup():
                 disabled=False,
                 button_style='')
     pageup.on_click(on_pageup)
-    checkitem.append(pagedown)
     checkitem.append(pageup)
+    checkitem.append(pagedown)
 
     def loop():
         update_bollupbuttons()
