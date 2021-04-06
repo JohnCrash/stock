@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import Formatter
 import math
 import numpy as np
+from numpy.lib.function_base import disp
 from . import shared
 from . import stock
 from . import xueqiu
@@ -78,8 +79,6 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
         ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
     ax[0].set_xticks(xticks)
     ax[0].set_xlim(0,4*60)
-    bottom,top = ax[0].get_ylim()
-    ax[0].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)    
     #ax[0].set_ylim(-10,10)
     """
     bolls = [(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型(up,top,mid,bottom,down),8 bo),...]
@@ -97,6 +96,8 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
             ax[0].axhline(y=y,linestyle=period2c[boll[0]][2],linewidth=period2c[boll[0]][0],color=period2c[boll[0]][1])
             ax[0].annotate('%d'%(boll[8][9]),xy=(240-2*boll[8][9],y),xytext=(20,20 if boll[8][9]%2 else -20), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
             connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')                
+    bottom,top = ax[0].get_ylim()
+    ax[0].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)                
 
 ETFs = [ 
     'SZ159919', #沪深300ETF
@@ -341,6 +342,7 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
+        "监视":[muti_monitor],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业
@@ -1214,9 +1216,42 @@ def monitor_bollup():
 
 """
 分屏多窗口监控分时图
-分类,概念,ETF资金面前n名,分类,概念,ETF涨幅榜前n名,异动榜
 """
 def muti_monitor():
-    #f flow
-    def plotk(ax,k,d,f,title):
-        pass
+    monitor_output = widgets.Output()
+    companys = xueqiu.get_company_select()
+    def update_plot(data):
+        gs_kw = dict(width_ratios=[1,1,1,1], height_ratios=[2,1,2,1])
+        fig,axs = plt.subplots(4,4,figsize=(36,16),gridspec_kw = gs_kw)
+        for i in range(8):
+            p = data[i]
+            x = 2*int((i)/4.)
+            y = (i)%4
+            ax = [axs[x,y],axs[x+1,y]]
+            plotfs(ax,p[0],p[1],p[2])
+        fig.subplots_adjust(hspace=0,wspace=0.08)
+        kline.output_show(monitor_output)
+    def loop():
+        nonlocal companys
+        t = date.today()
+        b,k,d = xueqiu.getTodayRT()
+        t2 = t
+        if not b:
+            for i in range(1,7):
+                t2 = t-timedelta(days=i)
+                b,k,d = xueqiu.getTodayRT(t2)
+                if b:
+                    break
+                if i==6:
+                    break
+        if b:
+            b,S = shared.fromRedis('monitor')
+            if b:
+                data = []
+                for i in range(8):
+                    j = S[i]
+                    data.append((k[j,:,:],d,companys[j][2]))
+                update_plot(data)
+        xueqiu.setTimeout(60,loop,'monitor.monitor')
+    loop() 
+    display(monitor_output)

@@ -333,58 +333,39 @@ def moniterLoop():
     #xueqiu.Timer(60,moniterLoop)
 
 """
-companys = xueqiu.get_company_select()
-_,K,D = stock.loadKline('SH000001','d')#xueqiu.get_period_k(240)
-b,a = monitor.bollwayex(K[:,4])
-print(b,a)
+发现那些大资金流入最稳健的
 """
-"""
-for p in [60,30,15]:
-    xueqiu.clear_period_sequence(p)
-    xueqiu.rebuild_period_sequence(p)    #'d'            
-"""
-#print(monitor.timesplitEvent())
-shared.delKey('bolls')
-#monitor.monitor_bollup()
-#xueqiu.update_today_period([240,60,30,15])
-"""
-companys = xueqiu.get_company_select()
-t = datetime.today()
-n = "emflowts2_%d_%d"%(t.month,t.day)
-k = "emflownp2_%d_%d"%(t.month,t.day)
-shared.delKey(n)
-shared.delKey(k)
-xueqiu.emflowRT2()
-b,k,d = xueqiu.getTodayRT()
-print(b)
-"""
-#kline.Plote('BK0436',5,mode='auto').show()
+def searchstrongflow():
+    companys = xueqiu.get_company_select()
+    t = date.today()
+    b,k,d = xueqiu.getTodayRT()
+    t2 = t
+    if not b:
+        for i in range(1,7):
+            t2 = t-timedelta(days=i)
+            b,k,d = xueqiu.getTodayRT(t2)
+            if b:
+                break
+            if i==6:
+                return
+    S = []
+    for i in range(k.shape[0]):
+        if companys[i][3]=='90' or companys[i][3]=='91':
+            mflow = k[i,:,3]+k[i,:,4]
+            inn = 1
+            outn = 1
+            for j in range(1,k.shape[1]):
+                #if mflow[j]>mflow[j-1]:
+                if k[i,j,0]>k[i,j-1,0]:
+                    inn+=1
+                else:
+                    outn+=1
+            S.append((inn/outn,i))
+    S = sorted(S,key=lambda it:it[0],reverse=True)
+    R = []
+    for s in S:
+        R.append(s[1])
+    shared.toRedis(R[:8],'monitor',ex=24*3600)
 
-#k,d = xueqiu.get_period_k(5)
-#print(k.shape,len(d),d[-1])
-
-"""
-def testplotfs():
-    fig, axs = plt.subplots(2, 1, sharex=True)
-    b,k,d = xueqiu.getTodayRT(datetime(year=2021,month=4,day=2))
-    if b:
-        companys = xueqiu.get_company_select()
-        for i in range(len(companys)):
-            monitor.plotfs(axs,k[i,:,:],d,companys[i][2])
-            break
-    fig.subplots_adjust(hspace=0,wspace=0.05)
-    plt.show()
-
-#testplotfs()
-fig,axs = plt.subplots(4,2)
-print(axs[0,0])
-print(axs[1,0])
-print(axs[2,0])
-print(axs[3,0])
-print(axs[0,1])
-print(axs[1,1])
-print(axs[2,1])
-print(axs[3,1])
-
-plt.show()
-"""
+k,d = xueqiu.get_period_k(60)
+k,d = xueqiu.get_period_k(60)
