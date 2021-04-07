@@ -4,6 +4,8 @@ import numpy as np
 import requests
 import time
 import subprocess
+import ipywidgets as widgets
+from IPython.display import display,update_display,clear_output
 from datetime import date,datetime,timedelta
 import json
 from . import mylog
@@ -367,5 +369,3 @@ def searchstrongflow():
         R.append(s[1])
     shared.toRedis(R[:8],'monitor',ex=24*3600)
 
-k,d = xueqiu.get_period_k(60)
-k,d = xueqiu.get_period_k(60)

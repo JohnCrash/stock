@@ -61,7 +61,7 @@ defaultPlotfsStyle = {
 def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
     ax[0].set_title(title,y=0.93)
     x = np.arange(k.shape[0])
-    xticks = [0,60,2*60,3*60,4*60]
+    xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
     ax[0].axhline(y=0,color='black',linestyle='dotted')
     ax[0].plot(x,k[:,1],color=style['pcolor'])
     m60 = stock.ma(k[:,1],60)
@@ -70,7 +70,7 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
         ax[1].axhline(y=0,color='black',linestyle='dotted')
         ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
         ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
-        ax[1].set_xlim(0,4*60)
+        ax[1].set_xlim(0,15+4*60)
         ax[1].set_xticks(xticks)
         ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
         bottom,top = ax[1].get_ylim()
@@ -78,7 +78,9 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
     else:
         ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
     ax[0].set_xticks(xticks)
-    ax[0].set_xlim(0,4*60)
+    ax[0].set_xlim(0,15+4*60)
+    ax[0].grid(True)
+    ax[1].grid(True)
     #ax[0].set_ylim(-10,10)
     """
     bolls = [(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型(up,top,mid,bottom,down),8 bo),...]
@@ -88,14 +90,18 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
     if bolls is not None:
         openp = k[-1,0]/(1.+k[-1,1]/100.)
         period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),240:(5,'red','dotted')}
+        offy = -20
         for boll in bolls:
             if boll[7]=='up':
                 y = 100.*(boll[4]-openp)/openp
             elif boll[7]=='down':
                 y=100.*(boll[5]-openp)/openp
+            else:
+                continue
             ax[0].axhline(y=y,linestyle=period2c[boll[0]][2],linewidth=period2c[boll[0]][0],color=period2c[boll[0]][1])
-            ax[0].annotate('%d'%(boll[8][9]),xy=(240-2*boll[8][9],y),xytext=(20,20 if boll[8][9]%2 else -20), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
-            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',color='black')                
+            ax[0].annotate('%d-%d %.1f%%'%(boll[8][9],boll[8][2],100*(boll[4]-boll[5])/boll[5]),xy=(240-2*boll[8][9],y),xytext=(20,offy), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",
+            connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',fontweight='bold',color=period2c[boll[0]][1])                
+            offy += 20
     bottom,top = ax[0].get_ylim()
     ax[0].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)                
 
@@ -342,10 +348,10 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
-        "监视":[muti_monitor],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业
+        "监视":[muti_monitor],            
         "上榜分类":getDTop('90',3)[:10],
         "上榜概念":getDTop('91',15)[:20],
         "ETF":ETFs,
@@ -825,9 +831,11 @@ def BollK(code,bolls):
         axK = axs[0]
         for bo in bolls:
             bbi,bei = getx(self._date,bo[2],bo[3])
+            if bbi==0:
+                continue
             if bei==0:
                 bei = ei-3
-            if bei-bbi>0:
+            if bei>bi and bei-bbi>0:
                 axK.broken_barh([(bbi,bei-bbi)], (bo[5],bo[4]-bo[5]),facecolor='None',edgecolor=period2c[bo[0]][1],linewidth=period2c[bo[0]][0],linestyle=period2c[bo[0]][2])
         #绘制5日和10日均线
         m = period2ma[self._period]
@@ -862,13 +870,13 @@ def monitor_bollup():
     npage = 0
     page = 0
     switch = 1
-    news = 1 #0 持续 ，1 最新 ，2 昨日
+    news = 1 #0 持续 ，1 最新 ，2 全部
     tf = 0 #时间过滤
     def tf2range():
         nonlocal tf
         if tf==0:
             t = datetime.today()
-            return (t.hour*60,t.hour*60+60)
+            return (t.hour*60-(60-t.minute),t.hour*60+60)
         elif tf==1:
             return 9*60,9*60+30
         elif tf==2:
@@ -926,8 +934,8 @@ def monitor_bollup():
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] > bo[5]+2*H/3 and ky[i,-1,0] < bo[6])
                                 bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'top',bo))
-                        elif switch==3: #通道中部
-                            if k[i,-1,0] < bo[5]+2*H/3 and k[i,-1,0] > bo[5]+H/3:
+                        elif switch==3: #通道内部
+                            if k[i,-1,0] <= bo[6] and k[i,-1,0] >= bo[5]:
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5]+2*H/3 and ky[i,-1,0] > bo[5]+H/3)
                                 bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'mid',bo))
@@ -941,7 +949,7 @@ def monitor_bollup():
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5])
                                 bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'down',bo))
-                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)):
+                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)) or news==2:
                     bstyle = ''
                     if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
                         bstyle = 'danger'
@@ -953,8 +961,8 @@ def monitor_bollup():
                         description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
                         disabled=False,
                         button_style=bstyle,
-                        icon='',
-                        layout=Layout(width='220px'))
+                        icon='cannabis',
+                        layout=Layout(width='240px'))
                     but.event = ('bollup',companys[i],periods)
                     but.bolls = bolls
                     but.code = companys[i][1]
@@ -1085,10 +1093,10 @@ def monitor_bollup():
         nonlocal peroid_checktable
         peroid_checktable[e['owner'].it] = e['new']
         update_bollupbuttons()       
-    switch2name = {1:'向上突破',2:'通道上部',3:'通道中部',4:'通道下部',5:'向下突破'}
-    switchname2switch = {'向上突破':1,'通道上部':2,'通道中部':3,'通道下部':4,'向下突破':5}
+    switch2name = {1:'向上突破',2:'通道上部',3:'通道内部',4:'通道下部',5:'向下突破'}
+    switchname2switch = {'向上突破':1,'通道上部':2,'通道内部':3,'通道下部':4,'向下突破':5}
     switchDropdown = widgets.Dropdown(
-        options=['向上突破','通道上部','通道中部','通道下部','向下突破'],
+        options=['向上突破','通道上部','通道内部','通道下部','向下突破'],
         value=switch2name[switch],
         description='',
         disabled=False,
@@ -1116,14 +1124,14 @@ def monitor_bollup():
     1 最新:昨天没有突破，今天突破的
     2 昨日:昨日突破，今日回落的(目前没有实现)
     """
-    new2name = {0:'持续',1:'最新',2:'昨日'}
-    newname2new = {'持续':0,'最新':1,'昨日':2}
+    new2name = {0:'持续',1:'最新',2:'全部'}
+    newname2new = {'持续':0,'最新':1,'全部':2}
     def on_news(e):
         nonlocal news
         news = newname2new[e['new']]
         update_bollupbuttons()
     newdrop =  widgets.Dropdown(
-        options=['最新','持续','昨日'],
+        options=['最新','持续','全部'],
         value=new2name[news],
         description='',
         disabled=False,
@@ -1215,43 +1223,74 @@ def monitor_bollup():
     display(monitor_output,bollup_output,kline_output)
 
 """
+返回资金流入最稳定
+typeid=0资金流,1增长流,2增长排名
+"""
+def get_strong_flow(k,d,companys,prefix='90',typeid=0):
+    S = []
+    if typeid==2:
+        for i in range(k.shape[0]):
+            if companys[i][3]==prefix:
+                S.append((k[i,-1,1],i))
+    else:
+        for i in range(k.shape[0]):
+            if companys[i][3]==prefix:
+                mflow = k[i,:,3]+k[i,:,4]
+                inn = 1
+                outn = 1
+                for j in range(1,k.shape[1]):
+                    if typeid==0:
+                        if mflow[j]>mflow[j-1]:
+                            inn+=1
+                        else:
+                            outn+=1
+                    elif typeid==1:
+                        if k[i,j,1]>k[i,j-1,1]:
+                            inn+=1
+                        else:
+                            outn+=1                    
+                S.append((inn/outn,i))
+    S = sorted(S,key=lambda it:it[0],reverse=True)
+    R = []
+    for s in S:
+        R.append(s[1])
+    return R
+"""
 分屏多窗口监控分时图
 """
 def muti_monitor():
     monitor_output = widgets.Output()
     companys = xueqiu.get_company_select()
-    def update_plot(data):
-        gs_kw = dict(width_ratios=[1,1,1,1], height_ratios=[2,1,2,1])
-        fig,axs = plt.subplots(4,4,figsize=(36,16),gridspec_kw = gs_kw)
-        for i in range(8):
-            p = data[i]
-            x = 2*int((i)/4.)
-            y = (i)%4
-            ax = [axs[x,y],axs[x+1,y]]
-            plotfs(ax,p[0],p[1],p[2])
+    code2i = xueqiu.get_company_code2i()
+    shi = code2i['SH000001']
+    szi = code2i['SZ399001']
+    def update_plot(data,row=4,col=7,figsize=(50,16)):
+        gs_kw = dict(height_ratios=[2,1,2,1])
+        fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
+        for i in range(int(row*col/2)):
+            if i<len(data):
+                p = data[i]
+                x = 2*int((i)/col)
+                y = (i)%col
+                ax = [axs[x,y],axs[x+1,y]]
+                plotfs(ax,p[0],p[1],p[2])
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(monitor_output)
     def loop():
-        nonlocal companys
+        nonlocal companys,shi,szi
         t = date.today()
         b,k,d = xueqiu.getTodayRT()
         t2 = t
-        if not b:
-            for i in range(1,7):
-                t2 = t-timedelta(days=i)
-                b,k,d = xueqiu.getTodayRT(t2)
-                if b:
-                    break
-                if i==6:
-                    break
         if b:
-            b,S = shared.fromRedis('monitor')
-            if b:
-                data = []
-                for i in range(8):
-                    j = S[i]
-                    data.append((k[j,:,:],d,companys[j][2]))
-                update_plot(data)
+            data = [(k[shi,:,:],d,companys[shi][2]),(k[szi,:,:],d,companys[szi][2])]
+            R = []
+            for it in (('2',2,'ETF'),('90',0,'行业资金'),('90',2,'行业增幅'),('91',0,'概念资金'),('91',2,'概念增幅')):    
+                S = get_strong_flow(k,d,companys,it[0],it[1])
+                for i in S[:3]:
+                    if i not in R:
+                        data.append((k[i,:,:],d,'%s %s'%(companys[i][2],it[2])))
+                        R.append(i)
+            update_plot(data)
         xueqiu.setTimeout(60,loop,'monitor.monitor')
     loop() 
     display(monitor_output)

@@ -347,6 +347,13 @@ def get_company_code2com():
     for c in companys:
         code2com[c[1]] = c
     return code2com
+def get_company_code2i():
+    companys = get_company_select()
+    code2i = {}
+    for i in range(len(companys)):
+        c = companys[i]
+        code2i[c[1]] = i
+    return code2i
 def get_company_select_id2com():
     companys = get_company_select()
     id2com = {}
@@ -1769,7 +1776,7 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
                 bi = r.text.find('({"rc":')
                 if bi>0:
                     R = json.loads(r.text[bi+1:-2])
-                    shared.toRedis(R,n,2*60) #保存一个2分钟的缓存
+                    shared.toRedis(R,n,ex=2*60) #保存一个2分钟的缓存
                     return True,R
         except Exception as e:
             mylog.printe(e)
