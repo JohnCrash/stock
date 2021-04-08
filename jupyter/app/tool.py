@@ -369,3 +369,5 @@ def searchstrongflow():
         R.append(s[1])
     shared.toRedis(R[:8],'monitor',ex=24*3600)
 
+xueqiu.emflow2db()
+

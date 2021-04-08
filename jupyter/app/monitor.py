@@ -802,7 +802,7 @@ def bolltrench():
 向上通道突破
 bolls = [(0 period,1 price,2 tbi,3 tei,4 top,5 bottom),...]
 """
-def BollK(code,bolls):
+def BollK(code,bolls,isall=True):
     def getx(d,b,e):
         bi = 0
         ei = 0
@@ -849,8 +849,10 @@ def BollK(code,bolls):
         period = max(period,bo[0])
     if period==240:
         period = 'd'
-
-    kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='auto').show(figsize=(36,16))
+    if isall:
+        kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').show(figsize=(36,15))
+    else:
+        kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').showKline(figsize=(16,16))
 
 """
 通道突破监控
@@ -858,8 +860,8 @@ def BollK(code,bolls):
 def monitor_bollup():
     monitor_output = widgets.Output()
     kline_output = widgets.Output()
+    kview_output = widgets.Output()
     bollup_output = widgets.Output()    
-    box = Box(children=[],layout=box_layout)
     prefix_checktable = {'90':True,'91':False,'0':False,'1':False,'2':False}
     peroid_checktable = {5:True,15:True,30:True,60:True,240:True}    
     companys = xueqiu.get_company_select()
@@ -881,16 +883,19 @@ def monitor_bollup():
             return 9*60,9*60+30
         elif tf==2:
             return (9*60+30,11*60+30)
-        else:
+        elif tf==3:
             return (13*60,15*60)
+        else:
+            return (0,15*60)
     def onkline(e):
-        #kline_output.clear_output(wait=True)
+        kline_output.clear_output(wait=True)
         with kline_output:
             if e.event[0]=='bollup':
-                BollK(e.event[1][1],e.bolls)
+                BollK(e.event[1][1],e.bolls,True)
 
     def update_bollupbuttons():
         nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news
+        
         bos = bolltrench()
         t = date.today()
         b,k,d = xueqiu.getTodayRT()
@@ -1032,13 +1037,15 @@ def monitor_bollup():
         for it in sorteditems:
             if it[2] in FILTERCOLORS:
                 items.append(it[1])
-        box.children = items
+        bollup_output.clear_output(wait=True)
+        with bollup_output:
+            display(Box(children=items,layout=box_layout))        
         update_current_plot(k,d)      
     """
     绘制更新选择的分时图表
     """
     def update_current_plot(k=None,d=None):
-        nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup,box
+        nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup
         if k is None: #如果k,d没有传递过来
             t = date.today()
             b,k,d = xueqiu.getTodayRT()
@@ -1067,7 +1074,7 @@ def monitor_bollup():
             pageup.disabled = False
 
         gs_kw = dict(width_ratios=[1,1,1,1], height_ratios=[2,1,2,1])
-        fig,axs = plt.subplots(4,4,figsize=(36,16),gridspec_kw = gs_kw)
+        fig,axs = plt.subplots(4,4,figsize=(32,16),gridspec_kw = gs_kw)
         views = []
         for i in range(8*page,N):
             c = FILTERCURRENT[i][0]
@@ -1077,11 +1084,13 @@ def monitor_bollup():
                 ax = [axs[x,y],axs[x+1,y]]
                 views.append(c[0][1])
                 plotfs(ax,k[c[2],:,:],d,c[0][2],bolls=c[1])
+        """
         for item in box.children:
             if item.code in views:
                 item.icon = 'check'
             else:
                 item.icon = ''
+        """
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(monitor_output)
 
@@ -1146,10 +1155,10 @@ def monitor_bollup():
     2 10点中之前
     """
 
-    tf2name = {0:'最近',1:'盘前',2:'上午',3:'下午'}
-    name2tf = {'最近':0,'盘前':1,'上午':2,'下午':3}
+    tf2name = {0:'最近',1:'盘前',2:'上午',3:'下午',4:'全天'}
+    name2tf = {'最近':0,'盘前':1,'上午':2,'下午':3,'全天':4}
     tfdrop = widgets.Dropdown(
-        options=['最近','盘前','上午','下午'],
+        options=['最近','盘前','上午','下午','全天'],
         value=tf2name[tf],
         description='',
         disabled=False,
@@ -1164,6 +1173,7 @@ def monitor_bollup():
 
     def on_clear(e):
         kline_output.clear_output()
+        kview_output.clear_output()
     clearbut = widgets.Button(
                 description="清除",
                 disabled=False,
@@ -1216,11 +1226,8 @@ def monitor_bollup():
         xueqiu.setTimeout(60,loop,'monitor.bollup')
     loop()    
     checkbox = Box(children=checkitem,layout=box_layout)
-    bollup_output.clear_output(wait=True)
-    with bollup_output:
-        display(checkbox,box)
- 
-    display(monitor_output,bollup_output,kline_output)
+    #mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
+    display(monitor_output,checkbox,bollup_output,kline_output)
 
 """
 返回资金流入最稳定

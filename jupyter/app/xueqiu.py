@@ -2221,8 +2221,9 @@ def emflow2db():
                     if code not in code2id:
                         needrebuild = True
                         qss = stock.query("select max(company_id) from flow_em_category")
-                        company_id = qss[0]+1
-                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s',%d,0)"%(s['f14'],code,s['f13']+i,company_id))
+                        company_id = qss[0][0]+1
+                        prefix = s['f13']+i
+                        stock.execute("insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s','%s',0,%d)"%(s['f14'],code,prefix,company_id))
         if needrebuild:
             rebuild_em_category()
             ls = get_em_category()

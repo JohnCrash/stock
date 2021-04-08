@@ -155,13 +155,14 @@ class MyFormatterK5(Formatter):
         return ''
 
 class MyFormatter(Formatter):
-    def __init__(self, dates,period,fmt='%Y-%m-%d'):
+    def __init__(self,dates,period,fmt=None):
         self.dates = dates
         self.period = period
-        if type(period)==str:
-            self.fmt = fmt
+        if period=='w':
+            fmt = 'y-m-d'
         else:
-            self.fmt = '%Y-%m-%d %h:%M'
+            fmt = 'm-d'
+        self.fmt = fmt
 
     def __call__(self, x, pos=0):
         'Return the label for time x at position pos'
@@ -170,10 +171,20 @@ class MyFormatter(Formatter):
             return ''
 
         t = self.dates[ind][0]
-        if type(self.period)==str:
-            return '%s-%s-%s'%(t.year,t.month,t.day)
+        if self.fmt=='m-d':
+            return '%02d-%02d'%(t.month,t.day)
+        elif self.fmt=='h:m':
+            return '%02d:%02d'%(t.hour,t.minute)
+        elif self.fmt=='y-m-d':
+            return '%02d-%02d-%02d'%(t.year,t.month,t.day)
+        elif self.fmt=='d h:m':
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
+        elif self.fmt=='h:m:s':
+            return '%02d:%02d:%02d'%(t.hour,t.minute,t.second)
+        elif self.fmt=='d h:m:s':
+            return '%d %02d:%02d:%02d'%(t.day,t.hour,t.minute,t.second)            
         else:
-            return '%s-%s-%s %s:%s'%(t.year,t.month,t.day,t.hour,t.minute)
+            return '%d %02d:%02d'%(t.day,t.hour,t.minute)
 
 def volume2str(v):
     return "%.2f亿"%(v/1e8)
