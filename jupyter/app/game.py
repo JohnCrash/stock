@@ -335,3 +335,10 @@ def play(code=None,period=15,figsize=(32,15)):
     replayButton.on_click(onReplay)
     display(box,output,output2)
     update()
+
+"""
+分类和概念
+沿着时间推移，将分类和概念列表放入
+"""
+def mutiplay(period=15,figsize=(32,15)):
+    box = Box(children=[],layout=box_layout)

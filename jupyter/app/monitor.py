@@ -872,6 +872,7 @@ def monitor_bollup():
     FILTERCOLORS = []
     FILTERCURRENT = []
     button_items = []
+    flow_xch = {}
     npage = 0
     page = 0
     switch = 1
@@ -897,7 +898,7 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls,False)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news,list_output,list_box,button_items
+        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news,list_output,list_box,button_items,flow_xch
         
         bos = bolltrench()
         t = date.today()
@@ -919,7 +920,10 @@ def monitor_bollup():
                 break
         ALLBOLLS = []
         FILTERCOLORS = []
-        
+        dt5 = timedelta(minutes=5)
+        for i in list(flow_xch.keys()):
+            if t-flow_xch[i]>dt5:
+                flow_xch.remove(i)
         items = []
         for i in range(len(companys)):
             code = companys[i][1]
@@ -957,7 +961,9 @@ def monitor_bollup():
                                 periods.append(bo[1])
                                 isnew = b1 and (ky[i,-1,0] < bo[5])
                                 bolls.append((bo[1],k[i,-1,0],bo[7],bo[8],bo[3],bo[4],isnew,'down',bo))
-                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)) or news==2:
+                if k.shape[1]>1 and k[i,-1,3]+k[i,-1,4]>0 and k[i,-2,3]+k[i,-2,4]<0 and (companys[i][3]=='90' or companys[i][3]=='91'):#查找那些主力先流出后流入的
+                    flow_xch[i] = t
+                if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)) or news==2 or i in flow_xch:
                     bstyle = ''
                     if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
                         bstyle = 'danger'
@@ -971,6 +977,8 @@ def monitor_bollup():
                         button_style=bstyle,
                         icon='cannabis',
                         layout=Layout(width='240px'))
+                    if i in flow_xch:
+                        but.style.button_color = '#ff00ff'
                     but.event = ('bollup',companys[i],periods)
                     but.bolls = bolls
                     but.code = companys[i][1]
@@ -1318,7 +1326,7 @@ def muti_monitor():
     code2i = xueqiu.get_company_code2i()
     shi = code2i['SH000001']
     szi = code2i['SZ399001']
-    def update_plot(data,row=4,col=7,figsize=(50,16)):
+    def update_plot(data,row=4,col=5,figsize=(50,16)):
         gs_kw = dict(height_ratios=[2,1,2,1])
         fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
         for i in range(int(row*col/2)):
