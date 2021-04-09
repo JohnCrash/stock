@@ -1,5 +1,6 @@
 from ipywidgets.widgets.widget_selection import Dropdown
 from IPython.display import display,Markdown
+from IPython.core.interactiveshell import InteractiveShell
 import ipywidgets as widgets
 from ipywidgets import Layout, Button, Box
 from datetime import date,datetime,timedelta
@@ -861,7 +862,8 @@ def monitor_bollup():
     monitor_output = widgets.Output()
     kline_output = widgets.Output()
     kview_output = widgets.Output()
-    bollup_output = widgets.Output()    
+    list_output = widgets.Output()    
+    list_box = Box(children=[],layout=box_layout)
     prefix_checktable = {'90':True,'91':False,'0':False,'1':False,'2':False}
     peroid_checktable = {5:True,15:True,30:True,60:True,240:True}    
     companys = xueqiu.get_company_select()
@@ -869,6 +871,7 @@ def monitor_bollup():
     ALLBOLLS = []
     FILTERCOLORS = []
     FILTERCURRENT = []
+    button_items = []
     npage = 0
     page = 0
     switch = 1
@@ -894,7 +897,7 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls,False)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news
+        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news,list_output,list_box,button_items
         
         bos = bolltrench()
         t = date.today()
@@ -1033,19 +1036,32 @@ def monitor_bollup():
         下面对按钮对应公司的日涨幅进行排序，将涨幅大的放置在列表的前面        
         """
         sorteditems = sorted(items,key=lambda it:it[0],reverse=True)
-        items = []
+        button_items = []
         for it in sorteditems:
             if it[2] in FILTERCOLORS:
-                items.append(it[1])
-        bollup_output.clear_output(wait=True)
-        with bollup_output:
-            display(Box(children=items[:32],layout=box_layout))        
+                button_items.append(it[1])
+        """
+        box = Box(children=items[:32],layout=box_layout)
+        fmt = InteractiveShell.instance().display_formatter.format
+        data, metadata = fmt(box)
+        list_output.outputs = ({
+            'output_type': 'display_data',
+            'data':data,
+            'metadata': metadata
+        },)
+        """                
+        #list_output.clear_output(wait=True)
+        #with list_output:
+        #    display(Box(children=items[:32],layout=box_layout))
+        #list_output.append_display_data(Box(children=items[:32],layout=box_layout))
+        list_box.children = button_items
         update_current_plot(k,d)      
+        
     """
     绘制更新选择的分时图表
     """
     def update_current_plot(k=None,d=None):
-        nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup
+        nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup,button_items
         if k is None: #如果k,d没有传递过来
             t = date.today()
             b,k,d = xueqiu.getTodayRT()
@@ -1084,13 +1100,11 @@ def monitor_bollup():
                 ax = [axs[x,y],axs[x+1,y]]
                 views.append(c[0][1])
                 plotfs(ax,k[c[2],:,:],d,c[0][2],bolls=c[1])
-        """
-        for item in box.children:
-            if item.code in views:
-                item.icon = 'check'
+        for but in button_items:
+            if but.code in views:
+                but.icon = 'check'
             else:
-                item.icon = ''
-        """
+                but.icon = ''
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(monitor_output)
 
@@ -1171,6 +1185,20 @@ def monitor_bollup():
     checkitem.append(tfdrop)
     tfdrop.observe(on_tf,names='value')
 
+    def on_refrush(e):
+        nonlocal list_output,list_box,button_items
+        list_output.clear_output(wait=True)
+        list_box = Box(children=button_items,layout=box_layout)
+        with list_output:
+            display(list_box)
+        update_current_plot()   
+    refrushbut = widgets.Button(
+                description="刷新",
+                disabled=False,
+                button_style='')
+    refrushbut.on_click(on_refrush)
+    checkitem.append(refrushbut)
+
     def on_clear(e):
         kline_output.clear_output()
         kview_output.clear_output()
@@ -1180,7 +1208,7 @@ def monitor_bollup():
                 button_style='')
     clearbut.on_click(on_clear)
     checkitem.append(clearbut)
-    
+
     def on_list(e):
         nonlocal ALLBOLLS,FILTERCOLORS
         kline_output.clear_output()
@@ -1196,10 +1224,14 @@ def monitor_bollup():
     allbut.on_click(on_list)
     checkitem.append(allbut)
     def on_pagedown(e):
-        nonlocal page,npage
+        nonlocal page,npage,list_output,list_box,button_items
         page+=1
         if page>=npage:
-            page = npage-1     
+            page = npage-1
+        list_output.clear_output(wait=True)
+        list_box = Box(children=button_items,layout=box_layout)
+        with list_output:
+            display(list_box)           
         update_current_plot()   
     pagedown = widgets.Button(
                 description="下一页",
@@ -1208,10 +1240,14 @@ def monitor_bollup():
     pagedown.on_click(on_pagedown)
     
     def on_pageup(e):
-        nonlocal page,npage
+        nonlocal page,npage,list_output,list_box,button_items
         page-=1
         if page<0:
             page = 0
+        list_output.clear_output(wait=True)
+        list_box = Box(children=button_items,layout=box_layout)
+        with list_output:
+            display(list_box)            
         update_current_plot()
     pageup = widgets.Button(
                 description="上一页",
@@ -1222,6 +1258,13 @@ def monitor_bollup():
     checkitem.append(pagedown)
     timeLabel = widgets.Label()
     checkitem.append(timeLabel)
+    
+    checkbox = Box(children=checkitem,layout=box_layout)
+    mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
+    display(mbox,checkbox,list_output,kline_output)
+    with list_output:
+        display(list_box)
+
     lastminute = -1
     def loop():
         nonlocal timeLabel,lastminute
@@ -1232,9 +1275,6 @@ def monitor_bollup():
             update_bollupbuttons()
         xueqiu.setTimeout(1,loop,'monitor.bollup')
     loop()    
-    checkbox = Box(children=checkitem,layout=box_layout)
-    mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
-    display(mbox,checkbox,bollup_output,kline_output)
 
 """
 返回资金流入最稳定
