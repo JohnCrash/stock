@@ -877,12 +877,6 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     if b:
         print('更新程序已经在运行了')
         return 'alrady'
-    companys = stock.query("""select company_id,code,name,category from company_select""")
-    coms = []
-    idds = []
-    for c in companys:
-        idds.append(c[0])
-        coms.append(c[1])
     t = datetime.today()
     print('开始实时更新全部数据...')
     b,seqs = shared.fromRedis('runtime_sequence')
@@ -891,10 +885,6 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     lastUpdateFlow = -1
     #如果company_select中的公司数量改变了确保过往的临时数据也做相应的改变
     try:
-        if len(seqs)>0:
-            b,f = shared.numpyFromRedis("rt%d"%seqs[-1])
-            if b and len(f)!=len(idds): #数量不对需要对过往数据做重新修正
-                rebuild_runtime_sequence(idds,seqs)
         rebuild_period_sequence(240)    #'d'            
         rebuild_period_sequence(60)
         rebuild_period_sequence(30)

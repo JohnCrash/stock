@@ -888,10 +888,10 @@ def monitor_bollup():
         else:
             return (0,15*60)
     def onkline(e):
-        kline_output.clear_output(wait=True)
-        with kline_output:
+        kview_output.clear_output(wait=True)
+        with kview_output:
             if e.event[0]=='bollup':
-                BollK(e.event[1][1],e.bolls,True)
+                BollK(e.event[1][1],e.bolls,False)
 
     def update_bollupbuttons():
         nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news
@@ -1039,7 +1039,7 @@ def monitor_bollup():
                 items.append(it[1])
         bollup_output.clear_output(wait=True)
         with bollup_output:
-            display(Box(children=items,layout=box_layout))        
+            display(Box(children=items[:32],layout=box_layout))        
         update_current_plot(k,d)      
     """
     绘制更新选择的分时图表
@@ -1220,14 +1220,21 @@ def monitor_bollup():
     pageup.on_click(on_pageup)
     checkitem.append(pageup)
     checkitem.append(pagedown)
-
+    timeLabel = widgets.Label()
+    checkitem.append(timeLabel)
+    lastminute = -1
     def loop():
-        update_bollupbuttons()
-        xueqiu.setTimeout(60,loop,'monitor.bollup')
+        nonlocal timeLabel,lastminute
+        t = datetime.today()
+        timeLabel.value = '%d:%d:%d'%(t.hour,t.minute,t.second)
+        if t.minute!=lastminute:
+            lastminute = t.minute
+            update_bollupbuttons()
+        xueqiu.setTimeout(1,loop,'monitor.bollup')
     loop()    
     checkbox = Box(children=checkitem,layout=box_layout)
-    #mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
-    display(monitor_output,checkbox,bollup_output,kline_output)
+    mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
+    display(mbox,checkbox,bollup_output,kline_output)
 
 """
 返回资金流入最稳定
