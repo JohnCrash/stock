@@ -369,8 +369,11 @@ def searchstrongflow():
         R.append(s[1])
     shared.toRedis(R[:8],'monitor',ex=24*3600)
 
+"""
+更新period_sequence
+"""
 def update_period_sequence():
     for p in [240,60,30,15,5]:
         xueqiu.rebuild_period_sequence(p)
 
-update_period_sequence()
+    

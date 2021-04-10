@@ -856,6 +856,19 @@ def BollK(code,bolls,isall=True):
         kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').showKline(figsize=(16,16))
 
 """
+返回最近的实时数据
+"""
+def get_last_rt(t):
+    b,k,d = xueqiu.getTodayRT(t)
+    t2 = t
+    if not b:
+        for i in range(1,7):
+            t2 = t-timedelta(days=i)
+            b,k,d = xueqiu.getTodayRT(t2)
+            if b:
+                break
+    return t2,k,d
+"""
 通道突破监控
 """
 def monitor_bollup():
@@ -867,7 +880,8 @@ def monitor_bollup():
     prefix_checktable = {'90':True,'91':False,'0':False,'1':False,'2':False}
     peroid_checktable = {5:True,15:True,30:True,60:True,240:True}    
     companys = xueqiu.get_company_select()
-    code2com = xueqiu.get_company_code2com()
+    code2i = xueqiu.get_company_code2i()
+    #code2com = xueqiu.get_company_code2com()
     ALLBOLLS = []
     FILTERCOLORS = []
     FILTERCURRENT = []
@@ -902,22 +916,9 @@ def monitor_bollup():
         
         bos = bolltrench()
         t = date.today()
-        b,k,d = xueqiu.getTodayRT()
-        t2 = t
-        if not b:
-            for i in range(1,7):
-                t2 = t-timedelta(days=i)
-                b,k,d = xueqiu.getTodayRT(t2)
-                if b:
-                    break
-                if i==6:
-                    return
+        t2,k,d = get_last_rt(t)
         #使用昨天的k,d数据
-        b1,ky,dy = False,None,None
-        for i in range(1,7):
-            b1,ky,dy = xueqiu.getTodayRT(t2-timedelta(days=i))
-            if b1:
-                break
+        b1,ky,dy = get_last_rt(t2-timedelta(days=1))
         ALLBOLLS = []
         FILTERCOLORS = []
         dt5 = timedelta(minutes=5)
@@ -1063,25 +1064,57 @@ def monitor_bollup():
         #    display(Box(children=items[:32],layout=box_layout))
         #list_output.append_display_data(Box(children=items[:32],layout=box_layout))
         list_box.children = button_items
-        update_current_plot(k,d)      
+        update_current_plot(k,d)   
+        update_top_plot(k,d)   
+    """
+    绘制一个大盘涨幅和资金流，行业前10的，概念前10的
+    """
+    def update_top_plot(k=None,d=None):
+        nonlocal companys,code2i,kview_output
         
+        if k is None:
+            t = datetime.today()
+            b,k,d = get_last_rt(t)
+            if not b:
+                return
+        gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
+        fig,axs = plt.subplots(4,2,figsize=(18,16),gridspec_kw = gs_kw)
+        
+        SP = (np.argsort(k[:,-1,1]),np.argsort(k[:,-1,3]+k[:,-1,4])) #资金
+        x = np.arange(k.shape[1])
+        xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
+        for p in [('90',(0,0),(1,0),'行业涨幅前5',0),('91',(0,1),(1,1),'概念涨幅前5',0),('90',(2,0),(3,0),'行业资金前5',1),('91',(2,1),(3,1),'概念资金前5',1)]:
+            tops = []
+            sp = SP[p[4]]
+            for i in range(len(sp)-1,0,-1):
+                if companys[sp[i]][3] == p[0]:
+                    tops.append(sp[i])
+                    if len(tops)>4:
+                        break
+            for i in tops:
+                axs[p[1]].set_title(p[3],y=0.93)
+                axs[p[1]].plot(x,k[i,:,1],label=companys[i][2])
+                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=companys[i][2])
+                axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
+                for j in (1,2):
+                    axs[p[j]].axhline(y=0,color='black',linestyle='dotted')
+                    axs[p[j]].set_xticks(xticks)
+                    axs[p[j]].set_xlim(0,15+4*60)
+                    axs[p[j]].grid(True,axis='x')
+                axs[p[1]].legend()
+
+        fig.subplots_adjust(hspace=0,wspace=0.08)
+        kline.output_show(kview_output)
     """
     绘制更新选择的分时图表
     """
     def update_current_plot(k=None,d=None):
         nonlocal FILTERCURRENT,monitor_output,page,npage,pagedown,pageup,button_items
-        if k is None: #如果k,d没有传递过来
-            t = date.today()
-            b,k,d = xueqiu.getTodayRT()
-            t2 = t
+        if k is None:
+            t = datetime.today()
+            b,k,d = get_last_rt(t)
             if not b:
-                for i in range(1,7):
-                    t2 = t-timedelta(days=i)
-                    b,k,d = xueqiu.getTodayRT(t2)
-                    if b:
-                        break
-                    if i==6:
-                        return            
+                return
         N = len(FILTERCURRENT)
         npage = int(N/8.)+(0 if N%8==0 else 1)
         if page>=npage:

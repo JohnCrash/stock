@@ -2509,3 +2509,7 @@ def appendEMK(code,period,k,d):
                         nk,nd = stock.mergeK(nk,nd,int(period/5))
                     return True,np.vstack((k,nk)),d+nd
     return False,k,d
+
+"""
+将分类和概念的每天的实时数据保存到数据库中
+"""
