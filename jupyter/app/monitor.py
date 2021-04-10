@@ -1139,8 +1139,14 @@ def monitor_bollup():
             y = (i-8*page)%4
             if x<3:
                 ax = [axs[x,y],axs[x+1,y]]
-                views.append(c[0][1])
-                plotfs(ax,k[c[2],:,:],d,c[0][2],bolls=c[1])
+                if x==2 and y==3: #将上证放置在这个位置上
+                    pass
+                else:
+                    views.append(c[0][1])
+                    plotfs(ax,k[c[2],:,:],d,c[0][2],bolls=c[1])
+        shi = code2i['SH000001']
+        ax = [axs[2,3],axs[2+1,3]]
+        plotfs(ax,k[shi,:,:],d,'上证指数')
         for but in button_items:
             if but.code in views:
                 but.icon = 'check'
