@@ -9,6 +9,7 @@ from app import stock
 from app import xueqiu
 from app import status
 from app import config
+from app import ziprt
 from app import shared
 from app import mylog
 
@@ -85,8 +86,12 @@ if __name__=='__main__':
             #新版本仅仅跟踪msci个股
             print("开始更新缓存...")
             xueqiu.update_today_period([240,60,30,15,5])
+            print("将RT数据压缩存盘...")
+            ziprt.saveRT()
             print("更新完成。")
             download_done_day = t.day
             shared.toRedis(download_done_day,"last_download_day")
         else:
             time.sleep(10)
+
+

@@ -2250,17 +2250,12 @@ class Plote:
                 except Exception as e:
                     mylog.printe(e)
                 refreshbutton.button_style = ''
-                try:
-                    startTimer()
-                except Exception as e:
-                    mylog.printe(e)
-                break
 
-        def startTimer():
-            if stock.isTransTime():
+        def loop():
+            if stock.isTransTime() and stock.isTransDay():
                 nt = xueqiu.next_k_date(5)
+                update()
             else:
-                nt = 0 #xueqiu.next_k_date(self._period)
-            if nt>0:
-                self._timer = xueqiu.setTimeout(nt+1,update,'kline%s'%self.code())
-        startTimer()
+                nt = 10 #xueqiu.next_k_date(self._period)
+            self._timer = xueqiu.setTimeout(nt+1,loop,'kline%s'%self.code())
+        loop()

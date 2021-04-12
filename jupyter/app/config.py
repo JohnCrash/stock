@@ -13,3 +13,4 @@ tdx_app = [layout_exe,'F:\\pingan\\TdxW.exe','平安证券慧赢V8.16','TdxW_Mai
 
 chrome_app = [layout_exe,'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe','','Chrome_WidgetWin_1','2']
 updateAllRT_thread_count = 10
+zipdir = 'e:\\rtdata\\'

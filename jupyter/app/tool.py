@@ -16,6 +16,7 @@ from . import stock
 from . import status
 from . import kline
 from . import monitor
+from . import ziprt
 
 log = mylog.init('tool.log',name='tool')
 """
@@ -376,4 +377,117 @@ def update_period_sequence():
     for p in [240,60,30,15,5]:
         xueqiu.rebuild_period_sequence(p)
 
-    
+"""
+返回最近的实时数据
+"""
+def get_last_rt(t):
+    b,k,d = xueqiu.getTodayRT(t)
+    t2 = t
+    if not b:
+        for i in range(1,7):
+            t2 = t-timedelta(days=i)
+            b,k,d = xueqiu.getTodayRT(t2)
+            if b:
+                break
+    return t2,k,d
+
+"""
+压缩rt数据
+"""
+def ziprt2():
+    import pickle
+    import zlib
+    b,k,d = get_last_rt(datetime.today())
+    if b:
+        info = pickle.dumps([k.shape,k.dtype.name])
+        length = int(len(info))
+        encoded = length.to_bytes(2,byteorder='big')+info+k.tobytes()
+        data = zlib.compress(encoded)
+        with open('d://rt.dat', 'wb') as f:
+            f.write(data)
+
+def ziprtopen():
+    import pickle
+    import zlib
+    with open('d://rt.dat', 'rb') as f:
+        data = f.read()
+        encoded = zlib.decompress(data)
+        length = int.from_bytes(encoded[:2],byteorder='big')
+        info = pickle.loads(encoded[2:2+length])
+        a = np.frombuffer(encoded,dtype=info[1],offset=2+length).reshape(info[0])
+        return True,a
+    return False,None
+
+def zqxy(prefix='91',N=3):
+    k,d = xueqiu.get_period_k(15)
+    companys = xueqiu.get_company_select()
+    zqk = []
+    zqmin = []
+    zqmax = []
+    zqd = []
+    def calc_zqxy(z,i,k,d):
+        p = k[z,i]
+        v = 0
+        minv = 99999
+        maxv = 0
+        b = False
+        for j in range(i+15,i+15+16):
+            if k.shape[1]>j and k[z,j]>p:
+                v+=1
+            if k.shape[1]>j and k[z,j]>maxv:
+                maxv = k[z,j]
+                b = True
+            if k.shape[1]>j and k[z,j]<minv:
+                minv = k[z,j]
+                b = True
+        if b:
+            return v/16.,minv,maxv
+        else:
+            return v/16.,k[z,-1],k[z,-1]
+    for i in range(len(d)):
+        if d[i][0].hour==10 and d[i][0].minute==0:
+            sni = np.argsort((k[:,i]-k[:,i-3])/k[:,i-3])
+            v = 0
+            minV = 0
+            maxV = 0
+            n = 0
+            S = []
+            for j in range(-1,-len(d),-1):
+                z = sni[j]
+                if companys[z][3]==prefix and k[z,i]>0:
+                    vv,minv,maxv = calc_zqxy(z,i,k,d)
+                    minV += ((minv-k[z,i])/k[z,i])/N
+                    maxV += ((maxv-k[z,i])/k[z,i])/N
+                    v += vv/N
+                    n+=1
+                    #print(n,companys[z][2])
+                    S.append((n,companys[z][2]))
+                    if n>=N:
+                        break
+            zqmin.append(minV*100)
+            zqmax.append(maxV*100)
+            zqk.append(v)
+            zqd.append((datetime(year=d[i][0].year,month=d[i][0].month,day=d[i][0].day),))
+            print(zqd[-1][0],S)
+
+    fig,axs = plt.subplots(2,1,figsize=(32,16))
+    x = np.arange(len(zqk))
+    xticks = []
+    for i in range(len(zqk)):
+        xticks.append(i)
+    axs[0].xaxis.set_major_formatter(kline.MyFormatter(zqd,'m-d'))
+    axs[0].plot(x,zqk)
+    axs[0].axhline(y=0.5,color='black',linestyle='dotted')
+    axs[0].set_xticks(xticks)
+    axs[0].grid(True)
+    axs[1].xaxis.set_major_formatter(kline.MyFormatter(zqd,'m-d'))
+    axs[1].plot(x,zqmin,label='min')
+    axs[1].plot(x,zqmax,label='max')
+    axs[1].grid(True)
+    axs[1].set_xticks(xticks)
+    axs[1].legend()
+    plt.show()
+
+
+ids,k,d = ziprt.readbydate(date(year=2021,month=4,day=6))
+print(ids,k.shape,d)
