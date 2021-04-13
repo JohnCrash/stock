@@ -877,8 +877,8 @@ def monitor_bollup():
     kview_output = widgets.Output()
     list_output = widgets.Output()    
     list_box = Box(children=[],layout=box_layout)
-    prefix_checktable = {'90':True,'91':False,'0':False,'1':False,'2':False}
-    peroid_checktable = {5:True,15:True,30:True,60:True,240:True}    
+    prefix_checktable = {'90':True,'91':True,'0':False,'1':False,'2':False}
+    peroid_checktable = {5:True,15:True,30:True,60:True,240:False}    
     companys = xueqiu.get_company_select()
     code2i = xueqiu.get_company_code2i()
     #code2com = xueqiu.get_company_code2com()
@@ -890,7 +890,7 @@ def monitor_bollup():
     npage = 0
     page = 0
     switch = 1
-    news = 1 #0 持续 ，1 最新 ，2 全部
+    news = 2 #0 持续 ，1 最新 ，2 全部
     tf = 0 #时间过滤
     def tf2range():
         nonlocal tf
@@ -1027,7 +1027,7 @@ def monitor_bollup():
         """
         将ALLBOLLS中的公司绘制出价格走势图表，并且标记出突破点的价格和周期
         """      
-        ALLBOLLS = sorted(ALLBOLLS,key=lambda it:it[3],reverse=True)
+        ALLBOLLS = sorted(ALLBOLLS,key=lambda it:it[3],reverse=True if switch!=5 else False)
         tfr = tf2range()
         FILTERCURRENT = []
         for c in ALLBOLLS:
@@ -1044,7 +1044,7 @@ def monitor_bollup():
         """
         下面对按钮对应公司的日涨幅进行排序，将涨幅大的放置在列表的前面        
         """
-        sorteditems = sorted(items,key=lambda it:it[0],reverse=True)
+        sorteditems = sorted(items,key=lambda it:it[0],reverse=True if switch!=5 else False)
         button_items = []
         for it in sorteditems:
             if it[2] in FILTERCOLORS:
@@ -1249,6 +1249,7 @@ def monitor_bollup():
     def on_clear(e):
         kline_output.clear_output()
         kview_output.clear_output()
+        update_current_plot()
     clearbut = widgets.Button(
                 description="清除",
                 disabled=False,

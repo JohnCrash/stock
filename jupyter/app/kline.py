@@ -2089,7 +2089,7 @@ class Plote:
                 old = name2peroid[e['old']]
                 if sel[2] != old[2] and self._timer is not None:
                     xueqiu.cancelTimeout(self._timer)
-                    startTimer()
+                    loop()
 
             self.reload()
             #日线和周线切换为MACD+,其他切换为MACD
@@ -2250,6 +2250,7 @@ class Plote:
                 except Exception as e:
                     mylog.printe(e)
                 refreshbutton.button_style = ''
+                break
 
         def loop():
             if stock.isTransTime() and stock.isTransDay():
