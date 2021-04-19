@@ -15,6 +15,9 @@ from . import mylog
 import asyncio
 from . import config
 
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'zh-CN,zh;q=0.9'}
 class Timer:
     def __init__(self, timeout, callback):
         self._timeout = timeout
@@ -81,8 +84,6 @@ xueqiu_cookie = ""
 #获取xueqiu网站的cookie
 def xueqiuCookie():
     s = requests.session()
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-            'Accept-Encoding': 'gzip, deflate'}
     r = s.get('https://xueqiu.com/',headers=headers)    
     if r.status_code==200:
         cookie = ""
@@ -118,10 +119,10 @@ init_xueqiu_cookie()
 
 def xueqiuJson(url,timeout=None):
     global xueqiu_cookie
-    s = requests.session()
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
             'Accept-Encoding': 'gzip, deflate',
-            'Cookie':xueqiu_cookie}
+            'Cookie':xueqiu_cookie}    
+    s = requests.session()
     if timeout is None:
         r = s.get(url,headers=headers)
     else:
@@ -138,9 +139,6 @@ def xueqiuJson(url,timeout=None):
 def qqK5(code,n=96):
     try:
         s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate',
-                'Accept-Language': 'zh-CN,zh;q=0.9'}
         
         url = """http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=%s,m5,,%d&_var=m5_today&r=%f"""%(code.lower(),n+1,random.random())
         r = s.get(url,headers=headers)
@@ -225,9 +223,6 @@ def qqK15(code,n=32):
 def getSinaFlow():
     try: 
         s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate',
-                'Accept-Language': 'zh-CN,zh;q=0.9'}
         url = """https://stock.sina.com.cn/stock/api/jsonp.php/var%20_sh0000012020=/TouziService.getMinuteFlow?random=$rn"""
         r = s.get(url,headers=headers)
         if r.status_code==200:
@@ -290,9 +285,6 @@ def sinaFlow(t=None):
 def sinaK(code,period,n):
     try:
         s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate',
-                'Accept-Language': 'zh-CN,zh;q=0.9'}
         timestramp = math.floor(time.time()*1000)
         #https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20_sh000001_5_1582094915235=/CN_MarketDataService.getKLineData?symbol=sh000001&scale=5&ma=no&datalen=1023
         url = """https://quotes.sina.cn/cn/api/jsonp_v2.php/var _%s_%d_%d=/CN_MarketDataService.getKLineData?symbol=%s&scale=%d&ma=no&datalen=%d"""%(code.lower(),period,timestramp,code.lower(),period,n+1)
@@ -465,7 +457,7 @@ def get_period_k(period):
                     ts = seqs[i]
                     b,p = shared.numpyFromRedis("k%d%d"%(period,ts))
                     if b:
-                        _K60[period][:,_N60[period]] = p
+                        _K60[period][:p.shape[0],_N60[period]] = p
                         _D60[period][_N60[period]] = (datetime.fromtimestamp(ts),ts)
                         _N60[period]+=1
         else:
@@ -476,7 +468,7 @@ def get_period_k(period):
                 if ba:
                     b,p = shared.numpyFromRedis("k%d%d"%(period,ts))
                     if b:
-                        _K60[period][:,_N60[period]] = p
+                        _K60[period][:p.shape[0],_N60[period]] = p
                         _D60[period][_N60[period]] = (datetime.fromtimestamp(ts),ts)
                         _N60[period]+=1
                 elif ts==lastts:
@@ -484,7 +476,7 @@ def get_period_k(period):
         #将最新的帧数据刷新到_K60中去
         b,p = shared.numpyFromRedis("k%d%d"%(period,seqs[-1]))
         if b:
-            _K60[period][:,_N60[period]-1] = p
+            _K60[period][:p.shape[0],_N60[period]-1] = p
     if _K60[period] is not None:
         bi = 0
         return _K60[period][:,bi:_N60[period]],_D60[period][bi:_N60[period]]
@@ -673,7 +665,7 @@ def rebuild_period_sequence(period):
         dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
         t = datetime.fromtimestamp(seqs[-1])
         lastdate = date(year=t.year,month=t.month,day=t.day)
-        if bb and len(f)==len(companys) and dd[0][0]<=lastdate:
+        if bb and len(f)<=len(companys) and dd[0][0]<=lastdate:
             return #已经有完整的加载数据了不需要重新加载
     if b:
         for ts in seqs:
@@ -1081,9 +1073,6 @@ def sinaRT(codes,result=None):
     uri = "http://hq.sinajs.cn/rn=%s&list=%s"%(str(uuid.uuid4())[:5],cs[:-1])
     try:
         s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate',
-                'Accept-Language': 'zh-CN,zh;q=0.9'}
         r = s.get(uri,headers=headers,timeout=3)
         if r.status_code==200:
             bi = 0
@@ -1149,9 +1138,6 @@ def qqRT(codes,result=None):
     uri = "http://qt.gtimg.cn/q=%s&r=%s"%(cs[:-1],rn)
     try:
         s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate',
-                'Accept-Language': 'zh-CN,zh;q=0.9'}
         r = s.get(uri,headers=headers,timeout=3)
         if r.status_code==200:
             bi = 0
@@ -1756,8 +1742,6 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
     for i in range(tryn):
         try:
             s = requests.session()
-            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                    'Accept-Encoding': 'gzip, deflate'}
             if timeout is None:
                 r = s.get(uri,headers=headers)
             else:
@@ -1829,8 +1813,6 @@ def emkline(code,period='d',begin='19900101',end='20250101',timeout=None,tryn=3)
     for i in range(tryn):
         try:
             s = requests.session()
-            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                    'Accept-Encoding': 'gzip, deflate'}
             if timeout is None:
                 r = s.get(uri,headers=headers)
             else:
@@ -1898,8 +1880,6 @@ def emdistribute(t=0,timeout=None):
     uri = "http://push2.eastmoney.com/api/qt/clist/get?cb=jQuery112308140186664104734_%d&pn=1&pz=500&po=1&np=1&fields=f12%%2Cf13%%2Cf14%%2Cf62&fid=f62&fs=m%%3A90%%2Bt%%%s&ut=b2884a393a59ad64002292a3e90d46a5&_=%d"%(ts,typeword,ts)
     try:
         s = requests.session()
-        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                'Accept-Encoding': 'gzip, deflate'}
         if timeout is None:
             r = s.get(uri,headers=headers)
         else:
@@ -1986,8 +1966,6 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=3):
     for i in range(tryn):
         try:
             s = requests.session()
-            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-                    'Accept-Encoding': 'gzip, deflate'}
             if timeout is None:
                 r = s.get(uri,headers=headers)
             else:
@@ -2511,5 +2489,30 @@ def appendEMK(code,period,k,d):
     return False,k,d
 
 """
-将分类和概念的每天的实时数据保存到数据库中
+北向资金
+F52 沪股通
+F54 深股通
+F56 北向合计
 """
+def bxzj(timeout=None):
+    ts = math.floor(time.time())
+    uri = "http://push2.eastmoney.com/api/qt/kamt.rtmin/get?fields1=f1,f3&fields2=f51,f52,f54&ut=b2884a393a59ad64002292a3e90d46a5&cb=jQuery1123029834897868708166_1618550220729&_=%d"%(ts)
+    try:
+        s = requests.session()
+        if timeout is None:
+            r = s.get(uri,headers=headers)
+        else:
+            r = s.get(uri,headers=headers,timeout=timeout)
+        if r.status_code==200:
+            bi = r.text.find('({"rc":')
+            if bi>0:
+                R = json.loads(r.text[bi+1:-2])
+                return True,R
+            else:
+                return False,r.text
+        else:
+            return False,r.reason
+    except Exception as e:
+        mylog.printe(e)
+        return False,str(e)    
+

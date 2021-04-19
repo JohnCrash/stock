@@ -488,6 +488,4 @@ def zqxy(prefix='91',N=3):
     axs[1].legend()
     plt.show()
 
-
-ids,k,d = ziprt.readbydate(date(year=2021,month=4,day=6))
-print(ids,k.shape,d)
+kline.Plote('SH000001','d',config={'index':True},mode='runtime').show()

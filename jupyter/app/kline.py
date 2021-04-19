@@ -1507,7 +1507,7 @@ class Plote:
 
     #code2另一只股票，进行比较显示
     #pos = '2019-1-1' 直接跳转到该日期
-    def show(self,bi=None,ei=None,code2=None,figsize=(32,14),pos=None):
+    def show(self,bi=None,ei=None,code2=None,figsize=(32,14),pos=None,simple=False):
         if self._gotoTrendHeandPos:
             if len(self._k)-self._trendHeadPos>math.floor(self._showcount/2):
                 bi = self._trendHeadPos-math.floor(self._showcount/2)
@@ -1756,7 +1756,7 @@ class Plote:
                     break
         favoritecheckbox = widgets.Checkbox(value=isfavorite,description='关注',disabled=False,layout=Layout(display='block',width='72px'))
         box_layout = Layout(display='flex',
-                            flex_flow='wrap',
+                            flex_flow='row',
                             align_items='stretch',
                             border='solid',
                             width='100%')
@@ -1774,8 +1774,10 @@ class Plote:
                 link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(eastname))
             else:
                 link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode[2:]))
-            
-        items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
+        if simple:
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2]
+        else:
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
 
         if self._keyindex is not None:
             keyprev = widgets.Button(description="<<",layout=Layout(width='48px'))

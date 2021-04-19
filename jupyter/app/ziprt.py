@@ -86,4 +86,25 @@ def saveRT():
                         K[:,:,1] = k[ss1,:,2]
                         K[:,:,2] = k[ss1,:,3]+k[ss1,:,4]
                         K[:,:,3] = k[ss1,:,6]
-                    writeRT(name,ids,K,d)                        
+                    writeRT(name,ids,K,d)
+
+"""
+将北向数据存入压缩保存
+"""
+def bxzj2db():
+    t = datetime.today()
+    if t.hour>=15:
+        for i in range(5):
+            b,j = xueqiu.bxzj()
+            if b and 'data' in j and 's2n' in j['data']:
+                data = j['data']['s2n']
+                if len(data)>=240 and len(data[-1])>12:
+                    datazip = zlib.compress(pickle.dumps(data))
+                    name = '%sbxzj%d%d%d'%(config.zipdir,t.year,t.month,t.day)
+                    with open(name,'wb') as f:
+                        f.write(datazip)
+                    return
+                else:
+                    print('bxzj2db 数据不完整')
+                    return
+        print('bxzj2db 没有成功下载')

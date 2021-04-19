@@ -853,7 +853,7 @@ def BollK(code,bolls,isall=True):
     if isall:
         kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').show(figsize=(36,15))
     else:
-        kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').showKline(figsize=(16,16))
+        kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').show(figsize=(18,15),simple=True)#showKline(figsize=(18,16))
 
 """
 返回最近的实时数据
@@ -1306,7 +1306,10 @@ def monitor_bollup():
     checkitem.append(pagedown)
     timeLabel = widgets.Label()
     checkitem.append(timeLabel)
-    
+    link1 = widgets.HTML(value="""<a href="http://vip.stock.finance.sina.com.cn/moneyflow/#sczjlx" target="_blank" rel="noopener">资金流向</a>""")
+    link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/hsgtcg/" target="_blank" rel="noopener">北向资金</a>""")
+    link3 = widgets.HTML(value="""<a href="http://summary.jrj.com.cn/dpyt/" target="_blank" rel="noopener">大盘云图</a>""")
+    checkitem+=[link1,link2,link3]
     checkbox = Box(children=checkitem,layout=box_layout)
     mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
     display(mbox,checkbox,list_output,kline_output)
@@ -1396,3 +1399,6 @@ def muti_monitor():
         xueqiu.setTimeout(60,loop,'monitor.monitor')
     loop() 
     display(monitor_output)
+
+"""
+"""

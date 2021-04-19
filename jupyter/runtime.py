@@ -88,6 +88,7 @@ if __name__=='__main__':
             xueqiu.update_today_period([240,60,30,15,5])
             print("将RT数据压缩存盘...")
             ziprt.saveRT()
+            ziprt.bxzj2db()
             print("更新完成。")
             download_done_day = t.day
             shared.toRedis(download_done_day,"last_download_day")
