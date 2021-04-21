@@ -18,7 +18,7 @@ if __name__=='__main__':
     t = datetime.today()
     #如果是autorun模式仅仅在周1-5的早晨6-9点开机才有效
     if len(sys.argv)>1 and sys.argv[1]=='autorun':
-        if t.hour>=6 and t.hour==9 and t.weekday()<5 and t.weekday()>=0:
+        if t.hour>=6 and t.hour<=15 and t.weekday()>=0:
             pass #继续运行
         else:
             sys.exit() #退出
