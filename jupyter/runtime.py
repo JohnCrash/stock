@@ -74,13 +74,17 @@ if __name__=='__main__':
                 mylog.printe(e)             
             try:
                 print("开始从雪球下载数据")
+                b = False
                 for i in range(3):
                     r = subprocess.run(['node',config.download_js])
                     if r.returncode==0:
                         log.info("done")
+                        b = True
                         break
                     else:
                         log.warning("%s下载出现问题"%(config.download_js))
+                if not b:
+                    print('========xueqiu下载出现问题!==========')
             except Exception as e:
                 mylog.printe(e)                 
             #新版本仅仅跟踪msci个股

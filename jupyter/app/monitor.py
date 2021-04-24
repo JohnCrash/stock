@@ -181,7 +181,7 @@ BCs = [
 """
 def K(code,period=None,pos=None):
     if pos is None:
-        kline.Plote(code,period,config={'index':True},mode='runtime').show()
+        kline.Plote(code,period,config={'index':True},mode='auto').show(figsize=(46,16))
     else:
         kline.Plote(code,period,config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
 
@@ -286,6 +286,34 @@ def getMaRise(prefix='90',period=240,mas=[5,10,20,30,60]):
     return R
 
 """
+返回可做的概念或者分类
+10点钟在排行榜上
+"""
+def get10Top(prefix='90',top=5,nday=3):
+    companys = xueqiu.get_company_select()
+    K,D = xueqiu.get_period_k(30)
+    n = 0
+    R = {}
+    for i in range(-1,-len(D),-1):
+        if n<nday:
+            if D[i][0].hour==10 and D[i][0].minute==0:
+                n+=1
+                m = 0
+                K[K[:,i-2]==0,i-2] = 1
+                dk = (K[:,i]-K[:,i-2])/K[:,i-2]
+                a = list(np.argsort(dk))
+                a.reverse()
+                for j in a:
+                    if m<top:
+                        if companys[j][3]==prefix and K[j,i]>K[j,i-2]: #附加一个条件最高价必须大于昨日收盘
+                            R[companys[j][1]] = 1
+                            m+=1
+                    else:
+                        break
+        else:
+            break
+    return R.keys()
+"""
 返回最近nday天排名前top的概念或者分类
 [
     [0.分类代码],
@@ -352,7 +380,9 @@ def Indexs():
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业
-        "监视":[muti_monitor],            
+        "监视":[muti_monitor],
+        "活跃分类":get10Top('90',5,3),
+        "活跃概念":get10Top('91',10,3),
         "上榜分类":getDTop('90',3)[:10],
         "上榜概念":getDTop('91',15)[:20],
         "ETF":ETFs,
@@ -1399,6 +1429,3 @@ def muti_monitor():
         xueqiu.setTimeout(60,loop,'monitor.monitor')
     loop() 
     display(monitor_output)
-
-"""
-"""

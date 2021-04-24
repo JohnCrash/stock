@@ -641,7 +641,7 @@ def update_today_period(periods_args):
                     shared.numpyToRedis(plane[:,i],"k%d%d"%(period,seqs_today[i]),ex=period_ex(period))
                 shared.toRedis(seqs,'k%d_sequence'%period)
     else:
-        print("今天的数据还没有更新完成，不能k%d_sequence数据"%periods_args)
+        print("今天的数据还没有更新完成，不能k%s_sequence数据"%str(periods_args))
 
 def clear_period_sequence(period):
     b,seqs = shared.fromRedis('k%d_sequence'%period)
