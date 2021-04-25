@@ -1,4 +1,5 @@
 from ipywidgets.widgets.widget_selection import Dropdown
+from ipywidgets import GridBox
 from IPython.display import display,Markdown
 from IPython.core.interactiveshell import InteractiveShell
 import ipywidgets as widgets
@@ -49,6 +50,7 @@ class MyFormatterRT(Formatter):
 """
 绘制分时图
 ax 绘制句柄数组,k (),d 日期,title 标题,style绘制风格
+ma5b 5日均线起点
 """
 defaultPlotfsStyle = {
     'pcolor':'steelblue',
@@ -59,7 +61,7 @@ defaultPlotfsStyle = {
     'maincolor':'fuchsia',
     'tingcolor':'cornflowerblue'
 }
-def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
+def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
     ax[0].set_title(title,y=0.93)
     x = np.arange(k.shape[0])
     xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
@@ -67,6 +69,17 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle):
     ax[0].plot(x,k[:,1],color=style['pcolor'])
     m60 = stock.ma(k[:,1],60)
     ax[0].plot(x,m60,color=style['ma60color'],linestyle=style['ma60linestyle'])#分时均线
+    if ma5b is not None:
+        if len(k)>0:
+            openp = k[0,0]/(1.+k[0,1]/100.)
+            ma5 = np.zeros((len(k),))
+            for i in range(len(k)):
+                if i<15:
+                    ma5[i] = ma5b
+                else:
+                    ma5[i] = ma5[i-1]+(k[i,0]-ma5[i-1])/(240*5) #这是一个近似迭代
+            
+            ax[0].plot(x,100*(ma5-openp)/openp,linewidth=4,color='magenta')
     if len(ax)==2:
         ax[1].axhline(y=0,color='black',linestyle='dotted')
         ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
@@ -357,6 +370,22 @@ def getDTop(perfix='90',top=3,nday=20,K=None):
     return R
 
 """
+网格放置k线图
+"""
+def gridK(codes,ncol=2):
+    outs = []
+    for code in codes:
+        outs.append(widgets.Output())
+        with outs[-1]:
+            kline.Plote(code,5,mode='normal').show(figsize=(18,16),simple=True)
+    grid = GridBox(children=outs,
+        layout=Layout(
+            width='100%',
+            grid_template_columns='50% 50%')
+       )
+    display(grid)
+
+"""
 返回当前涨幅排名前3
 """
 def getTodayTop(perfix='90',top=3,K=None):
@@ -391,6 +420,10 @@ def Indexs():
     }
     indexpage(menus)
 
+def flgrid():
+    gridK(get10Top('90',5,3))
+def glgrid():
+    gridK(get10Top('91',10,3))    
 """
 从尾部向前搜索中枢
 方法:通过加大搜索范围来
@@ -1336,9 +1369,9 @@ def monitor_bollup():
     checkitem.append(pagedown)
     timeLabel = widgets.Label()
     checkitem.append(timeLabel)
-    link1 = widgets.HTML(value="""<a href="http://vip.stock.finance.sina.com.cn/moneyflow/#sczjlx" target="_blank" rel="noopener">资金流向</a>""")
-    link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/hsgtcg/" target="_blank" rel="noopener">北向资金</a>""")
-    link3 = widgets.HTML(value="""<a href="http://summary.jrj.com.cn/dpyt/" target="_blank" rel="noopener">大盘云图</a>""")
+    link1 = widgets.HTML(value="""<a href="http://vip.stock.finance.sina.com.cn/moneyflow/#sczjlx" target="_blank" rel="noopener">流向</a>""")
+    link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/zjlx/dpzjlx.html" target="_blank" rel="noopener">资金</a>""")
+    link3 = widgets.HTML(value="""<a href="http://summary.jrj.com.cn/dpyt/" target="_blank" rel="noopener">云图</a>""")
     checkitem+=[link1,link2,link3]
     checkbox = Box(children=checkitem,layout=box_layout)
     mbox = Box(children=[monitor_output,kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
@@ -1395,12 +1428,18 @@ def get_strong_flow(k,d,companys,prefix='90',typeid=0):
 """
 def muti_monitor():
     monitor_output = widgets.Output()
+    list_output = widgets.Output()
     companys = xueqiu.get_company_select()
     code2i = xueqiu.get_company_code2i()
+    pages = Box(children=[])
+    prefix = '90'
+    ntop = 3
+    nday = 3
+    npage = 0
     shi = code2i['SH000001']
     szi = code2i['SZ399001']
-    def update_plot(data,row=4,col=5,figsize=(50,16)):
-        gs_kw = dict(height_ratios=[2,1,2,1])
+    def update_plot(data,row=4,col=5,figsize=(50,20)):
+        gs_kw = dict(height_ratios=[3,1,3,1])
         fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
         for i in range(int(row*col/2)):
             if i<len(data):
@@ -1408,24 +1447,71 @@ def muti_monitor():
                 x = 2*int((i)/col)
                 y = (i)%col
                 ax = [axs[x,y],axs[x+1,y]]
-                plotfs(ax,p[0],p[1],p[2])
+                plotfs(ax,p[0],p[1],p[2],ma5b=p[3])
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(monitor_output)
-    def loop():
-        nonlocal companys,shi,szi
+    def on_page(e):
+        nonlocal pages,npage
+        for but in pages.children:
+            but.button_style = ''
+        e.button_style='success'
+        npage = int(e.description)
+        update()
+    def update_pages(N):
+        nonlocal pages
+        ps = []
+        for i in range(N):
+            ps.append(widgets.Button(description=str(i),button_style='success' if i==0 else ''))
+            ps[-1].on_click(on_page)
+        pages.children = ps
+    def update():
+        nonlocal companys,shi,szi,prefix,ntop,nday,npage
         t = date.today()
-        b,k,d = xueqiu.getTodayRT()
+        b,k,d = get_last_rt(t)
         t2 = t
         if b:
-            data = [(k[shi,:,:],d,companys[shi][2]),(k[szi,:,:],d,companys[szi][2])]
-            R = []
-            for it in (('2',2,'ETF'),('90',0,'行业资金'),('90',2,'行业增幅'),('91',0,'概念资金'),('91',2,'概念增幅')):    
-                S = get_strong_flow(k,d,companys,it[0],it[1])
-                for i in S[:3]:
-                    if i not in R:
-                        data.append((k[i,:,:],d,'%s %s'%(companys[i][2],it[2])))
-                        R.append(i)
-            update_plot(data)
+            R = get10Top(prefix,ntop,nday)
+            K,D = xueqiu.get_period_k(15)
+            data = []
+            bi = 0
+            for i in range(-1,-len(D),-1):
+                if D[i][0].hour==15:
+                    bi = i
+                    break
+            for code in R:
+                if code in code2i:
+                    i = code2i[code]
+                    ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
+                    data.append((k[i,:,:],d,companys[i][2],ma5[bi]))
+            update_plot(data[8*npage:])
+            return data
+        return []
+    def loop():
+        if stock.isTransDay() and stock.isTransTime():
+            update()
         xueqiu.setTimeout(60,loop,'monitor.monitor')
+    tools = []
+    def on_switch(e):
+        nonlocal prefix,ntop,nday,npage
+        prefix = e.prefix
+        ntop = e.ntop
+        nday = e.nday
+        npage = 0
+        for but in tools:
+            if type(but)==Button and but.button_style=='success':
+                but.button_style = ''
+        e.button_style='success'
+        data = update()
+        update_pages(math.ceil(len(data)/8.))
+    for it in (('概念','91',10,3),('行业','90',5,3),('ETF','2',3,3),('SH','1',10,3),('SZ','0',10,3)):
+        tools.append(widgets.Button(description=it[0],button_style='success' if it[1]==prefix else ''))
+        tools[-1].on_click(on_switch)
+        tools[-1].prefix = it[1]
+        tools[-1].ntop = it[2]
+        tools[-1].nday = it[3]
+    
+    tools.append(pages)
+    tool_box = Box(children=tools,layout=box_layout)
+    update()
     loop() 
-    display(monitor_output)
+    display(monitor_output,tool_box,list_output)

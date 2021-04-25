@@ -1189,7 +1189,6 @@ class Plote:
         xx2 = None
         """绘制BOLL线"""
         if self._showboll:
-
             if self._show5bigma20 and self._period==5:
                 xx2,ma1520 = stock.maRangeK(self._k,20*3,bi,ei)#15分钟的20均线
                 xx2,ma3020 = stock.maRangeK(self._k,20*6,bi,ei) #30分钟的20均线

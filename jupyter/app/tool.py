@@ -488,4 +488,4 @@ def zqxy(prefix='91',N=3):
     plt.show()
 
 #kline.Plote('SH000001','d',config={'index':True},mode='runtime').show()
-print(monitor.get10Top())
+monitor.muti_monitor()
