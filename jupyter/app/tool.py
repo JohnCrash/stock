@@ -487,5 +487,49 @@ def zqxy(prefix='91',N=3):
     axs[1].legend()
     plt.show()
 
+"""
+将分类和概念的个股列表存入到emlist中去
+"""
+def saveemlist():
+    companys = xueqiu.get_company_select()
+    alls = stock.query("select code from company")
+    codenum2code = {}
+    for c in alls:
+        codenum2code[c[0][2:]] = c[0]
+    for com in companys:
+        QS = stock.query("select * from emlist where emcode='%s'"%com[1])
+        if (com[3]=='90' or com[3]=='91') and len(QS)==0:
+            b,R = xueqiu.emgllist(com[1])
+            if b:
+                print(com[1],len(R))
+                QS = ""
+                for it in R:
+                    if 'f12' in it and it['f12'] in codenum2code:
+                        QS += "('%s','%s'),"%(com[1],codenum2code[it['f12']])
+                stock.execute("insert ignore into emlist (emcode,code) values %s"%QS[:-1])
+
+
+#打印分类和概念的个股属于flow_em_category
+def printemlist():
+    companys = xueqiu.get_company_select()
+    code2com = xueqiu.get_company_code2com()
+    for com in companys:
+        if com[3]=='90' or com[3]=='91':
+            QS = stock.query("select * from emlist where emcode='%s'"%com[1])
+            
+            S = ""
+            n = 0
+            for it in QS:
+                if it[1] in code2com:
+                    S += "%s,"%it[1]
+                    n+=1
+            #print(S[:-1])
+            print("%s %s %s %d/%d"%(com[1],com[2],com[3],n,len(QS)))
+
+printemlist()
+
 #kline.Plote('SH000001','d',config={'index':True},mode='runtime').show()
-monitor.muti_monitor()
+#monitor.muti_monitor()
+#saveemlist()
+#b,J = xueqiu.emgllist('BK0501')
+#print(b,len(J))

@@ -2516,3 +2516,72 @@ def bxzj(timeout=None):
         mylog.printe(e)
         return False,str(e)    
 
+"""
+em概念对应的公司列表
+{
+    data{
+        diff:[
+            {
+
+            }
+        ]
+        total:108
+    }
+    full,
+    lt,
+    rc,
+    rt
+}
+f2 价格
+f3 当日涨幅
+f12 代码
+f14 名称
+f62 主力净额
+f66 超大单净额
+f69 中单占比
+f72 大单净额
+f75 大单占比
+f78 中单流入
+f81 中单占比
+f84 小单净额
+f87 小单占比
+f124 ?
+f184 主力占比
+"""
+def emglpage(code,page=1,tryn=3,timeout=None):
+    ts = math.floor(time.time())
+    uri="http://push2.eastmoney.com/api/qt/clist/get?cb=jQuery1123026793826214185734_%d&fid=f62&po=1&pz=50&pn=%d&np=1&fltt=2&invt=2&ut=b2884a393a59ad64002292a3e90d46a5&fs=b%%3A%s&fields=f12%%2Cf14%%2Cf2%%2Cf3%%2Cf62%%2Cf184%%2Cf66%%2Cf69%%2Cf72%%2Cf75%%2Cf78%%2Cf81%%2Cf84%%2Cf87%%2Cf204%%2Cf205%%2Cf124"%(ts,page,code)
+    for i in range(tryn):
+        try:
+            s = requests.session()
+            if timeout is None:
+                r = s.get(uri,headers=headers)
+            else:
+                r = s.get(uri,headers=headers,timeout=timeout)
+            if r.status_code==200:
+                bi = r.text.find('({"rc":')
+                if bi>0:
+                    R = json.loads(r.text[bi+1:-2])
+                    return True,R
+        except Exception as e:
+            mylog.printe(e)
+    return False,None
+
+def emgllist(code):
+    R = []
+    for i in range(1,1000):
+        b,J = emglpage(code,i)
+        if b and 'data' in J:
+            data = J['data']
+            if 'total' in data and 'diff' in data:
+                R += data['diff']
+                if len(R)>=data['total']:
+                    return True,R
+            else:
+                print('emgllist数据结构中没有包括total or diff')
+                break
+        else:
+            print('emgllist数据结构中没有包括data')
+            break
+
+    return False,R

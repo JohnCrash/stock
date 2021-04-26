@@ -64,22 +64,30 @@ defaultPlotfsStyle = {
 def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
     ax[0].set_title(title,y=0.93)
     x = np.arange(k.shape[0])
-    xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
+    xticks = [0,60-15,2*60-15,3*60+15,4*60+15,len(d)-1]
     ax[0].axhline(y=0,color='black',linestyle='dotted')
     ax[0].plot(x,k[:,1],color=style['pcolor'])
     m60 = stock.ma(k[:,1],60)
     ax[0].plot(x,m60,color=style['ma60color'],linestyle=style['ma60linestyle'])#分时均线
-    if ma5b is not None:
-        if len(k)>0:
-            openp = k[0,0]/(1.+k[0,1]/100.)
-            ma5 = np.zeros((len(k),))
-            for i in range(len(k)):
-                if i<15:
-                    ma5[i] = ma5b
-                else:
-                    ma5[i] = ma5[i-1]+(k[i,0]-ma5[i-1])/(240*5) #这是一个近似迭代
-            
-            ax[0].plot(x,100*(ma5-openp)/openp,linewidth=4,color='magenta')
+    #计算盘前开始于结束
+    pbi = 0
+    for i in range(len(d)-1,0,-1):
+        if d[i].hour==9 and d[i].minute==29:
+            ax[0].scatter([i],[k[i,1]])
+        if d[i].hour==9 and (d[i].minute==15 or d[i].minute==16):
+            pbi=i
+            break
+    
+    if ma5b is not None and len(k)>0:
+        openp = k[-1,0]/(1.+k[-1,1]/100.)
+        ma5 = np.zeros((len(k),))
+        for i in range(len(k)):
+            if i<15:
+                ma5[i] = ma5b
+            else:
+                ma5[i] = ma5[i-1]+(k[i,0]-ma5[i-1])/(240*5) #这是一个近似迭代
+        
+        ax[0].plot(x,100*(ma5-openp)/openp,linewidth=4,color='magenta')
     if len(ax)==2:
         ax[1].axhline(y=0,color='black',linestyle='dotted')
         ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
@@ -88,7 +96,7 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
         ax[1].set_xticks(xticks)
         ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
         bottom,top = ax[1].get_ylim()
-        ax[1].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)    
+        ax[1].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1)    
     else:
         ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
     ax[0].set_xticks(xticks)
@@ -117,7 +125,7 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
             connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',fontweight='bold',color=period2c[boll[0]][1])                
             offy += 20
     bottom,top = ax[0].get_ylim()
-    ax[0].broken_barh([(0,15)], (bottom,top-bottom),facecolor='blue',alpha=0.05)                
+    ax[0].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1)                
 
 ETFs = [ 
     'SZ159919', #沪深300ETF
@@ -194,7 +202,7 @@ BCs = [
 """
 def K(code,period=None,pos=None):
     if pos is None:
-        kline.Plote(code,period,config={'index':True},mode='auto').show(figsize=(46,16))
+        kline.Plote(code,period,config={'index':True},mode='auto').show(figsize=(46,18))
     else:
         kline.Plote(code,period,config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
 
@@ -325,6 +333,7 @@ def get10Top(prefix='90',top=5,nday=3):
                         break
         else:
             break
+
     return R.keys()
 """
 返回最近nday天排名前top的概念或者分类
@@ -1432,6 +1441,7 @@ def muti_monitor():
     companys = xueqiu.get_company_select()
     code2i = xueqiu.get_company_code2i()
     pages = Box(children=[])
+    listbox = Box(children=[],layout=box_layout)
     prefix = '90'
     ntop = 3
     nday = 3
@@ -1464,12 +1474,18 @@ def muti_monitor():
             ps.append(widgets.Button(description=str(i),button_style='success' if i==0 else ''))
             ps[-1].on_click(on_page)
         pages.children = ps
+    def on_show(e):
+        nonlocal list_output
+        list_output.clear_output()
+        with list_output:
+            K(e.code)
     def update():
         nonlocal companys,shi,szi,prefix,ntop,nday,npage
         t = date.today()
-        b,k,d = get_last_rt(t)
+        lastt,k,d = get_last_rt(t)
+        lastt2,k2,d2 = get_last_rt(lastt-timedelta(days=1))
         t2 = t
-        if b:
+        if True:
             R = get10Top(prefix,ntop,nday)
             K,D = xueqiu.get_period_k(15)
             data = []
@@ -1478,12 +1494,21 @@ def muti_monitor():
                 if D[i][0].hour==15:
                     bi = i
                     break
+            buts = []
             for code in R:
                 if code in code2i:
                     i = code2i[code]
                     ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
-                    data.append((k[i,:,:],d,companys[i][2],ma5[bi]))
-            update_plot(data[8*npage:])
+                    #将昨天的数据补在前面
+                    if len(d)>=254:
+                        data.append((k[i,:,:],d,companys[i][2],ma5[bi]))
+                    else:
+                        data.append((np.vstack((k2[i,-255+len(d):,:],k[i,:,:])),d2[-255+len(d):]+d,companys[i][2],ma5[bi]))
+                    buts.append(widgets.Button(description=companys[i][2],button_style='success' if len(data)>=10*npage and len(data)<=10*npage+10 else ''))
+                    buts[-1].code = companys[i][1]
+                    buts[-1].on_click(on_show)
+            listbox.children = buts
+            update_plot(data[10*npage:])
             return data
         return []
     def loop():
@@ -1502,7 +1527,7 @@ def muti_monitor():
                 but.button_style = ''
         e.button_style='success'
         data = update()
-        update_pages(math.ceil(len(data)/8.))
+        update_pages(math.ceil(len(data)/10.))
     for it in (('概念','91',10,3),('行业','90',5,3),('ETF','2',3,3),('SH','1',10,3),('SZ','0',10,3)):
         tools.append(widgets.Button(description=it[0],button_style='success' if it[1]==prefix else ''))
         tools[-1].on_click(on_switch)
@@ -1514,4 +1539,4 @@ def muti_monitor():
     tool_box = Box(children=tools,layout=box_layout)
     update()
     loop() 
-    display(monitor_output,tool_box,list_output)
+    display(monitor_output,tool_box,listbox,list_output)
