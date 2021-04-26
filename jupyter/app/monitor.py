@@ -319,21 +319,48 @@ def get10Top(prefix='90',top=5,nday=3):
         if n<nday:
             if D[i][0].hour==10 and D[i][0].minute==0:
                 n+=1
-                m = 0
+                m=0
                 K[K[:,i-2]==0,i-2] = 1
                 dk = (K[:,i]-K[:,i-2])/K[:,i-2]
                 a = list(np.argsort(dk))
                 a.reverse()
-                for j in a:
-                    if m<top:
-                        if companys[j][3]==prefix and K[j,i]>K[j,i-2]: #附加一个条件最高价必须大于昨日收盘
-                            R[companys[j][1]] = 1
-                            m+=1
-                    else:
-                        break
+                if type(prefix)==str:
+                    for j in a:
+                        if m<top:
+                            if companys[j][3]==prefix and K[j,i]>K[j,i-2]: #附加一个条件最高价必须大于昨日收盘
+                                if companys[j][1] not in R:
+                                    R[companys[j][1]] = (j,i)
+                                    m+=1
+                        else:
+                            break
+                else:
+                    for j in a:
+                        if m<top:
+                            if companys[j][1] in prefix and K[j,i]>K[j,i-2]:
+                                if companys[j][1] not in R:
+                                    R[companys[j][1]] = (j,i)
+                                    m+=1
+                        else:
+                            break
         else:
             break
-
+    """
+    删除已经走坏的分类
+    1.全天50%处于5日均线下方
+    """
+    for it in list(R.items()):
+        j = it[1][0]
+        i = it[1][1]
+        ma5 = stock.ma(K[j,:],40)
+        n = 0
+        for s in range(-1,i-1,-1): #如果有连续的4根k线在5日均线下就算走坏
+            if K[j,s] < ma5[s]:
+                n+=1
+            else:
+                n = 0
+            if n>=4:
+                del R[it[0]]
+                break
     return R.keys()
 """
 返回最近nday天排名前top的概念或者分类
@@ -415,10 +442,11 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
+        "可交易":[muti_monitor],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业
-        "监视":[muti_monitor],
+        "通道突破":[monitor_bollup],
         "活跃分类":get10Top('90',5,3),
         "活跃概念":get10Top('91',10,3),
         "上榜分类":getDTop('90',3)[:10],
@@ -1432,22 +1460,30 @@ def get_strong_flow(k,d,companys,prefix='90',typeid=0):
     for s in S:
         R.append(s[1])
     return R
+
+"""
+个股和概念的匹配度排名列表
+"""
+def fits(code):
+    R = []
+    return R
 """
 分屏多窗口监控分时图
+将每天上午10点涨幅排行放入监控列表
 """
 def muti_monitor():
     monitor_output = widgets.Output()
     list_output = widgets.Output()
     companys = xueqiu.get_company_select()
     code2i = xueqiu.get_company_code2i()
+    code2com = xueqiu.get_company_code2com()
     pages = Box(children=[])
     listbox = Box(children=[],layout=box_layout)
     prefix = '90'
     ntop = 3
     nday = 3
     npage = 0
-    shi = code2i['SH000001']
-    szi = code2i['SZ399001']
+
     def update_plot(data,row=4,col=5,figsize=(50,20)):
         gs_kw = dict(height_ratios=[3,1,3,1])
         fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
@@ -1480,13 +1516,27 @@ def muti_monitor():
         with list_output:
             K(e.code)
     def update():
-        nonlocal companys,shi,szi,prefix,ntop,nday,npage
+        nonlocal companys,prefix,ntop,nday,npage
         t = date.today()
         lastt,k,d = get_last_rt(t)
-        lastt2,k2,d2 = get_last_rt(lastt-timedelta(days=1))
-        t2 = t
+        _,k2,d2 = get_last_rt(lastt-timedelta(days=1))
         if True:
-            R = get10Top(prefix,ntop,nday)
+            code2gl = {} #代码对应的概念
+            if prefix=='':
+                prefixs = []
+                for r in (get10Top('90',5,3), get10Top('91',10,3)):
+                    for c in r:
+                        qs = stock.query("select code from emlist where emcode='%s'"%c)
+                        for cc in qs:
+                            if cc[0] in code2i:
+                                if cc[0] in code2gl:
+                                    code2gl[cc[0]].append(c)
+                                else:
+                                    code2gl[cc[0]] = [c]
+                                prefixs.append(cc[0])
+                R = get10Top(prefixs,ntop,nday)
+            else:
+                R = get10Top(prefix,ntop,nday)
             K,D = xueqiu.get_period_k(15)
             data = []
             bi = 0
@@ -1500,10 +1550,14 @@ def muti_monitor():
                     i = code2i[code]
                     ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
                     #将昨天的数据补在前面
+                    glstr = ''
+                    if companys[i][1] in code2gl:
+                        for c in code2gl[companys[i][1]]:
+                            glstr += ' %s'%code2com[c][2]
                     if len(d)>=254:
-                        data.append((k[i,:,:],d,companys[i][2],ma5[bi]))
+                        data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i))
                     else:
-                        data.append((np.vstack((k2[i,-255+len(d):,:],k[i,:,:])),d2[-255+len(d):]+d,companys[i][2],ma5[bi]))
+                        data.append((np.vstack((k2[i,-255+len(d):,:],k[i,:,:])),d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i))
                     buts.append(widgets.Button(description=companys[i][2],button_style='success' if len(data)>=10*npage and len(data)<=10*npage+10 else ''))
                     buts[-1].code = companys[i][1]
                     buts[-1].on_click(on_show)
@@ -1528,7 +1582,7 @@ def muti_monitor():
         e.button_style='success'
         data = update()
         update_pages(math.ceil(len(data)/10.))
-    for it in (('概念','91',10,3),('行业','90',5,3),('ETF','2',3,3),('SH','1',10,3),('SZ','0',10,3)):
+    for it in (('概念','91',10,3),('行业','90',5,3),('ETF','2',3,3),('SH','1',10,3),('SZ','0',10,3),('叠加MSCI','',20,3)):
         tools.append(widgets.Button(description=it[0],button_style='success' if it[1]==prefix else ''))
         tools[-1].on_click(on_switch)
         tools[-1].prefix = it[1]

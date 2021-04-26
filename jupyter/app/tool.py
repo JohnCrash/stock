@@ -526,10 +526,5 @@ def printemlist():
             #print(S[:-1])
             print("%s %s %s %d/%d"%(com[1],com[2],com[3],n,len(QS)))
 
-printemlist()
 
-#kline.Plote('SH000001','d',config={'index':True},mode='runtime').show()
-#monitor.muti_monitor()
-#saveemlist()
-#b,J = xueqiu.emgllist('BK0501')
-#print(b,len(J))
+print(monitor.get10Top())
