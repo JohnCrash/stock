@@ -310,12 +310,18 @@ def getMaRise(prefix='90',period=240,mas=[5,10,20,30,60]):
 返回可做的概念或者分类
 10点钟在排行榜上
 """
-def get10Top(prefix='90',top=5,nday=3):
+def get10Top(prefix='90',top=5,nday=3,eit=None):
     companys = xueqiu.get_company_select()
     K,D = xueqiu.get_period_k(30)
     n = 0
     R = {}
-    for i in range(-1,-len(D),-1):
+    ei = -1
+    if eit is not None:
+        for i in range(-1,-len(D),-1):
+            if D[i][0]<=eit:
+                ei = i
+                break
+    for i in range(ei,-len(D),-1):
         if n<nday:
             if D[i][0].hour==10 and D[i][0].minute==0:
                 n+=1
@@ -329,7 +335,7 @@ def get10Top(prefix='90',top=5,nday=3):
                         if m<top:
                             if companys[j][3]==prefix and K[j,i]>K[j,i-2]: #附加一个条件最高价必须大于昨日收盘
                                 if companys[j][1] not in R:
-                                    R[companys[j][1]] = (j,i)
+                                    R[companys[j][1]] = (j,i,D[i][0])
                                     m+=1
                         else:
                             break
@@ -338,7 +344,7 @@ def get10Top(prefix='90',top=5,nday=3):
                         if m<top:
                             if companys[j][1] in prefix and K[j,i]>K[j,i-2]:
                                 if companys[j][1] not in R:
-                                    R[companys[j][1]] = (j,i)
+                                    R[companys[j][1]] = (j,i,D[i][0])
                                     m+=1
                         else:
                             break
@@ -353,7 +359,7 @@ def get10Top(prefix='90',top=5,nday=3):
         i = it[1][1]
         ma5 = stock.ma(K[j,:],40)
         n = 0
-        for s in range(-1,i-1,-1): #如果有连续的4根k线在5日均线下就算走坏
+        for s in range(ei,i-1,-1): #如果有连续的4根k线在5日均线下就算走坏
             if K[j,s] < ma5[s]:
                 n+=1
             else:
@@ -361,7 +367,13 @@ def get10Top(prefix='90',top=5,nday=3):
             if n>=4:
                 del R[it[0]]
                 break
-    return R.keys()
+    """
+    进行排序
+    """
+    result = []
+    for it in sorted(R.items(),key=lambda it:it[1][2],reverse=True):
+        result.append(it[0])
+    return result
 """
 返回最近nday天排名前top的概念或者分类
 [
@@ -1483,7 +1495,7 @@ def muti_monitor():
     ntop = 3
     nday = 3
     npage = 0
-
+    npos = 0
     def update_plot(data,row=4,col=5,figsize=(50,20)):
         gs_kw = dict(height_ratios=[3,1,3,1])
         fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
@@ -1516,15 +1528,20 @@ def muti_monitor():
         with list_output:
             K(e.code)
     def update():
-        nonlocal companys,prefix,ntop,nday,npage
+        nonlocal companys,prefix,ntop,nday,npage,npos
         t = date.today()
         lastt,k,d = get_last_rt(t)
         _,k2,d2 = get_last_rt(lastt-timedelta(days=1))
+        eit = None
+        if npos!=0:
+            k = k[:npos]
+            d = d[:npos]
+            eit = d[-1]
         if True:
             code2gl = {} #代码对应的概念
-            if prefix=='':
+            if prefix=='MSCI':
                 prefixs = []
-                for r in (get10Top('90',5,3), get10Top('91',10,3)):
+                for r in (get10Top('90',5,3,eit), get10Top('91',10,3,eit)):
                     for c in r:
                         qs = stock.query("select code from emlist where emcode='%s'"%c)
                         for cc in qs:
@@ -1534,9 +1551,16 @@ def muti_monitor():
                                 else:
                                     code2gl[cc[0]] = [c]
                                 prefixs.append(cc[0])
-                R = get10Top(prefixs,ntop,nday)
+                R = get10Top(prefixs,ntop,nday,eit)
+            elif prefix=='FAV':
+                today = date.today()  
+                after = today-timedelta(days=nday)
+                result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
+                R = ['SH000001','SZ399001']            #将大盘加入其中
+                for it in result:
+                    R.append(it[2])
             else:
-                R = get10Top(prefix,ntop,nday)
+                R = get10Top(prefix,ntop,nday,eit)
             K,D = xueqiu.get_period_k(15)
             data = []
             bi = 0
@@ -1557,7 +1581,11 @@ def muti_monitor():
                     if len(d)>=254:
                         data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i))
                     else:
-                        data.append((np.vstack((k2[i,-255+len(d):,:],k[i,:,:])),d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i))
+                        #这里要重新计算昨天的涨幅
+                        tk = np.vstack((k2[i,-255+len(d):,:],k[i,:,:]))
+                        openp = tk[-1,0]/(1.+tk[-1,1]/100.)
+                        tk[:255-len(d),1] = 100*(tk[:255-len(d),0]-openp)/openp
+                        data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i))
                     buts.append(widgets.Button(description=companys[i][2],button_style='success' if len(data)>=10*npage and len(data)<=10*npage+10 else ''))
                     buts[-1].code = companys[i][1]
                     buts[-1].on_click(on_show)
@@ -1582,7 +1610,7 @@ def muti_monitor():
         e.button_style='success'
         data = update()
         update_pages(math.ceil(len(data)/10.))
-    for it in (('概念','91',10,3),('行业','90',5,3),('ETF','2',3,3),('SH','1',10,3),('SZ','0',10,3),('叠加MSCI','',20,3)):
+    for it in (('概念','91',10,4),('行业','90',5,4),('ETF','2',3,4),('SH','1',10,4),('SZ','0',10,4),('叠加MSCI','MSCI',20,4),('关注','FAV',10,3)):
         tools.append(widgets.Button(description=it[0],button_style='success' if it[1]==prefix else ''))
         tools[-1].on_click(on_switch)
         tools[-1].prefix = it[1]
@@ -1590,6 +1618,20 @@ def muti_monitor():
         tools[-1].nday = it[3]
     
     tools.append(pages)
+    #如果不是交易时间可以review
+    if datetime.today().hour>=15:
+        def on_review(e):
+            nonlocal npos
+            if e.description=='>':
+                npos+=15
+            else:
+                npos-=15
+            if npos>0:
+                npos = 0
+            update()
+        for it in ('<','>'):
+            tools.append(widgets.Button(description=it))
+            tools[-1].on_click(on_review)
     tool_box = Box(children=tools,layout=box_layout)
     update()
     loop() 

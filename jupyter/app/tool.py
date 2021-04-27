@@ -527,4 +527,4 @@ def printemlist():
             print("%s %s %s %d/%d"%(com[1],com[2],com[3],n,len(QS)))
 
 
-print(monitor.get10Top())
+print(monitor.muti_monitor())

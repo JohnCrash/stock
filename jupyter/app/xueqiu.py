@@ -896,9 +896,7 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                         update_period_plane(t,plane,[240,60,30,15,5])
                     print("emflowRT %s"%str(t))
                 shared.toRedis(datetime.today(),'runtime_update',ex=60)                
-            dt = 20-(datetime.today()-t).seconds #20秒更新一次
-            if dt>0:
-                time.sleep(dt)
+            time.sleep(5)
             t = datetime.today()
         except Exception as e:
             mylog.printe(e)
