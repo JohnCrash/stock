@@ -1489,9 +1489,10 @@ def fits(code,day=3):
         c,k,d = stock.loadKline(code,5,after=bi)
         if len(K)==len(k):
             p = (k[:,4]-k[0,4])/k[0,4]
-            p = p/p.max()
-            dp = p-P
-            result.append((dp.sum(),np.abs(dp).sum(),code))
+            if p.max()>0:
+                p = p/p.max()
+                dp = p-P
+                result.append((dp.sum(),np.abs(dp).sum(),code))
     return list(sorted(result,key=lambda it:it[1]))
   
 """
@@ -1650,12 +1651,16 @@ def muti_monitor():
             nonlocal npos
             if e.description=='>':
                 npos+=15
-            else:
+            elif e.description=='<':
                 npos-=15
+            elif e.description=='>>':
+                npos+=255
+            else:
+                npos-=255
             if npos>0:
                 npos = 0
             update()
-        for it in ('<','>'):
+        for it in ('<<','<','>','>>'):
             tools.append(widgets.Button(description=it))
             tools[-1].on_click(on_review)
     def on_list(e):

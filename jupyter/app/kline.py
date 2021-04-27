@@ -1891,7 +1891,7 @@ class Plote:
         def on_codetext(e):
             nonlocal link,link2
             c = e['new'].upper()
-            if len(c)==8 and c[0]=='S' and (c[1]=='Z' or c[1]=='H'):
+            if (len(c)==8 and c[0]=='S' and (c[1]=='Z' or c[1]=='H')) or (len(c)==6 and c[0]=='B'):
                 self._comarg = c
                 self.reload()
                 recalcRange()
