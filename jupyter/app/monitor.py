@@ -94,11 +94,11 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
         ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
         ax[1].set_xlim(0,15+4*60)
         ax[1].set_xticks(xticks)
-        ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
+        ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))
         bottom,top = ax[1].get_ylim()
         ax[1].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1)    
     else:
-        ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
+        ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))
     ax[0].set_xticks(xticks)
     ax[0].set_xlim(0,15+4*60)
     ax[0].grid(True)
@@ -1479,6 +1479,7 @@ def get_strong_flow(k,d,companys,prefix='90',typeid=0):
 def fits(code):
     R = []
     return R
+  
 """
 分屏多窗口监控分时图
 将每天上午10点涨幅排行放入监控列表
@@ -1530,12 +1531,16 @@ def muti_monitor():
     def update():
         nonlocal companys,prefix,ntop,nday,npage,npos
         t = date.today()
-        lastt,k,d = get_last_rt(t)
-        _,k2,d2 = get_last_rt(lastt-timedelta(days=1))
         eit = None
-        if npos!=0:
-            k = k[:npos]
-            d = d[:npos]
+        if npos==0:
+            lastt,k,d = get_last_rt(t)
+            _,k2,d2 = get_last_rt(lastt-timedelta(days=1))
+        else:
+            lastt,k,d = get_last_rt(t-timedelta(days=math.floor(-npos/255)))
+            _,k2,d2 = get_last_rt(lastt-timedelta(days=1))
+            j = -((-npos)%255)-1
+            k = k[:,:j,:]
+            d = d[:j]
             eit = d[-1]
         if True:
             code2gl = {} #代码对应的概念
@@ -1565,9 +1570,10 @@ def muti_monitor():
             data = []
             bi = 0
             for i in range(-1,-len(D),-1):
-                if D[i][0].hour==15:
-                    bi = i
-                    break
+                if eit is None or eit>=D[i][0]:
+                    if D[i][0].hour==15:
+                        bi = i
+                        break
             buts = []
             for code in R:
                 if code in code2i:
