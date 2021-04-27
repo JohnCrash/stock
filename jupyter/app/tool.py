@@ -194,6 +194,22 @@ def etfcc():
                 print(qs)
                 stock.execute(qs)
 
+#将etf持仓放入emlist
+def eft2emlist():
+    etfs = stock.query("select * from flow_em_category where name like '%%ETF'")
+    companys = stock.query("select * from company")
+    code2c = {}
+    for c in companys:
+        code2c[c[1]] = c
+    for c in etfs:
+        #使用em数据将ETF持仓加入到flow_em_category中去
+        print("处理%s %s:"%(c[1],c[2]))
+        codes = getetfcc(c[2])
+        QS = ""
+        for code in codes:
+            QS += "('%s','%s'),"%(c[2],code)
+        stock.execute("insert ignore into emlist (emcode,code) values %s"%QS[:-1])
+
 """
 检查数据库k5_xueqiu,kd_xueqiu,k5_em,kd_em看看最近那些没有正常更新
 同时检查flow,flow_em
@@ -527,4 +543,4 @@ def printemlist():
             print("%s %s %s %d/%d"%(com[1],com[2],com[3],n,len(QS)))
 
 
-print(monitor.muti_monitor())
+#print(monitor.fits('BK0478'))

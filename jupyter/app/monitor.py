@@ -1476,9 +1476,23 @@ def get_strong_flow(k,d,companys,prefix='90',typeid=0):
 """
 个股和概念的匹配度排名列表
 """
-def fits(code):
-    R = []
-    return R
+def fits(code,day=3):
+    R = stock.query("select code from emlist where emcode='%s'"%code)
+    kdd = stock.query('select date from kd_xueqiu where id=8828 order by date desc limit %d'%day)
+    bi = stock.dateString(kdd[-1][0])
+    C,K,D = stock.loadKline(code,5,after=bi)
+    P = (K[:,4]-K[0,4])/K[0,4]
+    P = P/P.max()
+    result = []
+    for it in R:
+        code = it[0]
+        c,k,d = stock.loadKline(code,5,after=bi)
+        if len(K)==len(k):
+            p = (k[:,4]-k[0,4])/k[0,4]
+            p = p/p.max()
+            dp = p-P
+            result.append((dp.sum(),np.abs(dp).sum(),code))
+    return list(sorted(result,key=lambda it:it[1]))
   
 """
 分屏多窗口监控分时图
@@ -1497,6 +1511,8 @@ def muti_monitor():
     nday = 3
     npage = 0
     npos = 0
+    curcode = ''
+    curlist = []
     def update_plot(data,row=4,col=5,figsize=(50,20)):
         gs_kw = dict(height_ratios=[3,1,3,1])
         fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
@@ -1524,12 +1540,13 @@ def muti_monitor():
             ps[-1].on_click(on_page)
         pages.children = ps
     def on_show(e):
-        nonlocal list_output
+        nonlocal list_output,curcode
         list_output.clear_output()
         with list_output:
+            curcode = e.code
             K(e.code)
     def update():
-        nonlocal companys,prefix,ntop,nday,npage,npos
+        nonlocal companys,prefix,ntop,nday,npage,npos,curlist
         t = date.today()
         eit = None
         if npos==0:
@@ -1563,7 +1580,8 @@ def muti_monitor():
                 result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
                 R = ['SH000001','SZ399001']            #将大盘加入其中
                 for it in result:
-                    R.append(it[2])
+                    if it[2] not in R:
+                        R.append(it[2])
             else:
                 R = get10Top(prefix,ntop,nday,eit)
             K,D = xueqiu.get_period_k(15)
@@ -1575,8 +1593,10 @@ def muti_monitor():
                         bi = i
                         break
             buts = []
+            curlist = []
             for code in R:
                 if code in code2i:
+                    curlist.append(code)
                     i = code2i[code]
                     ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
                     #将昨天的数据补在前面
@@ -1638,6 +1658,22 @@ def muti_monitor():
         for it in ('<','>'):
             tools.append(widgets.Button(description=it))
             tools[-1].on_click(on_review)
+    def on_list(e):
+        nonlocal curlist
+        list_output.clear_output()
+        with list_output:
+            for c in curlist:
+                K(c)
+    tools.append(widgets.Button(description='列表'))
+    tools[-1].on_click(on_list)
+    def on_fit(e):
+        nonlocal curcode,list_output
+        with list_output:
+            for it in fits(curcode):
+                if it[0]>0:
+                    K(it[2])
+    tools.append(widgets.Button(description='匹配'))
+    tools[-1].on_click(on_fit)    
     tool_box = Box(children=tools,layout=box_layout)
     update()
     loop() 
