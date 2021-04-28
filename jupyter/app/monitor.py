@@ -1507,7 +1507,7 @@ def muti_monitor():
     code2com = xueqiu.get_company_code2com()
     pages = Box(children=[])
     listbox = Box(children=[],layout=box_layout)
-    prefix = '90'
+    prefix = '2'
     ntop = 3
     nday = 3
     npage = 0
@@ -1593,11 +1593,8 @@ def muti_monitor():
                     if D[i][0].hour==15:
                         bi = i
                         break
-            buts = []
-            curlist = []
             for code in R:
                 if code in code2i:
-                    curlist.append(code)
                     i = code2i[code]
                     ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
                     #将昨天的数据补在前面
@@ -1606,22 +1603,33 @@ def muti_monitor():
                         for c in code2gl[companys[i][1]]:
                             glstr += ' %s'%code2com[c][2]
                     if len(d)>=254:
-                        data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i))
+                        data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i,(k[i,-1,0]-ma5[-1])/ma5[-1],code))
                     else:
                         #这里要重新计算昨天的涨幅
                         tk = np.vstack((k2[i,-255+len(d):,:],k[i,:,:]))
                         openp = tk[-1,0]/(1.+tk[-1,1]/100.)
                         tk[:255-len(d),1] = 100*(tk[:255-len(d),0]-openp)/openp
-                        data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i))
-                    buts.append(widgets.Button(description=companys[i][2],button_style='success' if len(data)>=10*npage and len(data)<=10*npage+10 else ''))
-                    buts[-1].code = companys[i][1]
-                    buts[-1].on_click(on_show)
+                        data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i,(k[i,-1,0]-ma5[-1])/ma5[-1],code))
+
+            data = sorted(data,key=lambda it:it[5])
+            curlist = []
+            buts = []
+            for j in range(len(data)):
+                it = data[j]
+                i = it[4]
+                code = it[6]
+                curlist.append(code)
+                buts.append(widgets.Button(description="%s%.1f%%"%(companys[i][2],100*it[5]),button_style='success' if j>=10*npage and j<10*npage+10 else ''))
+                buts[-1].code = companys[i][1]
+                buts[-1].on_click(on_show)                
             listbox.children = buts
             update_plot(data[10*npage:])
             return data
         return []
     def loop():
+        nonlocal npos
         if stock.isTransDay() and stock.isTransTime():
+            npos = 0
             update()
         xueqiu.setTimeout(60,loop,'monitor.monitor')
     tools = []
@@ -1637,7 +1645,7 @@ def muti_monitor():
         e.button_style='success'
         data = update()
         update_pages(math.ceil(len(data)/10.))
-    for it in (('概念','91',10,4),('行业','90',5,4),('ETF','2',3,4),('SH','1',10,4),('SZ','0',10,4),('叠加MSCI','MSCI',20,4),('关注','FAV',10,3)):
+    for it in (('概念','91',20,4),('行业','90',5,4),('ETF','2',8,4),('SH','1',10,4),('SZ','0',10,4),('叠加MSCI','MSCI',20,4),('关注','FAV',20,3)):
         tools.append(widgets.Button(description=it[0],button_style='success' if it[1]==prefix else ''))
         tools[-1].on_click(on_switch)
         tools[-1].prefix = it[1]
@@ -1646,37 +1654,39 @@ def muti_monitor():
     
     tools.append(pages)
     #如果不是交易时间可以review
-    if datetime.today().hour>=15:
-        def on_review(e):
-            nonlocal npos
-            if e.description=='>':
-                npos+=15
-            elif e.description=='<':
-                npos-=15
-            elif e.description=='>>':
-                npos+=255
-            else:
-                npos-=255
-            if npos>0:
-                npos = 0
-            update()
-        for it in ('<<','<','>','>>'):
-            tools.append(widgets.Button(description=it))
-            tools[-1].on_click(on_review)
+    def on_review(e):
+        nonlocal npos
+        if e.description=='>':
+            npos+=15
+        elif e.description=='<':
+            npos-=15
+        elif e.description=='>>':
+            npos+=255
+        else:
+            npos-=255
+        if npos>0:
+            npos = 0
+        update()
+    for it in ('<<','<','>','>>'):
+        tools.append(widgets.Button(description=it))
+        tools[-1].on_click(on_review)
     def on_list(e):
-        nonlocal curlist
+        nonlocal curlist,npage
         list_output.clear_output()
         with list_output:
-            for c in curlist:
-                K(c)
+            for i in range(10*npage,10*npage+10):
+                if i<len(curlist):
+                    c = curlist[i]
+                    K(c)
     tools.append(widgets.Button(description='列表'))
     tools[-1].on_click(on_list)
     def on_fit(e):
         nonlocal curcode,list_output
-        with list_output:
-            for it in fits(curcode):
-                if it[0]>0:
-                    K(it[2])
+        if len(curcode)>5:
+            with list_output:
+                for it in fits(curcode):
+                    if it[0]>0:
+                        K(it[2])
     tools.append(widgets.Button(description='匹配'))
     tools[-1].on_click(on_fit)    
     tool_box = Box(children=tools,layout=box_layout)

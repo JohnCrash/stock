@@ -2180,7 +2180,7 @@ class Plote:
             figuretoggle.observe(on_change,names='value')
 
         display(box)
-        self.showKline(beginPT,endPT,figsize=figsize)
+        #self.showKline(beginPT,endPT,figsize=figsize)
         if self.code()[0]=='b':
             display(list_output)        
         if figure2 is not None:
@@ -2252,12 +2252,16 @@ class Plote:
                     mylog.printe(e)
                 refreshbutton.button_style = ''
                 break
-
+        first = True
         def loop():
+            nonlocal first
             if stock.isTransTime() and stock.isTransDay():
                 nt = xueqiu.next_k_date(5)
                 update()
             else:
                 nt = 10 #xueqiu.next_k_date(self._period)
+                if first:
+                    update()
+                first = False
             self._timer = xueqiu.setTimeout(nt+1,loop,'kline%s'%self.code())
         loop()
