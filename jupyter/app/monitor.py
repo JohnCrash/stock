@@ -61,7 +61,7 @@ defaultPlotfsStyle = {
     'maincolor':'fuchsia',
     'tingcolor':'cornflowerblue'
 }
-def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
+def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None,topshow=None):
     ax[0].set_title(title,y=0.93)
     x = np.arange(k.shape[0])
     xticks = [0,60-15,2*60-15,3*60+15,4*60+15,len(d)-1]
@@ -88,6 +88,14 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None):
                 ma5[i] = ma5[i-1]+(k[i,0]-ma5[i-1])/(240*5) #这是一个近似迭代
         
         ax[0].plot(x,100*(ma5-openp)/openp,linewidth=4,color='magenta')
+    if topshow is not None:
+        xx = 0
+        for i in range(len(d)):
+            if d[i] == topshow[1]:
+                xx = i
+                yy = k[i,1]
+        if xx!=0:
+            ax[0].annotate(str(topshow[0]),xy=(xx,yy),xytext=(-30,50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',fontweight='bold')
     if len(ax)==2:
         ax[1].axhline(y=0,color='black',linestyle='dotted')
         ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
@@ -285,6 +293,80 @@ def favoriteList():
             width='100%'))    
     display(box,out)
 
+def getma5longtop():
+    companys = xueqiu.get_company_select()
+    K,D = xueqiu.get_period_k(30)
+    MA5 = stock.maMatrix(K,40)
+    R = []
+    for j in range(len(companys)):
+        n = 0
+        m = 0
+        for i in range(-1,-len(D),-1):
+            if K[j,i]>MA5[j,i]:
+                n+=1
+                m=0
+            else:
+                m+=1
+            if m>8:
+                R.append((j,i,n))
+                break
+    return sorted(R,key=lambda it:it[2],reverse=True)
+            
+"""
+一个5日均线长度排行榜
+如果全天都在5日线下就算结束
+"""
+def ma5longTop():
+    tools = []
+    companys = xueqiu.get_company_select()
+    tops = getma5longtop()
+    plot_output = widgets.Output()
+    list_output = widgets.Output()
+    cur_prefix = ''
+    def listtops(prefix,r):
+        nonlocal list_output,tops,companys
+        list_output.clear_output()
+        with list_output:
+            for it in tops:
+                com = companys[it[0]]
+                n = math.ceil(it[2]/8)
+                if com[3]==prefix and n>=1 and n>=r[0] and n<=r[1]:
+                    K(com[1])
+    def plotetops(prefix):
+        nonlocal plot_output,tops,companys,cur_prefix
+        R = []
+        cur_prefix = prefix
+        for it in tops:
+            com = companys[it[0]]
+            if com[3]==prefix and it[2]>=8:
+                R.append((it[2],com[2],com[1]))
+        plot_output.clear_output()
+        with plot_output:
+            fig,ax = plt.subplots(1,1,figsize=(46,16))
+            x = np.arange(len(R))
+            ax.set_xticks(x)
+            ax.set_xticklabels([it[1] for it in R])
+            plt.setp(ax.get_xticklabels(),rotation=45,horizontalalignment='right')
+            ax.set_xlim(-1,len(R))
+            ax.bar(x,[math.ceil(it[0]/8.) for it in R],0.9)
+        kline.output_show(plot_output)
+    def on_click(e):
+        plotetops(e.prefix)
+
+    for it in [('概念','91'),('行业','90'),('ETF','2'),('SH','1'),('SZ','0')]:
+        tools.append(widgets.Button(description=it[0]))
+        tools[-1].prefix = it[1]
+        tools[-1].on_click(on_click)
+    def on_rangelist(e):
+        nonlocal cur_prefix
+        listtops(cur_prefix,e.range)
+
+    for it in [(20,1000,'大于20'),(10,20,'10-20'),(5,10,'5-10'),(1,5,'1-5')]:
+        tools.append(widgets.Button(description=it[2]))
+        tools[-1].range = (it[0],it[1])
+        tools[-1].on_click(on_rangelist)
+    tool_box = Box(children=tools,layout=box_layout)
+    display(tool_box,plot_output,list_output)
 """
 返回在5日均线上穿10日均线的概念和分类
 """
@@ -310,7 +392,7 @@ def getMaRise(prefix='90',period=240,mas=[5,10,20,30,60]):
 返回可做的概念或者分类
 10点钟在排行榜上
 """
-def get10Top(prefix='90',top=5,nday=3,eit=None):
+def get10Top(prefix='90',top=5,nday=3,eit=None,detail=False):
     companys = xueqiu.get_company_select()
     K,D = xueqiu.get_period_k(30)
     n = 0
@@ -335,7 +417,7 @@ def get10Top(prefix='90',top=5,nday=3,eit=None):
                         if m<top:
                             if companys[j][3]==prefix and K[j,i]>K[j,i-2]: #附加一个条件最高价必须大于昨日收盘
                                 if companys[j][1] not in R:
-                                    R[companys[j][1]] = (j,i,D[i][0])
+                                    R[companys[j][1]] = (j,i,D[i][0],m+1)
                                     m+=1
                         else:
                             break
@@ -344,7 +426,7 @@ def get10Top(prefix='90',top=5,nday=3,eit=None):
                         if m<top:
                             if companys[j][1] in prefix and K[j,i]>K[j,i-2]:
                                 if companys[j][1] not in R:
-                                    R[companys[j][1]] = (j,i,D[i][0])
+                                    R[companys[j][1]] = (j,i,D[i][0],m+1)
                                     m+=1
                         else:
                             break
@@ -372,7 +454,10 @@ def get10Top(prefix='90',top=5,nday=3,eit=None):
     """
     result = []
     for it in sorted(R.items(),key=lambda it:it[1][2],reverse=True):
-        result.append(it[0])
+        if detail:
+            result.append((it[0],it[1][2],it[1][3]))
+        else:
+            result.append(it[0])
     return result
 """
 返回最近nday天排名前top的概念或者分类
@@ -454,6 +539,7 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
+        "5日线排行":[ma5longTop],
         "可交易":[muti_monitor],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
@@ -468,11 +554,7 @@ def Indexs():
         "关注":[favoriteList]
     }
     indexpage(menus)
-
-def flgrid():
-    gridK(get10Top('90',5,3))
-def glgrid():
-    gridK(get10Top('91',10,3))    
+  
 """
 从尾部向前搜索中枢
 方法:通过加大搜索范围来
@@ -1523,7 +1605,7 @@ def muti_monitor():
                 x = 2*int((i)/col)
                 y = (i)%col
                 ax = [axs[x,y],axs[x+1,y]]
-                plotfs(ax,p[0],p[1],p[2],ma5b=p[3])
+                plotfs(ax,p[0],p[1],p[2],ma5b=p[3],topshow=(p[8],p[7]))
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(monitor_output)
     def on_page(e):
@@ -1574,17 +1656,17 @@ def muti_monitor():
                                 else:
                                     code2gl[cc[0]] = [c]
                                 prefixs.append(cc[0])
-                R = get10Top(prefixs,ntop,nday,eit)
+                R = get10Top(prefixs,ntop,nday,eit,detail=True)
             elif prefix=='FAV':
                 today = date.today()  
                 after = today-timedelta(days=nday)
                 result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
-                R = ['SH000001','SZ399001']            #将大盘加入其中
+                R = [('SH000001',None,0),('SZ399001',None,0)]            #将大盘加入其中
                 for it in result:
                     if it[2] not in R:
-                        R.append(it[2])
+                        R.append((it[2],None,0))
             else:
-                R = get10Top(prefix,ntop,nday,eit)
+                R = get10Top(prefix,ntop,nday,eit,detail=True)
             K,D = xueqiu.get_period_k(15)
             data = []
             bi = 0
@@ -1593,7 +1675,8 @@ def muti_monitor():
                     if D[i][0].hour==15:
                         bi = i
                         break
-            for code in R:
+            for it in R:
+                code = it[0]
                 if code in code2i:
                     i = code2i[code]
                     ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
@@ -1603,13 +1686,13 @@ def muti_monitor():
                         for c in code2gl[companys[i][1]]:
                             glstr += ' %s'%code2com[c][2]
                     if len(d)>=254:
-                        data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i,(k[i,-1,0]-ma5[-1])/ma5[-1],code))
+                        data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
                     else:
                         #这里要重新计算昨天的涨幅
                         tk = np.vstack((k2[i,-255+len(d):,:],k[i,:,:]))
                         openp = tk[-1,0]/(1.+tk[-1,1]/100.)
                         tk[:255-len(d),1] = 100*(tk[:255-len(d),0]-openp)/openp
-                        data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i,(k[i,-1,0]-ma5[-1])/ma5[-1],code))
+                        data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
 
             data = sorted(data,key=lambda it:it[5])
             curlist = []
