@@ -330,7 +330,7 @@ def ma5longTop():
             for it in tops:
                 com = companys[it[0]]
                 n = math.ceil(it[2]/8)
-                if com[3]==prefix and n>=1 and n>=r[0] and n<=r[1]:
+                if com[3]==prefix and n>=1 and n>=r[0] and n<r[1]:
                     K(com[1])
     def plotetops(prefix):
         nonlocal plot_output,tops,companys,cur_prefix
