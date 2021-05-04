@@ -545,4 +545,5 @@ def printemlist():
 
 
 #monitor.get10Top('91',20,4)
-monitor.muti_monitor()
+#monitor.muti_monitor()
+monitor.getma5longtopgn('BK0939')

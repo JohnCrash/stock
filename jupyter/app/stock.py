@@ -16,7 +16,7 @@ def isTransTime(t=None):
 def isTransDay():
     t = datetime.today()
     if t.weekday()>=0 and t.weekday()<5:
-        return True
+        return False
     else:
         return False
 

@@ -208,11 +208,11 @@ BCs = [
 """
 指数分类界面
 """
-def K(code,period=None,pos=None):
+def K(code,period=None,pos=None,mode='auto'):
     if pos is None:
-        kline.Plote(code,period,config={'index':True},mode='auto').show(figsize=(46,18))
+        kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(46,18))
     else:
-        kline.Plote(code,period,config={'index':True},mode='auto',lastday=10*365).show(pos=pos)
+        kline.Plote(code,period,config={'index':True},mode=mode,lastday=10*365).show(pos=pos)
 
 def indexpage(menus):
     buts = []
@@ -308,10 +308,36 @@ def getma5longtop():
             else:
                 m+=1
             if m>8:
-                R.append((j,i,n))
                 break
+        if n>0:
+            R.append((j,i,n))
     return sorted(R,key=lambda it:it[2],reverse=True)
-            
+
+"""
+将概念的中的个股进行5日线长度排名
+下5日线超过1天就算下5日线
+"""
+def getma5longtopgn(code):
+    af = stock.dateString(datetime.today()-timedelta(days=60))
+    QS = stock.query("select code from emlist where emcode='%s'"%code)            
+    R = []
+    for it in QS:
+        c,k,d = stock.loadKline(it[0],5,after=af)
+        if len(k)>0:
+            MA5 = stock.maK(k,240)
+            n = 0
+            m = 0
+            for i in range(-1,-len(MA5),-1):
+                if k[i,4]>MA5[i]:
+                    n+=1
+                    m=0
+                else:
+                    m+=1
+                if m>8*6:
+                    break
+            if n>0:
+                R.append((c,i,n))
+    return sorted(R,key=lambda it:it[2],reverse=True)
 """
 一个5日均线长度排行榜
 如果全天都在5日线下就算结束
@@ -321,7 +347,9 @@ def ma5longTop():
     companys = xueqiu.get_company_select()
     tops = getma5longtop()
     plot_output = widgets.Output()
+    complot_output = widgets.Output()
     list_output = widgets.Output()
+    combox = Box(children=[],layout=box_layout)
     cur_prefix = ''
     def listtops(prefix,r):
         nonlocal list_output,tops,companys
@@ -331,15 +359,44 @@ def ma5longTop():
                 com = companys[it[0]]
                 n = math.ceil(it[2]/8)
                 if com[3]==prefix and n>=1 and n>=r[0] and n<r[1]:
-                    K(com[1])
+                    K(com[1],mode='normal')
+    def on_gntops(e): #对概念内进行排行
+        complot_output.clear_output()
+        list_output.clear_output()
+        gntops = getma5longtopgn(e.code)
+        R = []
+        for it in gntops:
+            if it[2]>=48:
+                R.append((it[2],it[0][2],it[0][1]))
+        with complot_output:
+            fig,ax = plt.subplots(1,1,figsize=(46,16))
+            x = np.arange(len(R))
+            ax.set_xticks(x)
+            ax.set_xticklabels([it[1] for it in R])
+            plt.setp(ax.get_xticklabels(),rotation=45,horizontalalignment='right')
+            ax.set_xlim(-1,len(R))
+            ax.bar(x,[math.ceil(it[0]/48.) for it in R],0.9)
+        kline.output_show(complot_output)
+        with list_output:
+             K(e.code,mode='normal')
+             #前20
+             for i in range(len(gntops)):
+                 if i<20:
+                    K(gntops[i][0][1],mode='normal')
+
     def plotetops(prefix):
-        nonlocal plot_output,tops,companys,cur_prefix
+        nonlocal plot_output,tops,companys,cur_prefix,combox
         R = []
         cur_prefix = prefix
+        buts = []
         for it in tops:
             com = companys[it[0]]
             if com[3]==prefix and it[2]>=8:
                 R.append((it[2],com[2],com[1]))
+                buts.append(widgets.Button(description="%s%d"%(com[2],math.ceil(it[2]/8))))
+                buts[-1].code = com[1]
+                buts[-1].on_click(on_gntops)
+        combox.children = buts
         plot_output.clear_output()
         with plot_output:
             fig,ax = plt.subplots(1,1,figsize=(46,16))
@@ -366,7 +423,7 @@ def ma5longTop():
         tools[-1].range = (it[0],it[1])
         tools[-1].on_click(on_rangelist)
     tool_box = Box(children=tools,layout=box_layout)
-    display(tool_box,plot_output,list_output)
+    display(tool_box,plot_output,combox,complot_output,list_output)
 """
 返回在5日均线上穿10日均线的概念和分类
 """
@@ -1679,20 +1736,21 @@ def muti_monitor():
                 code = it[0]
                 if code in code2i:
                     i = code2i[code]
-                    ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
-                    #将昨天的数据补在前面
-                    glstr = ''
-                    if companys[i][1] in code2gl:
-                        for c in code2gl[companys[i][1]]:
-                            glstr += ' %s'%code2com[c][2]
-                    if len(d)>=254:
-                        data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
-                    else:
-                        #这里要重新计算昨天的涨幅
-                        tk = np.vstack((k2[i,-255+len(d):,:],k[i,:,:]))
-                        openp = tk[-1,0]/(1.+tk[-1,1]/100.)
-                        tk[:255-len(d),1] = 100*(tk[:255-len(d),0]-openp)/openp
-                        data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
+                    if i<k2.shape[0] and i<k.shape[0]:
+                        ma5 = stock.ma(K[i,:],80) #计算5日均线起点和终点
+                        #将昨天的数据补在前面
+                        glstr = ''
+                        if companys[i][1] in code2gl:
+                            for c in code2gl[companys[i][1]]:
+                                glstr += ' %s'%code2com[c][2]
+                        if len(d)>=254:
+                            data.append((k[i,:,:],d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
+                        else:
+                            #这里要重新计算昨天的涨幅
+                            tk = np.vstack((k2[i,-255+len(d):,:],k[i,:,:]))
+                            openp = tk[-1,0]/(1.+tk[-1,1]/100.)
+                            tk[:255-len(d),1] = 100*(tk[:255-len(d),0]-openp)/openp
+                            data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
 
             data = sorted(data,key=lambda it:it[5])
             curlist = []
