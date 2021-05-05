@@ -2105,17 +2105,14 @@ def emflowRT2():
         alls = get_em_category()
         code2i = {}
         codes = []
-        etfs = []
         for i in range(len(alls)):
             c = alls[i]
             code2i[c[2]] = i
             codes.append(c[2])
-            if c[3]=='2':
-                etfs.append(c[2])
         #每一个批量不要多于100个
         a = np.zeros((len(alls),1,7))
         for i in range(0,len(codes),100):
-            b,r = emdistribute2(codes[i:i+100],'f12,f13,f2,f3,f5,f66,f72,f78,f84')
+            b,r = emdistribute2(codes[i:i+100],'f12,f13,f1,f2,f3,f5,f66,f72,f78,f84')
             if b:
                 if 'data' in r:
                     ls = r['data']['diff']
@@ -2131,10 +2128,12 @@ def emflowRT2():
                             #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
                             j = code2i[code]
                             if j<len(code2i) and v['f2'] is not None:
-                                if code in etfs:
+                                if v['f1']==3:
                                     a[j,0,0] = int(v['f2'])/1000.0
-                                else:
+                                elif v['f1']==2:
                                     a[j,0,0] = int(v['f2'])/100.0
+                                else:
+                                    a[j,0,0] = int(v['f2'])/math.pow(10,v['f1'])
                                 if a[j,0,0]==0 and R is not None:
                                     a[j,0,0] = R[j,-1,0]
                                 if a[j,0,1]==0 and R is not None:

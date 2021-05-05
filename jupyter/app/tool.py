@@ -543,7 +543,10 @@ def printemlist():
             print("%s %s %s %d/%d"%(com[1],com[2],com[3],n,len(QS)))
 
 
-
-#monitor.get10Top('91',20,4)
-#monitor.muti_monitor()
-monitor.getma5longtopgn('BK0939')
+#删除今天的emflow
+def deleteEmFlow():
+    t = datetime.today()
+    n = "emflowts2_%d_%d"%(t.month,t.day)
+    k = "emflownp2_%d_%d"%(t.month,t.day)
+    shared.delKey(n)
+    shared.delKey(k)
