@@ -550,3 +550,9 @@ def deleteEmFlow():
     k = "emflownp2_%d_%d"%(t.month,t.day)
     shared.delKey(n)
     shared.delKey(k)
+
+#monitor.getDTop('90',3)
+xueqiu.clear_period_sequence(240)
+xueqiu.rebuild_period_sequence(240)
+K,D = xueqiu.get_period_k(240)
+print(K.shape)

@@ -1719,8 +1719,10 @@ def muti_monitor():
                 after = today-timedelta(days=nday)
                 result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
                 R = [('SH000001',None,0),('SZ399001',None,0)]            #将大盘加入其中
+                T = {}
                 for it in result:
-                    if it[2] not in R:
+                    if it[2] not in R and it[2] not in T:
+                        T[it[2]] = 1
                         R.append((it[2],None,0))
             else:
                 R = get10Top(prefix,ntop,nday,eit,detail=True)

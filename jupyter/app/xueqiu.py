@@ -517,6 +517,8 @@ def next_period_timestamp(d,period):
     return None
 
 def period_ex(period):
+    if period==240:
+        return 12*30*24*3600 #12个月
     if period==60:
         return 3*30*24*3600 #3个月
     elif period==30:
