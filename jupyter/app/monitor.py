@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import Formatter
 import math
 import numpy as np
+from numpy.core.fromnumeric import compress
 from numpy.lib.function_base import disp
 from . import shared
 from . import stock
@@ -445,6 +446,27 @@ def getMaRise(prefix='90',period=240,mas=[5,10,20,30,60]):
             R.append(c[1])
     return R
 
+def getCrossMa(prefix='91',mas=[5,20],nday=1):
+    companys = xueqiu.get_company_select()
+    K,D = xueqiu.get_period_k(240)
+    maks = []
+    for ma in mas:
+        maks.append(stock.maMatrix(K,ma))
+    R = []
+    for i in range(len(companys)):
+        b = True
+        for j in range(len(mas)):
+            if K[i,-nday-1]>maks[j][i,-nday-1]:
+                b = False
+                break
+        if b:
+            for j in range(len(mas)):
+                if K[i,-1]<maks[j][i,-1]:
+                    b = False
+                    break
+            if b:
+                R.append(companys[i][1])
+    return R
 """
 返回可做的概念或者分类
 10点钟在排行榜上
@@ -1726,6 +1748,7 @@ def muti_monitor():
                         R.append((it[2],None,0))
             else:
                 R = get10Top(prefix,ntop,nday,eit,detail=True)
+                R2 = getCrossMa(prefix,[5,10,20,30])
             K,D = xueqiu.get_period_k(15)
             data = []
             bi = 0

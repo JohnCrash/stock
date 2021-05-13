@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.core.fromnumeric import compress
 import requests
 import time
 import subprocess
@@ -551,8 +552,18 @@ def deleteEmFlow():
     shared.delKey(n)
     shared.delKey(k)
 
-#monitor.getDTop('90',3)
-xueqiu.clear_period_sequence(240)
-xueqiu.rebuild_period_sequence(240)
-K,D = xueqiu.get_period_k(240)
-print(K.shape)
+"""
+检查flow_em_category中的company_id是不是完全和company的id对应
+"""
+def checkcompanyid():
+    qs = stock.query('select company_id,code,name from flow_em_category')
+    for it in qs:
+        q = stock.query("select id from company where code='%s'"%it[1])
+        if len(q)==1:
+            if q[0][0]==it[0]:
+                continue
+            else:
+                print("发现id不一致%s"%str(it))
+
+R = monitor.get10Top('2',8,4)
+print(R)
