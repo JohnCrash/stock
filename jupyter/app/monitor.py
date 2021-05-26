@@ -618,11 +618,11 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
-        "5日线排行":[ma5longTop],
-        "可交易":[muti_monitor],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
-            'SZ399006'],#创业
+            'SZ399006'],#创业        
+        "5日线排行":[ma5longTop],
+        "可交易":[muti_monitor],
         "通道突破":[monitor_bollup],
         "活跃分类":get10Top('90',5,3),
         "活跃概念":get10Top('91',10,3),
@@ -1150,7 +1150,7 @@ def monitor_bollup():
     kview_output = widgets.Output()
     list_output = widgets.Output()    
     list_box = Box(children=[],layout=box_layout)
-    prefix_checktable = {'90':True,'91':True,'0':False,'1':False,'2':False}
+    prefix_checktable = {'90':False,'91':True,'0':False,'1':False,'2':False}
     peroid_checktable = {5:True,15:True,30:True,60:True,240:False}    
     companys = xueqiu.get_company_select()
     code2i = xueqiu.get_company_code2i()
@@ -1164,7 +1164,8 @@ def monitor_bollup():
     page = 0
     switch = 1
     news = 2 #0 持续 ，1 最新 ，2 全部
-    tf = 0 #时间过滤
+    tf = 4 #时间过滤
+    top10 = True #10top过滤,概念或者分类必须在get10Top返回的列表中间
     def tf2range():
         nonlocal tf
         if tf==0:
@@ -1185,7 +1186,7 @@ def monitor_bollup():
                 BollK(e.event[1][1],e.bolls,False)
 
     def update_bollupbuttons():
-        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news,list_output,list_box,button_items,flow_xch
+        nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news,list_output,list_box,button_items,flow_xch,top10
         
         bos = bolltrench()
         t = date.today()
@@ -1199,6 +1200,18 @@ def monitor_bollup():
             if t-flow_xch[i]>dt5:
                 flow_xch.remove(i)
         items = []
+        top10result = []
+        if top10:
+            p2t = {'91':[20,5],'90':[5,4],'0':[10,4],'1':[10,4],'2':[10,4]}
+            
+            for prefix in prefix_checktable:
+                if prefix_checktable[prefix]:
+                    top10result += get10Top(prefix,p2t[prefix][0],p2t[prefix][1])
+        def top10filter(c):
+            if top10:
+                return c[1] in top10result
+            else:
+                return True
         for i in range(len(companys)):
             code = companys[i][1]
             if code in bos:
@@ -1208,7 +1221,7 @@ def monitor_bollup():
                 for bo in bos[code]:
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
                     #bo (0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei,9 zfn)
-                    if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]]:
+                    if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]] and top10filter(companys[i]):
                         H = bo[6]-bo[5]
                         if switch==1: #突破向上
                             if k[i,-1,0] > bo[6]:
@@ -1504,6 +1517,14 @@ def monitor_bollup():
         update_bollupbuttons()        
     checkitem.append(tfdrop)
     tfdrop.observe(on_tf,names='value')
+    
+    def on_top10check(e):
+        nonlocal top10
+        top10 = e['new']
+        update_bollupbuttons()
+    top10check = widgets.Checkbox(value=top10,description='top10过滤',disabled=False,layout=Layout(display='block',width='140px'))
+    top10check.observe(on_top10check,names='value')
+    checkitem.append(top10check)
 
     def on_refrush(e):
         nonlocal list_output,list_box,button_items
@@ -1511,7 +1532,7 @@ def monitor_bollup():
         list_box = Box(children=button_items,layout=box_layout)
         with list_output:
             display(list_box)
-        update_current_plot()   
+        update_current_plot()
     refrushbut = widgets.Button(
                 description="刷新",
                 disabled=False,
@@ -1811,7 +1832,7 @@ def muti_monitor():
         e.button_style='success'
         data = update()
         update_pages(math.ceil(len(data)/10.))
-    for it in (('概念','91',20,4),('行业','90',5,4),('ETF','2',8,4),('SH','1',10,4),('SZ','0',10,4),('叠加MSCI','MSCI',20,4),('关注','FAV',20,3)):
+    for it in (('概念','91',20,5),('行业','90',5,4),('ETF','2',8,4),('SH','1',10,4),('SZ','0',10,4),('叠加MSCI','MSCI',20,4),('关注','FAV',20,3)):
         tools.append(widgets.Button(description=it[0],button_style='success' if it[1]==prefix else ''))
         tools[-1].on_click(on_switch)
         tools[-1].prefix = it[1]

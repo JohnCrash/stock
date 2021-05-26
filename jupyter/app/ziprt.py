@@ -68,7 +68,7 @@ def saveRT():
         if b:
             ct = d[-1]
             if ct.hour==15 or (ct.hour==14 and ct.minute>=58):
-                name = '%s%d%d%d.rt'%(config.zipdir,ct.year,ct.month,ct.day)
+                name = '%s%d%02d%02d.rt'%(config.zipdir,ct.year,ct.month,ct.day)
                 if not isexist(name):
                     """
                     数据仅仅保存主力和小单
@@ -100,7 +100,7 @@ def bxzj2db():
                 data = j['data']['s2n']
                 if len(data)>=240 and len(data[-1])>12:
                     datazip = zlib.compress(pickle.dumps(data))
-                    name = '%sbxzj%d%d%d'%(config.zipdir,t.year,t.month,t.day)
+                    name = '%sbxzj%d%02d%02d'%(config.zipdir,t.year,t.month,t.day)
                     with open(name,'wb') as f:
                         f.write(datazip)
                     return
