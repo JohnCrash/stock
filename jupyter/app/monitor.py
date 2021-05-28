@@ -8,6 +8,7 @@ from datetime import date,datetime,timedelta
 import matplotlib.pyplot as plt
 from matplotlib.ticker import Formatter
 import math
+import time
 import numpy as np
 from numpy.core.fromnumeric import compress
 from numpy.lib.function_base import disp
@@ -1128,6 +1129,12 @@ def BollK(code,bolls,isall=True):
     else:
         kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').show(figsize=(18,15),simple=True)#showKline(figsize=(18,16))
 
+bit = time.time()
+def printt(s):
+    global bit
+    t = time.time()
+    print("%s %f"%(s,t-bit))
+    bit = t
 """
 返回最近的实时数据
 """
@@ -1187,7 +1194,6 @@ def monitor_bollup():
 
     def update_bollupbuttons():
         nonlocal ALLBOLLS,FILTERCOLORS,FILTERCURRENT,switch,news,list_output,list_box,button_items,flow_xch,top10
-        
         bos = bolltrench()
         t = date.today()
         t2,k,d = get_last_rt(t)
@@ -1252,37 +1258,8 @@ def monitor_bollup():
                 if k.shape[1]>1 and k[i,-1,3]+k[i,-1,4]>0 and k[i,-2,3]+k[i,-2,4]<0 and (companys[i][3]=='90' or companys[i][3]=='91'):#查找那些主力先流出后流入的
                     flow_xch[i] = t
                 if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)) or news==2 or i in flow_xch:
-                    if k.shape[1]>1:
-                        hugv = k[i,-1,3]+k[i,-1,4]
-                        if hugv>0:
-                            style = "#FF80FF" if hugv>k[i,-2,3]+k[i,-2,4] else "#FF8080"
-                        elif hugv<0:
-                            style = "#FFA500" if hugv>k[i,-2,3]+k[i,-2,4] else "#00FF00"
-                        else:
-                            style = '#C8C8C8'
-                    else:
-                        style = '#C8C8C8'                      
-                    if companys[i][1] in RISE:
-                        style = '#FF00FF'
-                        but = widgets.Button(
-                            description="(%d) %s%%%s%s"%(RISE[companys[i][1]],k[i,-1,1],companys[i][2],str(periods)),
-                            disabled=False,
-                            icon='cannabis',
-                            layout=Layout(width='240px'))
-                    else:
-                        but = widgets.Button(
-                            description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
-                            disabled=False,
-                            icon='cannabis',
-                            layout=Layout(width='240px'))
-                      
-                    but.style.button_color = style
-                    but.event = ('bollup',companys[i],periods)
-                    but.bolls = bolls
-                    but.code = companys[i][1]
                     ALLBOLLS.append((companys[i],bolls,i,k[i,-1,1]))
-                    but.on_click(onkline)
-                    items.append((k[i,-1,1],but,companys[i][1]))
+                    items.append((k[i,-1,1],i,companys[i][1],periods))
         """
         上面的算法对当前通道进行搜索，返回ALLBOLLS,和满足条件的公司对应的按钮列表items
         bolls = [(0 period,1 price,2 tbi 3 tei,4 up 5 down ,6 isnew今天新的, 7 类型up,top...,8 bo),...]
@@ -1345,7 +1322,37 @@ def monitor_bollup():
         button_items = []
         for it in sorteditems:
             if it[2] in FILTERCOLORS:
-                button_items.append(it[1])
+                i = it[1]
+                periods = it[3]
+                if k.shape[1]>1:
+                    hugv = k[i,-1,3]+k[i,-1,4]
+                    if hugv>0:
+                        style = "#FF80FF" if hugv>k[i,-2,3]+k[i,-2,4] else "#FF8080"
+                    elif hugv<0:
+                        style = "#FFA500" if hugv>k[i,-2,3]+k[i,-2,4] else "#00A800"
+                    else:
+                        style = '#C8C8C8'
+                else:
+                    style = '#C8C8C8'                  
+                if companys[i][1] in RISE:
+                    style = '#FF00FF'
+                    but = widgets.Button(
+                        description="(%d) %s%%%s%s"%(RISE[companys[i][1]],k[i,-1,1],companys[i][2],str(periods)),
+                        disabled=False,
+                        icon='cannabis',
+                        layout=Layout(width='240px'))
+                else:
+                    but = widgets.Button(
+                        description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
+                        disabled=False,
+                        icon='cannabis',
+                        layout=Layout(width='240px'))           
+                but.style.button_color = style
+                but.event = ('bollup',companys[i],periods)
+                but.bolls = bolls
+                but.code = companys[i][1]
+                but.on_click(onkline)                
+                button_items.append(but)
         """
         box = Box(children=items[:32],layout=box_layout)
         fmt = InteractiveShell.instance().display_formatter.format
