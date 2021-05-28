@@ -619,12 +619,13 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
-        "通道突破":[monitor_bollup],
+        "追涨":[riseview],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业        
-        "5日线排行":[ma5longTop],
         "可交易":[muti_monitor],
+        "通道突破":[monitor_bollup],
+        "5日线排行":[ma5longTop],
         "活跃分类":get10Top('90',5,3),
         "活跃概念":get10Top('91',10,3),
         "上榜分类":getDTop('90',3)[:10],

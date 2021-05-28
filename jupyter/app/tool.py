@@ -580,13 +580,3 @@ def get_last_rt(t):
     return t2,k,d
 
 #monitor.riseview('2021-05-29',10)
-
-bit = time.time()
-def printt(s):
-    global bit
-    t = time.time()
-    print("%s %f"%(s,t-bit))
-    bit = t
-
-printt('开始')
-printt('结束')
