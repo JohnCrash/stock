@@ -211,7 +211,7 @@ BCs = [
 """
 def K(code,period=None,pos=None,mode='auto'):
     if pos is None:
-        kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(46,18))
+        kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(46,20))
     else:
         kline.Plote(code,period,config={'index':True},mode=mode,lastday=10*365).show(pos=pos)
 
@@ -618,12 +618,12 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
+        "通道突破":[monitor_bollup],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业        
         "5日线排行":[ma5longTop],
         "可交易":[muti_monitor],
-        "通道突破":[monitor_bollup],
         "活跃分类":get10Top('90',5,3),
         "活跃概念":get10Top('91',10,3),
         "上榜分类":getDTop('90',3)[:10],
@@ -1045,7 +1045,7 @@ def bolltrench():
     if not b:
         bolls = {}
     isupdate = False
-    for period in [5,15,30,60,240]:
+    for period in [5,15,30,60]:
         if period not in bolls or t-bolls[period] > timedelta(minutes=period):
             bolls[period] = t
             isupdate = True
@@ -1165,7 +1165,7 @@ def monitor_bollup():
     switch = 1
     news = 2 #0 持续 ，1 最新 ，2 全部
     tf = 4 #时间过滤
-    top10 = True #10top过滤,概念或者分类必须在get10Top返回的列表中间
+    top10 = False #10top过滤,概念或者分类必须在get10Top返回的列表中间
     def tf2range():
         nonlocal tf
         if tf==0:
@@ -1212,6 +1212,7 @@ def monitor_bollup():
                 return c[1] in top10result
             else:
                 return True
+        RISE = searchRise(companys,k,d,ky,dy)
         for i in range(len(companys)):
             code = companys[i][1]
             if code in bos:
@@ -1251,21 +1252,31 @@ def monitor_bollup():
                 if k.shape[1]>1 and k[i,-1,3]+k[i,-1,4]>0 and k[i,-2,3]+k[i,-2,4]<0 and (companys[i][3]=='90' or companys[i][3]=='91'):#查找那些主力先流出后流入的
                     flow_xch[i] = t
                 if len(bolls)>0 and ((news==1 and isnew) or (news==0 and not isnew)) or news==2 or i in flow_xch:
-                    bstyle = ''
-                    if k[i,-1,3]+k[i,-1,4]>0 and k[i,-1,6]<0:
-                        bstyle = 'danger'
-                    elif k[i,-1,3]+k[i,-1,4]>0:
-                        bstyle = 'warning'
-                    elif k[i,-1,3]+k[i,-1,4]<0 and k[i,-1,6]>0:
-                        bstyle = 'success'
-                    but = widgets.Button(
-                        description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
-                        disabled=False,
-                        button_style=bstyle,
-                        icon='cannabis',
-                        layout=Layout(width='240px'))
-                    if i in flow_xch:
-                        but.style.button_color = '#ff00ff'
+                    if k.shape[1]>1:
+                        hugv = k[i,-1,3]+k[i,-1,4]
+                        if hugv>0:
+                            style = "#FF80FF" if hugv>k[i,-2,3]+k[i,-2,4] else "#FF8080"
+                        elif hugv<0:
+                            style = "#FFA500" if hugv>k[i,-2,3]+k[i,-2,4] else "#00FF00"
+                        else:
+                            style = '#C8C8C8'
+                    else:
+                        style = '#C8C8C8'                      
+                    if companys[i][1] in RISE:
+                        style = '#FF00FF'
+                        but = widgets.Button(
+                            description="(%d) %s%%%s%s"%(RISE[companys[i][1]],k[i,-1,1],companys[i][2],str(periods)),
+                            disabled=False,
+                            icon='cannabis',
+                            layout=Layout(width='240px'))
+                    else:
+                        but = widgets.Button(
+                            description="%s%%%s%s"%(k[i,-1,1],companys[i][2],str(periods)),
+                            disabled=False,
+                            icon='cannabis',
+                            layout=Layout(width='240px'))
+                      
+                    but.style.button_color = style
                     but.event = ('bollup',companys[i],periods)
                     but.bolls = bolls
                     but.code = companys[i][1]
@@ -1349,9 +1360,9 @@ def monitor_bollup():
         #with list_output:
         #    display(Box(children=items[:32],layout=box_layout))
         #list_output.append_display_data(Box(children=items[:32],layout=box_layout))
-        list_box.children = button_items
         update_current_plot(k,d)   
-        update_top_plot(k,d)   
+        update_top_plot(k,d)
+        list_box.children = button_items
     """
     绘制一个大盘涨幅和资金流，行业前10的，概念前10的
     """
@@ -1469,7 +1480,7 @@ def monitor_bollup():
         check.it = it[1]
         check.observe(on_perfixcheck,names='value')
         checkitem.append(check)
-    for it in [('5',5),('15',15),('30',30),('60',60),('240',240)]:
+    for it in [('5',5),('15',15),('30',30),('60',60)]:
         check = widgets.Checkbox(value=peroid_checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='72px'))
         check.it = it[1]
         check.observe(on_peroidcheck,names='value')
@@ -1677,6 +1688,32 @@ def fits(code,day=3):
                 result.append((dp.sum(),np.abs(dp).sum(),code))
     return list(sorted(result,key=lambda it:it[1]))
   
+
+"""
+跟踪分类 90,概念 91,ETF 2
+10:30点前，1 流入 2 放量 3 通道内突破5日线上
+"""
+def searchRise(companys,k,d,k2,d2,prefixs=('90','91','2')):
+    K,D = xueqiu.get_period_k(15)
+    bolls = bolltrench()
+    R = []
+    for i in range(len(companys)):
+        if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
+            if k[i,-1,3]+k[i,-1,4]>0: #净流入
+                ma5 = stock.ma(K[i,:],80)
+                if k[i,-1,0]>=ma5[-1]: #大于5日均线
+                    if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
+                        if companys[i][1] in bolls:
+                            R.append((companys[i],k[i,-1,1]))
+    R = sorted(R,key=lambda it:it[1],reverse=True)
+    result = {}
+    count = {'90':0,'91':0,'2':0}
+
+    for i in range(len(R)):
+        if count[R[i][0][3]]<5:
+            count[R[i][0][3]]+=1
+            result[R[i][0][1]] = count[R[i][0][3]]
+    return result
 """
 分屏多窗口监控分时图
 将每天上午10点涨幅排行放入监控列表
@@ -1696,6 +1733,7 @@ def muti_monitor():
     npos = 0
     curcode = ''
     curlist = []
+    flashButs = []
     def update_plot(data,row=4,col=5,figsize=(50,20)):
         gs_kw = dict(height_ratios=[3,1,3,1])
         fig,axs = plt.subplots(row,col,figsize=figsize,gridspec_kw = gs_kw)
@@ -1729,7 +1767,7 @@ def muti_monitor():
             curcode = e.code
             K(e.code)
     def update():
-        nonlocal companys,prefix,ntop,nday,npage,npos,curlist
+        nonlocal companys,prefix,ntop,nday,npage,npos,curlist,flashButs
         t = date.today()
         eit = None
         if npos==0:
@@ -1742,6 +1780,7 @@ def muti_monitor():
             k = k[:,:j,:]
             d = d[:j]
             eit = d[-1]
+        RISE = searchRise(companys,k,d,k2,d2)
         if True:
             code2gl = {} #代码对应的概念
             if prefix=='MSCI':
@@ -1770,6 +1809,7 @@ def muti_monitor():
             else:
                 R = get10Top(prefix,ntop,nday,eit,detail=True)
                 R2 = getCrossMa(prefix,[5,10,20,30])
+
             K,D = xueqiu.get_period_k(15)
             data = []
             bi = 0
@@ -1798,27 +1838,55 @@ def muti_monitor():
                             tk[:255-len(d),1] = 100*(tk[:255-len(d),0]-openp)/openp
                             data.append((tk,d2[-255+len(d):]+d,companys[i][2]+glstr,ma5[bi],i,(k[i,bi,0]-ma5[bi])/ma5[bi],code,it[1],it[2]))
 
-            data = sorted(data,key=lambda it:it[5])
+            data = sorted(data,key=lambda it:it[5],reverse=True)
             curlist = []
             buts = []
+            flashButs = []
             for j in range(len(data)):
                 it = data[j]
                 i = it[4]
                 code = it[6]
                 curlist.append(code)
-                buts.append(widgets.Button(description="%s%.1f%%"%(companys[i][2],100*it[5]),button_style='success' if j>=10*npage and j<10*npage+10 else ''))
+                ii = code2i[code]
+                if k.shape[1]>1:
+                    hugv = k[ii,-1,3]+k[ii,-1,4]
+                    if hugv>0:
+                        style = "#FF80FF" if hugv>k[ii,-2,3]+k[ii,-2,4] else "#FF8080"
+                    elif hugv<0:
+                        style = "#FFA500" if hugv>k[ii,-2,3]+k[ii,-2,4] else "#00A500"
+                    else:
+                        style = '#C8C8C8'
+                else:
+                    style = '#C8C8C8'
+                if companys[i][1] in RISE:
+                    style = '#FF00FF'
+                    buts.append(widgets.Button(description="(%d) %s%.1f%%"%(RISE[companys[i][1]],companys[i][2],100*it[5]),icon='check' if j>=10*npage and j<10*npage+10 else ''))
+                    flashButs.append(buts[-1])
+                else:
+                    buts.append(widgets.Button(description="%s%.1f%%"%(companys[i][2],100*it[5]),icon='check' if j>=10*npage and j<10*npage+10 else ''))
+                buts[-1].style.button_color = style
                 buts[-1].code = companys[i][1]
                 buts[-1].on_click(on_show)                
             listbox.children = buts
             update_plot(data[10*npage:])
             return data
         return []
+    lastt = None
     def loop():
-        nonlocal npos
-        if stock.isTransDay() and stock.isTransTime():
+        nonlocal npos,lastt,flashButs
+        t = datetime.today()
+        if (lastt is None or (lastt is not None and t.minute!=lastt.munute)) and stock.isTransDay() and stock.isTransTime():
             npos = 0
+            lastt = t
             update()
-        xueqiu.setTimeout(60,loop,'monitor.monitor')
+        elif stock.isTransTime():
+            for but in flashButs:
+                if but.style.button_color!='#FF00FF':
+                    but.style.button_color = '#FF00FF'
+                else:
+                    but.style.button_color = '#C8C8C8'
+        
+        xueqiu.setTimeout(1,loop,'monitor.muti_monitor')
     tools = []
     def on_switch(e):
         nonlocal prefix,ntop,nday,npage
@@ -1880,3 +1948,129 @@ def muti_monitor():
     update()
     loop() 
     display(monitor_output,tool_box,listbox,list_output)
+
+#早盘显示
+"""
+复盘
+review = 日期，DT=多少秒更新一次
+"""
+def riseview(review=None,DT=60,BI=18):
+    companys = xueqiu.get_company_select()
+    code2i = xueqiu.get_company_code2i()
+    kview_output = widgets.Output()
+    toolbox = Box(children=[],layout=box_layout)
+    kout = widgets.Output()
+    def rise(k,d,k2,d2,prefixs=('91','2')):
+        nonlocal companys
+        K,D = xueqiu.get_period_k(15)
+        if review is not None:
+            for i in range(len(D)-1,0,-1):
+                if D[i][0].day==d[-1].day and D[i][0].hour==d[-1].hour and D[i][0].minute>=d[-1].minute:
+                    K = K[:,:i]
+                    D = D[:i]
+        
+        R = []
+        if d[-1].hour==9 and d[-1].minute<=30:
+            for i in range(len(companys)):
+                if companys[i][3] in prefixs and i<k.shape[0]:
+                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1])) #company,涨幅,量增幅比率,流入          
+        else:
+            bolls = bolltrench()
+            for i in range(len(companys)):
+                if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
+                    if k[i,-1,3]+k[i,-1,4]>0: #净流入
+                        ma5 = stock.ma(K[i,:],80)
+                        if k[i,-1,0]>=ma5[-1]: #大于5日均线
+                            if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
+                                if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
+                                    r = 0
+                                    if k2[i,k.shape[1]-1,2]>0:
+                                        r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
+                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4])) #company,涨幅,量增幅比率,流入
+        return R
+    #0 company_id,1 code,2 name,3 prefix
+    #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
+    def getTops(R,prefix,top,sortcoln):
+        S = []
+        for r in R:
+            if r[0][3]==prefix: 
+                S.append((r[0][1],r[sortcoln],r[0]))
+        S = sorted(S,key=lambda it:it[1],reverse=True)
+        return S[:top]
+
+    def on_show(e):
+        nonlocal kout
+        kout.clear_output()
+        with kout:
+            K(e.code)
+
+    def update(offset=None):
+        nonlocal code2i,companys,kview_output,toolbox
+        if review is None:
+            t = datetime.today()
+        else:
+            t = datetime.fromisoformat(review)
+        lastt,k,d = get_last_rt(t)
+        if offset is not None and offset<k.shape[1]:
+            k = k[:,:offset,:]
+            d = d[:offset]
+        _,k2,d2 = get_last_rt(lastt-timedelta(days=1))   
+        R = rise(k,d,k2,d2)
+
+        gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
+        fig,axs = plt.subplots(4,2,figsize=(48,22),gridspec_kw = gs_kw)
+        x = np.arange(k.shape[1])
+        xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
+        #计算盘前开始于结束
+        pbi = 0
+        for i in range(len(d)-1,0,-1):
+            if d[i].hour==9 and (d[i].minute==15 or d[i].minute==16):
+                pbi=i
+                break
+        comps = []
+        for p in [('91',(0,0),(1,0),'概念涨幅',10,1),('91',(0,1),(1,1),'概念量增',10,2),('2',(2,0),(3,0),'ETF涨幅',5,1),('2',(2,1),(3,1),'ETF量增',5,2)]:
+            tops = getTops(R,p[0],p[4],p[5])
+
+            for it in tops:
+                i = code2i[it[0]]
+                comps.append(it[2])
+                axs[p[1]].set_title("%s %d-%d %d:%d"%(p[3],d[-1].month,d[-1].day,d[-1].hour,d[-1].minute),y=0.93)
+                axs[p[1]].plot(x,k[i,:,1],label=companys[i][2])
+                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=companys[i][2])
+                axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
+                for j in (1,2):
+                    axs[p[j]].axhline(y=0,color='black',linestyle='dotted')
+                    axs[p[j]].set_xticks(xticks)
+                    axs[p[j]].set_xlim(0,15+4*60)
+                    axs[p[j]].grid(True,axis='x')
+
+                axs[p[1]].legend()
+            for j in (1,2):
+                bottom,top = axs[p[j]].get_ylim()
+                axs[p[j]].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1)  
+        buts = []
+        for com in comps:
+            buts.append(widgets.Button(description="%s"%(com[2])))
+            buts[-1].code = com[1]
+            buts[-1].on_click(on_show)   
+        toolbox.children = buts
+        fig.subplots_adjust(hspace=0,wspace=0.08)
+        kline.output_show(kview_output)
+    first = True
+    if review is None:
+        dt = None
+    else:
+        dt = BI
+    def loop():
+        nonlocal first,dt
+        if review is not None or (stock.isTransDay() and stock.isTransTime()):
+            update(dt)
+        elif first:
+            update(dt)
+        if review is not None:
+            dt+=1
+        first = False
+        xueqiu.setTimeout(DT,loop,'monitor.riseview')
+    mbox = Box(children=[kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
+    display(mbox,toolbox,kout)
+    loop()

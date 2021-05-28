@@ -1199,3 +1199,4 @@ def calcHoldup(k,date,n,m=None,b=3):
 """
 分析股价与boll通道的关系
 """
+#提示，1 早盘 2放量 3流入 4 站上5日均线或者某一级别boll突破

@@ -12,6 +12,7 @@ from app import config
 from app import ziprt
 from app import shared
 from app import mylog
+from app import monitor
 
 if __name__=='__main__':
     #import os
@@ -37,10 +38,21 @@ if __name__=='__main__':
             subprocess.run(config.tdx_app)
             subprocess.run(config.chrome_app)
 
+    def risewarning():
+        print("弹出式提示...")
+        while True:
+            t = datetime.today()
+            if t.hour>=9 and t.hour<15 and stock.isTransDay() and stock.isTransTime():
+                monitor.risePopup()
+            elif t.hour>15:
+                break
+            time.sleep(1)
+
     if platform.platform()[:7]=='Windows':
         print("启动jupyter lab")
         threading.Thread(target=jupyter).start()
         threading.Thread(target=launapp).start()
+        #threading.Thread(target=risewarning).start()
 
     while True:
         t = datetime.today()

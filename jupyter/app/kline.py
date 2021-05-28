@@ -791,7 +791,7 @@ class Plote:
         return np.array([]).reshape(-1,5),[]
 
     #显示K线图
-    def showKline(self,bi=None,ei=None,figsize=(32,16)):  
+    def showKline(self,bi=None,ei=None,figsize=(32,16),popup=False):  
         if self._axsInx==0:
             return
         if bi is None:
@@ -1484,14 +1484,17 @@ class Plote:
         fig.autofmt_xdate()
 
         #单独做一个显示层级
-        if not self._isupdate:
-            self._output = widgets.Output()
-            display(self._output)
-            self._isupdate = True
-        #self._output.clear_output(wait=True)
-        #with self._output:
-        #    plt.show()
-        output_show(self._output)
+        if popup:
+            plt.show()
+        else:
+            if not self._isupdate:
+                self._output = widgets.Output()
+                display(self._output)
+                self._isupdate = True
+            #self._output.clear_output(wait=True)
+            #with self._output:
+            #    plt.show()
+            output_show(self._output)
         #plt.show()
         """
         这里定制plt.show函数，参加backend_inline.py

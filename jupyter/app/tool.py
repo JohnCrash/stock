@@ -565,5 +565,18 @@ def checkcompanyid():
             else:
                 print("发现id不一致%s"%str(it))
 
-R = monitor.get10Top('2',8,4)
-print(R)
+def PopupK(code,period=None,mode='auto'):
+    kline.Plote(code,period,config={'index':True},mode=mode).showKline(figsize=(16,10),popup=True)
+
+def get_last_rt(t):
+    b,k,d = xueqiu.getTodayRT(t)
+    t2 = t
+    if not b:
+        for i in range(1,7):
+            t2 = t-timedelta(days=i)
+            b,k,d = xueqiu.getTodayRT(t2)
+            if b:
+                break
+    return t2,k,d
+
+monitor.riseview('2021-05-29',10)
