@@ -637,63 +637,12 @@ def Indexs():
     indexpage(menus)
   
 """
-从尾部向前搜索中枢
-方法:通过加大搜索范围来
-返回b,(通道长度，上限，下限)
-"""
-def bollwayex(k,n=16,jcn=3):
-    for i in range(5*n,0,-n):
-        b,a = bollway(k,i,jcn)
-        if b:
-            return b,a
-    return False,(0,0,0,0,0,0)
-"""
-从尾部向前搜索中枢
-方法:先确定一个高点范围，和低点范围，然后如果k在高点和低点之间交替超过2次
-返回b,(通道长度，上限，下限)
-"""
-def bollway(k,n=16,jcn=3):
-    if len(k)>n:
-        argv = k[-n-1:-1].mean()
-        real_maxv = np.amax(k[-n-1:-1])
-        real_minv = np.amin(k[-n-1:-1])
-        maxv = real_maxv
-        minv = real_minv
-        if maxv-argv>argv-minv: #取离平均数较近的作为通道宽度的一半
-            maxv = 2*argv-minv
-        else:
-            minv = 2*argv-maxv
-        delta = (maxv-minv)*0.191 #黄金分割
-        upmax = maxv+delta
-        upmin = maxv-delta
-        downmax = minv+delta
-        downmin = minv-delta
-        f = []
-        for i in range(-1,-len(k),-1):
-            p = k[i]
-            if p<upmax and p>upmin:
-                f.append((i,1))
-            elif p<downmax and p>downmin:
-                f.append((i,-1))
-            elif p>upmax or p<downmin:
-                break
-        N = -i-1 #通道长度
-        if N>=n:
-            zfc = 0
-            zfn = 0 #交替次数
-            for it in f:
-                if it[1]!=zfc:
-                    zfn+=1
-                    zfc = it[1]
-            return zfn>jcn,(N,minv,maxv,real_minv,real_maxv,zfn) #(通道底，通道顶，通道最小值，通道最大值)
-    return False,(0,0,0,0,0,0)
-"""
 boll通道由平直到打开返回True,否则返回False
 通道检查n个点，通道宽度都要小于p
 """
 def bollopenk(k,period=240,n=16):
     if len(k)>n and k[-1]>k[-2] and k[-1]>k[-3] and k[-1]>k[-4]: #快速过滤掉大部分的
-        b,(N,up,down,minv,maxv,real_minv,real_maxv,zfn)=bollwayex(k[:-1],n)
+        b,(N,up,down,minv,maxv,real_minv,real_maxv,zfn)=stock.bollwayex(k[:-1],n)
         return b and k[-1]>maxv
     return False
 
@@ -1054,7 +1003,7 @@ def bolltrench():
             K,D = xueqiu.get_period_k(period)
             for i in range(len(companys)):
                 for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
-                    b,(n,down,up,mink,maxk,zfn) = bollwayex(K[i,:j],16,3)
+                    b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(K[i,:j],16,3)
                     if b:
                         tbi = D[j-n][0]
                         tei = D[j][0]
@@ -1079,34 +1028,13 @@ def bolltrench():
 bolls = [(0 period,1 price,2 tbi,3 tei,4 top,5 bottom),...]
 """
 def BollK(code,bolls,isall=True):
-    def getx(d,b,e):
-        bi = 0
-        ei = 0
-        if type(d[0][0])==datetime:
-            for i in range(len(d)):
-                t = d[i][0]
-                if bi==0 and t>=b:
-                    bi = i
-                if ei==0 and t>=e:
-                    ei = i
-                    break
-        else:
-            for i in range(len(d)):
-                t = d[i][0]
-                t = datetime(year=t.year,month=t.month,day=t.day)
-                if bi==0 and t>=b:
-                    bi = i
-                if ei==0 and t>=e:
-                    ei = i
-                    break
-        return bi,ei
     period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),240:(5,'red','dotted')}
     style = (('5日','magenta',1),('10日','orange',3))
     period2ma = {5:(320,640,0,1),15:(160,320,0,1),15:(80,160,0,1),30:(40,80,0,1),60:(20,40,0,1),120:(10,20,0,1),'d':(5,10,0,1)}
     def cb(self,axs,bi,ei):
         axK = axs[0]
         for bo in bolls:
-            bbi,bei = getx(self._date,bo[2],bo[3])
+            bbi,bei = stock.get_date_i(self._date,bo[2],bo[3])
             if bbi==0:
                 continue
             if bei==0:
@@ -1120,7 +1048,7 @@ def BollK(code,bolls,isall=True):
         xx,alv = stock.maRangeK(self._k,m[1],bi,ei)
         axK.plot(xx,alv,label=style[m[3]][0],color=style[m[3]][1],linewidth=style[m[3]][2])            
 
-    period = 0
+    period = 5
     for bo in bolls:
         period = max(period,bo[0])
     if period==240:
@@ -1959,7 +1887,8 @@ def muti_monitor():
 
 #早盘显示
 """
-复盘
+用于早盘追涨
+review复盘
 review = 日期，DT=多少秒更新一次
 """
 def riseview(review=None,DT=60,BI=18):
@@ -1992,7 +1921,7 @@ def riseview(review=None,DT=60,BI=18):
                             if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
                                 if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
                                     r = 0
-                                    if k2[i,k.shape[1]-1,2]>0:
+                                    if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
                                         r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
                                     R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4])) #company,涨幅,量增幅比率,流入
         return R
@@ -2026,7 +1955,7 @@ def riseview(review=None,DT=60,BI=18):
         R = rise(k,d,k2,d2)
 
         gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
-        fig,axs = plt.subplots(4,2,figsize=(48,22),gridspec_kw = gs_kw)
+        fig,axs = plt.subplots(4,2,figsize=(48,20),gridspec_kw = gs_kw)
         x = np.arange(k.shape[1])
         xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
         #计算盘前开始于结束
@@ -2059,6 +1988,21 @@ def riseview(review=None,DT=60,BI=18):
         buts = []
         for com in comps:
             buts.append(widgets.Button(description="%s"%(com[2])))
+            i = code2i[com[1]]
+            if k.shape[1]>1:
+                if k[i,-1,3]+k[i,-1,4]>k2[i,-2,3]+k2[i,-2,4]: #流入
+                    if k[i,-1,0]>k2[i,-2,0]: #涨
+                        color = '#FF8080' #流入涨 红
+                    else:
+                        color = '#FF80FF' #流入跌 紫
+                else: #流出
+                    if k[i,-1,0]>k2[i,-2,0]: #涨
+                        color = '#FFA500' #流出涨 黄
+                    else:
+                        color = '#00A500' #流出跌 绿         
+            else:
+                color = '#C8C8C8'
+            buts[-1].style.button_color = color
             buts[-1].code = com[1]
             buts[-1].on_click(on_show)   
         toolbox.children = buts

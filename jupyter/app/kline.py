@@ -1450,6 +1450,22 @@ class Plote:
             axs[self._rsiInx].plot(x,self._rsi[bi:ei],label="RSI",color='orange')
             axs[self._rsiInx].axhline(20,color='black',linestyle='--')
             axs[self._rsiInx].axhline(80,color='black',linestyle='--')
+        #绘制通道
+        if type(self._period)==int:#self._bollway:
+            for peroid in (5,15,30,60):
+                if peroid>=self._period:
+                    _,K,D = self.getKlineData(self._comarg,peroid)
+                    for j in range(-1,-len(K)+16,-1):
+                        b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(K[:j,4],16,3)
+                        if b: #绘制发现的第一个通道
+                            tbi = D[j-n][0]
+                            tei = D[j][0]                        
+                            bbi,bei = stock.get_date_i(self._date,tbi,tei)
+                            period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),'d':(5,'red','dotted')}
+                            st = period2c[peroid]
+                            axsK.broken_barh([(bbi,bei-bbi)], (mink,maxk-mink),facecolor='None',edgecolor=st[1],linewidth=st[0],linestyle=st[2])
+                            break
+            
         #绘制额外的图表
         while self._showfigure:
             i = 0

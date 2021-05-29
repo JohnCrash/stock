@@ -1197,6 +1197,82 @@ def calcHoldup(k,date,n,m=None,b=3):
     return result
 
 """
+从尾部向前搜索中枢
+方法:通过加大搜索范围来
+返回b,(通道长度，上限，下限)
+"""
+def bollwayex(k,n=16,jcn=3):
+    for i in range(5*n,0,-n):
+        b,a = bollway(k,i,jcn)
+        if b:
+            return b,a
+    return False,(0,0,0,0,0,0)
+"""
+从尾部向前搜索中枢
+方法:先确定一个高点范围，和低点范围，然后如果k在高点和低点之间交替超过2次
+返回b,(通道长度，上限，下限)
+"""
+def bollway(k,n=16,jcn=3):
+    if len(k)>n:
+        argv = k[-n-1:-1].mean()
+        real_maxv = np.amax(k[-n-1:-1])
+        real_minv = np.amin(k[-n-1:-1])
+        maxv = real_maxv
+        minv = real_minv
+        if maxv-argv>argv-minv: #取离平均数较近的作为通道宽度的一半
+            maxv = 2*argv-minv
+        else:
+            minv = 2*argv-maxv
+        delta = (maxv-minv)*0.191 #黄金分割
+        upmax = maxv+delta
+        upmin = maxv-delta
+        downmax = minv+delta
+        downmin = minv-delta
+        f = []
+        for i in range(-1,-len(k),-1):
+            p = k[i]
+            if p<upmax and p>upmin:
+                f.append((i,1))
+            elif p<downmax and p>downmin:
+                f.append((i,-1))
+            elif p>upmax or p<downmin:
+                break
+        N = -i-1 #通道长度
+        if N>=n:
+            zfc = 0
+            zfn = 0 #交替次数
+            for it in f:
+                if it[1]!=zfc:
+                    zfn+=1
+                    zfc = it[1]
+            return zfn>jcn,(N,minv,maxv,real_minv,real_maxv,zfn) #(通道底，通道顶，通道最小值，通道最大值)
+    return False,(0,0,0,0,0,0)
+
+"""
+将biei映射到d日期的索引
+"""
+def get_date_i(d,b,e):
+    bi = 0
+    ei = 0
+    if type(d[0][0])==datetime:
+        for i in range(len(d)):
+            t = d[i][0]
+            if bi==0 and t>=b:
+                bi = i
+            if ei==0 and t>=e:
+                ei = i
+                break
+    else:
+        for i in range(len(d)):
+            t = d[i][0]
+            t = datetime(year=t.year,month=t.month,day=t.day)
+            if bi==0 and t>=b:
+                bi = i
+            if ei==0 and t>=e:
+                ei = i
+                break
+    return bi,ei    
+"""
 分析股价与boll通道的关系
 """
 #提示，1 早盘 2放量 3流入 4 站上5日均线或者某一级别boll突破
