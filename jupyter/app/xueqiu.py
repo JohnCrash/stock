@@ -2166,6 +2166,44 @@ def emflowRT2():
     except Exception as e:
         mylog.printe(e)
     return None
+
+def emflowRT3(codes):
+    a = np.zeros((len(codes),1,7))
+    for i in range(0,len(codes),100):
+        b,r = emdistribute2(codes[i:i+100],'f12,f13,f1,f2,f3,f5,f66,f72,f78,f84')
+        if b:
+            if 'data' in r:
+                ls = r['data']['diff']
+                #使用emls的顺序重新组织数据
+                for it in ls:
+                    v = ls[it]
+                    perfix = v['f13']
+                    if perfix==90:
+                        code = v['f12']
+                    else:
+                        code = ('SH'+v['f12']) if perfix==1 else ('SZ'+v['f12'])
+
+                    #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
+                    j = i + int(it)
+                    if j<len(codes) and v['f2'] is not None:
+                        if v['f1']==3:
+                            a[j,0,0] = int(v['f2'])/1000.0
+                        elif v['f1']==2:
+                            a[j,0,0] = int(v['f2'])/100.0
+                        else:
+                            a[j,0,0] = int(v['f2'])/math.pow(10,v['f1'])
+                        a[j,0,1] = int(v['f3'])/100.0
+                        a[j,0,2] = v['f5']
+                        a[j,0,3] = v['f66']
+                        a[j,0,4] = v['f72']
+                        a[j,0,5] = v['f78']
+                        a[j,0,6] = v['f84']
+                    else:
+                        print("没有成功获取数据 %s"%(code))
+        else:
+            print("%s emflowRT3数据加装失败..."%str(r))
+            return False,a
+    return True,a
 """
 将eastmoney资金流数据存入数据库中
 """

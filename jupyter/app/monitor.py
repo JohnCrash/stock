@@ -1897,6 +1897,13 @@ def riseview(review=None,DT=60,BI=18):
     kview_output = widgets.Output()
     toolbox = Box(children=[],layout=box_layout)
     kout = widgets.Output()
+    rtlist = []
+    rt2i = {}
+    for i in range(len(companys)):
+        c = companys[i]
+        if c[3]=='91' or c[3]=='2':
+            rtlist.append(c[1])
+            rt2i[c[1]] = i
     def rise(k,d,k2,d2,prefixs=('91','2')):
         nonlocal companys
         K,D = xueqiu.get_period_k(15)
@@ -1942,7 +1949,7 @@ def riseview(review=None,DT=60,BI=18):
             K(e.code)
 
     def update(offset=None):
-        nonlocal code2i,companys,kview_output,toolbox
+        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i
         if review is None:
             t = datetime.today()
         else:
@@ -1952,6 +1959,17 @@ def riseview(review=None,DT=60,BI=18):
             k = k[:,:offset,:]
             d = d[:offset]
         _,k2,d2 = get_last_rt(lastt-timedelta(days=1))   
+
+        if stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=29: #一般数据更新周期1分钟，这里对最后的数据做即时更新
+            b,a = xueqiu.emflowRT3(rtlist)
+            if b:
+                k = np.copy(k)
+                for j in range(len(rtlist)):
+                    c = rtlist[j]
+                    i = rt2i[c]
+                    if i<k.shape[0]:
+                        k[i,-1,:] = a[j,-1,:]
+
         R = rise(k,d,k2,d2)
 
         gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
@@ -1990,13 +2008,13 @@ def riseview(review=None,DT=60,BI=18):
             buts.append(widgets.Button(description="%s"%(com[2])))
             i = code2i[com[1]]
             if k.shape[1]>1:
-                if k[i,-1,3]+k[i,-1,4]>k2[i,-2,3]+k2[i,-2,4]: #流入
-                    if k[i,-1,0]>k2[i,-2,0]: #涨
+                if k[i,-1,3]+k[i,-1,4]>k[i,-2,3]+k[i,-2,4]: #流入
+                    if k[i,-1,0]>k[i,-2,0]: #涨
                         color = '#FF8080' #流入涨 红
                     else:
                         color = '#FF80FF' #流入跌 紫
                 else: #流出
-                    if k[i,-1,0]>k2[i,-2,0]: #涨
+                    if k[i,-1,0]>k[i,-2,0]: #涨
                         color = '#FFA500' #流出涨 黄
                     else:
                         color = '#00A500' #流出跌 绿         
@@ -2014,8 +2032,14 @@ def riseview(review=None,DT=60,BI=18):
     else:
         dt = BI
     def loop():
-        nonlocal first,dt
+        nonlocal first,dt,DT
         if review is not None or (stock.isTransDay() and stock.isTransTime()):
+            if review is None:
+                t = datetime.today()
+                if t.hour==9 and t.minute>=29:
+                    DT = 5
+                else:
+                    DT = 60
             update(dt)
         elif first:
             update(dt)
