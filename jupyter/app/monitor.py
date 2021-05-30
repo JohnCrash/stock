@@ -1005,8 +1005,11 @@ def bolltrench():
                 for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
                     b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(K[i,:j],16,3)
                     if b:
-                        tbi = D[j-n][0]
-                        tei = D[j][0]
+                        bi,ei = stock.extway(K[i,:],j,n,mink,maxk)
+                        tbi = D[bi][0]
+                        tei = D[ei][0]  
+                        #tbi = D[j-n][0]
+                        #tei = D[j][0]
                         if companys[i][1] not in bolls:
                             bolls[companys[i][1]] = []
                         bls = bolls[companys[i][1]]
@@ -1899,6 +1902,7 @@ def riseview(review=None,DT=60,BI=18):
     kout = widgets.Output()
     rtlist = []
     rt2i = {}
+    buts = []
     for i in range(len(companys)):
         c = companys[i]
         if c[3]=='91' or c[3]=='2':
@@ -1947,9 +1951,21 @@ def riseview(review=None,DT=60,BI=18):
         kout.clear_output()
         with kout:
             K(e.code)
-
+    def on_shollall(e):
+        nonlocal kout,buts,code2i,companys
+        kout.clear_output()
+        with kout:
+            for but in buts:
+                if but.code in code2i and companys[code2i[but.code]][3]==e.perfix:
+                    K(but.code)
+    #列出全部概念，或者全部ETF
+    TOOLBUTS = []
+    for it in (('列概念','91'),('列ETF','2')):
+        TOOLBUTS.append(widgets.Button(description=it[0]))
+        TOOLBUTS[-1].perfix = it[1]
+        TOOLBUTS[-1].on_click(on_shollall)
     def update(offset=None):
-        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i
+        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i,TOOLBUTS,buts
         if review is None:
             t = datetime.today()
         else:
@@ -1976,6 +1992,7 @@ def riseview(review=None,DT=60,BI=18):
         fig,axs = plt.subplots(4,2,figsize=(48,20),gridspec_kw = gs_kw)
         x = np.arange(k.shape[1])
         xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
+
         #计算盘前开始于结束
         pbi = 0
         for i in range(len(d)-1,0,-1):
@@ -1988,7 +2005,8 @@ def riseview(review=None,DT=60,BI=18):
 
             for it in tops:
                 i = code2i[it[0]]
-                comps.append(it[2])
+                if it[2] not in comps:
+                    comps.append(it[2])
                 axs[p[1]].set_title("%s %d-%d %d:%d"%(p[3],d[-1].month,d[-1].day,d[-1].hour,d[-1].minute),y=0.93)
                 axs[p[1]].plot(x,k[i,:,1],label=companys[i][2])
                 axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=companys[i][2])
@@ -2023,7 +2041,7 @@ def riseview(review=None,DT=60,BI=18):
             buts[-1].style.button_color = color
             buts[-1].code = com[1]
             buts[-1].on_click(on_show)   
-        toolbox.children = buts
+        toolbox.children = buts+TOOLBUTS
         fig.subplots_adjust(hspace=0,wspace=0.08)
         kline.output_show(kview_output)
     first = True

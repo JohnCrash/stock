@@ -1248,6 +1248,17 @@ def bollway(k,n=16,jcn=3):
             return zfn>jcn,(N,minv,maxv,real_minv,real_maxv,zfn) #(通道底，通道顶，通道最小值，通道最大值)
     return False,(0,0,0,0,0,0)
 
+#对通道做延申处理
+def extway(k,i,n,mink,maxk):
+    bi = i-n
+    for bi in range(i-n,0,-1):
+        if k[bi]>maxk or k[bi]<mink:
+            break
+    ei = i
+    for ei in range(i,0,1):
+        if k[ei]>maxk or k[ei]<mink:
+            break
+    return bi,ei
 """
 将biei映射到d日期的索引
 """
