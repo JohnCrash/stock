@@ -1903,6 +1903,12 @@ def riseview(review=None,DT=60,BI=18):
     rtlist = []
     rt2i = {}
     buts = []
+    TOPS = {}
+    t = datetime.today()
+    tname = "risetops_%02d_%02d"%(t.month,t.day)
+    b,tops = shared.fromRedis(tname)
+    if b:
+        TOPS = tops
     for i in range(len(companys)):
         c = companys[i]
         if c[3]=='91' or c[3]=='2':
@@ -1928,7 +1934,7 @@ def riseview(review=None,DT=60,BI=18):
                 if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
                     if k[i,-1,3]+k[i,-1,4]>0: #净流入
                         ma5 = stock.ma(K[i,:],80)
-                        if k[i,-1,0]>=ma5[-1]: #大于5日均线
+                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长
                             if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
                                 if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
                                     r = 0
@@ -1938,6 +1944,7 @@ def riseview(review=None,DT=60,BI=18):
         return R
     #0 company_id,1 code,2 name,3 prefix
     #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
+    #返回 (code,涨幅/增长/流入,company)
     def getTops(R,prefix,top,sortcoln):
         S = []
         for r in R:
@@ -1965,7 +1972,7 @@ def riseview(review=None,DT=60,BI=18):
         TOOLBUTS[-1].perfix = it[1]
         TOOLBUTS[-1].on_click(on_shollall)
     def update(offset=None):
-        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i,TOOLBUTS,buts
+        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i,TOOLBUTS,buts,TOPS,tname
         if review is None:
             t = datetime.today()
         else:
@@ -2000,8 +2007,26 @@ def riseview(review=None,DT=60,BI=18):
                 pbi=i
                 break
         comps = []
-        for p in [('91',(0,0),(1,0),'概念涨幅',10,1),('91',(0,1),(1,1),'概念量增',10,2),('2',(2,0),(3,0),'ETF涨幅',5,1),('2',(2,1),(3,1),'ETF量增',5,2)]:
-            tops = getTops(R,p[0],p[4],p[5])
+        for p in [('91',(0,0),(1,0),'概念涨幅',10,1,True),('2',(2,0),(3,0),'ETF涨幅',10,1,True),('91',(0,1),(1,1),'概念下榜',100,1,False),('2',(2,1),(3,1),'ETF下榜',100,1,False)]:
+            if p[6]:
+                tops = getTops(R,p[0],p[4],p[5])
+                chx = False
+                for it in tops:
+                    if it[0] not in TOPS:
+                        TOPS[it[0]] = it
+                        chx = True
+                if chx:
+                    shared.toRedis(TOPS,tname,ex=24*3600)
+            else: #不在排行榜中但是在历史榜中的
+                tops = getTops(R,p[0],p[4],p[5])
+                topscode = {}
+                for it in tops:
+                    topscode[it[0]] = 1
+                tops = []
+                for code in TOPS:
+                    it = TOPS[code]
+                    if it[2][3]==p[0] and it[0] not in topscode:
+                        tops.append(it)
 
             for it in tops:
                 i = code2i[it[0]]

@@ -579,15 +579,5 @@ def get_last_rt(t):
                 break
     return t2,k,d
 
-#monitor.riseview('2021-05-29',10)
-codes = [
-    'SZ159919', #沪深300ETF
-    'SH510050', #上证50ETF
-    'SZ159949', #创业板50
-    'SH588000', #科创板50ETF
-    'SZ159995', #芯片
-    'SZ159997', #电子ETF
-    'SH515980' #人工智能    
-]
-b,a = xueqiu.emflowRT3(codes)
-print(b,a)
+
+monitor.riseview()
