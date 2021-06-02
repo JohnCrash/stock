@@ -341,7 +341,8 @@ class Plote:
                     self._gotoTrendHeandPos = True
                     break
         else:
-            self._trendHeadPos = len(self._k)
+            if self._trendHeadPos is None:
+                self._trendHeadPos = len(self._k)
 
         if 'energy' in self._config and self._config['energy']:
             self._energyInx = self._axsInx+1
@@ -632,6 +633,7 @@ class Plote:
         self._day_trend = None
         self._lastday = lastday
         self._transpos = transpos
+        self._trendHeadPos = None
         ispervsetting = True if period is None else False
         if period is None:
             b,p = shared.fromRedis('kline.period')
@@ -810,6 +812,7 @@ class Plote:
         else:
             if ei<=-len(self._k):
                 ei = -len(self._k)+1
+
         axsK = None
         #绘制趋势线
         def drawTrendLine(ax,period,dates,cx0,cx1,cy0=None,cy1=None,lw=3):
@@ -1564,7 +1567,7 @@ class Plote:
                 if type(post)==date and type(self._date[-1][0])==datetime:
                     post = datetime(post.year,post.month,post.day)
                 elif type(post)==datetime and type(self._date[-1][0])==date:
-                    post = date(post.year,post.month,post.day)               
+                    post = date(post.year,post.month,post.day)            
             for i in range(len(self._date)):
                 if self._date[i][0]>=post:
                     bi = math.floor(i-self._showcount/2)
@@ -2265,14 +2268,15 @@ class Plote:
             updateFavoriteTimer = xueqiu.setTimeout(3,updateFavoriteText,'favorite%s'%self.code())
 
         fafavoriteNodeWidget.observe(on_favoriteText,names='value')
-        def update():
+        def update(isFirst):
             for i in range(10):
                 refreshbutton.button_style = 'success' #green button
                 try:
                     self.reload(all=False)
                 except Exception as e:
                     mylog.printe(e)
-                recalcRange(False)
+                if not isFirst:
+                    recalcRange(False)
                 try:    
                     showline()
                 except Exception as e:
@@ -2284,11 +2288,11 @@ class Plote:
             nonlocal first
             if stock.isTransTime() and stock.isTransDay():
                 nt = xueqiu.next_k_date(5)
-                update()
+                update(False)
             else:
                 nt = 10 #xueqiu.next_k_date(self._period)
                 if first:
-                    update()
+                    update(True)
                 first = False
             self._timer = xueqiu.setTimeout(nt+1,loop,'kline%s'%self.code())
         loop()

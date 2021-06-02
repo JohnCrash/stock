@@ -11,6 +11,7 @@ import math
 import time
 import numpy as np
 from numpy.core.fromnumeric import compress
+from numpy.core.numeric import NaN
 from numpy.lib.function_base import disp
 from . import shared
 from . import stock
@@ -1900,22 +1901,22 @@ def riseview(review=None,DT=60,BI=18):
     kview_output = widgets.Output()
     toolbox = Box(children=[],layout=box_layout)
     kout = widgets.Output()
+    last2daymin = None
     rtlist = []
     rt2i = {}
     buts = []
-    TOPS = {}
-    t = datetime.today()
-    tname = "risetops_%02d_%02d"%(t.month,t.day)
-    b,tops = shared.fromRedis(tname)
-    if b:
-        TOPS = tops
+
     for i in range(len(companys)):
         c = companys[i]
         if c[3]=='91' or c[3]=='2':
             rtlist.append(c[1])
             rt2i[c[1]] = i
+    """
+    净流入涨幅榜
+    返回[(com,日涨幅,成交量增加率,流入),...]
+    """
     def rise(k,d,k2,d2,prefixs=('91','2')):
-        nonlocal companys
+        nonlocal companys,last2daymin
         K,D = xueqiu.get_period_k(15)
         if review is not None:
             for i in range(len(D)-1,0,-1):
@@ -1924,9 +1925,30 @@ def riseview(review=None,DT=60,BI=18):
                     D = D[:i]
         
         R = []
+        """
+        当前价格和过去两天的最低点比较不要大于5% 
+        """
+        lasti = 0
+        if last2daymin is None:
+            last2daymin = np.min(K[:,-32:],axis=1)
+            last2daymin[last2daymin<=0] = 1
+            if last2daymin.shape[0]>k.shape[0]:
+                last2daymin = last2daymin[:k.shape[0]]
+            elif last2daymin.shape[0]<k.shape[0]:
+                temp = np.ones((k.shape[0],))
+                temp[:last2daymin.shape[0]] = last2daymin
+                last2daymin = temp
+        for i in range(-1,-len(d)+1,-1):
+            if d[i].hour==9 and d[i].minute<=30:
+                lasti = i
+                break
+        maxrate = (k[:,lasti,0]-last2daymin)/last2daymin#开盘加不与最近2天的最低价格的涨幅
+        """
+        结束
+        """
         if d[-1].hour==9 and d[-1].minute<=30:
             for i in range(len(companys)):
-                if companys[i][3] in prefixs and i<k.shape[0]:
+                if companys[i][3] in prefixs and i<k.shape[0] and k[i,-1,1]>0 and maxrate[i]<0.05:
                     R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1])) #company,涨幅,量增幅比率,流入          
         else:
             bolls = bolltrench()
@@ -1934,7 +1956,7 @@ def riseview(review=None,DT=60,BI=18):
                 if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
                     if k[i,-1,3]+k[i,-1,4]>0: #净流入
                         ma5 = stock.ma(K[i,:],80)
-                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长
+                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0 and maxrate[i]<0.05: #大于5日均线并且要求增长
                             if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
                                 if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
                                     r = 0
@@ -1942,6 +1964,28 @@ def riseview(review=None,DT=60,BI=18):
                                         r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
                                     R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4])) #company,涨幅,量增幅比率,流入
         return R
+    """
+    流入速率于涨幅速率榜
+    """
+    def riserate(k,d,k2,d2,prefixs=('91','2')):
+        R = []
+        if k.shape[1]>5:
+            for i in range(len(companys)):
+                if companys[i][3] in prefixs and i<k.shape[0]:
+                    if k[i,-1,3]!=0 and k[i,-1,4]!=0:
+                        F = k[i,:,3]+k[i,:,4]
+                        F[F!=F]=0 #消除NaN
+                        hug5 = stock.ma(F,5)
+                        j = -1
+                        for j in range(-1,-k.shape[1]+2,-1):
+                            if hug5[j]<hug5[j-1]:
+                                break
+                        if j!=-1:
+                            dhug = (k[i,-1,3]+k[i,-1,4]-hug5[j])
+                            if dhug>=0:
+                                R.append((companys[i],k[i,-1,1],dhug,0))#company,涨幅,涨幅增量+流入增量,0
+
+        return R        
     #0 company_id,1 code,2 name,3 prefix
     #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
     #返回 (code,涨幅/增长/流入,company)
@@ -1972,7 +2016,7 @@ def riseview(review=None,DT=60,BI=18):
         TOOLBUTS[-1].perfix = it[1]
         TOOLBUTS[-1].on_click(on_shollall)
     def update(offset=None):
-        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i,TOOLBUTS,buts,TOPS,tname
+        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i,TOOLBUTS,buts
         if review is None:
             t = datetime.today()
         else:
@@ -1994,6 +2038,7 @@ def riseview(review=None,DT=60,BI=18):
                         k[i,-1,:] = a[j,-1,:]
 
         R = rise(k,d,k2,d2)
+        R2 = riserate(k,d,k2,d2)
 
         gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
         fig,axs = plt.subplots(4,2,figsize=(48,20),gridspec_kw = gs_kw)
@@ -2007,26 +2052,11 @@ def riseview(review=None,DT=60,BI=18):
                 pbi=i
                 break
         comps = []
-        for p in [('91',(0,0),(1,0),'概念涨幅',10,1,True),('2',(2,0),(3,0),'ETF涨幅',10,1,True),('91',(0,1),(1,1),'概念下榜',100,1,False),('2',(2,1),(3,1),'ETF下榜',100,1,False)]:
+        for p in [('91',(0,0),(1,0),'概念涨幅',10,1,True),('2',(2,0),(3,0),'ETF涨幅',10,1,True),('91',(0,1),(1,1),'概念即时',10,2,False),('2',(2,1),(3,1),'ETF即时',10,2,False)]:
             if p[6]:
                 tops = getTops(R,p[0],p[4],p[5])
-                chx = False
-                for it in tops:
-                    if it[0] not in TOPS:
-                        TOPS[it[0]] = it
-                        chx = True
-                if chx:
-                    shared.toRedis(TOPS,tname,ex=24*3600)
-            else: #不在排行榜中但是在历史榜中的
-                tops = getTops(R,p[0],p[4],p[5])
-                topscode = {}
-                for it in tops:
-                    topscode[it[0]] = 1
-                tops = []
-                for code in TOPS:
-                    it = TOPS[code]
-                    if it[2][3]==p[0] and it[0] not in topscode:
-                        tops.append(it)
+            else:
+                tops = getTops(R2,p[0],p[4],p[5])
 
             for it in tops:
                 i = code2i[it[0]]

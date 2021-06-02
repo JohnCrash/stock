@@ -1287,3 +1287,37 @@ def get_date_i(d,b,e):
 分析股价与boll通道的关系
 """
 #提示，1 早盘 2放量 3流入 4 站上5日均线或者某一级别boll突破
+
+"""
+对分时线进行分析
+返回[0开盘，1上午最低，2上午最高，3收盘，4将上午时间轴视为0-1则最低点值,5最高点值]
+"""
+def pkfx(k,d):
+    if len(d)==0:
+        return None    
+    openv = 0
+    low = 1e9
+    high = 0
+    t = d[0]
+    tbi = datetime(year=t.year,month=t.month,day=t.day,hour=9,minute=30)
+    tei = datetime(year=t.year,month=t.month,day=t.day,hour=11,minute=30)
+    lowt = tbi
+    hight = tbi
+    for i in range(len(k)):
+        if openv==0 and d[i]>=tbi:
+            openv = k
+        if d[i]>=tbi and d[i]<=tei:
+            if k[i]<low:
+                low = k[i]
+                lowt = d[i]
+            if k[i]>high:
+                high = k[i]
+                hight = d[i]
+        if d[i]>=tei:
+            break
+    
+    return (openv,low,high,k[-1],(lowt-tbi)/(tei-tbi),(hight-tbi)/(tei-tbi))
+        
+"""
+对
+"""

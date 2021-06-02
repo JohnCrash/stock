@@ -37,9 +37,12 @@ def decompressRT(data):
     return info[2],a,info[3]
 
 def readRT(name):
-    with open(name,'rb') as f:
-        ids,k,d = decompressRT(f.read())
-        return ids,k,d
+    try:
+        with open(name,'rb') as f:
+            ids,k,d = decompressRT(f.read())
+            return ids,k,d
+    except FileNotFoundError as e:
+        pass
     return None,None,None
 
 def writeRT(name,ids,k,d):
@@ -47,7 +50,7 @@ def writeRT(name,ids,k,d):
         f.write(compressRT(ids,k,d))
 
 def readbydate(t):
-    name = '%s%d%d%d.rt'%(config.zipdir,t.year,t.month,t.day)
+    name = '%s%d%02d%02d.rt'%(config.zipdir,t.year,t.month,t.day)
     return readRT(name)
 """
 将rt数据存入到文件中去

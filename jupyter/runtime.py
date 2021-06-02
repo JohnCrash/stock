@@ -65,8 +65,8 @@ if __name__=='__main__':
                 print(e)
         elif t.hour>=15 and t.day!=download_done_day and stock.isTransDay():
             if t.hour==15:
-                print("5分钟后开始更新数据库...")
-                time.sleep(5*60)
+                print("1分钟后开始更新数据库...")
+                time.sleep(1*60)
             
             try:
                 print("保存sina资金流向到数据库...")

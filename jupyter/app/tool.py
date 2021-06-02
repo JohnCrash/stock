@@ -579,5 +579,196 @@ def get_last_rt(t):
                 break
     return t2,k,d
 
+"""
+遍历过往概念的1分钟级别的数据
+"""
+def enumrt(bi,cb,data,param):
+    t = bi
+    today = datetime.today()
+    while t<=today:
+        ids,k,d = ziprt.readbydate(t)
+        if ids is not None:
+            cb(t,ids,k,d,data,param)
+        t = t+timedelta(days=1)
+"""
+测试过往数据看看追涨效果
+参数：追涨名次，时间
+输出：次日最高和亏损情况
+并将结果绘制成图表
+"""
+def testrise():
+    bi = datetime(year=2021,month=4,day=6)
+    data = []
+    lastprice = None
+    #(0 t, 1 id,2 price,3 rate,4 rmax,5 rmin,6 avg,7 dmax,8 dmin) 日期,公司id,买入价格，买入时日增长率，次日最大收益，次日最低收益，次日平均收益，最大收益时间，最小收益时间
+    # companys 0 company_id,1 code,2 name,3 prefix
+    # k = [(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)]
+    # k = [(0 price,1 volume,2 hug,3 ting)] 精简
+    def cb(t,ids,k,d,data,param):
+        nonlocal lastprice
+        if len(data)>0: #处理上一个买入的结果数据
+            S = data[-1]
+            for i in range(len(ids)):
+                if ids[i]==S[1]:
+                    imax = k[i,15:,0].argmax()+15
+                    imin = k[i,15:,0].argmin()+15
+                    rmax = (k[i,imax,0]-S[2])/S[2]
+                    rmin = (k[i,imin,0]-S[2])/S[2]
+                    dmax = d[imax]
+                    dmin = d[imin]
+                    avg = (np.mean(k[i,:,0])-S[2])/S[2]
+                    S[4] = rmax
+                    S[5] = rmin
+                    S[6] = avg
+                    S[7] = dmax
+                    S[8] = dmin
+                    break
+        #下面进入本日追涨买入
+        i = 0
+        for i in range(len(d)):
+            if d[i].hour==9 and d[i].minute>=param:
+                break
+        R = []
+        if lastprice is None:
+            lastprice = {}
+            for j in range(k.shape[0]):
+                lastprice[ids[j]] = k[j,0,0]
+        for j in range(k.shape[0]):
+            price = k[j,i,0]
+            if ids[j] in lastprice:
+                r = (price-lastprice[ids[j]])/lastprice[ids[j]]
+                flow = k[j,i,2]
+                if r>0 and flow>0:
+                    R.append((ids[j],price,r))
+        R = sorted(R,key=lambda it:it[2],reverse=True)
+        S = R[0]
+        data.append([t,S[0],S[1],S[2],0,0,0,None,None])
+        #将当日的最后一个价格作为收盘价格
+        for j in range(k.shape[0]):
+            lastprice[ids[j]] = k[j,-1,0]    
+
+    id2com = xueqiu.get_company_select_id2com()
+    for param in range(31,35):
+        data = []
+        enumrt(bi,cb,data,param)
+        avgbuy = 0
+        avgmax = 0
+        avgmin = 0
+        avgavg = 0
+        for it in data:
+            ts = ''
+            if it[7] is not None and it[8] is not None:
+                ts = "\t%s\t%s"%(stock.timeString2(it[7]),stock.timeString2(it[8]))
+            print("%d\t%s\t%s\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%\t%s"%(param,str(it[0]),id2com[it[1]][2],100*it[3],100*it[4],100*it[5],100*it[6],ts))
+            avgbuy += it[3]
+            avgmax += it[4]
+            avgmin += it[5]
+            avgavg += it[6]
+        print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
+
+#testrise()
+"""
+其他都和1一样，增加了9:30-9:40之间的操作，进行追加仓位来扩大收益
+"""
+def testrise2():
+    bi = datetime(year=2021,month=4,day=6)
+    data = []
+    lastprice = None
+    #(0 t, 1 id,2 price,3 rate,4 rmax,5 rmin,6 avg,7 dmax,8 dmin,9 mul) 日期,公司id,买入价格，买入时日增长率，次日最大收益，次日最低收益，次日平均收益，最大收益时间，最小收益时间，持仓乘数
+    # companys 0 company_id,1 code,2 name,3 prefix
+    # k = [(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)]
+    # k = [(0 price,1 volume,2 hug,3 ting)] 精简
+    def cb(t,ids,k,d,data,param):
+        nonlocal lastprice
+        if len(data)>0: #处理上一个买入的结果数据
+            S = data[-1]
+            for i in range(len(ids)):
+                if ids[i]==S[1]:
+                    imax = k[i,15:,0].argmax()+15
+                    imin = k[i,15:,0].argmin()+15
+                    rmax = S[9]*(k[i,imax,0]-S[2])/S[2]
+                    rmin = S[9]*(k[i,imin,0]-S[2])/S[2]
+                    dmax = d[imax]
+                    dmin = d[imin]
+                    avg = S[9]*(np.mean(k[i,:,0])-S[2])/S[2]
+                    S[4] = rmax
+                    S[5] = rmin
+                    S[6] = avg
+                    S[7] = dmax
+                    S[8] = dmin
+                    break
+        #下面进入本日追涨买入
+        i30 = 0
+        i35 = 0
+        i40 = 0
+        for i in range(len(d)):
+            if d[i].hour==9 and d[i].minute==param:
+                i30 = i
+            if d[i].hour==9 and d[i].minute==35:
+                i35 = i
+            if d[i].hour==9 and d[i].minute==40:
+                i40 = i
+                break
+        R = []
+        if lastprice is None:
+            lastprice = {}
+            for j in range(k.shape[0]):
+                lastprice[ids[j]] = k[j,0,0]
+        for j in range(k.shape[0]):
+            if ids[j] in lastprice:
+                price30 = k[j,i30,0]
+                price35 = k[j,i35,0]
+                price40 = k[j,i40,0]
+                r = (price30-lastprice[ids[j]])/lastprice[ids[j]]
+                flow = k[j,i30,2]
+                m = 1 #乘数
+                price = price30 #平均成本
+                if r>0 and flow>0:
+                    """
+                    if price35>price30 and k[j,i35,2]>k[j,i30,2]:
+                        m += 1
+                        price = (price+price35)/2.
+                        if price40>price35 and k[j,i40,2]>k[j,i35,2]:
+                            m += 1
+                            price = price*2./3. + price40/3.
+                    """
+                    R.append((ids[j],price,r,m))
+        R = sorted(R,key=lambda it:it[2],reverse=True)
+        if len(R)>0:
+            S = R[0]
+            data.append([t,S[0],S[1],S[2],0,0,0,None,None,S[3]])
+        #将当日的最后一个价格作为收盘价格
+        for j in range(k.shape[0]):
+            lastprice[ids[j]] = k[j,-1,0]    
+
+    id2com = xueqiu.get_company_select_id2com()
+    for param in range(31,32):
+        data = []
+        enumrt(bi,cb,data,param)
+        avgbuy = 0
+        avgmax = 0
+        avgmin = 0
+        avgavg = 0
+        for it in data:
+            ts = ''
+            if it[7] is not None and it[8] is not None:
+                ts = "\t%s\t%s"%(stock.timeString2(it[7]),stock.timeString2(it[8]))
+            m = it[9]
+            #print("%d\t%s\t%s\t%s\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%\t%s\t%d"%(param,str(it[0]),id2com[it[1]][1],id2com[it[1]][2],100*it[3],100*it[4],100*it[5],100*it[6],ts,m))
+            t = it[0]
+            t = datetime(year=it[0].year,month=it[0].month,day=it[0].day,hour=9,minute=30)
+            print("K('%s',5,'%s')"%(id2com[it[1]][1],str(t)))
+            avgbuy += it[3]
+            avgmax += it[4]
+            avgmin += it[5]
+            avgavg += it[6]
+        #print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
+
+#testrise2()
+"""
+def K(code,period,pos):
+    kline.Plote(code,period,mode='normal',lastday=2*365).show(figsize=(32,15),pos=pos)
+K('BK0450',5,'2021-04-07 09:35:00')
+"""
 
 monitor.riseview()
