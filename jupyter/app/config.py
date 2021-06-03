@@ -7,7 +7,7 @@ download_js='d:/source/stock/download_script/download.js'
 
 layout_exe='d:\\source\\stock\\layout\\layout\\x64\\Release\\layout.exe'
 
-ths_app = [layout_exe,'F:\\apps\\同花顺远航版\\bin\\happ.exe','同花顺远航版','','0']
+ths_app = [layout_exe,'F:\\apps\\同花顺远航版\\bin\\happ.exe','同花顺远航版','','1']
 
 tdx_app = [layout_exe,'F:\\pingan\\TdxW.exe','平安证券慧赢V8.16','TdxW_MainFrame_Class','1']
 

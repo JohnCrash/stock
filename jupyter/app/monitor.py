@@ -2039,7 +2039,6 @@ def riseview(review=None,DT=60,BI=18):
 
         R = rise(k,d,k2,d2)
         R2 = riserate(k,d,k2,d2)
-
         gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
         fig,axs = plt.subplots(4,2,figsize=(48,20),gridspec_kw = gs_kw)
         x = np.arange(k.shape[1])
@@ -2052,19 +2051,39 @@ def riseview(review=None,DT=60,BI=18):
                 pbi=i
                 break
         comps = []
-        for p in [('91',(0,0),(1,0),'概念涨幅',10,1,True),('2',(2,0),(3,0),'ETF涨幅',10,1,True),('91',(0,1),(1,1),'概念即时',10,2,False),('2',(2,1),(3,1),'ETF即时',10,2,False)]:
+        LS = [('91',(0,0),(1,0),'概念涨幅',10,1,True),('2',(2,0),(3,0),'ETF涨幅',10,1,True),('91',(0,1),(1,1),'概念即时',10,2,False),('2',(2,1),(3,1),'ETF即时',10,2,False)]
+        TOPS = []
+        CODES = []
+        for i in range(len(LS)):
+            p = LS[i]
             if p[6]:
-                tops = getTops(R,p[0],p[4],p[5])
+                TOPS.append(getTops(R,p[0],p[4],p[5]))
             else:
-                tops = getTops(R2,p[0],p[4],p[5])
+                TOPS.append(getTops(R2,p[0],p[4],p[5]))
+            CODES.append([])
+            for it in TOPS[-1]:
+                CODES[-1].append(it[0])
+                
+        def is2has(code,profix):
+            if profix=='91':
+                return code in CODES[0] and code in CODES[2]
+            else:
+                return code in CODES[1] and code in CODES[3]
+
+        for i in range(len(LS)):
+            p = LS[i]
+            tops = TOPS[i]
 
             for it in tops:
                 i = code2i[it[0]]
                 if it[2] not in comps:
                     comps.append(it[2])
                 axs[p[1]].set_title("%s %d-%d %d:%d"%(p[3],d[-1].month,d[-1].day,d[-1].hour,d[-1].minute),y=0.93)
-                axs[p[1]].plot(x,k[i,:,1],label=companys[i][2])
-                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=companys[i][2])
+                lw = 1
+                if is2has(it[0],p[0]): #同时存在于价格榜和流入涨幅榜
+                    lw = 3
+                axs[p[1]].plot(x,k[i,:,1],label=companys[i][2],linewidth=lw)
+                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=companys[i][2],linewidth=lw)
                 axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
                 for j in (1,2):
                     axs[p[j]].axhline(y=0,color='black',linestyle='dotted')
