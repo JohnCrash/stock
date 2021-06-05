@@ -10,6 +10,7 @@ from matplotlib.ticker import Formatter
 import math
 import time
 import numpy as np
+import random
 from numpy.core.fromnumeric import compress
 from numpy.core.numeric import NaN
 from numpy.lib.function_base import disp
@@ -49,7 +50,45 @@ class MyFormatterRT(Formatter):
             return '%02d:%02d'%(t.hour,t.minute)
         else:
             return '%d %02d:%02d'%(t.day,t.hour,t.minute)      
-
+mycolors=[
+    "red",
+    "purple",    
+    "black",
+    "green",
+    "blue",
+    "brown",
+    "orangered",
+    "sienna",
+    "darkorange",
+    "goldenrod",
+    "olivedrab",
+    "olive",
+    "darkgreen",
+    "seagreen",
+    "teal",
+    "darkturquoise",
+    "steelblue",
+    "dodgerblue",
+    "slategrey",
+    "royalblue",
+    "mediumblue",
+    "blueviolet",
+    "magenta",
+    "crimson",
+    "pink",
+    "cyan"
+]
+name2int = {}
+namecount = 0
+random.seed()
+def getmycolor(name):
+    global mycolors,name2int,namecount
+    if name in name2int:
+        return mycolors[name2int[name]]
+    
+    name2int[name] = random.randint(0,len(mycolors)-1)#namecount%len(mycolors)
+    namecount += 1
+    return mycolors[name2int[name]]
 """
 绘制分时图
 ax 绘制句柄数组,k (),d 日期,title 标题,style绘制风格
@@ -1151,6 +1190,7 @@ def monitor_bollup():
                 return c[1] in top10result
             else:
                 return True
+        bte = d[-1]-timedelta(days=1)
         RISE = searchRise(companys,k,d,ky,dy)
         for i in range(len(companys)):
             code = companys[i][1]
@@ -1159,6 +1199,8 @@ def monitor_bollup():
                 bolls = []
                 periods = []
                 for bo in bos[code]:
+                    if bo[8]<bte: #通道结束不要超过1天
+                        continue
                     #最近股价要大于通道顶，同时要大于通道里面的全部k线
                     #bo (0 timestramp,1 period,2 n,3 up,4 down,5 mink,6 maxk,7 tbi,8 tei,9 zfn)
                     if companys[i][3] in prefix_checktable and prefix_checktable[companys[i][3]] and bo[1] in peroid_checktable and peroid_checktable[bo[1]] and top10filter(companys[i]):

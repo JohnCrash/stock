@@ -330,7 +330,7 @@ def get_company_select():
     global _companys
     if _companys is None:
         #companys = stock.query("""select company_id,code,name,category,vmax,vmin from "company_select"")
-        companys = stock.query("""select company_id,code,name,prefix from flow_em_category""")
+        companys = stock.query("""select company_id,code,name,prefix,watch from flow_em_category""")
         _companys = companys
     return _companys
 def get_company_code2com():
