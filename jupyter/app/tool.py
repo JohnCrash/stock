@@ -771,5 +771,5 @@ def K(code,period,pos):
 K('BK0450',5,'2021-04-07 09:35:00')
 """
 
-#monitor.riseview('2021-06-03',3,40)
-monitor.monitor_bollup()
+monitor.riseview('2021-06-03',3,40)
+#monitor.monitor_bollup()

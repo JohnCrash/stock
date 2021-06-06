@@ -1931,6 +1931,30 @@ def muti_monitor():
     loop() 
     display(monitor_output,tool_box,listbox,list_output)
 
+"""
+返回指定类型的 通道增幅/通道长度 ,这是数字越小排名越靠前
+"""
+def bolltops(prefix='91',ntops=10):
+    c2c = xueqiu.get_company_code2com()
+    _,k,d = get_last_rt(date.today())
+    dt = timedelta(days=1)
+    bolls = bolltrench()
+    S = []
+    for (code,bo) in bolls.items():
+        if code in c2c and c2c[code][3]==prefix:
+            R = 100
+            RB = None
+            for b in bo:
+                if d[-1]-b[8]<dt:
+                    r = (b[6]-b[5])/(b[2]*b[5])
+                    if r<R:
+                        R = r
+                        RB = b
+            if R!=100:
+                S.append((code,R,RB,c2c[code]))
+    S = sorted(S,key=lambda it:it[1])
+    return S[:ntops]
+
 #早盘显示
 """
 用于早盘追涨
@@ -1947,6 +1971,13 @@ def riseview(review=None,DT=60,BI=18):
     rtlist = []
     rt2i = {}
     buts = []
+
+    #通道长度基本不变在开始就准备好
+    longboll = []
+    for it in (('91',20),('2',5)):
+        b = bolltops(it[0],ntops=it[1])
+        for c in b:
+            longboll.append(c[0])
 
     for i in range(len(companys)):
         c = companys[i]
@@ -2017,13 +2048,14 @@ def riseview(review=None,DT=60,BI=18):
                     if k[i,-1,3]!=0 and k[i,-1,4]!=0:
                         F = k[i,:,3]+k[i,:,4]
                         F[F!=F]=0 #消除NaN
-                        hug5 = stock.ma(F,5)
+                        m0 = stock.ma(F,3)
+                        m1 = stock.ma(F,30)
                         j = -1
                         for j in range(-1,-k.shape[1]+2,-1):
-                            if hug5[j]<hug5[j-1]:
+                            if m1[j]>m0[j]:
                                 break
                         if j!=-1:
-                            dhug = (k[i,-1,3]+k[i,-1,4]-hug5[j])
+                            dhug = (F[-1]-m1[j])
                             if dhug>=0:
                                 R.append((companys[i],k[i,-1,1],dhug,0))#company,涨幅,涨幅增量+流入增量,0
 
@@ -2122,10 +2154,15 @@ def riseview(review=None,DT=60,BI=18):
                     comps.append(it[2])
                 axs[p[1]].set_title("%s %d-%d %d:%d"%(p[3],d[-1].month,d[-1].day,d[-1].hour,d[-1].minute),y=0.93)
                 lw = 1
+                label = companys[i][2]
                 if is2has(it[0],p[0]): #同时存在于价格榜和流入涨幅榜
                     lw = 3
-                axs[p[1]].plot(x,k[i,:,1],label=companys[i][2],linewidth=lw)
-                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=companys[i][2],linewidth=lw)
+                    label = companys[i][2] #r"$\bf{%s}$"%(companys[i][2]) #汉字不能加粗？
+                if it[0] in longboll: #长通道排名
+                    lw = 5
+                    label = "*%s*"%label
+                axs[p[1]].plot(x,k[i,:,1],label=label,linewidth=lw)
+                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=label,linewidth=lw)
                 axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
                 for j in (1,2):
                     axs[p[j]].axhline(y=0,color='black',linestyle='dotted')
@@ -2158,7 +2195,7 @@ def riseview(review=None,DT=60,BI=18):
             buts[-1].code = com[1]
             buts[-1].on_click(on_show)   
         toolbox.children = buts+TOOLBUTS
-        fig.subplots_adjust(hspace=0,wspace=0.08)
+        fig.subplots_adjust(hspace=0,wspace=0.04)
         kline.output_show(kview_output)
     first = True
     if review is None:
