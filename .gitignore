@@ -54,3 +54,6 @@ layout/layout/.vs/layout/v16/Browse.VC.opendb
 layout/layout/.vs/layout/v16/ipch/AutoPCH/134c283183bb78ab/LAYOUT.ipch
 layout/layout/.vs/layout/v16/ipch/AutoPCH/5c44715b790b4fb0/LAYOUT.ipch
 layout/layout/.vs/layout/v16/ipch/AutoPCH/a5c126c352f58b4b/LAYOUT.ipch
+jupyter/app/nanovg/glew32.dll
+jupyter/app/nanovg/nanovg.dll
+jupyter/app/nanovg/__pycache__/nv.cpython-37.pyc

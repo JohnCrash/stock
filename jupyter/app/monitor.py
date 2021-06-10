@@ -1945,8 +1945,9 @@ def bolltops(prefix='91',ntops=10):
             R = 100
             RB = None
             for b in bo:
-                if d[-1]-b[8]<dt:
-                    r = (b[6]-b[5])/(b[2]*b[5])
+                rs = (b[6]-b[5])/b[5]
+                if d[-1]-b[8]<dt and rs<0.04:
+                    r = rs/b[2]
                     if r<R:
                         R = r
                         RB = b
@@ -1974,7 +1975,7 @@ def riseview(review=None,DT=60,BI=18):
 
     #通道长度基本不变在开始就准备好
     longboll = []
-    for it in (('91',20),('2',5)):
+    for it in (('91',60),('2',10)):
         b = bolltops(it[0],ntops=it[1])
         for c in b:
             longboll.append(c[0])
@@ -2192,6 +2193,8 @@ def riseview(review=None,DT=60,BI=18):
             else:
                 color = '#C8C8C8'
             buts[-1].style.button_color = color
+            if com[1] in longboll:
+                buts[-1].style.font_weight = 'bold'
             buts[-1].code = com[1]
             buts[-1].on_click(on_show)   
         toolbox.children = buts+TOOLBUTS
