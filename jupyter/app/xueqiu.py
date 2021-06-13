@@ -897,7 +897,9 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     if plane is not None:
                         update_period_plane(t,plane,[240,60,30,15,5])
                     print("emflowRT %s"%str(t))
-                shared.toRedis(datetime.today(),'runtime_update',ex=60)                
+                emflowRT9355(t)
+                shared.toRedis(datetime.today(),'runtime_update',ex=60)
+                #增加一个数据项在9:30-9:35的5秒一次的数据
             time.sleep(5)
             t = datetime.today()
         except Exception as e:
@@ -2086,25 +2088,54 @@ def emflowRT():
         mylog.printe(e)
 
 """
+将开盘9:30-9:35的数据记录下来保存7天
+"""
+sel9355 = None
+def emflowRT9355(t):
+    try:
+        if t.hour==9 and t.minute>=30 and t.minute<=45:
+            global sel9355
+            if sel9355 is None:
+                #概念，分类，ETF
+                sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2'")
+            emflowRT2(sel9355,tsname="emflowRT9355ts_%d_%d"%(t.month,t.day),kname="emflowRT9355k_%d_%d"%(t.month,t.day))
+    except Exception as e:
+        mylog.printe(e)
+
+def getEmflowRT9355():
+    global sel9355
+    if sel9355 is None:
+        #概念，分类，ETF
+        sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2'")
+    t = datetime.today()
+    tsname="emflowRT9355ts_%d_%d"%(t.month,t.day)
+    kname="emflowRT9355k_%d_%d"%(t.month,t.day)
+    b,D = shared.fromRedis(tsname)
+    b1,K = shared.numpyToRedis(kname)
+    return b and b1,K,D,sel9355
+"""
 对emflowRT进行改进,对flow_em_category中的全部进行监控
 返回当前的数据plane
+alls 代码列表,tsname=时间戳列表的redis名称,kname=数据的名称，ex保留时间
 [[0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting]]
 """
-def emflowRT2():
+def emflowRT2(alls=None,tsname=None,kname=None,ex=7*24*3600):
     try:
         t = datetime.today()
         if not (stock.isTransTime() and stock.isTransDay()):
             return
-        n = "emflowts2_%d_%d"%(t.month,t.day)
-        k = "emflownp2_%d_%d"%(t.month,t.day)
-        b,D = shared.fromRedis(n)
+        if tsname is None and kname is None:
+            tsname = "emflowts2_%d_%d"%(t.month,t.day)
+            kname = "emflownp2_%d_%d"%(t.month,t.day)
+        b,D = shared.fromRedis(tsname)
         if b and D[-1].minute==t.minute and D[-1].day==t.day:
             return
         if D is None:
             D = []
-        b,R = shared.numpyFromRedis(k)
+        b,R = shared.numpyFromRedis(kname)
             #对那些不是个股进行数据单独下载
-        alls = get_em_category()
+        if alls is None:
+            alls = get_em_category()
         code2i = {}
         codes = []
         for i in range(len(alls)):
@@ -2158,10 +2189,10 @@ def emflowRT2():
             RR = a
         else:
             RR = np.hstack((R,a))
-        D.append(datetime(t.year,t.month,t.day,t.hour,t.minute,0))
+        D.append(datetime(t.year,t.month,t.day,t.hour,t.minute,t.second))
 
-        shared.numpyToRedis(RR,k,ex=7*24*3600) #保留7天
-        shared.toRedis(D,n,ex=7*24*3600)
+        shared.numpyToRedis(RR,kname,ex=ex) #保留7天
+        shared.toRedis(D,tsname,ex=ex)
         return a
     except Exception as e:
         mylog.printe(e)

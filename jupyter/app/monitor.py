@@ -1969,8 +1969,6 @@ def riseview(review=None,DT=60,BI=18):
     toolbox = Box(children=[],layout=box_layout)
     kout = widgets.Output()
     last2daymin = None
-    rtlist = []
-    rt2i = {}
     buts = []
 
     #通道长度基本不变在开始就准备好
@@ -1980,11 +1978,6 @@ def riseview(review=None,DT=60,BI=18):
         for c in b:
             longboll.append(c[0])
 
-    for i in range(len(companys)):
-        c = companys[i]
-        if c[3]=='91' or c[3]=='2':
-            rtlist.append(c[1])
-            rt2i[c[1]] = i
     """
     净流入涨幅榜
     返回[(com,日涨幅,成交量增加率,流入),...]
@@ -2022,21 +2015,21 @@ def riseview(review=None,DT=60,BI=18):
         """
         if d[-1].hour==9 and d[-1].minute<=30:
             for i in range(len(companys)):
-                if companys[i][3] in prefixs and i<k.shape[0] and k[i,-1,1]>0 and maxrate[i]<0.05:
-                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1])) #company,涨幅,量增幅比率,流入          
+                if companys[i][3] in prefixs and i<k.shape[0] and k[i,-1,1]>0:
+                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],maxrate[i]<0.05)) #company,涨幅,量增幅比率,流入
         else:
             bolls = bolltrench()
             for i in range(len(companys)):
                 if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
                     if k[i,-1,3]+k[i,-1,4]>0: #净流入
                         ma5 = stock.ma(K[i,:],80)
-                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0 and maxrate[i]<0.05: #大于5日均线并且要求增长
+                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长
                             if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
                                 if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
                                     r = 0
                                     if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
                                         r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
-                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4])) #company,涨幅,量增幅比率,流入
+                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],maxrate[i]<0.05)) #company,涨幅,量增幅比率,流入
         return R
     """
     流入速率于涨幅速率榜
@@ -2058,19 +2051,19 @@ def riseview(review=None,DT=60,BI=18):
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
                             if dhug>=0:
-                                R.append((companys[i],k[i,-1,1],dhug,0))#company,涨幅,涨幅增量+流入增量,0
+                                R.append((companys[i],k[i,-1,1],dhug,0,False))#company,涨幅,涨幅增量+流入增量,0
 
-        return R        
+        return R
     #0 company_id,1 code,2 name,3 prefix
     #0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
     #返回 (code,涨幅/增长/流入,company)
-    def getTops(R,prefix,top,sortcoln):
+    def getTops(R,prefix,sortcoln):
         S = []
         for r in R:
             if r[0][3]==prefix: 
-                S.append((r[0][1],r[sortcoln],r[0]))
+                S.append((r[0][1],r[sortcoln],r[0],r[4]))
         S = sorted(S,key=lambda it:it[1],reverse=True)
-        return S[:top]
+        return S
 
     def on_show(e):
         nonlocal kout
@@ -2091,7 +2084,7 @@ def riseview(review=None,DT=60,BI=18):
         TOOLBUTS[-1].perfix = it[1]
         TOOLBUTS[-1].on_click(on_shollall)
     def update(offset=None):
-        nonlocal code2i,companys,kview_output,toolbox,rtlist,rt2i,TOOLBUTS,buts
+        nonlocal code2i,companys,kview_output,toolbox,TOOLBUTS,buts
         if review is None:
             t = datetime.today()
         else:
@@ -2102,20 +2095,20 @@ def riseview(review=None,DT=60,BI=18):
             d = d[:offset]
         _,k2,d2 = get_last_rt(lastt-timedelta(days=1))   
 
-        if stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=29: #一般数据更新周期1分钟，这里对最后的数据做即时更新
-            b,a = xueqiu.emflowRT3(rtlist)
+        if stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30 and t.minute<=45: #一般数据更新周期1分钟，这里对最后的数据做即时更新
+            b,a,ts,rtlist = xueqiu.getEmflowRT9355()
             if b:
                 k = np.copy(k)
                 for j in range(len(rtlist)):
-                    c = rtlist[j]
-                    i = rt2i[c]
+                    c = rtlist[j][2]
+                    i = code2i[c]
                     if i<k.shape[0]:
                         k[i,-1,:] = a[j,-1,:]
 
         R = rise(k,d,k2,d2)
         R2 = riserate(k,d,k2,d2)
-        gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
-        fig,axs = plt.subplots(4,2,figsize=(48,20),gridspec_kw = gs_kw)
+        gs_kw = dict(width_ratios=[1,1,1], height_ratios=[2,1,2,1])
+        fig,axs = plt.subplots(4,3,figsize=(48,20),gridspec_kw = gs_kw)
         x = np.arange(k.shape[1])
         xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
 
@@ -2132,9 +2125,10 @@ def riseview(review=None,DT=60,BI=18):
         for i in range(len(LS)):
             p = LS[i]
             if p[6]:
-                TOPS.append(getTops(R,p[0],p[4],p[5]))
+                S = getTops(R,p[0],p[5])                
             else:
-                TOPS.append(getTops(R2,p[0],p[4],p[5]))
+                S = getTops(R2,p[0],p[5])
+            TOPS.append(S[:p[4]])
             CODES.append([])
             for it in TOPS[-1]:
                 CODES[-1].append(it[0])
@@ -2152,7 +2146,7 @@ def riseview(review=None,DT=60,BI=18):
             for it in tops:
                 i = code2i[it[0]]
                 if it[2] not in comps:
-                    comps.append(it[2])
+                    comps.append((it[2],it[3]))
                 axs[p[1]].set_title("%s %d-%d %d:%d"%(p[3],d[-1].month,d[-1].day,d[-1].hour,d[-1].minute),y=0.93)
                 lw = 1
                 label = companys[i][2]
@@ -2162,8 +2156,8 @@ def riseview(review=None,DT=60,BI=18):
                 if it[0] in longboll: #长通道排名
                     lw = 5
                     label = "*%s*"%label
-                axs[p[1]].plot(x,k[i,:,1],label=label,linewidth=lw)
-                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=label,linewidth=lw)
+                axs[p[1]].plot(x,k[i,:,1],label=label,linewidth=lw,linestyle='--' if not it[3] else None)
+                axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=label,linewidth=lw,linestyle='--' if not it[3] else None)
                 axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
                 for j in (1,2):
                     axs[p[j]].axhline(y=0,color='black',linestyle='dotted')
@@ -2176,7 +2170,9 @@ def riseview(review=None,DT=60,BI=18):
                 bottom,top = axs[p[j]].get_ylim()
                 axs[p[j]].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1)  
         buts = []
-        for com in comps:
+        for it in comps:
+            com = it[0]
+            ge005 = it[1]
             buts.append(widgets.Button(description="%s"%(com[2])))
             i = code2i[com[1]]
             if k.shape[1]>1:
@@ -2184,7 +2180,10 @@ def riseview(review=None,DT=60,BI=18):
                     if k[i,-1,0]>k[i,-2,0]: #涨
                         color = '#FF8080' #流入涨 红
                     else:
-                        color = '#FF80FF' #流入跌 紫
+                        if ge005:
+                            color = '#FFA0FF' #流入跌 紫 并且在增长率>5%
+                        else:
+                            color = '#FF80FF' #流入跌 紫
                 else: #流出
                     if k[i,-1,0]>k[i,-2,0]: #涨
                         color = '#FFA500' #流出涨 黄

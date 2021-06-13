@@ -5,6 +5,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "type": "node",
             "request": "launch",
@@ -97,6 +98,12 @@
             "request": "launch",
             "name": "Debug runtime.py",
             "program": "${workspaceFolder}\\jupyter\\runtime.py"
-        }         
+        },
+        {
+            "type": "python",
+            "request": "launch",
+            "name": "Debug test2.py",
+            "program": "${workspaceFolder}\\jupyter\\test2.py"
+        }           
     ]
 }

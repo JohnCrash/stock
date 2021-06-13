@@ -1,5 +1,5 @@
 """nanovg wrapper"""
-from ctypes import CDLL, POINTER, Structure, Union,c_int,c_uint,c_void_p,c_float,c_char_p,c_ubyte
+from ctypes import CDLL, POINTER, Structure, Union,c_int,c_uint,c_void_p,c_float,c_char_p,c_ubyte,c_bool
 
 _path = '/'.join(str.split(__file__,'\\')[:-1])
 glew_path = '%s/glew32.dll'%_path
@@ -7,18 +7,34 @@ nanovg_path = '%s/nanovg.dll'%_path
 glew = CDLL(glew_path)
 nanovg = CDLL(nanovg_path)
 
-def _bind(funcname, args=None, returns=None):
-    func = getattr(nanovg, funcname, None)
+def _bind(funcname, args=None, returns=None,lib=nanovg):
+    func = getattr(lib, funcname, None)
     if not func:
         e = "Could not find function '%s'"
         raise ValueError(e % (funcname))
     func.argtypes = args
     func.restype = returns
     return func
-
+"""
+glew.h
+"""
+GLEW_OK=0
+GLEW_NO_ERROR=0
+GLEW_ERROR_NO_GL_VERSION=1
+GLEW_ERROR_GL_VERSION_10_ONLY=2
+#GLEW_ERROR_GLX_VERSION_11_ONLY 3  /* Need at least GLX 1.2 */
+glewInit = _bind('glewInit',[],c_int,glew)
+glewIsSupported = _bind('glewIsSupported',[c_char_p],c_bool,glew)
+glewGetExtension = _bind('glewGetExtension',[c_char_p],c_bool,glew)
+glewGetErrorString = _bind('glewGetErrorString',[c_int],POINTER(c_ubyte),glew)
+glewGetString = _bind('glewGetString',[c_int],POINTER(c_ubyte),glew)
 """
 nanovg_gl.h
 """
+NVG_ANTIALIAS 		= 1<<0
+NVG_STENCIL_STROKES	= 1<<1
+NVG_DEBUG 			= 1<<2
+
 class NVGcontext(c_void_p):
     pass
 GLuint = c_uint
