@@ -1101,12 +1101,6 @@ def BollK(code,bolls,isall=True):
     else:
         kline.Plote(code,period,config={'main_menu':'CLEAR','index_menu':'FLOW','index':False,'cb':cb},mode='normal').show(figsize=(18,15),simple=True)#showKline(figsize=(18,16))
 
-bit = time.time()
-def printt(s):
-    global bit
-    t = time.time()
-    print("%s %f"%(s,t-bit))
-    bit = t
 """
 返回最近的实时数据
 """
@@ -1198,6 +1192,8 @@ def monitor_bollup():
                 isnew = False #和昨天比
                 bolls = []
                 periods = []
+                if not stock.isStrongBollway(bos[code]):
+                    continue
                 for bo in bos[code]:
                     if bo[8]<bte: #通道结束不要超过1天
                         continue
@@ -1956,58 +1952,7 @@ def bolltops(prefix='91',ntops=10):
     S = sorted(S,key=lambda it:it[1])
     return S[:ntops]
 
-"""
-对通道进行过滤
-1.净量多的周期
-2.多周期必须最大重叠
-"""
-def isStrongBollway(bolls):
-    if bolls[-1][1]==60: #可以考虑减少一个通道
-        b = isStrongBollwayImp(bolls[:-1])
-        if b:
-            return True
-    return isStrongBollwayImp(bolls)
 
-def isStrongBollwayImp(bolls):
-    if len(bolls)<2: #必须有2个
-        return False
-    #确保时间部分尽量重叠
-    max_dt = timedelta(seconds=1)
-    bi,ei = None,None
-    max_width = 0
-    maxp = 0
-    minp = 1e9
-    for bo in bolls:
-        if bo[8]-bo[7]>max_dt:
-            max_dt = bo[8]-bo[7]
-            bi = bo[7]
-            ei = bo[8]
-        if bo[6]-bo[5]>max_width:
-            max_width = bo[6]-bo[5]
-            maxp = bo[6]
-            minp = bo[5]
-    if bi is None:
-        return False
-    if ei-bi<timedelta(days=5): #最长通道必须大于5天
-        return False
-    for bo in bolls:
-        if stock.overlay(bo[7].timestamp(),bo[8].timestamp(),bi.timestamp(),ei.timestamp())<0.618:
-            return False
-    #确保在涨幅上尽量重叠
-    for bo in bolls:
-        if stock.overlay(bo[5],bo[6],minp,maxp)<0.618:
-            return False
-    return True
-
-"""
-突破压力线
-"""
-def getBollwayUpline(bolls):
-    maxx = 0
-    for bo in bolls:
-        if bo[6]>maxx:
-            maxx = bo[6]
-    return maxx
 #早盘显示
 """
 用于早盘追涨
@@ -2051,7 +1996,7 @@ def riseview(review=None,DT=60,BI=18):
         if d[-1].hour==9 and d[-1].minute<=30:
             for i in range(len(companys)):
                 if companys[i][3] in prefixs and companys[i][1] in bolls and i<k.shape[0] and k[i,-1,1]>0:
-                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],getBollwayUpline(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
+                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],stock.getBollwayUpline(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
         else:
             for i in range(len(companys)):
                 if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
@@ -2059,11 +2004,11 @@ def riseview(review=None,DT=60,BI=18):
                         ma5 = stock.ma(K[i,:],80)
                         if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长
                             if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
-                                if (companys[i][1] in bolls and isStrongBollway(bolls[companys[i][1]])) or review is not None: #review 不进行bolls检查
+                                if (companys[i][1] in bolls and stock.isStrongBollway(bolls[companys[i][1]])) or review is not None: #review 不进行bolls检查
                                     r = 0
                                     if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
                                         r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
-                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],getBollwayUpline(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
+                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],stock.getBollwayUpline(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
         return R
     """
     流入速率于涨幅速率榜
@@ -2085,8 +2030,8 @@ def riseview(review=None,DT=60,BI=18):
                                 break
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
-                            if dhug>=0 and ((companys[i][1] in bolls and isStrongBollway(bolls[companys[i][1]])) or review is not None):
-                                R.append((companys[i],k[i,-1,1],dhug,0,getBollwayUpline(bolls[companys[i][1]])))#company,涨幅,涨幅增量+流入增量,0
+                            if dhug>=0 and ((companys[i][1] in bolls and stock.isStrongBollway(bolls[companys[i][1]])) or review is not None):
+                                R.append((companys[i],k[i,-1,1],dhug,0,stock.getBollwayUpline(bolls[companys[i][1]])))#company,涨幅,涨幅增量+流入增量,0
 
         return R
     #0 company_id,1 code,2 name,3 prefix

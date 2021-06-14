@@ -443,7 +443,7 @@ class Plote:
     """
     对不同基本的数据留有缓存
     """
-    def getKlineData(self,code,period):
+    def getKlineData(self,code,period,runtime=True):
         global _cacheK
         if len(code)>3 and code[2]==':':
             code = code.replace(':','')
@@ -460,14 +460,20 @@ class Plote:
             elif period=='w':
                 c,k,d = stock.loadKline(code,'d',after=after)
             else:
-                c,k,d = stock.loadKline(code,5,after=after)
+                if code in _cacheK and 5 in _cacheK[code]: #尽量使用缓存数据，但是没考虑after
+                    c,k,d,_ =  _cacheK[code][5]
+                else:
+                    c,k,d = stock.loadKline(code,5,after=after)
                 k,d = stock.mergeK(k,d,int(period/5))
             
             if code is not _cacheK:
                 _cacheK[code] = {}
             _cacheK[code][period] = (c,k,d,after)
         cur = _cacheK[code][period]
-        _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
+        if runtime:
+            _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
+        else:
+            k,d = cur[1],cur[2]
         return cur[0],k,d
     """
     取得某一天的flow数据
@@ -1457,7 +1463,7 @@ class Plote:
         if type(self._period)==int:#self._bollway:
             for peroid in (5,15,30,60):
                 if peroid>=self._period:
-                    _,K,D = self.getKlineData(self._comarg,peroid)
+                    _,K,D = self.getKlineData(self._comarg,peroid,runtime=False)
                     #这里一self._trendHeadPos为终点向前搜索
                     if self._trendHeadPos<len(self._date):
                         postt = self._date[self._trendHeadPos][0]

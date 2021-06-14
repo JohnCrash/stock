@@ -20,6 +20,13 @@ from . import monitor
 from . import ziprt
 
 log = mylog.init('tool.log',name='tool')
+bit = time.time()
+def printt(s):
+    global bit
+    t = time.time()
+    print("%s %f"%(s,t-bit))
+    bit = t
+
 """
 标记msci个股，数据来自于EM
 在company中增加字段msci
@@ -570,7 +577,9 @@ def PopupK(code,period=None,mode='auto',pos=None,buyprice=None):
     def cb(self,axs,bi,ei):
         if buyprice is not None:
             axs[0].axhline(y=buyprice,color='red')
+    printt('begin')
     self = kline.Plote(code,period,config={'boll':True,'bigma20':True,'cb':cb},mode=mode)
+    printt('kline.Plote')
     bi = 0
     ei = 0
     if pos is not None:
@@ -592,6 +601,7 @@ def PopupK(code,period=None,mode='auto',pos=None,buyprice=None):
         self.showKline(figsize=(22,10),popup=True)
     else:   
         self.showKline(bi,ei,figsize=(22,10),popup=True)
+    printt('showKline')
 
 def get_last_rt(t):
     b,k,d = xueqiu.getTodayRT(t)
@@ -906,6 +916,9 @@ def testrise3():
             avgavg += it[6]
         print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
 
+"""
+研究在通道下轨出现下跌以来最大的快速上涨，比如5分钟k线实体比最近的都长
+"""
 #testrise3()
 
 """

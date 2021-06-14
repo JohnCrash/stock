@@ -15,7 +15,7 @@ def isTransTime(t=None):
 #判断今天是不是可以交易
 def isTransDay():
     t = datetime.today()
-    if False:#t.weekday()>=0 and t.weekday()<5:
+    if t.weekday()>=0 and t.weekday()<5:
         return True
     else:
         return False
@@ -1362,3 +1362,58 @@ def overlay(x0,x1,x2,x3):
     w = (max(xx1,xx3)-min(xx0,xx2)) #两端头尾的长度
     r = (w-addw)/(maxw-addw)
     return r
+
+"""
+对通道进行过滤
+1.净量多的周期
+2.多周期必须最大重叠
+"""
+def isStrongBollway(bolls):
+    if len(bolls)<2:
+        return False
+    if bolls[-1][1]==60: #可以考虑减少一个通道
+        b = isStrongBollwayImp(bolls[:-1])
+        if b:
+            return True
+    return isStrongBollwayImp(bolls)
+
+def isStrongBollwayImp(bolls):
+    if len(bolls)<2: #必须有2个
+        return False
+    #确保时间部分尽量重叠
+    max_dt = timedelta(seconds=1)
+    bi,ei = None,None
+    max_width = 0
+    maxp = 0
+    minp = 1e9
+    for bo in bolls:
+        if bo[8]-bo[7]>max_dt:
+            max_dt = bo[8]-bo[7]
+            bi = bo[7]
+            ei = bo[8]
+        if bo[6]-bo[5]>max_width:
+            max_width = bo[6]-bo[5]
+            maxp = bo[6]
+            minp = bo[5]
+    if bi is None:
+        return False
+    if ei-bi<timedelta(days=5): #最长通道必须大于5天
+        return False
+    for bo in bolls:
+        if overlay(bo[7].timestamp(),bo[8].timestamp(),bi.timestamp(),ei.timestamp())<0.618:
+            return False
+    #确保在涨幅上尽量重叠
+    for bo in bolls:
+        if overlay(bo[5],bo[6],minp,maxp)<0.618:
+            return False
+    return True
+
+"""
+突破压力线
+"""
+def getBollwayUpline(bolls):
+    maxx = 0
+    for bo in bolls:
+        if bo[6]>maxx:
+            maxx = bo[6]
+    return maxx
