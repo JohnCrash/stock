@@ -1458,6 +1458,16 @@ class Plote:
             for peroid in (5,15,30,60):
                 if peroid>=self._period:
                     _,K,D = self.getKlineData(self._comarg,peroid)
+                    #这里一self._trendHeadPos为终点向前搜索
+                    if self._trendHeadPos<len(self._date):
+                        postt = self._date[self._trendHeadPos][0]
+                        eii = -1
+                        for i in range(-1,-len(D)+2,-1):
+                            if D[i][0]<postt:
+                                eii = i
+                                break
+                        K = K[:eii,:]
+                        D = D[:eii]
                     for j in range(-1,-len(K)+16,-1):
                         b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(K[:j,4],16,3)
                         if b: #绘制发现的第一个通道
@@ -1512,6 +1522,7 @@ class Plote:
 
         #单独做一个显示层级
         if popup:
+            fig.subplots_adjust(left=0.05,right=0.95,bottom=0.05,top=0.95)
             plt.show()
         else:
             if not self._isupdate:

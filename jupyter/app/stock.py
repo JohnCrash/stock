@@ -15,7 +15,7 @@ def isTransTime(t=None):
 #判断今天是不是可以交易
 def isTransDay():
     t = datetime.today()
-    if t.weekday()>=0 and t.weekday()<5:
+    if False:#t.weekday()>=0 and t.weekday()<5:
         return True
     else:
         return False
@@ -1317,7 +1317,48 @@ def pkfx(k,d):
             break
     
     return (openv,low,high,k[-1],(lowt-tbi)/(tei-tbi),(hight-tbi)/(tei-tbi))
-        
+
 """
-对
+对数据平滑度进行量化，数据如果是单项递增的返回1，数据越是锯齿比较多越是小，最小为0
 """
+def smooth(v):
+    n = 0
+    for i in range(len(v)-2):
+        if (v[i+1]>=v[i] and v[i+2]>=v[i+1]) or (v[i+1]<=v[i] and v[i+2]<=v[i+1]):
+            n+=1
+    r = n/len(v)
+    r = (r-0.45)/(0.9-0.45)
+
+    if r<0:
+        r = 0
+    if r>1:
+        r = 1
+    return r
+
+"""
+判断流是一个圆弧底
+1.圆弧最低点在中间
+2.大部分小于0
+"""
+def isArcBottom(v):
+    mini = np.argmin(v)
+    r = mini/len(v)
+    le = len(v[v<0])
+    N = len(v)
+    leN = le/N
+    return abs(r-0.5)<0.2 and leN>0.9 and v[0]>v[mini]/2
+
+"""
+区间x0-x1 和 x2-x3覆盖率是多少
+完全不覆盖<0,完全覆盖返回1,正好不覆盖返回0
+"""
+def overlay(x0,x1,x2,x3):
+    xx0 = min(x0,x1)
+    xx1 = max(x0,x1)
+    xx2 = min(x2,x3)
+    xx3 = max(x2,x3)
+    addw = xx1-xx0+xx3-xx2 #收尾相连的长度
+    maxw = max(xx1-xx0,xx3-xx2)
+    w = (max(xx1,xx3)-min(xx0,xx2)) #两端头尾的长度
+    r = (w-addw)/(maxw-addw)
+    return r

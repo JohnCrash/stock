@@ -8,6 +8,7 @@ import ipywidgets as widgets
 from IPython.display import display,update_display,clear_output
 from datetime import date,datetime,timedelta
 import json
+import math
 from . import mylog
 from . import config
 from . import shared
@@ -565,8 +566,32 @@ def checkcompanyid():
             else:
                 print("发现id不一致%s"%str(it))
 
-def PopupK(code,period=None,mode='auto'):
-    kline.Plote(code,period,config={'index':True},mode=mode).showKline(figsize=(16,10),popup=True)
+def PopupK(code,period=None,mode='auto',pos=None,buyprice=None):
+    def cb(self,axs,bi,ei):
+        if buyprice is not None:
+            axs[0].axhline(y=buyprice,color='red')
+    self = kline.Plote(code,period,config={'boll':True,'bigma20':True,'cb':cb},mode=mode)
+    bi = 0
+    ei = 0
+    if pos is not None:
+        post = datetime.fromisoformat(pos)
+        for i in range(len(self._date)):
+            if self._date[i][0]>=post:
+                bi = math.floor(i-self._showcount*2/3)
+                if bi<=0:
+                    bi = 0
+                ei = bi+self._showcount
+                if ei>len(self._date):
+                    ei = len(self._date)
+                    bi = len(self._date)-self._showcount
+                    if bi<0:
+                        bi=0
+                self._trendHeadPos = i
+                break
+    if bi==0 and ei==0:
+        self.showKline(figsize=(22,10),popup=True)
+    else:   
+        self.showKline(bi,ei,figsize=(22,10),popup=True)
 
 def get_last_rt(t):
     b,k,d = xueqiu.getTodayRT(t)
@@ -578,6 +603,34 @@ def get_last_rt(t):
             if b:
                 break
     return t2,k,d
+
+
+def showrtflow(title,ti,id,bi,ei):
+    t = datetime.fromisoformat(ti)
+    ids,k,d = ziprt.readbydate(t)
+    if ids is not None:
+        for i in range(len(ids)):
+            if ids[i] == id:
+                break
+        k = k[i,bi:ei,:]
+        d = d[bi:ei]
+
+        fig,axs = plt.subplots(2,1,figsize=(18,12),sharex=True)
+        fig.subplots_adjust(left=0.05,right=0.95,bottom=0.05,top=0.95)
+        x = np.arange(k.shape[0])
+        xticks = []
+        for i in range(0,k.shape[0],10):
+            xticks.append(i)
+        dd = [(d[i],) for i in range(k.shape[0])]
+        axs[0].set_title(title)
+        axs[0].plot(x,k[:,0])
+        axs[0].grid(True)
+        axs[1].xaxis.set_major_formatter(kline.MyFormatterRT(dd,'h:m'))
+        axs[1].plot(x,k[:,2])
+        axs[1].axhline(y=0.,color='black',linestyle='dotted')
+        axs[1].set_xticks(xticks)
+        axs[1].grid(True)
+        plt.show()
 
 """
 遍历过往概念的1分钟级别的数据
@@ -765,7 +818,12 @@ def testrise2():
         print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
 
 """
-使用资金流入和平滑度选择出来的回测
+9-10:30 有突破boll通道上轨的态势
+条件
+1.早盘9:30-10:30，股价上行资金净流入
+2.股价处于多周期通道上轨以上
+3.追涨位置到通道上轨不得大于通道的宽度
+4.通道重叠度高，5日均线平直
 """
 def testrise3():
     bi = datetime(year=2021,month=4,day=6)
@@ -804,7 +862,7 @@ def testrise3():
             lastk = {}
             for j in range(k.shape[0]):
                 lastk[ids[j]] = k[j,0]
-        n = 2
+        n = 2 #连续n分钟资金逐渐增长
         for j in range(k.shape[0]):
             price = k[j,i+n,0]
             flow = k[j,i,2]
@@ -812,7 +870,7 @@ def testrise3():
                 lastprice = lastk[ids[j]][0]
                 lastvolume = lastk[ids[j]][2]
                 r = (price-lastprice)/lastprice
-                b = True
+                b = True #资金是单向流入的
                 for s in range(1,n):
                     if k[j,i+s+1,2]<k[j,i+s,2]:
                         b = False
@@ -840,18 +898,56 @@ def testrise3():
             if it[7] is not None and it[8] is not None:
                 ts = "\t%s\t%s"%(stock.timeString2(it[7]),stock.timeString2(it[8]))
             print("%d\t%s\t%s\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%\t%s"%(param,str(it[0]),id2com[it[1]][2],100*it[3],100*it[4],100*it[5],100*it[6],ts))
+            #showrtflow(id2com[it[1]][2],str(it[0]),it[1],0,-1)
+            PopupK(id2com[it[1]][1],5,mode='normal',pos=str(it[0]),buyprice=it[2])
             avgbuy += it[3]
             avgmax += it[4]
             avgmin += it[5]
             avgavg += it[6]
         print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
 
-testrise3()
+#testrise3()
+
+"""
+早盘先流出后流入
+"""
+def testsmooth():
+    bi = datetime(year=2021,month=4,day=6)
+    data = []
+    lastk = None
+    #(0 t, 1 id,2 price,3 rate,4 rmax,5 rmin,6 avg,7 dmax,8 dmin) 日期,公司id,买入价格，买入时日增长率，次日最大收益，次日最低收益，次日平均收益，最大收益时间，最小收益时间
+    # companys 0 company_id,1 code,2 name,3 prefix
+    # k = [(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)]
+    # k = [(0 price,1 volume,2 hug,3 ting)] 精简
+    id2com = xueqiu.get_company_select_id2com()
+    def cb(t,ids,k,d,data,param):
+        bi = 0
+        ei = 0
+        for i in range(k.shape[1]):
+            if bi==0 and d[i].hour==9 and d[i].minute==35:
+                bi = i
+            if ei==0 and d[i].hour==10 and d[i].minute==0:
+                ei = i
+                break
+        for i in range(k.shape[0]):
+            for j in range(bi,ei):
+                if k[i,j,2]<0 and k[i,j+1,2]>0:
+                    if stock.isArcBottom(k[i,bi:j+1,2]) and k[i,j+1,0]>k[i,bi:j,0].max():
+                        print("K('%s',5,'%s')"%(id2com[ids[i]][1],str(d[j+1])))
+                        
+                        #showrtflow("%s (%s)"%(id2com[ids[i]][2],id2com[ids[i]][1]),str(d[0]),i,bi,-1)
+                        #stock.isArcBottom(k[i,bi:j+1,2])
+                        break
+            
+    id2com = xueqiu.get_company_select_id2com()
+    enumrt(bi,cb,data,None)
+
+
+
 """
 def K(code,period,pos):
     kline.Plote(code,period,mode='normal',lastday=2*365).show(figsize=(32,15),pos=pos)
 K('BK0450',5,'2021-04-07 09:35:00')
 """
-
-#monitor.riseview('2021-06-03',3,40)
+monitor.riseview()
 #monitor.monitor_bollup()
