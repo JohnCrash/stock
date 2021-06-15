@@ -897,9 +897,9 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                     if plane is not None:
                         update_period_plane(t,plane,[240,60,30,15,5])
                     print("emflowRT %s"%str(t))
-                emflowRT9355(t)
-                shared.toRedis(datetime.today(),'runtime_update',ex=60)
-                #增加一个数据项在9:30-9:35的5秒一次的数据
+                    shared.toRedis(datetime.today(),'runtime_update',ex=60)
+                
+                emflowRT9355(t)#增加一个数据项在9:30-9:35的5秒一次的数据
             time.sleep(5)
             t = datetime.today()
         except Exception as e:
@@ -2111,7 +2111,7 @@ def getEmflowRT9355():
     tsname="emflowRT9355ts_%d_%d"%(t.month,t.day)
     kname="emflowRT9355k_%d_%d"%(t.month,t.day)
     b,D = shared.fromRedis(tsname)
-    b1,K = shared.numpyToRedis(kname)
+    b1,K = shared.numpyFromRedis(kname)
     return b and b1,K,D,sel9355
 """
 对emflowRT进行改进,对flow_em_category中的全部进行监控
@@ -2128,8 +2128,9 @@ def emflowRT2(alls=None,tsname=None,kname=None,ex=7*24*3600):
             tsname = "emflowts2_%d_%d"%(t.month,t.day)
             kname = "emflownp2_%d_%d"%(t.month,t.day)
         b,D = shared.fromRedis(tsname)
-        if b and D[-1].minute==t.minute and D[-1].day==t.day:
-            return
+        if tsname is None and kname is None:
+            if b and D[-1].minute==t.minute and D[-1].day==t.day:
+                return
         if D is None:
             D = []
         b,R = shared.numpyFromRedis(kname)

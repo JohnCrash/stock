@@ -2030,8 +2030,8 @@ def riseview(review=None,DT=60,BI=18):
                                 break
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
-                            if dhug>=0 and ((companys[i][1] in bolls and stock.isStrongBollway(bolls[companys[i][1]])) or review is not None):
-                                R.append((companys[i],k[i,-1,1],dhug,0,stock.getBollwayUpline(bolls[companys[i][1]])))#company,涨幅,涨幅增量+流入增量,0
+                            if dhug>=0:
+                                R.append((companys[i],k[i,-1,1],dhug,0,0))#company,涨幅,涨幅增量+流入增量,0
 
         return R
     #0 company_id,1 code,2 name,3 prefix
@@ -2076,7 +2076,8 @@ def riseview(review=None,DT=60,BI=18):
         _,k2,d2 = get_last_rt(lastt-timedelta(days=1))   
 
         a = None
-        if stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30 and t.minute<=45: #一般数据更新周期1分钟，这里对最后的数据做即时更新
+
+        if True:#stock.isTransTime() and stock.isTransDay():# and t.hour==9 and t.minute>=30 and t.minute<=45: #一般数据更新周期1分钟，这里对最后的数据做即时更新
             b,a,ts,rtlist = xueqiu.getEmflowRT9355()
             if b:
                 k = np.copy(k)
@@ -2093,7 +2094,11 @@ def riseview(review=None,DT=60,BI=18):
         if a is None:
             xticks = [0,60-15,2*60-15,3*60+15,4*60+15]
         else: #开始交易的15分钟使用5秒间隔个数据
-            k = a
+            k = np.zeros((k.shape[0],a.shape[1],a.shape[2]))
+            for i in range(a.shape[0]):
+                c = rtlist[i][2]
+                j = code2i[c]
+                k[j,:,:] = a[i,:,:]
             d = ts
             xticks = [i for i in range(0,12*15,12)]
         x = np.arange(k.shape[1])
