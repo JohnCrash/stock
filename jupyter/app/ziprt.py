@@ -92,7 +92,7 @@ def saveRT():
                         K[:,:,3] = k[ss1,:,6]
                     writeRT(name,ids,K,d)
         #存储955
-        b,k,d,ls = xueqiu.getEmflowRT9355()
+        b,k,d,ls = xueqiu.getEmflowRT9355(t-timedelta(days=i))
         if b:
             name = '%s%d%02d%02d.955'%(config.zipdir,ct.year,ct.month,ct.day)
             if not isexist(name):
@@ -100,10 +100,10 @@ def saveRT():
                 数据仅仅保存主力和小单
                 """
                 K = np.zeros((len(ls),k.shape[1],k.shape[2]-3))
-                K[:,:,0] = k[ss,:,0]
-                K[:,:,1] = k[ss,:,2]
-                K[:,:,2] = k[ss,:,3]+k[ss,:,4]
-                K[:,:,3] = k[ss,:,6]
+                K[:,:,0] = k[:,:,0]
+                K[:,:,1] = k[:,:,2]
+                K[:,:,2] = k[:,:,3]+k[:,:,4]
+                K[:,:,3] = k[:,:,6]
 
                 writeRT(name,ls,K,d)            
 

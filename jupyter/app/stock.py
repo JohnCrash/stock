@@ -27,6 +27,9 @@ def timeString(t):
 def timeString2(t):
     return '%s:%s:%s'%(t.hour,t.minute,t.second)
 
+def date2time(d):
+    return datetime(year=d.year,month=d.month,day=d.day)
+    
 gdb = None
 
 def escape_string(d):
@@ -1206,7 +1209,7 @@ def bollwayex(k,n=16,jcn=3):
         b,a = bollway(k,i,jcn)
         if b:
             return b,a
-    return False,(0,0,0,0,0,0)
+    return False,(0,0,0,0)
 """
 从尾部向前搜索中枢
 方法:先确定一个高点范围，和低点范围，然后如果k在高点和低点之间交替超过2次
@@ -1245,12 +1248,22 @@ def bollway(k,n=16,jcn=3):
                 if it[1]!=zfc:
                     zfn+=1
                     zfc = it[1]
-            return zfn>jcn,(N,minv,maxv,real_minv,real_maxv,zfn) #(通道底，通道顶，通道最小值，通道最大值)
-    return False,(0,0,0,0,0,0)
+            if minv==0:
+                return False,(0,0,0,0)
+            r = (maxv-minv)/minv
+            return zfn>jcn and r>0.016 and r<0.08,(N,real_minv,real_maxv,zfn)
+    return False,(0,0,0,0)
 
-#对通道做延申处理
+"""
+对通道算法进行优化
+def bollway2(k,d,n=48*3,jcn=3):
+    for i in range(-len(k)+1,1,-1):
+"""
+
+#对通道做延申处理,幅度做收缩处理
 def extway(k,i,n,mink,maxk):
     bi = i-n
+    #向两侧扩展
     for bi in range(i-n,0,-1):
         if k[bi]>maxk or k[bi]<mink:
             break
@@ -1258,7 +1271,19 @@ def extway(k,i,n,mink,maxk):
     for ei in range(i,0,1):
         if k[ei]>maxk or k[ei]<mink:
             break
-    return bi,ei
+    #向内部压缩，确保有一定比率的k向在通道外面
+    dk = (maxk-mink)/20
+    up = maxk
+    for j in range(1,10):
+        up = maxk-dk*j
+        if np.count_nonzero(k[bi:ei]>up)/(ei-bi)>0.16:
+            break
+    down = mink
+    for j in range(1,10):
+        down = mink+dk*j
+        if np.count_nonzero(k[bi:ei]<down)/(ei-bi)>0.16:
+            break            
+    return bi,ei,down,up
 """
 将biei映射到d日期的索引
 """
@@ -1369,15 +1394,6 @@ def overlay(x0,x1,x2,x3):
 2.多周期必须最大重叠
 """
 def isStrongBollway(bolls):
-    if len(bolls)<2:
-        return False
-    if bolls[-1][1]==60: #可以考虑减少一个通道
-        b = isStrongBollwayImp(bolls[:-1])
-        if b:
-            return True
-    return isStrongBollwayImp(bolls)
-
-def isStrongBollwayImp(bolls):
     if len(bolls)<2: #必须有2个
         return False
     #确保时间部分尽量重叠

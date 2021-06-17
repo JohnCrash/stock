@@ -1,9 +1,10 @@
-from app.nanovg import window,vg
+#from app.nanovg import window,vg
 from app import tool
 
+"""
 from OpenGL import GL
 #tool.testrise()
-"""
+
 glwin = window.window('图表',640,480)
 graph = window.fpsGraph()
 def render(_vg,dt,w,h):

@@ -2093,7 +2093,7 @@ def emflowRT():
 sel9355 = None
 def emflowRT9355(t):
     try:
-        if t.hour==9 and t.minute>=30 and t.minute<=45:
+        if t.hour==9 and t.minute>=30:
             global sel9355
             if sel9355 is None:
                 #概念，分类，ETF
@@ -2102,12 +2102,13 @@ def emflowRT9355(t):
     except Exception as e:
         mylog.printe(e)
 
-def getEmflowRT9355():
+def getEmflowRT9355(t=None):
     global sel9355
     if sel9355 is None:
         #概念，分类，ETF
         sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2'")
-    t = datetime.today()
+    if t is None:
+        t = datetime.today()
     tsname="emflowRT9355ts_%d_%d"%(t.month,t.day)
     kname="emflowRT9355k_%d_%d"%(t.month,t.day)
     b,D = shared.fromRedis(tsname)

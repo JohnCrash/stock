@@ -1036,32 +1036,31 @@ def bolltrench():
     if not b:
         bolls = {}
     isupdate = False
-    for period in [5,15,30,60]:
+    for period in [15,30,60]:
         if period not in bolls or t-bolls[period] > timedelta(minutes=period):
             bolls[period] = t
             isupdate = True
             K,D = xueqiu.get_period_k(period)
             for i in range(len(companys)):
                 for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
-                    b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(K[i,:j],16,3)
+                    b,(n,mink,maxk,zfn) = stock.bollwayex(K[i,:j])
                     if b:
-                        bi,ei = stock.extway(K[i,:],j,n,mink,maxk)
-                        tbi = D[bi][0]
-                        tei = D[ei][0]  
-                        #tbi = D[j-n][0]
-                        #tei = D[j][0]
-                        if companys[i][1] not in bolls:
-                            bolls[companys[i][1]] = []
-                        bls = bolls[companys[i][1]]
-                        isexist=False
-                        for i in range(len(bls)):
-                            if bls[i][1]==period: #已经存在就
-                                bls[i] = (D[-1][0],period,n,up,down,mink,maxk,tbi,tei,zfn)
-                                isexist = True
-                                break
-                        if not isexist:
-                            bls.append((D[-1][0],period,n,up,down,mink,maxk,tbi,tei,zfn))
-                        break
+                        bi,ei,mink,maxk= stock.extway(K[i,:],j,n,mink,maxk)
+                        if ei-bi>(4*16*15)/period: #>4 day
+                            tbi = D[bi][0]
+                            tei = D[ei][0]
+                            if companys[i][1] not in bolls:
+                                bolls[companys[i][1]] = []
+                            bls = bolls[companys[i][1]]
+                            isexist=False
+                            for i in range(len(bls)):
+                                if bls[i][1]==period: #已经存在就
+                                    bls[i] = (D[-1][0],period,n,mink,maxk,mink,maxk,tbi,tei,zfn)
+                                    isexist = True
+                                    break
+                            if not isexist:
+                                bls.append((D[-1][0],period,n,mink,maxk,mink,maxk,tbi,tei,zfn))
+                            break
     if isupdate:
         shared.toRedis(bolls,ename,ex=2*3600)
     return bolls
@@ -2004,11 +2003,12 @@ def riseview(review=None,DT=60,BI=18):
                         ma5 = stock.ma(K[i,:],80)
                         if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长
                             if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
-                                if (companys[i][1] in bolls and stock.isStrongBollway(bolls[companys[i][1]])) or review is not None: #review 不进行bolls检查
+                                if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
                                     r = 0
                                     if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
                                         r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
-                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],stock.getBollwayUpline(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
+                                    line = stock.getBollwayUpline(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else 0
+                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],line)) #company,涨幅,量增幅比率,流入
         return R
     """
     流入速率于涨幅速率榜
@@ -2026,7 +2026,7 @@ def riseview(review=None,DT=60,BI=18):
                         m1 = stock.ma(F,30)
                         j = -1
                         for j in range(-1,-k.shape[1]+2,-1):
-                            if m1[j]>m0[j]:
+                            if m1[j]>m0[j]: #长期大于短期
                                 break
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
@@ -2063,6 +2063,7 @@ def riseview(review=None,DT=60,BI=18):
         TOOLBUTS.append(widgets.Button(description=it[0]))
         TOOLBUTS[-1].perfix = it[1]
         TOOLBUTS[-1].on_click(on_shollall)
+    
     def update(offset=None):
         nonlocal code2i,companys,kview_output,toolbox,TOOLBUTS,buts
         if review is None:
@@ -2077,7 +2078,7 @@ def riseview(review=None,DT=60,BI=18):
 
         a = None
 
-        if True:#stock.isTransTime() and stock.isTransDay():# and t.hour==9 and t.minute>=30 and t.minute<=45: #一般数据更新周期1分钟，这里对最后的数据做即时更新
+        if stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
             b,a,ts,rtlist = xueqiu.getEmflowRT9355()
             if b:
                 k = np.copy(k)
@@ -2100,7 +2101,7 @@ def riseview(review=None,DT=60,BI=18):
                 j = code2i[c]
                 k[j,:,:] = a[i,:,:]
             d = ts
-            xticks = [i for i in range(0,12*15,12)]
+            xticks = [i for i in range(0,12*30,12)]
         x = np.arange(k.shape[1])
 
         #计算盘前开始于结束
@@ -2151,9 +2152,6 @@ def riseview(review=None,DT=60,BI=18):
                 if is2has(it[0],p[0]): #同时存在于价格榜和流入涨幅榜
                     lw += 2
                     label = companys[i][2] #r"$\bf{%s}$"%(companys[i][2]) #汉字不能加粗？
-                if k[i,-1,0]>it[3]: #长通道排名
-                    lw += 2
-                    label = "*%s*"%label
                 zpl = axs[p[1]].plot(x,k[i,:,1],label=label,linewidth=lw)
                 #相对值
                 hug = k[i,:,3]+k[i,:,4]
@@ -2167,8 +2165,10 @@ def riseview(review=None,DT=60,BI=18):
                 #这里计算突破为涨幅yp
                 openp = k[i,-1,0]/(1.+k[i,-1,1]/100.) #简单反推下开盘价格
                 yp = 100*(it[3]-openp)/openp    
-                if yp<5 and yp>-8: #距离太远不显示
+                if yp<5 and yp>-5 and yp!=0: #距离太远不显示
                     axs[p[1]].axhline(y=yp,linestyle='--',color=zpl[0]._color,linewidth=zpl[0]._linewidth)
+                if yp!=0: #同时存在于价格榜和流入涨幅榜
+                    lw += 2
                 #axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=label,linewidth=lw,linestyle='--' if not it[3] else None) #绝对值
                 axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
                 for j in (1,2):

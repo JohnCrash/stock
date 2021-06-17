@@ -1461,7 +1461,7 @@ class Plote:
             axs[self._rsiInx].axhline(80,color='black',linestyle='--')
         #绘制通道
         if type(self._period)==int:#self._bollway:
-            for peroid in (5,15,30,60):
+            for peroid in (15,30,60):
                 if peroid>=self._period:
                     _,K,D = self.getKlineData(self._comarg,peroid,runtime=False)
                     #这里一self._trendHeadPos为终点向前搜索
@@ -1475,23 +1475,24 @@ class Plote:
                         K = K[:eii,:]
                         D = D[:eii]
                     for j in range(-1,-len(K)+16,-1):
-                        b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(K[:j,4],16,3)
+                        b,(n,mink,maxk,zfn) = stock.bollwayex(K[:j,4])
                         if b: #绘制发现的第一个通道
-                            exbi,exei = stock.extway(K[:,4],j,n,mink,maxk)
-                            tbi = D[exbi][0]
-                            tei = D[exei][0]                        
-                            bbi,bei = stock.get_date_i(self._date,tbi,tei)
-                            if bbi<bi:
-                                bbi=bi
-                            if bei>ei:
-                                bei=ei
-                            if bbi>=bi and bbi<=ei and bei>=bi and bei<=ei:
-                                period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),'d':(5,'red','dotted')}
-                                st = period2c[peroid]
-                                axsK.broken_barh([(bbi,bei-bbi)], (mink,maxk-mink),facecolor='None',edgecolor=st[1],linewidth=st[0],linestyle=st[2])
-                                #将通道宽度和折返次数标识出来
-                                axsK.annotate("%d - %.2f%%"%(zfn,100*(maxk-mink)/mink),xy=(bei,maxk),xytext=(-50,50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',fontweight='bold')
-                            break
+                            exbi,exei,mink,maxk = stock.extway(K[:,4],j,n,mink,maxk)
+                            if ei-bi>(4*16*15)/peroid: #>4 day
+                                tbi = D[exbi][0]
+                                tei = D[exei][0]                        
+                                bbi,bei = stock.get_date_i(self._date,tbi,tei)
+                                if bbi<bi:
+                                    bbi=bi
+                                if bei>ei:
+                                    bei=ei
+                                if bbi>=bi and bbi<=ei and bei>=bi and bei<=ei:
+                                    period2c = {5:(3,'forestgreen','dotted'),15:(3,'royalblue','dotted'),30:(3,'fuchsia','dashed'),60:(4,'darkorange','dashdot'),'d':(5,'red','dotted')}
+                                    st = period2c[peroid]
+                                    axsK.broken_barh([(bbi,bei-bbi)], (mink,maxk-mink),facecolor='None',edgecolor=st[1],linewidth=st[0],linestyle=st[2])
+                                    #将通道宽度和折返次数标识出来
+                                    axsK.annotate("%d - %.2f%%"%(zfn,100*(maxk-mink)/mink),xy=(bei,maxk),xytext=(-50,50), textcoords='offset points',bbox=dict(boxstyle="round", fc="1.0"),arrowprops=dict(arrowstyle="->",connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',fontweight='bold')
+                                break
             
         #绘制额外的图表
         while self._showfigure:

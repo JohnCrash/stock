@@ -577,9 +577,8 @@ def PopupK(code,period=None,mode='auto',pos=None,buyprice=None):
     def cb(self,axs,bi,ei):
         if buyprice is not None:
             axs[0].axhline(y=buyprice,color='red')
-    printt('begin')
-    self = kline.Plote(code,period,config={'boll':True,'bigma20':True,'cb':cb},mode=mode)
-    printt('kline.Plote')
+
+    self = kline.Plote(code,period,config={'boll':True,'flow':True,'bigma20':True,'cb':cb},mode=mode)
     bi = 0
     ei = 0
     if pos is not None:
@@ -601,7 +600,6 @@ def PopupK(code,period=None,mode='auto',pos=None,buyprice=None):
         self.showKline(figsize=(22,10),popup=True)
     else:   
         self.showKline(bi,ei,figsize=(22,10),popup=True)
-    printt('showKline')
 
 def get_last_rt(t):
     b,k,d = xueqiu.getTodayRT(t)
@@ -828,12 +826,7 @@ def testrise2():
         print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
 
 """
-9-10:30 有突破boll通道上轨的态势
-条件
-1.早盘9:30-10:30，股价上行资金净流入
-2.股价处于多周期通道上轨以上
-3.追涨位置到通道上轨不得大于通道的宽度
-4.通道重叠度高，5日均线平直
+开盘连续资金流入，涨幅排名第一
 """
 def testrise3():
     bi = datetime(year=2021,month=4,day=6)
@@ -909,6 +902,178 @@ def testrise3():
                 ts = "\t%s\t%s"%(stock.timeString2(it[7]),stock.timeString2(it[8]))
             print("%d\t%s\t%s\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%\t%s"%(param,str(it[0]),id2com[it[1]][2],100*it[3],100*it[4],100*it[5],100*it[6],ts))
             #showrtflow(id2com[it[1]][2],str(it[0]),it[1],0,-1)
+            #PopupK(id2com[it[1]][1],5,mode='normal',pos=str(it[0]),buyprice=it[2])
+            avgbuy += it[3]
+            avgmax += it[4]
+            avgmin += it[5]
+            avgavg += it[6]
+        print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
+
+#testrise3()
+
+def backwardBollway(k,d):
+    for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
+        b,(n,down,up,mink,maxk,zfn) = stock.bollwayex(k[:j],16,3)
+        if b:
+            bi,ei = stock.extway(k,j,n,mink,maxk)
+            tbi = d[bi][0]
+            tei = d[ei][0]
+            return (tbi,tei,mink,maxk)
+    return ()
+"""
+计算D中每天开始前的通道,bi,ei是时间
+[(bi,ei,up,down),...]
+"""
+def bollwaybyD(k,d,D):
+    LS = []
+    bi = 0
+    for i in range(len(D)):
+        cd = D[i][0]
+        for j in range(bi,len(d)):
+            if d[j][0].day==cd.day:
+                bi = j
+                break
+            elif d[j][0]>cd:
+                bi = j
+                break
+        LS.append(backwardBollway(k[:bi],d[:bi]))
+    return LS
+        
+"""
+为了以后计算方便
+这里集中吧概念和ETF的通道都计算好存入文件
+"""
+def calcbollway():
+    t = datetime.today()
+    sname = "bollway_%02d_%02d"%(t.month,t.day)
+    b,S = shared.fromRedis(sname)
+    if b:
+        return S
+    sel = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2'")
+    R = {}
+    D = stock.query("select date from kd_xueqiu where id=8828 and date>'2021-02-01'") #比after落后一个月
+    D = [(stock.date2time(D[i][0]),) for i in range(len(D))]
+    after = '2021-01-01'
+    for i in range(len(sel)):
+        s = sel[i]
+        R[s[2]] = {}
+        _,k5,d5 = stock.loadKline(s[2],5,after=after)
+        print(i,len(sel),sel[i][1],sel[i][2])
+        for period in [5,15,30,60]:
+            if period==5:
+                k = k5
+                d = d5
+            else:
+                k,d = stock.mergeK(k5,d5,period)
+            R[s[2]][period] = bollwaybyD(k[:,4],d,D)
+    #R[code][period][day] = [(bi,ei,up,down),..]
+    #[(day,)...]
+    shared.toRedis((R,D),sname,ex=24*3600)
+    return R,D
+
+#calcbollway()
+"""
+9-10:30 有突破boll通道上轨的态势
+条件
+1.早盘9:30-10:30，股价上行资金净流入
+2.股价处于多周期通道上轨以上
+3.追涨位置到通道上轨不得大于通道的宽度
+4.通道重叠度高，5日均线平直
+"""
+def testrise4():
+    bi = datetime(year=2021,month=4,day=6)
+    data = []
+    lastk = None
+    bolls,bollsD = calcbollway()
+    id2com = xueqiu.get_company_select_id2com()
+    def getbollbycodedate(code,t):
+        nonlocal bolls,bollsD
+        bo = []
+        if code not in bolls:
+            return False
+        for i in range(len(bollsD)-1,0,-1):
+            if t>bollsD[i][0]:
+                break
+        for period in [5,15,30,60]:
+            b = bolls[code][period][i]
+            if len(b)>0:
+                bo.append([t,period,0,b[2],b[3],b[2],b[3],b[0],b[1],4])
+        return bo
+    #(0 t, 1 id,2 price,3 rate,4 rmax,5 rmin,6 avg,7 dmax,8 dmin) 日期,公司id,买入价格，买入时日增长率，次日最大收益，次日最低收益，次日平均收益，最大收益时间，最小收益时间
+    # companys 0 company_id,1 code,2 name,3 prefix
+    # k = [(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)]
+    # k = [(0 price,1 volume,2 hug,3 ting)] 精简
+    def cb(t,ids,k,d,data,param):
+        nonlocal lastk,id2com
+        if len(data)>0: #处理上一个买入的结果数据
+            S = data[-1]
+            for i in range(len(ids)):
+                if ids[i]==S[1]:
+                    imax = k[i,15:,0].argmax()+15
+                    imin = k[i,15:,0].argmin()+15
+                    rmax = (k[i,imax,0]-S[2])/S[2]
+                    rmin = (k[i,imin,0]-S[2])/S[2]
+                    dmax = d[imax]
+                    dmin = d[imin]
+                    avg = (np.mean(k[i,:,0])-S[2])/S[2]
+                    S[4] = rmax
+                    S[5] = rmin
+                    S[6] = avg
+                    S[7] = dmax
+                    S[8] = dmin
+                    break
+        #下面进入本日追涨买入
+        i = 0
+        for i in range(len(d)):
+            if d[i].hour==9 and d[i].minute>=param:
+                break
+        R = []
+        if lastk is None:
+            lastk = {}
+            for j in range(k.shape[0]):
+                lastk[ids[j]] = k[j,0]
+        n = 2 #连续n分钟资金逐渐增长
+        for j in range(k.shape[0]):
+            price = k[j,i+n,0]
+            flow = k[j,i,2]
+            if ids[j] in lastk:
+                lastprice = lastk[ids[j]][0]
+                lastvolume = lastk[ids[j]][2]
+                r = (price-lastprice)/lastprice
+                b = True #资金是单向流入的
+                for s in range(1,n):
+                    if k[j,i+s+1,2]<k[j,i+s,2]:
+                        b = False
+                        break
+                
+                if ids[j] in id2com:
+                    bo = getbollbycodedate(id2com[ids[j]][1],d[-1])
+                    if r>0 and k[j,i,2]>0 and b and stock.isStrongBollway(bo) and price>stock.getBollwayUpline(bo):
+                        print(bo)
+                        PopupK(id2com[ids[j]][1],15,mode='normal',pos=str(d[-1]),buyprice=price)
+                        R.append((ids[j],price,r))
+        R = sorted(R,key=lambda it:it[2],reverse=True)
+        if len(R)>0:
+            S = R[0]
+            data.append([t,S[0],S[1],S[2],0,0,0,None,None])
+            #将当日的最后一个价格作为收盘价格
+            for j in range(k.shape[0]):
+                lastk[ids[j]] = k[j,-1]    
+
+    id2com = xueqiu.get_company_select_id2com()
+    for param in range(31,32):
+        data = []
+        enumrt(bi,cb,data,param)
+        avgbuy = 0
+        avgmax = 0
+        avgmin = 0
+        avgavg = 0
+        for it in data:
+            ts = ''
+            if it[7] is not None and it[8] is not None:
+                ts = "\t%s\t%s"%(stock.timeString2(it[7]),stock.timeString2(it[8]))
+            print("%d\t%s\t%s\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%\t%s"%(param,str(it[0]),id2com[it[1]][2],100*it[3],100*it[4],100*it[5],100*it[6],ts))
+            #showrtflow(id2com[it[1]][2],str(it[0]),it[1],0,-1)
             PopupK(id2com[it[1]][1],5,mode='normal',pos=str(it[0]),buyprice=it[2])
             avgbuy += it[3]
             avgmax += it[4]
@@ -916,6 +1081,7 @@ def testrise3():
             avgavg += it[6]
         print(("%d\t%.02f%%\t%.02f%%\t%.02f%%\t%.02f%%")%(param,100*avgbuy/len(data),100*avgmax/len(data),100*avgmin/len(data),100*avgavg/len(data)))
 
+#testrise4()
 """
 研究在通道下轨出现下跌以来最大的快速上涨，比如5分钟k线实体比最近的都长
 """
