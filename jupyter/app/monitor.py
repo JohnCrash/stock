@@ -659,371 +659,22 @@ def getTodayTop(perfix='90',top=3,K=None):
 def Indexs():
     global ETFs,BCs
     menus = {
-        "追涨":[riseview],
+        "盯盘":[riseview],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业        
         "可交易":[muti_monitor],
         "通道突破":[monitor_bollup],
-        "5日线排行":[ma5longTop],
         "活跃分类":get10Top('90',5,3),
         "活跃概念":get10Top('91',10,3),
         "上榜分类":getDTop('90',3)[:10],
         "上榜概念":getDTop('91',15)[:20],
+        "5日线排行":[ma5longTop],
         "ETF":ETFs,
         "自选":BCs,
         "关注":[favoriteList]
     }
-    indexpage(menus)
-  
-"""
-boll通道由平直到打开返回True,否则返回False
-通道检查n个点，通道宽度都要小于p
-"""
-def bollopenk(k,period=240,n=16):
-    if len(k)>n and k[-1]>k[-2] and k[-1]>k[-3] and k[-1]>k[-4]: #快速过滤掉大部分的
-        b,(N,up,down,minv,maxv,real_minv,real_maxv,zfn)=stock.bollwayex(k[:-1],n)
-        return b and k[-1]>maxv
-    return False
-
-"""
-三角形整理
-最高偏离至少要大于p,最少要回归到最大值的q的位置,大于均线的k线个数要大于n
-返回b, (起涨点bi,最大点maxi)
-"""
-def trianglek(k,ma,p=0.02,q=1/2,n=5):
-    dk = k-ma
-    maxdk = 0
-    maxi = 0
-    if dk[-1]>0:
-        for i in range(-1,-len(dk)-1,-1):
-            if dk[i]>0:
-                if dk[i] > maxdk:
-                    maxdk = dk[i]
-                    maxi = i
-            else:
-                #要求最大要大于一个阈值
-                if maxi!=0 and maxi-i>=n:
-                    maxr = maxdk/ma[maxi] #最大点高于均线的比率
-                    endr = dk[-1]/ma[-1] #最后点高于均线的比率
-                    if maxr>p and  endr/maxr < q:
-                        return True,(i,maxi)
-                return False,(i,maxi)
-    return False,(0,0)
-"""
-股价先大幅高于均线ma,然后开始回落到ma返回True,否则返回False
-最高偏离至少要大于p,最少要回归到最大值的q的位置,大于均线的k线个数要大于n
-"""
-def maclose(k,ma,p=0.02,q=1/3,n=5):
-    b,_ = trianglek(k,ma,p,q,n)
-    return b
-
-"""
-对当前的事件进行组合提取
-返回一个
-{
-    code:[(type,period,time)]
-}
-"""
-def combo_event(E):
-    companys = xueqiu.get_company_select()
-    code2c = {}
-    for c in companys:
-        code2c[c[1]] = c
-    event = E['event'][-1]
-    R = {}
-    t = E['seqs'][-1]
-    def comboc(s,c):
-        LS = []
-        for m in ['fl_top','gn_top','bollopen','maclose']:
-            if m in E and c in E[m]:
-                for p in E[m][c].items():
-                    LS.append((m,p[0],p[1]))
-        if len(LS)>0: #必须有一个其他的事件
-            LS.append((s,0,t))
-            R[c] = LS
-    for s in ['fl_topup','gn_topup','fastup','highup']:
-        if s in event:
-            for c in event[s]:
-                comboc(s,c)
-    return R
-"""
-监视在均线附近
-1.boll通道向上(15分钟,30分钟,60分钟,日线)
-2.触碰重要均线向上(5日,10日,20日,60日)
-3.涨幅排名(首次进入排名，n次进入排名)
-4.快速上涨
-E = {
-    "fl_top":{ #分类排行
-        code:{
-            period:add_time
-        },
-        ...
-    },
-    "gn_top":{ #概念排行
-        code:{
-            period:add_time
-        },
-        ...
-    },
-    "bollopen":{
-        code:{
-            period:add_time
-        },
-        ...
-    },
-    "maclose":{
-        code:{
-            period:add_time
-        },
-        ...
-    },
-    "fl_top3":[] #当日分类排行
-    "gn_top3":[] #当日概念排行
-    "seqs":[
-        每次进行执行moniter_loop的时间列表
-    ],
-    "event":[
-        {"fl_topup":[],"gn_topup":[],"fastup":[],"highup":[]},
-        ....
-    ]
-}
-E 和 offset用于模拟
-"""
-def moniter_loop(periods=[15,30,60,240]):
-    t = datetime.today()
-    ename = 'event%d%d'%(t.month,t.day)
-    if not stock.isTransTime():
-        b,E = shared.fromRedis(ename)
-        return E
-    
-    companys = xueqiu.get_company_select()
-    K = {}
-    D = {}    
-    for period in periods:
-        K[period],D[period] = xueqiu.get_period_k(period)
-    b,E = shared.fromRedis(ename)
-    def add(es,com,period,arg=None):
-        nonlocal t
-        if es not in E:
-            E[es] = {}
-        if com not in E[es]:
-            E[es][com] = {}
-        if period not in E[es][com]:
-            E[es][com][period] = t
-    if not b:
-        E = {}
-        tops = getDTop('90',3,K=K[240]) #初始化日排行榜
-        for c in tops:
-            add('fl_top',c,240)
-        tops = getDTop('91',15,K=K[240]) #初始化日排行榜
-        for c in tops:
-            add('gn_top',c,240)
-        E['seqs'] = [t]
-        E['event'] = []
-        E['fl_top3'] = []
-        E['gn_top3'] = []
-    else:
-        E['seqs'].append(t)
-    #1.boll通道向上(15分钟,30分钟,60分钟,日线)
-    for period in periods:
-        k = K[period]
-        ma20 = stock.maMatrix(k,20)
-        for i in range(len(companys)):
-            if k[i,-1]>ma20[i,-1] and bollopenk(k[i,:],period): #对于在20均线上的才做检查
-                add('bollopen',companys[i][1],period)
-    #2.触碰重要均线向上(5日,10日,20日,60日)
-    cma = [
-        [30,40,5],#使用period=30的40均线,就是5日线做检查
-        [30,80,10],
-        [240,20,20],
-        [240,60,60]
-    ]
-    for p in cma:
-        k = K[p[0]]
-        ma = stock.maMatrix(k,p[1])
-        for i in range(len(companys)):
-            if k[i,-1]>=ma[i,-1] and maclose(k[i,:],ma[i,:]):
-                add('maclose',companys[i][1],p[2])
-    #3.涨幅排名(首次进入排名，n次进入排名)
-    event = {}
-    for it in [('90',3,'fl_top3','fl_topup'),('91',15,'gn_top3','gn_topup')]:
-        new_top3 = getTodayTop(it[0],it[1],K[240])
-        old_top3 = E[it[2]]
-        news = []
-        for c in new_top3:
-            if c not in old_top3:#新上榜
-                news.append(c)
-        if len(news)>0:
-            event[it[3]] = news
-        E[it[2]] = new_top3
-    b,r,d = xueqiu.getTodayRT()
-    if b:
-    #4.快速上涨(使用分时图进行检查)
-        if r.shape[1]==1:
-            highup = []
-            for i in range(r.shape[0]):
-                if r[i,-1,1]>=0.5: #高开大于0.5%的
-                    highup.append(companys[i][1])
-            if len(highup)>0:
-                event['highup'] = highup
-        else:
-            fastup = []
-            for i in range(r.shape[0]):
-                if r[i,-1,1]-r[i,-2,1]>=0.5: #1分钟涨幅大于0.5%的
-                    fastup.append(companys[i][1])
-            if len(fastup)>0:
-                event['fastup'] = fastup
-    event['timestamp'] = t
-    E['event'].append(event) #将E保存
-    shared.toRedis(E,ename,ex=7*24*3600)
-    return E
-
-def timesplitEvent():
-    t = datetime.today()
-    E = moniter_loop()
-    companys = xueqiu.get_company_select()
-    code2c = {}
-    for c in companys:
-        code2c[c[1]] = c
-    result = []
-    for es in [('bollopen','通道打开'),('maclose','三角整理')]:
-        if es[0] in E:
-            for e in E[es[0]].items():
-                code = e[0]
-                for c in e[1].items():
-                    period = c[0]
-                    tim = c[1]
-                    if tim.hour==t.hour:
-                        name = code2c[code][2]
-                        result.append(("'%s'周期%d%s"%(name,period,es[1]),es[0],code,period))
-
-    events = E['event']
-    for event in events:
-        tim = event['timestamp']
-        if tim.hour==t.hour:
-            for es in [('highup','高开'),('fastup','快速上涨'),('fl_topup','上分类榜'),('gn_topup','上概念榜')]:
-                if es[0] in event:
-                    for code in event[es[0]]:
-                        name = code2c[code][2]
-                        result.append(("%d:%d'%s'%s"%(tim.hour,tim.minute,name,es[1]),es[0],code,0))
-    return result
-            
-"""
-"""
-def monitor():
-    toolbar_output = widgets.Output()
-    kline_output = widgets.Output()
-    event_output = widgets.Output()
-    """
-    fltopDropdown = widgets.Dropdown(
-        options=[],
-        value=None,
-        description='分类榜',
-        disabled=False,
-        layout=Layout(width='196px')
-    )
-    gltopDropdown = widgets.Dropdown(
-        options=[],
-        value=None,
-        description='概念榜',
-        disabled=False,
-        layout=Layout(width='196px')
-    )     
-    bollupDropdown = widgets.Dropdown(
-        options=[],
-        value=None,
-        description='通道开',
-        disabled=False,
-        layout=Layout(width='196px')
-    )
-    triangleDropdown = widgets.Dropdown(
-        options=[],
-        value=None,
-        description='三角整理',
-        disabled=False,
-        layout=Layout(width='196px')
-    ) 
-    highupDropdown = widgets.Dropdown(
-        options=[],
-        value=None,
-        description='高开',
-        disabled=False,
-        layout=Layout(width='196px')
-    )
-    fastupDropdown = widgets.Dropdown(
-        options=[],
-        value=None,
-        description='快速上涨',
-        disabled=False,
-        layout=Layout(width='196px')
-    )
-    
-    box = Box(children=[fltopDropdown,gltopDropdown,triangleDropdown,highupDropdown,fastupDropdown],layout=box_layout)
-    """
-    currentEventList=None
-    checktable = {'bollopen':True,'maclose':False,'highup':True,'fastup':True,'fl_topup':True,'gn_topup':True}
-    box = Box(children=[],layout=box_layout)
-    def onkline(e):
-        #kline_output.clear_output(wait=True)
-        with kline_output:
-            if e.event[1]=='maclose':
-                period = 'd'
-                #e.event[3] 代表均线
-            else:
-                if e.event[3]==240 or e.event[3]==0:
-                    period = 'd'
-                else:
-                    period = e.event[3]
-            K(e.event[2],period)
-    def updateeventtable():
-        nonlocal checktable,currentEventList
-        items = []
-        if currentEventList is not None:
-            for event in currentEventList: #(0描述,1type,2code,3period)
-                if checktable[event[1]] and event[2][0]=='B':
-                    but = widgets.Button(
-                        description=event[0],
-                        disabled=False,
-                        button_style='',
-                        layout=Layout(width='196px'))
-                    but.event = event
-                    but.on_click(onkline)
-                    items.append(but)
-        box.children = items
-
-    def loop():
-        nonlocal currentEventList
-        currentEventList = timesplitEvent()
-        updateeventtable()
-        xueqiu.setTimeout(60,loop,'monitor.loop')
-    loop()
-    def oncheck(e):
-        nonlocal checktable
-        checktable[e['owner'].event] = e['new']
-        updateeventtable()
-    toolitem = []
-    for it in [('通道打开','bollopen'),('三角整理','maclose'),('高开','highup'),('快速上涨','fastup'),('分类上榜','fl_topup'),('概念上榜','gn_topup')]:
-        check = widgets.Checkbox(value=checktable[it[1]],description=it[0],disabled=False,layout=Layout(display='block',width='96px'))
-        check.event = it[1]
-        check.observe(oncheck,names='value')
-        toolitem.append(check)
-    clearbut = widgets.Button(
-                description="清除",
-                disabled=False,
-                button_style='')
-    
-    def on_clear(e):
-        kline_output.clear_output()
-    clearbut.on_click(on_clear)
-    toolitem.append(clearbut)    
-    checkbox = Box(children=toolitem,layout=box_layout)
-    event_output.clear_output(wait=True)
-    with event_output:
-        display(checkbox,box)  
- 
-    display(toolbar_output,kline_output,event_output)
-
+    indexpage(menus)    
 """
 返回当前监控的全部boll通道
 """
@@ -1951,7 +1602,6 @@ def bolltops(prefix='91',ntops=10):
     S = sorted(S,key=lambda it:it[1])
     return S[:ntops]
 
-
 #早盘显示
 """
 用于早盘追涨
@@ -1995,20 +1645,28 @@ def riseview(review=None,DT=60,BI=18):
         if d[-1].hour==9 and d[-1].minute<=30:
             for i in range(len(companys)):
                 if companys[i][3] in prefixs and companys[i][1] in bolls and i<k.shape[0] and k[i,-1,1]>0:
-                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],stock.getBollwayUpline(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
+                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],stock.getBollwayRange(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
         else:
             for i in range(len(companys)):
                 if companys[i][3] in prefixs and i<k.shape[0] and i<k2.shape[0]:
                     if k[i,-1,3]+k[i,-1,4]>0: #净流入
                         ma5 = stock.ma(K[i,:],80)
                         if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长
-                            if True:#k[i,-1,2]>k2[i,k.shape[1]-1,2] and k[i,-1,1]>0: #放量上涨
-                                if companys[i][1] in bolls or review is not None: #review 不进行bolls检查
-                                    r = 0
-                                    if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
-                                        r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
-                                    line = stock.getBollwayUpline(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else 0
-                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],line)) #company,涨幅,量增幅比率,流入
+                            if companys[i][1] in bolls:
+                                r = 0
+                                if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
+                                    r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
+                                rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
+                                R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],rang)) #company,涨幅,量增幅比率,流入
+                        else: #如果回到通道内给机会
+                            if companys[i][1] in bolls:
+                                r = 0
+                                if k.shape[1]-1<k2.shape[1] and k2[i,k.shape[1]-1,2]>0:
+                                    r = k[i,-1,2]/k2[i,k.shape[1]-1,2]
+                                rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
+                                if rang[0]>0 and k[i,-1,0]>rang[0]:
+                                    R.append((companys[i],k[i,-1,1],r,k[i,-1,3]+k[i,-1,4],rang)) #company,涨幅,量增幅比率,流入
+
         return R
     """
     流入速率于涨幅速率榜
@@ -2031,7 +1689,7 @@ def riseview(review=None,DT=60,BI=18):
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
                             if dhug>=0:
-                                R.append((companys[i],k[i,-1,1],dhug,0,0))#company,涨幅,涨幅增量+流入增量,0
+                                R.append((companys[i],k[i,-1,1],dhug,0,(0,0)))#company,涨幅,涨幅增量+流入增量,0
 
         return R
     #0 company_id,1 code,2 name,3 prefix
@@ -2063,7 +1721,11 @@ def riseview(review=None,DT=60,BI=18):
         TOOLBUTS.append(widgets.Button(description=it[0]))
         TOOLBUTS[-1].perfix = it[1]
         TOOLBUTS[-1].on_click(on_shollall)
-    
+    def on_clear(e):
+        nonlocal kout
+        kout.clear_output()
+    TOOLBUTS.append(widgets.Button(description='清除'))
+    TOOLBUTS[-1].on_click(on_clear)
     def update(offset=None):
         nonlocal code2i,companys,kview_output,toolbox,TOOLBUTS,buts
         if review is None:
@@ -2142,7 +1804,8 @@ def riseview(review=None,DT=60,BI=18):
             p = LS[i]
             tops = TOPS[i]
 
-            for it in tops:
+            for j in range(len(tops)):
+                it = tops[j]
                 i = code2i[it[0]]
                 if it[2] not in comps:
                     comps.append((it[2],it[3]))
@@ -2150,7 +1813,7 @@ def riseview(review=None,DT=60,BI=18):
                 lw = 1
                 label = companys[i][2]
                 if is2has(it[0],p[0]): #同时存在于价格榜和流入涨幅榜
-                    lw += 2
+                    lw += 1
                     label = companys[i][2] #r"$\bf{%s}$"%(companys[i][2]) #汉字不能加粗？
                 zpl = axs[p[1]].plot(x,k[i,:,1],label=label,linewidth=lw)
                 #相对值
@@ -2164,11 +1827,13 @@ def riseview(review=None,DT=60,BI=18):
                 #it[3] 是通道突破位置
                 #这里计算突破为涨幅yp
                 openp = k[i,-1,0]/(1.+k[i,-1,1]/100.) #简单反推下开盘价格
-                yp = 100*(it[3]-openp)/openp    
-                if yp<5 and yp>-5 and yp!=0: #距离太远不显示
-                    axs[p[1]].axhline(y=yp,linestyle='--',color=zpl[0]._color,linewidth=zpl[0]._linewidth)
-                if yp!=0: #同时存在于价格榜和流入涨幅榜
-                    lw += 2
+                down,up = it[3]
+                if down!=0 and up!=0:
+                    down_r = 100*(down-openp)/openp
+                    up_r = 100*(up-openp)/openp
+                    axs[p[1]].vlines(k.shape[1]+2*j+1,down_r,up_r,color=zpl[0]._color,linewidth=2*zpl[0]._linewidth)
+                    axs[p[1]].axhline(y=down_r,linestyle='dotted',color=zpl[0]._color,linewidth=zpl[0]._linewidth)
+                    axs[p[1]].axhline(y=up_r,linestyle='dashed',color=zpl[0]._color,linewidth=zpl[0]._linewidth)
                 #axs[p[2]].plot(x,k[i,:,3]+k[i,:,4],label=label,linewidth=lw,linestyle='--' if not it[3] else None) #绝对值
                 axs[p[2]].xaxis.set_major_formatter(MyFormatterRT(d,'h:m'))
                 for j in (1,2):

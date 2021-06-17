@@ -1425,11 +1425,14 @@ def isStrongBollway(bolls):
     return True
 
 """
-突破压力线
+通道的上部和下部
 """
-def getBollwayUpline(bolls):
+def getBollwayRange(bolls):
     maxx = 0
+    minx = 1e9
     for bo in bolls:
         if bo[6]>maxx:
             maxx = bo[6]
-    return maxx
+        if bo[5]<minx:
+            minx = bo[5]
+    return minx,maxx
