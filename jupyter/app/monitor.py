@@ -765,29 +765,44 @@ def get_last_rt(t):
                 break
     return t2,k,d
 
+_rt_k = None
+_rt_d = None
 def get_rt(n=1):
     """
     取的最近n天的k,d数据，并且叠加快速更新数据
     """
+    global _rt_k,_rt_d
     t = datetime.today()
     K = None
     D = []
-    for i in range(n):
-        pt,k,d = get_last_rt(t)
-        if d is not None:
-            if K is None:
-                K = k
-            else:
-                if k.shape[0]==K.shape[0]:
-                    K = np.hstack((k,K))
+    if _rt_k is None:
+        for i in range(n):
+            pt,k,d = get_last_rt(t)
+            if d is not None:
+                if K is None:
+                    K = k
                 else:
-                    k2 = np.zeros((K.shape[0],k.shape[1],k.shape[2]))
-                    k2[:k.shape[0],:,:] = k
-                    K = np.hstack((k2,K))
-            D = d+D
-            t = pt-timedelta(days=1)
-        else:
-            break
+                    if k.shape[0]==K.shape[0]:
+                        K = np.hstack((k,K))
+                    else:
+                        k2 = np.zeros((K.shape[0],k.shape[1],k.shape[2]))
+                        k2[:k.shape[0],:,:] = k
+                        K = np.hstack((k2,K))
+                D = d+D
+                t = pt-timedelta(days=1)
+            else:
+                break
+    elif t.minute==_rt_d[-1].minute and t.hour==_rt_d[-1].hour: #没有新的1分钟数据
+        #完全不需要更新
+        K = _rt_k
+        D = _rt_d
+    else: #重新加装今天的数据
+        pt,k,d = get_last_rt(t)
+        for i in range(len(d)):
+            if d[i]>_rt_d[-1]:
+                break
+        D = _rt_d+d[i:]
+        K = np.hstack((_rt_k,k[:,i:,:]))
     if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
         b,a,ts,rtlist = xueqiu.getEmflowRT9355()
         if b:
@@ -797,6 +812,8 @@ def get_rt(n=1):
                 i = code2i[c]
                 if i<K.shape[0]:
                     K[i,-1,:] = a[j,-1,:]
+    _rt_k = K
+    _rt_d = D
     return K,D
 """
 通道突破监控
@@ -1940,13 +1957,28 @@ def riseview(review=None,DT=60,BI=18):
     display(mbox,toolbox,kout)
     loop()
 
-def plotfs2(ax,k,d,title,rang=None,ma5b=None,style=defaultPlotfsStyle):
+def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,style=defaultPlotfsStyle):
+    """
+    k = (时间,(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)) , d = 时间戳 rang = (通道顶，通道底)
+    ma5b 起始位置5日均线 fv=0 显示大资金，1显示成交量
+    """
     ax[0].set_title(title,y=0.93,fontdict={'fontweight':'bold'})
     x = np.arange(len(d))
     xticks = []
-    for i in range(len(d)):
-        if (d[i].hour==9 and d[i].minute==30) or (d[i].hour==13 and d[i].minute==0):
-            xticks.append(i)
+    fmt = 'd h:m'
+    if dt==60:
+        for i in range(len(d)):
+            if (d[i].hour==9 and d[i].minute==30) or (d[i].hour==13 and d[i].minute==0):
+                xticks.append(i)
+    elif dt==5:
+        for i in range(len(d)):
+            if d[i].minute%5==0:
+                if len(xticks)==0:
+                    xticks.append(i)
+                elif i-xticks[-1]>12:
+                    xticks.append(i)
+        fmt = 'h:m'
+
     #ax[0].axhline(y=0,color='black',linestyle='dotted')
     ax[0].plot(x,k[:,0],color=style['pcolor'])
     m60 = stock.ma(k[:,0],60)
@@ -1961,13 +1993,28 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,style=defaultPlotfsStyle):
         ax[0].plot(x,ma5,linewidth=2,color='magenta',linestyle='dashed')
     if len(ax)==2:
         ax[1].axhline(y=0,color='black',linestyle='dotted')
-        ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
-        ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
+        if fv==0:
+            ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
+            ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
+        elif fv==1:
+            v = np.zeros((k.shape[0],))
+            v[1:] = k[1:,2]-k[:-1,2]
+            ax[1].bar(x,v) #成交量
+        else: #混合图
+            v = np.zeros((k.shape[0],))
+            v[1:] = k[1:,2]-k[:-1,2]
+            smax = k[k[:,6]==k[:,6],6].max()
+            vmax = v[v==v].max()
+            r = smax/vmax
+            ax[1].plot(x,v*r) #成交量            
+            ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
+            ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
+
         ax[1].set_xlim(0,x[-1])
         ax[1].set_xticks(xticks)
-        ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))  
+        ax[1].xaxis.set_major_formatter(MyFormatterRT(d,fmt))  
     else:
-        ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))
+        ax[0].xaxis.set_major_formatter(MyFormatterRT(d,fmt))
     ax[0].set_xticks(xticks)
     ax[0].set_xlim(0,x[-1])
     ax[0].grid(True)
@@ -2071,6 +2118,11 @@ class Frame:
     def toolbox_update(self):
         self._toolbox.children = self._toolbox_widgets
 
+    def toolbuttonbyid(self,id):
+        for but in self._toolbox_widgets:
+            if but.data==id:
+                return but
+        return None
     def toolbox_button(self,desc,data=None,disabled=False,button_style='',icon='',layout=Layout(),on_click=None,group=None,selected=False):
         """
         如果on_click=None将触发类方法on_click(data)
@@ -2128,20 +2180,23 @@ class HotPlot(Frame):
         super(HotPlot,self).__init__()
         self._code2data = {}
         self._page = 0
-        for it in [('刷新',1,None,False),('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('上一页',3,None,False),('下一页',4,None,False)]:
+        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
             self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
         self.toolbox_update()
         self._prefix = ('2',)
+        self._rt = 0 #0 普通60秒 1 5秒级别
     def on_click(self,data):
         if type(data)==str:
             self._page = 0
             self._prefix = (data,)
-        if data==1: #刷新的时候清除
-            self._output.clear_output()
-        elif data==3: #pageup
+        if data==3: #pageup
             self._page-=1
         elif data==4: #pagedown
             self._page+=1
+        elif data==5: #实时
+            self._rt=1 if self._rt==0 else 0
+
+        self._output.clear_output()
         self.update(datetime.today(),None)
     def on_check(self,data,check):
         pass
@@ -2176,7 +2231,22 @@ class HotPlot(Frame):
             self._page = 0
         if self._page>=math.ceil(len(dataSource)/N):
             self._page = math.ceil(len(dataSource)/N)-1
-        return dataSource[self._page*N:]
+        viewdata = dataSource[self._page*N:]
+        if self._rt==1 and len(viewdata)>0: #使用5秒级别的数据
+            b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][5][-1])
+            if b:
+                viewrt = []
+                c2i = {}
+                for i in range(len(rtlist)):
+                    c2i[rtlist[i][2]] = i
+                for it in viewdata:
+                    if it[0][1] in c2i:
+                        j = c2i[it[0][1]]
+                        viewrt.append((it[0],it[1],it[2],it[3],a[j,:,:],ts,None))
+                    else:
+                        viewrt.append(it) #没发现5秒数据
+                viewdata = viewrt
+        return viewdata
 
     def update(self,t,lastt):
         if lastt is None or (stock.isTransDay() and stock.isTransTime()):
@@ -2195,7 +2265,7 @@ class HotPlot(Frame):
             rang = source[n][3]
             ma5b = source[n][6]
             title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
-            plotfs2(ax,k,d,title,rang,ma5b)
+            plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5)
     def riseTop(self,prefixs=('2'),top=9):
         """
         返回涨幅排行
@@ -2226,4 +2296,5 @@ class HotPlot(Frame):
                         elif rang[0]>0 and k[i,-1,0]>rang[0]:#如果回到通道内给机会
                             R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b))
         TOPS = sorted(R,key=lambda it:it[1],reverse=True)
+        #将三点指数追加在末尾
         return TOPS[:top]
