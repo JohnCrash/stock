@@ -2,14 +2,15 @@ import ctypes
 from ctypes import c_int
 from OpenGL import GL
 import sdl2
-from sdl2 import video
+from sdl2 import video,events
 from sdl2.timer import SDL_GetTicks
 from . import vg
 
 """
 定义一个基本的VG窗口类
+初始化字体
 """
-class window:
+class frame:
     def __init__(self,title,w,h):
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError('SDL_Init')
@@ -18,7 +19,7 @@ class window:
                                     sdl2.SDL_WINDOWPOS_UNDEFINED,
                                     sdl2.SDL_WINDOWPOS_UNDEFINED, w, h,
                                     sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE)
-        if not window:
+        if not self._window:
             raise RuntimeError('SDL_CreateWindow')
         self._context = sdl2.SDL_GL_CreateContext(self._window)
         sdl2.SDL_GL_MakeCurrent(self._window,self._context)
@@ -32,15 +33,31 @@ class window:
         self._fps = 0
         self._interval = -1
         sdl2.SDL_GL_SetSwapInterval(0)
+        self.loadDemoData()
 
+    def quit(self):
+        self._running = False
+
+    def keyDown(self,event):
+        pass
+    def keyUp(self,event):
+        pass
+    def handleEvent(self,event):
+        return False
     def run(self):
         event = sdl2.SDL_Event()
         prevt = 0
         acc = 0
         while self._running:
             while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
-                if event.type == sdl2.SDL_QUIT:
-                    self._running = False
+                if not self.handleEvent(event):
+                    if event.type == sdl2.SDL_QUIT:
+                        self.quit()
+                    elif event.type == sdl2.SDL_KEYDOWN:
+                        #ptr = ctypes.cast(event, events.SDL_KeyboardEvent)
+                        self.keyDown(event.key)
+                    elif event.type == sdl2.SDL_KEYUP:
+                        self.keyUp(event.key)
             t = SDL_GetTicks()/1000.
             dt = t-prevt
             prevt = t
@@ -49,13 +66,19 @@ class window:
                 self.update(dt)
             acc+=dt
             sdl2.SDL_Delay(10)
-
+        sdl2.SDL_GL_DeleteContext(self._context)
+        sdl2.SDL_DestroyWindow(self._window)
+        sdl2.SDL_Quit()
+        
     def setInterval(self,r):
         self._fps = r
         if r>0:
             self._interval = 1./r
         else:
             self._interval = -1
+
+    def render(self,dt,w,h):
+        pass
 
     def update(self,dt):
         w,h = c_int(),c_int()
@@ -68,10 +91,45 @@ class window:
             GL.glClearColor(0.3, 0.3, 0.32, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT | GL.GL_STENCIL_BUFFER_BIT)
         
-        if self._render is not None:
-            self._render(self._vg,dt,fbWidth,fbHeight)
+        
+        self.render(dt,fbWidth,fbHeight)
         
         sdl2.SDL_GL_SwapWindow(self._window)
+
+    def loadDemoData(self):
+        data = {}
+        data['images'] = []
+        path = b'D:/source/SDL/build/win32'
+        for i in range(12):
+            file = b"%s/example/images/image%d.jpg"%(path,i+1)
+            data['images'].append(vg.nvgCreateImage(self._vg, file, 0))
+            if data['images'][-1]==0:
+                print("Could not load %s."%file)
+                return -1
+        
+        data['fontIcons'] = vg.nvgCreateFont(self._vg, b"icons", b"%s/example/entypo.ttf"%path)
+        if data['fontIcons'] == -1:
+            print("Could not add font icons.\n")
+            return -1
+
+        data['fontNormal'] = vg.nvgCreateFont(self._vg, b"sans", b"%s/example/Roboto-Regular.ttf"%path)
+        if data['fontNormal'] == -1:
+            print("Could not add font italic.\n")
+            return -1
+
+        data['fontBold'] = vg.nvgCreateFont(self._vg, b"sans-bold", b"%s/example/Roboto-Bold.ttf"%path)
+        if data['fontBold'] == -1:
+            print("Could not add font bold.\n")
+            return -1
+
+        data['fontEmoji'] = vg.nvgCreateFont(self._vg, b"emoji", b"%s/example/NotoEmoji-Regular.ttf"%path)
+        if data['fontEmoji'] == -1:
+            print("Could not add font emoji.\n")
+            return -1
+
+        vg.nvgAddFallbackFontId(self._vg, data['fontNormal'], data['fontEmoji'])
+        vg.nvgAddFallbackFontId(self._vg, data['fontBold'], data['fontEmoji'])
+        return data    
 
 class fpsGraph:
     def __init__(self):

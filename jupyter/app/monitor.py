@@ -764,6 +764,40 @@ def get_last_rt(t):
             if b:
                 break
     return t2,k,d
+
+def get_rt(n=1):
+    """
+    取的最近n天的k,d数据，并且叠加快速更新数据
+    """
+    t = datetime.today()
+    K = None
+    D = []
+    for i in range(n):
+        pt,k,d = get_last_rt(t)
+        if d is not None:
+            if K is None:
+                K = k
+            else:
+                if k.shape[0]==K.shape[0]:
+                    K = np.hstack((k,K))
+                else:
+                    k2 = np.zeros((K.shape[0],k.shape[1],k.shape[2]))
+                    k2[:k.shape[0],:,:] = k
+                    K = np.hstack((k2,K))
+            D = d+D
+            t = pt-timedelta(days=1)
+        else:
+            break
+    if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
+        b,a,ts,rtlist = xueqiu.getEmflowRT9355()
+        if b:
+            code2i = xueqiu.get_company_code2i()
+            for j in range(len(rtlist)):
+                c = rtlist[j][2]
+                i = code2i[c]
+                if i<K.shape[0]:
+                    K[i,-1,:] = a[j,-1,:]
+    return K,D
 """
 通道突破监控
 """
@@ -1750,8 +1784,8 @@ def riseview(review=None,DT=60,BI=18):
                     if i<k.shape[0]:
                         k[i,-1,:] = a[j,-1,:]
 
-        R = rise(k,d,k2,d2)
-        R2 = riserate(k,d,k2,d2)
+        R = rise(k,d,k2,d2)         #
+        R2 = riserate(k,d,k2,d2)    #
         gs_kw = dict(width_ratios=[1,1], height_ratios=[2,1,2,1])
         fig,axs = plt.subplots(4,2,figsize=(48,20),gridspec_kw = gs_kw)
         if a is None:
@@ -1818,11 +1852,13 @@ def riseview(review=None,DT=60,BI=18):
                 zpl = axs[p[1]].plot(x,k[i,:,1],label=label,linewidth=lw)
                 #相对值
                 hug = k[i,:,3]+k[i,:,4]
+                """
                 hug[hug!=hug] = 0
                 vmax = np.abs(hug).max()
                 if vmax==0:
                     vmax = 1
                 hug = hug/vmax
+                """
                 axs[p[2]].plot(x,hug,label=label,linewidth=smoothwidth(hug)) #绝对值
                 #it[3] 是通道突破位置
                 #这里计算突破为涨幅yp
@@ -1878,6 +1914,7 @@ def riseview(review=None,DT=60,BI=18):
         toolbox.children = buts+TOOLBUTS
         fig.subplots_adjust(hspace=0,wspace=0.04)
         kline.output_show(kview_output)
+    #update end
     first = True
     if review is None:
         dt = None
@@ -1902,3 +1939,291 @@ def riseview(review=None,DT=60,BI=18):
     mbox = Box(children=[kview_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
     display(mbox,toolbox,kout)
     loop()
+
+def plotfs2(ax,k,d,title,rang=None,ma5b=None,style=defaultPlotfsStyle):
+    ax[0].set_title(title,y=0.93,fontdict={'fontweight':'bold'})
+    x = np.arange(len(d))
+    xticks = []
+    for i in range(len(d)):
+        if (d[i].hour==9 and d[i].minute==30) or (d[i].hour==13 and d[i].minute==0):
+            xticks.append(i)
+    #ax[0].axhline(y=0,color='black',linestyle='dotted')
+    ax[0].plot(x,k[:,0],color=style['pcolor'])
+    m60 = stock.ma(k[:,0],60)
+    ax[0].plot(x,m60,color=style['ma60color'],linestyle=style['ma60linestyle'])#分时均线
+    ax[0].text(len(d)-1,k[-1,0],"%0.2f"%k[-1,1],linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='bottom',color='red' if k[-1,1]>=0 else 'darkgreen')
+    
+    if ma5b is not None and len(k)>0:
+        ma5 = np.zeros((len(k),))
+        ma5[0] = ma5b
+        for i in range(1,len(k)):
+            ma5[i] = ma5[i-1]+(k[i,0]-ma5[i-1])/(240*5) #这是一个近似迭代
+        ax[0].plot(x,ma5,linewidth=2,color='magenta',linestyle='dashed')
+    if len(ax)==2:
+        ax[1].axhline(y=0,color='black',linestyle='dotted')
+        ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
+        ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
+        ax[1].set_xlim(0,x[-1])
+        ax[1].set_xticks(xticks)
+        ax[1].xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))  
+    else:
+        ax[0].xaxis.set_major_formatter(MyFormatterRT(d,'d h:m'))
+    ax[0].set_xticks(xticks)
+    ax[0].set_xlim(0,x[-1])
+    ax[0].grid(True)
+    ax[1].grid(True)
+    if rang is not None and rang[0]!=0 and rang[1]!=0:
+        ax[0].axhline(y=rang[0],linewidth=2,linestyle='dashed',color='green')
+        ax[0].axhline(y=rang[1],linewidth=2,linestyle='dashed',color='red')
+        ax[0].text(2,rang[0],"%0.2f"%(100*(rang[1]-rang[0])/rang[0]),fontsize=12,fontweight='black')
+class Frame:
+    """
+    """
+    companys = xueqiu.get_company_select()
+    code2i = xueqiu.get_company_code2i()
+    code2com = xueqiu.get_company_code2com()
+    _uuid = random.randint(0,1e5)
+
+    def __init__(self):
+        self._id = Frame._uuid
+        Frame._uuid+=1
+        self._interval = 60
+        self._lastt = None
+        self._dataSource  = None
+        self._plot_output = widgets.Output()
+        self._output = widgets.Output()
+        self._toolbox = Box(children=[],layout=box_layout)
+        self._stocklistbox = Box(children=[],layout=box_layout)
+        self._outbox = Box(children=[self._output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
+        mbox = Box(children=[self._plot_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
+        display(mbox,self._toolbox,self._stocklistbox,self._outbox)
+        self._toolbox_widgets = []
+
+    def showStock(self,ls):
+        """
+        显示股票列表,ls = [code,...]
+        调用plotStock显示，并调用listStock将股票按钮放入到_stocklistbox
+        """        
+        self.plotStock(ls)
+        self.listStock(ls)
+
+    def plt_show(self):
+        kline.output_show(self._plot_output)
+
+    def subplots(self,row=1,col=1,plot=None,source=None,figsize=(48,20)):
+        """
+        将股票列表显示在图表里面
+        """
+        gs_kw = dict(width_ratios=[1]*col, height_ratios=[2 if i%2==0 else 1 for i in range(row*2)])
+        fig,axs = plt.subplots(row*2,col,figsize=figsize,gridspec_kw = gs_kw)
+        for i in range(col):
+            for j in range(row):
+                ax = (axs[(2*j,i)],axs[(2*j+1,i)])
+                plot(ax,i,j,source)
+        fig.subplots_adjust(hspace=0,wspace=0.04)
+        self.plt_show()
+
+    def stock2button(self,code):
+        """
+        创建一个股票按钮
+        """
+        return widgets.Button(description="%s"%Frame.code2com[code][2])
+
+    def K(self,code,period=15,pos=None,mode='auto'):
+        kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(46,20),pos=pos)
+
+    def listStock(self,ls):
+        """
+        将股票列表转换为按钮
+        """
+        def on_click(e):
+            with self._output:
+                self.K(e._code)
+        buts = []
+        for code in ls:
+            buts.append(self.stock2button(code))
+            buts[-1]._code = code
+            buts[-1].on_click(on_click)
+        self._stocklistbox.children = buts
+
+    def search(self):
+        pass
+
+    def update(self,t,lastt):
+        """
+        t 当前时间，lastt 上一次更新时间，第一次为None        
+        """
+
+    def loop(self):
+        t = datetime.today()
+        self.update(t,self._lastt)
+        self._lastt = t
+        xueqiu.setTimeout(self._interval,self.loop,'monitor.Frame_%d'%self._id)
+
+    def setUpdateInterval(self,a):
+        """
+        设置更新间隔，单位秒
+        """
+        self._interval = a
+
+    def toolbox_clear(self):
+        self._toolbox_widgets = []
+    def toolbox_update(self):
+        self._toolbox.children = self._toolbox_widgets
+
+    def toolbox_button(self,desc,data=None,disabled=False,button_style='',icon='',layout=Layout(),on_click=None,group=None,selected=False):
+        """
+        如果on_click=None将触发类方法on_click(data)
+        可以将多个按钮编为一组group，相同组的按钮别点击时被标记
+        """
+        but = widgets.Button(description=desc,disabled=disabled,button_style=button_style,icon=icon,layout=layout)
+        but.data = data
+        but.group = group
+        if selected:
+            but.button_style='success'
+        def onclick(e):
+            e.button_style = 'warning'
+            if on_click is None:
+                self.on_click(e.data)
+            else:
+                on_click(e.data)
+            if e.group is not None:
+                for b in self._toolbox_widgets:
+                    if b.group==e.group:
+                        b.button_style=''
+                e.button_style='success'
+            else:
+                e.button_style=''
+        but.on_click(onclick)
+        self._toolbox_widgets.append(but)
+        return but
+    def toolbox_checkbox(self,desc,value=False,data=None,disabled=False,icon='',layout=Layout(),on_check=None):
+        """
+        事件处理函数on_check(data,check)
+        """
+        but = widgets.Checkbox(description=desc,value=value,disabled=disabled,icon=icon,layout=layout)
+        but.data = data
+        def oncheck(e):
+            if on_check is None:
+                self.on_check(e['owner'].data,e['new'])
+            else:
+                on_check(e['owner'].data,e['new'])
+        but.observe(oncheck,names='value')
+        self._toolbox_widgets.append(but)
+        return but
+    def toolbox_dropdown(self,desc,options=[],value=None,data=None,disabled=False,layout=Layout(),on_list=None):
+        but = widgets.Dropdown(description=desc,options=options,value=value,disabled=disabled,layout=layout)
+        but.data = data
+        def onlist(e):
+            if on_list is None:
+                self.on_check(e['owner'].data,e['new'])
+            else:
+                on_list(e['owner'].data,e['new'])
+        but.observe(onlist,names='value')
+        self._toolbox_widgets.append(but)
+        return but
+
+class HotPlot(Frame):
+    def __init__(self):
+        super(HotPlot,self).__init__()
+        self._code2data = {}
+        self._page = 0
+        for it in [('刷新',1,None,False),('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('上一页',3,None,False),('下一页',4,None,False)]:
+            self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
+        self.toolbox_update()
+        self._prefix = ('2',)
+    def on_click(self,data):
+        if type(data)==str:
+            self._page = 0
+            self._prefix = (data,)
+        if data==1: #刷新的时候清除
+            self._output.clear_output()
+        elif data==3: #pageup
+            self._page-=1
+        elif data==4: #pagedown
+            self._page+=1
+        self.update(datetime.today(),None)
+    def on_check(self,data,check):
+        pass
+    def on_list(self,e):
+        pass
+    def stock2button(self,code):
+        but = super(HotPlot,self).stock2button(code)
+        data = self.code2data(code)
+        if data is not None:
+            k = data[4]
+            if k.shape[0]>1:
+                if k[-1,3]+k[-1,4]>k[-2,3]+k[-2,4]: #流入
+                    if k[-1,0]>k[-2,0]: #涨
+                        color = '#FF8080' #流入涨 红
+                    else:
+                        color = '#FF80FF' #流入跌 紫
+                else: #流出
+                    if k[-1,0]>k[-2,0]: #涨
+                        color = '#FFA500' #流出涨 橙
+                    else:
+                        color = '#00A500' #流出跌 绿         
+            else:
+                color = '#C8C8C8'            
+            but.style.button_color = color
+        return but
+
+    def code2data(self,code):
+        return self._code2data[code] if code in self._code2data else None
+
+    def currentPageDataSource(self,dataSource,N): #当前显示的数据,受到翻页的影响
+        if self._page<0:
+            self._page = 0
+        if self._page>=math.ceil(len(dataSource)/N):
+            self._page = math.ceil(len(dataSource)/N)-1
+        return dataSource[self._page*N:]
+
+    def update(self,t,lastt):
+        if lastt is None or (stock.isTransDay() and stock.isTransTime()):
+            self._dataSource = self.riseTop(self._prefix)
+            self._code2data = {}
+            for data in self._dataSource:
+                self._code2data[data[0][1]] = data
+            self.subplots(2,3,self.riseTopPlot,source=self.currentPageDataSource(self._dataSource,2*3))
+            self.listStock([it[0][1] for it in self._dataSource])
+
+    def riseTopPlot(self,ax,i,j,source):
+        n = i+3*j
+        if n<len(source):
+            k = source[n][4]
+            d = source[n][5]
+            rang = source[n][3]
+            ma5b = source[n][6]
+            title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
+            plotfs2(ax,k,d,title,rang,ma5b)
+    def riseTop(self,prefixs=('2'),top=9):
+        """
+        返回涨幅排行
+        返回值 [(com,price,hug,rang,k,d),...]
+        """
+        t = datetime.today()
+        k,d = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
+        bi = -255*3
+        k = k[:,bi:,:]
+        d = d[bi:]
+        companys = HotPlot.companys
+        K,D = xueqiu.get_period_k(15)
+        R = []
+        bolls = bolltrench()
+        if d[-1].hour==9 and d[-1].minute<=30:
+            for i in range(len(companys)):
+                if companys[i][3] in prefixs and companys[i][1] in bolls and i<k.shape[0] and k[i,-1,1]>0:
+                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],stock.getBollwayRange(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
+        else:
+            for i in range(len(companys)):
+                if companys[i][3] in prefixs and i<k.shape[0]:
+                    if k[i,-1,3]+k[i,-1,4]>0 and companys[i][1] in bolls: #净流入，存在通道
+                        ma5 = stock.ma(K[i,:],80)
+                        ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
+                        rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
+                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长 
+                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b)) #0company,1涨幅,2流入,3通道,4k,5d,6k起始位置的ma5
+                        elif rang[0]>0 and k[i,-1,0]>rang[0]:#如果回到通道内给机会
+                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b))
+        TOPS = sorted(R,key=lambda it:it[1],reverse=True)
+        return TOPS[:top]
