@@ -1,6 +1,7 @@
 import MySQLdb
 import numpy as np
 import math
+import time
 from datetime import date,datetime,timedelta
 from . import shared
 from . import config
@@ -1424,10 +1425,10 @@ def isStrongBollway(bolls):
             return False
     return True
 
-"""
-通道的上部和下部
-"""
 def getBollwayRange(bolls):
+    """
+    通道的上部和下部
+    """
     maxx = 0
     minx = 1e9
     for bo in bolls:
@@ -1436,3 +1437,14 @@ def getBollwayRange(bolls):
         if bo[5]<minx:
             minx = bo[5]
     return minx,maxx
+
+def timethis(func):
+    """
+    函数测速装饰器
+    """
+    def wraper(*args,**kwargs):
+        start = time.time()
+        result = func(*args,**kwargs)
+        print(func.__name__,time.time()-start)
+        return result
+    return wraper

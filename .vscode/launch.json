@@ -85,6 +85,7 @@
             "type": "python",
             "request": "launch",
             "name": "Debug test.py",
+            "justMyCode":false,
             "program": "${workspaceFolder}\\jupyter\\test.py"
         },            
         {

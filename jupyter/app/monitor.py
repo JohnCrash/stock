@@ -175,7 +175,7 @@ def plotfs(ax,k,d,title,bolls=None,style=defaultPlotfsStyle,ma5b=None,topshow=No
             connectionstyle="angle,angleA=0,angleB=90,rad=10"),fontsize='large',fontweight='bold',color=period2c[boll[0]][1])                
             offy += 20
     bottom,top = ax[0].get_ylim()
-    ax[0].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1)                
+    ax[0].broken_barh([(pbi,15)], (bottom,top-bottom),facecolor='blue',alpha=0.1) 
 
 ETFs = [ 
     'SZ159919', #沪深300ETF
@@ -655,11 +655,13 @@ def getTodayTop(perfix='90',top=3,K=None):
     for i in range(top):
         R.append(companys[s[i][0]][1])
     return R
-
+def newriseview():
+    HotPlot().loop()
 def Indexs():
     global ETFs,BCs
     menus = {
-        "盯盘":[riseview],
+        "盯盘":[newriseview],
+        "横向比较":[riseview],
         "大盘":['SH000001', #上证
             'SZ399001', #深成
             'SZ399006'],#创业        
@@ -1957,10 +1959,10 @@ def riseview(review=None,DT=60,BI=18):
     display(mbox,toolbox,kout)
     loop()
 
-def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,style=defaultPlotfsStyle):
+def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=defaultPlotfsStyle):
     """
     k = (时间,(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)) , d = 时间戳 rang = (通道顶，通道底)
-    ma5b 起始位置5日均线 fv=0 显示大资金，1显示成交量
+    ma5b 起始位置5日均线 fv=0 显示大资金，1显示成交量,fx=True标记流入和涨落的相关性
     """
     ax[0].set_title(title,y=0.93,fontdict={'fontweight':'bold'})
     x = np.arange(len(d))
@@ -1970,6 +1972,8 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,style=defaultPlotfsStyle
         for i in range(len(d)):
             if (d[i].hour==9 and d[i].minute==30) or (d[i].hour==13 and d[i].minute==0):
                 xticks.append(i)
+        ax[0].set_xlim(0,255*3)
+        ax[1].set_xlim(0,255*3)
     elif dt==5:
         for i in range(len(d)):
             if d[i].minute%5==0:
@@ -1978,12 +1982,33 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,style=defaultPlotfsStyle
                 elif i-xticks[-1]>12:
                     xticks.append(i)
         fmt = 'h:m'
+        ax[0].set_xlim(0,12*30)
+        ax[1].set_xlim(0,12*30)
 
     #ax[0].axhline(y=0,color='black',linestyle='dotted')
     ax[0].plot(x,k[:,0],color=style['pcolor'])
-    m60 = stock.ma(k[:,0],60)
+    if ma60b is None:
+        m60 = stock.ma(k[:,0],60)
+    else:
+        m60 = np.zeros((len(k),))
+        m60[0] = ma60b
+        for i in range(1,len(k)):
+            m60[i] = m60[i-1]+(k[i,0]-m60[i-1])/(60*12) #这是一个近似迭代
+
     ax[0].plot(x,m60,color=style['ma60color'],linestyle=style['ma60linestyle'])#分时均线
-    ax[0].text(len(d)-1,k[-1,0],"%0.2f"%k[-1,1],linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='bottom',color='red' if k[-1,1]>=0 else 'darkgreen')
+    ax[0].text(len(d)-1,k[-1,0],"%0.2f"%k[-1,1],linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='left',verticalalignment='center',color='red' if k[-1,1]>0 else 'darkgreen')
+    todaybi = 0
+    if dt==60:
+        for i in range(len(d)-1,0,-1):
+            if d[i].day!=d[-1].day:
+                todaybi = i+1
+                break
+    maxi = np.argmax(k[todaybi:,0])+todaybi
+    mini = np.argmin(k[todaybi:,0])+todaybi
+    if mini!=len(d)-1:
+        ax[0].text(mini,k[mini,0],"%0.2f"%k[mini,1],linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='top',color='red' if k[mini,1]>0 else 'darkgreen')
+    if maxi!=len(d)-1:
+        ax[0].text(maxi,k[maxi,0],"%0.2f"%k[maxi,1],linespacing=13,fontsize=12,fontweight='black',fontfamily='monospace',horizontalalignment='center',verticalalignment='bottom',color='red' if k[maxi,1]>0 else 'darkgreen')
     
     if ma5b is not None and len(k)>0:
         ma5 = np.zeros((len(k),))
@@ -2010,13 +2035,14 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,style=defaultPlotfsStyle
             ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
             ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
 
-        ax[1].set_xlim(0,x[-1])
+        #ax[1].set_xlim(0,x[-1])
         ax[1].set_xticks(xticks)
         ax[1].xaxis.set_major_formatter(MyFormatterRT(d,fmt))  
     else:
         ax[0].xaxis.set_major_formatter(MyFormatterRT(d,fmt))
+
     ax[0].set_xticks(xticks)
-    ax[0].set_xlim(0,x[-1])
+    #ax[0].set_xlim(0,x[-1])
     ax[0].grid(True)
     ax[1].grid(True)
     if rang is not None and rang[0]!=0 and rang[1]!=0:
@@ -2034,6 +2060,7 @@ class Frame:
     def __init__(self):
         self._id = Frame._uuid
         Frame._uuid+=1
+        self._acct=0
         self._interval = 60
         self._lastt = None
         self._dataSource  = None
@@ -2045,7 +2072,6 @@ class Frame:
         mbox = Box(children=[self._plot_output],layout=Layout(display='flex',flex_flow='row',align_items='stretch',min_width='3048px'))
         display(mbox,self._toolbox,self._stocklistbox,self._outbox)
         self._toolbox_widgets = []
-
     def showStock(self,ls):
         """
         显示股票列表,ls = [code,...]
@@ -2056,18 +2082,18 @@ class Frame:
 
     def plt_show(self):
         kline.output_show(self._plot_output)
-
     def subplots(self,row=1,col=1,plot=None,source=None,figsize=(48,20)):
         """
         将股票列表显示在图表里面
         """
         gs_kw = dict(width_ratios=[1]*col, height_ratios=[2 if i%2==0 else 1 for i in range(row*2)])
         fig,axs = plt.subplots(row*2,col,figsize=figsize,gridspec_kw = gs_kw)
+        
+        fig.subplots_adjust(hspace=0,wspace=0.04)
         for i in range(col):
             for j in range(row):
                 ax = (axs[(2*j,i)],axs[(2*j+1,i)])
                 plot(ax,i,j,source)
-        fig.subplots_adjust(hspace=0,wspace=0.04)
         self.plt_show()
 
     def stock2button(self,code):
@@ -2078,7 +2104,7 @@ class Frame:
 
     def K(self,code,period=15,pos=None,mode='auto'):
         kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(46,20),pos=pos)
-
+    
     def listStock(self,ls):
         """
         将股票列表转换为按钮
@@ -2103,15 +2129,21 @@ class Frame:
 
     def loop(self):
         t = datetime.today()
-        self.update(t,self._lastt)
+        if self._acct>self._interval or self._lastt is None:
+            self._acct=0
+            self.update(t,self._lastt)
+        else:
+            dt = t-self._lastt
+            self._acct += dt.seconds+dt.microseconds/1e6
         self._lastt = t
-        xueqiu.setTimeout(self._interval,self.loop,'monitor.Frame_%d'%self._id)
+        xueqiu.setTimeout(1,self.loop,'monitor.Frame_%d'%self._id)
 
     def setUpdateInterval(self,a):
         """
         设置更新间隔，单位秒
         """
         self._interval = a
+        self._acct = 0
 
     def toolbox_clear(self):
         self._toolbox_widgets = []
@@ -2141,7 +2173,7 @@ class Frame:
                 on_click(e.data)
             if e.group is not None:
                 for b in self._toolbox_widgets:
-                    if b.group==e.group:
+                    if type(b)==widgets.Button and b.group==e.group:
                         b.button_style=''
                 e.button_style='success'
             else:
@@ -2180,8 +2212,10 @@ class HotPlot(Frame):
         super(HotPlot,self).__init__()
         self._code2data = {}
         self._page = 0
-        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
+        self._flowin = False
+        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
             self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
+        self.toolbox_checkbox('净流入',self._flowin,1)
         self.toolbox_update()
         self._prefix = ('2',)
         self._rt = 0 #0 普通60秒 1 5秒级别
@@ -2195,11 +2229,17 @@ class HotPlot(Frame):
             self._page+=1
         elif data==5: #实时
             self._rt=1 if self._rt==0 else 0
+            if self._rt==1:
+                self.setUpdateInterval(5)
+            else:
+                self.setUpdateInterval(60)
 
         self._output.clear_output()
         self.update(datetime.today(),None)
     def on_check(self,data,check):
-        pass
+        if data==1:
+            self._flowin = check
+        self.update(datetime.today(),None)
     def on_list(self,e):
         pass
     def stock2button(self,code):
@@ -2226,7 +2266,11 @@ class HotPlot(Frame):
     def code2data(self,code):
         return self._code2data[code] if code in self._code2data else None
 
-    def currentPageDataSource(self,dataSource,N): #当前显示的数据,受到翻页的影响
+    def currentPageDataSource(self,dataSource,N): 
+        """
+        数据在显示前进行前置处理
+        1 受到翻页的影响 2 切换到5秒级别的数据
+        """
         if self._page<0:
             self._page = 0
         if self._page>=math.ceil(len(dataSource)/N):
@@ -2242,14 +2286,26 @@ class HotPlot(Frame):
                 for it in viewdata:
                     if it[0][1] in c2i:
                         j = c2i[it[0][1]]
-                        viewrt.append((it[0],it[1],it[2],it[3],a[j,:,:],ts,None))
+                        k = it[4]
+                        d = it[5]
+                        for i in range(len(d)-1,0,-1):
+                            if d[i].day!=d[-1].day:
+                                i+=1
+                                break
+                        ma60b = None
+                        if i-60>0:
+                            ma60b = k[i-60:i,0].sum()/60
+                        viewrt.append((it[0],it[1],it[2],it[3],a[j,:,:],ts[:],None,ma60b))
                     else:
                         viewrt.append(it) #没发现5秒数据
                 viewdata = viewrt
         return viewdata
-
+    
     def update(self,t,lastt):
         if lastt is None or (stock.isTransDay() and stock.isTransTime()):
+            if lastt is not None and lastt.hour==9 and lastt.minute==29:
+                self._rt = 1
+                self.setUpdateInterval(5)
             self._dataSource = self.riseTop(self._prefix)
             self._code2data = {}
             for data in self._dataSource:
@@ -2264,18 +2320,20 @@ class HotPlot(Frame):
             d = source[n][5]
             rang = source[n][3]
             ma5b = source[n][6]
+            ma60b = source[n][7]
             title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
-            plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5)
-    def riseTop(self,prefixs=('2'),top=9):
+            plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5,ma60b=ma60b)
+
+    def riseTop(self,prefixs=('2'),top=12):
         """
-        返回涨幅排行
-        返回值 [(com,price,hug,rang,k,d),...]
+        涨幅排行,满足大资金流入，5日均线上有强通道或者返回强通道中
+        返回值 [(com,price,hug,rang,k,d,ma5b),...]
         """
         t = datetime.today()
-        k,d = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
+        ok,od = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
         bi = -255*3
-        k = k[:,bi:,:]
-        d = d[bi:]
+        k = ok[:,bi:,:]
+        d = od[bi:]
         companys = HotPlot.companys
         K,D = xueqiu.get_period_k(15)
         R = []
@@ -2287,14 +2345,14 @@ class HotPlot(Frame):
         else:
             for i in range(len(companys)):
                 if companys[i][3] in prefixs and i<k.shape[0]:
-                    if k[i,-1,3]+k[i,-1,4]>0 and companys[i][1] in bolls: #净流入，存在通道
+                    if (self._flowin==False or (self._flowin and k[i,-1,3]+k[i,-1,4]>0)) and companys[i][1] in bolls: #净流入，存在通道
                         ma5 = stock.ma(K[i,:],80)
                         ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
                         rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
                         if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长 
-                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b)) #0company,1涨幅,2流入,3通道,4k,5d,6k起始位置的ma5
+                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None)) #0company,1 涨幅,2 流入,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
                         elif rang[0]>0 and k[i,-1,0]>rang[0]:#如果回到通道内给机会
-                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b))
+                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None))
         TOPS = sorted(R,key=lambda it:it[1],reverse=True)
         #将三点指数追加在末尾
         return TOPS[:top]

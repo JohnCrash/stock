@@ -50,9 +50,9 @@ def plt_show(display_id,isupdate):
 
 def output_show(output):
     try:
-        for figure_manager in Gcf.get_all_fig_managers():
+        for figure_manager in Gcf.get_all_fig_managers():            
             format = InteractiveShell.instance().display_formatter.format
-            format_dict, md_dict = format(figure_manager.canvas.figure)  
+            format_dict, md_dict = format(figure_manager.canvas.figure) 
             output.outputs = ({
                 'output_type': 'display_data',
                 'data':json_clean(encode_images(format_dict)),
@@ -64,6 +64,15 @@ def output_show(output):
         # close triggers gc.collect, which can be slow
         if Gcf.get_all_fig_managers():
             plt.close('all')
+
+def output_show2(output,figure_manager):
+    format = InteractiveShell.instance().display_formatter.format
+    format_dict, md_dict = format(figure_manager.canvas.figure) 
+    output.outputs = ({
+        'output_type': 'display_data',
+        'data':json_clean(encode_images(format_dict)),
+        'metadata': {'needs_background': 'light'}
+    },)
 
 """绘制k线图"""
 def plotK(axs,k,bi,ei):
