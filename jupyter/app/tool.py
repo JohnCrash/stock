@@ -1132,5 +1132,5 @@ K('BK0450',5,'2021-04-07 09:35:00')
 #monitor.riseview('2021-06-16',3,17)
 #monitor.monitor_bollup()
 
-#monitor.HotPlot().loop()
+monitor.HotPlot().loop()
 

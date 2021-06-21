@@ -37,7 +37,7 @@ def gtimerLoop():
     global gtimer
     deletes = []
     gt = gtimer
-    for v in gt:
+    for v in list(gt):
         timer = gt[v]
         if timer is not None and 't' in timer and 'func' in timer:
             timer['t'] += 1

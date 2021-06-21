@@ -475,6 +475,8 @@ class Plote:
                     c,k,d = stock.loadKline(code,5,after=after)
                 k,d = stock.mergeK(k,d,int(period/5))
             
+            if len(d)==0:
+                return c,k,d
             if code is not _cacheK:
                 _cacheK[code] = {}
             _cacheK[code][period] = (c,k,d,after)
@@ -557,6 +559,8 @@ class Plote:
                 self._company,self._k,self._date = self.getKlineData(company,self._period)
                 k = self._k
                 d = self._date
+                if len(self._k)==0:
+                    return
                 #这里计算相对于昨天的涨跌率
                 if period=='d':
                     if len(k)>2:
@@ -1799,17 +1803,22 @@ class Plote:
         listbutton = widgets.Button(description="列表",layout=Layout(width='64px'))
         codetext = widgets.Text(value=self.code(),description='',layout=Layout(width='96px'))
         #output = widgets.Output()
-        b,favorites = shared.fromRedis('favorite_'+str(date.today()))
+        
         isfavorite = False
         favoriteNode = ''
         favoriteContext = ''
+        def getFavorite():
+            b,favorites = shared.fromRedis('favorite_'+str(date.today()))
+            if b:
+                for fav in favorites:
+                    if fav['code']==self.code():
+                        return True,fav
+            return False,None
+        b,fav = getFavorite()
         if b:
-            for fav in favorites:
-                if fav['code']==self.code():
-                    isfavorite = True
-                    favoriteNode = fav['node']
-                    favoriteContext = fav['context']
-                    break
+            isfavorite = True
+            favoriteNode = fav['node']
+            favoriteContext = fav['context']
         favoritecheckbox = widgets.Checkbox(value=isfavorite,description='关注',disabled=False,layout=Layout(display='block',width='72px'))
         box_layout = Layout(display='flex',
                             flex_flow='row',
@@ -1820,6 +1829,8 @@ class Plote:
             stockcode = self._comarg
         else:
             stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
+
+        holdcheckbox = widgets.Checkbox(value=stock.isHoldStock(stockcode),description='持有',disabled=False,layout=Layout(display='block',width='72px'))
         if self._company is not None and len(self._company)>2 and self._company[3]=='EM':
             link = widgets.HTML(value="""<a href="http://quote.eastmoney.com/bk/90.%s.html" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode))
             link2 = widgets.HTML(value="""<a href="http://data.eastmoney.com/bkzj/%s.html" target="_blank" rel="noopener">资金流向</a>"""%(stockcode))
@@ -1833,8 +1844,11 @@ class Plote:
         if simple:
             items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2]
         else:
-            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,codetext]
-
+            items = [prevbutton,nextbutton,zoominbutton,zoomoutbutton,backbutton,slider,frontbutton,mainDropdown,indexDropdown,periodDropdown,refreshbutton,link,link2,favoritecheckbox,holdcheckbox,codetext]
+        def on_hold(e):
+            stock.holdStock(self.code(),e['new'])
+        holdcheckbox.observe(on_hold,names='value')
+        
         if self._keyindex is not None:
             keyprev = widgets.Button(description="<<",layout=Layout(width='48px'))
             keynext = widgets.Button(description=">>",layout=Layout(width='48px'))
@@ -1946,13 +1960,16 @@ class Plote:
             showline()
 
         def on_codetext(e):
-            nonlocal link,link2
+            nonlocal link,link2,favoritecheckbox,holdcheckbox
             c = e['new'].upper()
             if (len(c)==8 and c[0]=='S' and (c[1]=='Z' or c[1]=='H')) or (len(c)==6 and c[0]=='B'):
                 self._comarg = c
                 self.reload()
                 recalcRange()
                 showline()
+                b,fav = getFavorite()
+                favoritecheckbox.value = b
+                holdcheckbox.value = stock.isHoldStock(self.code())
                 refreshbutton.button_style = ''
                 stockcode = self._comarg if self._comarg[2]!=':' else self._comarg[0:2]+self._comarg[3:]
                 link.value="""<a href="https://xueqiu.com/S/%s" target="_blank" rel="noopener">%s(%s)</a>"""%(stockcode,self._company[2],stockcode)

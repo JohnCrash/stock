@@ -804,6 +804,10 @@ def get_rt(n=1):
             if d[i]>_rt_d[-1]:
                 break
         D = _rt_d+d[i:]
+        if k.shape[0]>_rt_k.shape[0]:
+            news = np.zeros((k.shape[0],_rt_k.shape[1],_rt_k.shape[2]))
+            news[:_rt_k.shape[0]] = _rt_k
+            _rt_k = news
         K = np.hstack((_rt_k,k[:,i:,:]))
     if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
         b,a,ts,rtlist = xueqiu.getEmflowRT9355()
@@ -2024,10 +2028,14 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
         elif fv==1:
             v = np.zeros((k.shape[0],))
             v[1:] = k[1:,2]-k[:-1,2]
+            v[v!=v]= 0
+            v[v<0] = 0
             ax[1].bar(x,v) #成交量
         else: #混合图
             v = np.zeros((k.shape[0],))
             v[1:] = k[1:,2]-k[:-1,2]
+            v[v!=v]= 0
+            v[v<0] = 0
             smax = k[k[:,6]==k[:,6],6].max()
             vmax = v[v==v].max()
             r = smax/vmax
@@ -2103,13 +2111,14 @@ class Frame:
         return widgets.Button(description="%s"%Frame.code2com[code][2])
 
     def K(self,code,period=15,pos=None,mode='auto'):
-        kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(46,20),pos=pos)
+        kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(48,20),pos=pos)
     
     def listStock(self,ls):
         """
         将股票列表转换为按钮
         """
         def on_click(e):
+            self._output.clear_output()
             with self._output:
                 self.K(e._code)
         buts = []
@@ -2200,7 +2209,7 @@ class Frame:
         but.data = data
         def onlist(e):
             if on_list is None:
-                self.on_check(e['owner'].data,e['new'])
+                self.on_list(e['owner'].data,e['new'])
             else:
                 on_list(e['owner'].data,e['new'])
         but.observe(onlist,names='value')
@@ -2213,16 +2222,22 @@ class HotPlot(Frame):
         self._code2data = {}
         self._page = 0
         self._flowin = False
-        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
+        self._options = {'涨幅榜':self.riseTop,'流入榜':self.riseFlow,'活跃':self.activeTop}
+        self._sel = list(self._options)[0]
+        self._dataMethods = self._options[self._sel]
+        self._dropdown = self.toolbox_dropdown('方法',list(self._options),self._sel,1)
+        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('指数',6,1,False),('持有',7,1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
             self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
         self.toolbox_checkbox('净流入',self._flowin,1)
         self.toolbox_update()
         self._prefix = ('2',)
         self._rt = 0 #0 普通60秒 1 5秒级别
+        self._index = 0 #0 正常 1 显示指数 2 持有
     def on_click(self,data):
         if type(data)==str:
             self._page = 0
             self._prefix = (data,)
+        self._index = 0
         if data==3: #pageup
             self._page-=1
         elif data==4: #pagedown
@@ -2233,15 +2248,21 @@ class HotPlot(Frame):
                 self.setUpdateInterval(5)
             else:
                 self.setUpdateInterval(60)
-
+        elif data==6: #指数
+            self._index = 1 #
+        elif data==7:
+            self._index = 2 #持有
         self._output.clear_output()
         self.update(datetime.today(),None)
     def on_check(self,data,check):
         if data==1:
             self._flowin = check
         self.update(datetime.today(),None)
-    def on_list(self,e):
-        pass
+    def on_list(self,data,sel):
+        if data==1:
+            self._sel = sel
+            self._dataMethods = self._options[self._sel]
+        self.update(datetime.today(),None)
     def stock2button(self,code):
         but = super(HotPlot,self).stock2button(code)
         data = self.code2data(code)
@@ -2261,6 +2282,7 @@ class HotPlot(Frame):
             else:
                 color = '#C8C8C8'            
             but.style.button_color = color
+            but.description = "%s %.2f%%"%(Frame.code2com[code][2],k[-1,1])
         return but
 
     def code2data(self,code):
@@ -2276,6 +2298,11 @@ class HotPlot(Frame):
         if self._page>=math.ceil(len(dataSource)/N):
             self._page = math.ceil(len(dataSource)/N)-1
         viewdata = dataSource[self._page*N:]
+        for it in viewdata: #处理数据问题：1 价格为0
+            k = it[4]
+            for i in range(1,len(k)):
+                if k[i,0]==0:
+                    k[i,0] = k[i-1,0]
         if self._rt==1 and len(viewdata)>0: #使用5秒级别的数据
             b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][5][-1])
             if b:
@@ -2306,7 +2333,12 @@ class HotPlot(Frame):
             if lastt is not None and lastt.hour==9 and lastt.minute==29:
                 self._rt = 1
                 self.setUpdateInterval(5)
-            self._dataSource = self.riseTop(self._prefix)
+            if self._index==1:
+                self._dataSource = self.mapCode2DataSource(['SH000001','SZ399001','SZ399006','SH000688'])
+            elif self._index==2:
+                self._dataSource = self.mapCode2DataSource(stock.getHoldStocks())
+            else:
+                self._dataSource = self._dataMethods()
             self._code2data = {}
             for data in self._dataSource:
                 self._code2data[data[0][1]] = data
@@ -2324,7 +2356,9 @@ class HotPlot(Frame):
             title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
             plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5,ma60b=ma60b)
 
-    def riseTop(self,prefixs=('2'),top=12):
+    def isSelected(self,company,bolls,k):
+        return company[3] in self._prefix and company[1] in bolls and k[-1,1]>0
+    def riseTop(self,top=12):
         """
         涨幅排行,满足大资金流入，5日均线上有强通道或者返回强通道中
         返回值 [(com,price,hug,rang,k,d,ma5b),...]
@@ -2340,12 +2374,12 @@ class HotPlot(Frame):
         bolls = bolltrench()
         if d[-1].hour==9 and d[-1].minute<=30:
             for i in range(len(companys)):
-                if companys[i][3] in prefixs and companys[i][1] in bolls and i<k.shape[0] and k[i,-1,1]>0:
+                if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
                     R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],stock.getBollwayRange(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
         else:
             for i in range(len(companys)):
-                if companys[i][3] in prefixs and i<k.shape[0]:
-                    if (self._flowin==False or (self._flowin and k[i,-1,3]+k[i,-1,4]>0)) and companys[i][1] in bolls: #净流入，存在通道
+                if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
+                    if (self._flowin==False or (self._flowin and k[i,-1,3]+k[i,-1,4]>0)): #净流入，存在通道
                         ma5 = stock.ma(K[i,:],80)
                         ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
                         rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
@@ -2356,3 +2390,67 @@ class HotPlot(Frame):
         TOPS = sorted(R,key=lambda it:it[1],reverse=True)
         #将三点指数追加在末尾
         return TOPS[:top]
+    def riseFlow(self,top=12):
+        """
+        流入排行榜
+        """ 
+        k,d = get_rt(4)  
+        bi = -255*3
+        k = k[:,bi:,:]
+        d = d[bi:]        
+        companys = HotPlot.companys   
+        K,D = xueqiu.get_period_k(15)
+        R = []
+        if k.shape[1]>5:
+            bolls = bolltrench()
+            for i in range(len(companys)):
+                if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
+                    if k[i,-1,3]!=0 and k[i,-1,4]!=0:
+                        F = k[i,:,3]+k[i,:,4]
+                        F[F!=F]=0 #消除NaN
+                        m0 = stock.ma(F,3)
+                        m1 = stock.ma(F,30)
+                        j = -1
+                        for j in range(-1,-k.shape[1]+2,-1):
+                            if m1[j]>m0[j]: #长期大于短期
+                                break
+                        if j!=-1:
+                            dhug = (F[-1]-m1[j])
+                            if dhug>=0:
+                                rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
+                                ma5 = stock.ma(K[i,:],80)
+                                ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线                                
+                                R.append((companys[i],dhug,k[i,-1,1],rang,k[i],d,ma5b,None)) #0company,1  流入,2 涨幅,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
+        TOPS = sorted(R,key=lambda it:it[1],reverse=True)
+        #将三点指数追加在末尾
+        return TOPS[:top]
+    def activeTop(self,top=12):
+        """
+        最近比较活跃的
+        """
+        tb = {'90':(5,3),"91":(10,3),"2":(5,3),"0":(10,3),"1":(10,3)}
+        it = tb[self._prefix[0]]
+        TOPS = get10Top(self._prefix[0],it[0],it[1])
+        return self.mapCode2DataSource(TOPS)
+    def mapCode2DataSource(self,codes,top=12):
+        """
+        将代码列表映射为数据源
+        """
+        k,d = get_rt(4)  
+        bi = -255*3
+        k = k[:,bi:,:]
+        d = d[bi:]          
+        companys = HotPlot.companys   
+        K,D = xueqiu.get_period_k(15)
+        bolls = bolltrench()
+        R = []
+        for code in codes:
+            i = HotPlot.code2i[code]
+            if companys[i][1] in bolls:
+                rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
+            else:
+                rang = (0,0)
+            ma5 = stock.ma(K[i,:],80)
+            ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线                                
+            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None))
+        return R[:top]

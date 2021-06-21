@@ -1448,3 +1448,40 @@ def timethis(func):
         print(func.__name__,time.time()-start)
         return result
     return wraper
+
+def completion(k):
+    """
+    如果数据是0就使用它后面的非0数据补全
+    """
+    for i in range(-2,-len(k),-1):
+        if k[i]==0:
+            k[i] = k[i+1]
+
+def isHoldStock(code):
+    """
+    判断是否持有该股票
+    """
+    b,ls = shared.fromRedis('hold')
+    return b and code in ls
+def holdStock(code,b):
+    """
+    b True持有，b False不持有
+    """
+    try:
+        b1,ls = shared.fromRedis('hold')
+        if b:
+            if not b1:
+                ls = []
+            ls.append(code)
+        else:
+            if b1:
+                ls.remove(code)
+        shared.toRedis(ls,'hold')
+    except:
+        pass
+def getHoldStocks():
+    """
+    返回持有的代码列表
+    """
+    b,ls = shared.fromRedis('hold')
+    return ls if b else []
