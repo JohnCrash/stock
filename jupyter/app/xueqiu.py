@@ -2096,8 +2096,8 @@ def emflowRT9355(t):
         if t.hour==9 and t.minute>=30:
             global sel9355
             if sel9355 is None:
-                #概念，分类，ETF
-                sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2'")
+                #概念，分类，ETF,增加深圳成指
+                sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2' or code='SZ399001'")
             emflowRT2(sel9355,tsname="emflowRT9355ts_%d_%d"%(t.month,t.day),kname="emflowRT9355k_%d_%d"%(t.month,t.day))
     except Exception as e:
         mylog.printe(e)
@@ -2105,8 +2105,8 @@ def emflowRT9355(t):
 def getEmflowRT9355(t=None):
     global sel9355
     if sel9355 is None:
-        #概念，分类，ETF
-        sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2'")
+        #概念，分类，ETF,增加深圳成指
+        sel9355 = stock.query("select * from flow_em_category where prefix='90' or prefix='91' or prefix='2' or code='SZ399001'")
     if t is None:
         t = datetime.today()
     tsname="emflowRT9355ts_%d_%d"%(t.month,t.day)

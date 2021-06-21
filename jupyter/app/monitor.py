@@ -2233,6 +2233,7 @@ class HotPlot(Frame):
         self._prefix = ('2',)
         self._rt = 0 #0 普通60秒 1 5秒级别
         self._index = 0 #0 正常 1 显示指数 2 持有
+        self._szk = None
     def on_click(self,data):
         if type(data)==str:
             self._page = 0
@@ -2303,6 +2304,7 @@ class HotPlot(Frame):
             for i in range(1,len(k)):
                 if k[i,0]==0:
                     k[i,0] = k[i-1,0]
+        self._szk = None
         if self._rt==1 and len(viewdata)>0: #使用5秒级别的数据
             b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][5][-1])
             if b:
@@ -2310,6 +2312,8 @@ class HotPlot(Frame):
                 c2i = {}
                 for i in range(len(rtlist)):
                     c2i[rtlist[i][2]] = i
+                    if rtlist[i][2]=='SZ399001':
+                        self._szk = k[i]
                 for it in viewdata:
                     if it[0][1] in c2i:
                         j = c2i[it[0][1]]
@@ -2354,8 +2358,26 @@ class HotPlot(Frame):
             ma5b = source[n][6]
             ma60b = source[n][7]
             title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
+            if self._szk is not None and self._index!=1: #将指数显示上去
+                x = np.arange(len(d))
+                kmax = k[:,0].max()
+                kmin = k[:,0].min()
+                szkmax = self._szk[:,0].max()
+                szkmin = self._szk[:,0].min()
+                ax[0].plot(x,(self._szk[:,0]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='back')
             plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5,ma60b=ma60b)
-
+    def getCurrentRT(self):
+        """
+        返回当前数据
+        """
+        t = datetime.today()
+        k,d = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
+        bi = -255*3
+        k = k[:,bi:,:]
+        d = d[bi:]
+        k15,d15 = xueqiu.get_period_k(15)
+        bolls = bolltrench()
+        return k,d,k15,d15,bolls
     def isSelected(self,company,bolls,k):
         return company[3] in self._prefix and company[1] in bolls and k[-1,1]>0
     def riseTop(self,top=12):
@@ -2363,15 +2385,9 @@ class HotPlot(Frame):
         涨幅排行,满足大资金流入，5日均线上有强通道或者返回强通道中
         返回值 [(com,price,hug,rang,k,d,ma5b),...]
         """
-        t = datetime.today()
-        ok,od = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
-        bi = -255*3
-        k = ok[:,bi:,:]
-        d = od[bi:]
+        k,d,K,D,bolls = self.getCurrentRT()
         companys = HotPlot.companys
-        K,D = xueqiu.get_period_k(15)
         R = []
-        bolls = bolltrench()
         if d[-1].hour==9 and d[-1].minute<=30:
             for i in range(len(companys)):
                 if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
@@ -2394,15 +2410,10 @@ class HotPlot(Frame):
         """
         流入排行榜
         """ 
-        k,d = get_rt(4)  
-        bi = -255*3
-        k = k[:,bi:,:]
-        d = d[bi:]        
+        k,d,K,D,bolls = self.getCurrentRT()
         companys = HotPlot.companys   
-        K,D = xueqiu.get_period_k(15)
         R = []
         if k.shape[1]>5:
-            bolls = bolltrench()
             for i in range(len(companys)):
                 if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
                     if k[i,-1,3]!=0 and k[i,-1,4]!=0:
@@ -2436,13 +2447,8 @@ class HotPlot(Frame):
         """
         将代码列表映射为数据源
         """
-        k,d = get_rt(4)  
-        bi = -255*3
-        k = k[:,bi:,:]
-        d = d[bi:]          
+        k,d,K,D,bolls = self.getCurrentRT()
         companys = HotPlot.companys   
-        K,D = xueqiu.get_period_k(15)
-        bolls = bolltrench()
         R = []
         for code in codes:
             i = HotPlot.code2i[code]
