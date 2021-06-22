@@ -1741,6 +1741,7 @@ def emflow(code,timeout=None,tryn=3):
     uri = "http://push2.eastmoney.com/api/qt/stock/fflow/kline/get?cb=jQuery112309731450462414866_%d&\
 &lmt=0&klt=1&fields1=f1%%2Cf2%%2Cf3%%2Cf7&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56%%2Cf57%%2Cf58%%2Cf59%%2Cf60%%2Cf61%%2Cf62%%2Cf63%%2Cf64%%2Cf65&ut=b2884a393a59ad64002292a3e90d46a5&\
 secid=%s.%s&_=%d"%(ts,perfix,code,ts)
+    E = None
     for i in range(tryn):
         try:
             s = requests.session()
@@ -1755,7 +1756,9 @@ secid=%s.%s&_=%d"%(ts,perfix,code,ts)
                     shared.toRedis(R,n,ex=2*60) #保存一个2分钟的缓存
                     return True,R
         except Exception as e:
-            mylog.printe(e)
+            E = e
+    if E is not None:
+        mylog.printe(E)
     return False,None
 
 """
@@ -1812,6 +1815,7 @@ def emkline(code,period='d',begin='19900101',end='20250101',timeout=None,tryn=3)
     if period=='d':
         period = 101
     uri = "http://push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery112406067857018266605_1616059436301&secid=%s.%s&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%%2Cf2%%2Cf3%%2Cf4%%2Cf5&fields2=f51%%2Cf52%%2Cf53%%2Cf54%%2Cf55%%2Cf56&klt=%d&fqt=0&beg=%s&end=%s&_=%d"%(perfix,code,period,begin,end,ts)
+    E = None
     for i in range(tryn):
         try:
             s = requests.session()
@@ -1843,7 +1847,9 @@ def emkline(code,period='d',begin='19900101',end='20250101',timeout=None,tryn=3)
                                     K.append((float(vs[5]),float(vs[1]),float(vs[3]),float(vs[4]),float(vs[2])))
                     return True,K,D
         except Exception as e:
-            mylog.printe(e)
+            E = e
+    if E is not None:
+        mylog.printe(E)
     return False,None,None
 """
 主力净流入分布
@@ -1965,6 +1971,7 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=3):
     codelists = codelists[:-1]
     n = len(codes)
     uri="https://push2.eastmoney.com/api/qt/ulist/get?cb=jQuery1124046041648531999235_%d&invt=3&pi=0&pz=%d&mpi=2000&secids=%s&ut=6d2ffaa6a585d612eda28417681d58fb&fields=%s&po=1&_=%d"%(ts,n,codelists,field,ts)
+    E = None
     for i in range(tryn):
         try:
             s = requests.session()
@@ -1978,7 +1985,9 @@ def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=3):
                     R = json.loads(r.text[bi+1:-2])
                     return True,R
         except Exception as e:
-            mylog.printe(e)
+            E = e
+    if E is not None:
+        mylog.printe(E)
     return False,None
 
 def emdistribute3(codes,timeout=None):
@@ -2183,7 +2192,7 @@ def emflowRT2(alls=None,tsname=None,kname=None,ex=7*24*3600):
                             print("没有成功获取数据 %s"%(code))
             else:
                 print("%s emflowRT2数据加装失败..."%str(t))
-                return
+                return None
         if np.count_nonzero(a[:,0,0])<a.shape[0]*0.95: #超过一定比率下载失败就不更新数据了
             print("%s emflowRT2数据更新出现较多的数据错误 %d/%d"%(str(t),np.count_nonzero(a[:,0,0]),a.shape[0]))
             return None

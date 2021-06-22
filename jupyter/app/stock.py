@@ -1429,14 +1429,15 @@ def getBollwayRange(bolls):
     """
     通道的上部和下部
     """
-    maxx = 0
-    minx = 1e9
-    for bo in bolls:
-        if bo[6]>maxx:
-            maxx = bo[6]
-        if bo[5]<minx:
-            minx = bo[5]
-    return minx,maxx
+    up = 0
+    down = 0
+    if len(bolls)>0:
+        for bo in bolls:
+            up += bo[6]
+            down += bo[5]
+        return down/len(bolls),up/len(bolls)
+    else:
+        return (0,0)
 
 def timethis(func):
     """

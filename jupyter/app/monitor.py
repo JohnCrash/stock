@@ -512,7 +512,7 @@ def getCrossMa(prefix='91',mas=[5,20],nday=1):
 返回可做的概念或者分类
 10点钟在排行榜上
 """
-def get10Top(prefix='90',top=5,nday=3,eit=None,detail=False):
+def get10Top(prefix='90',top=5,nday=3,eit=None,detail=False,reverse=True):
     companys = xueqiu.get_company_select()
     K,D = xueqiu.get_period_k(30)
     n = 0
@@ -573,7 +573,7 @@ def get10Top(prefix='90',top=5,nday=3,eit=None,detail=False):
     进行排序
     """
     result = []
-    for it in sorted(R.items(),key=lambda it:it[1][2],reverse=True):
+    for it in sorted(R.items(),key=lambda it:it[1][2],reverse=reverse):
         if detail:
             result.append((it[0],it[1][2],it[1][3]))
         else:
@@ -2222,13 +2222,17 @@ class HotPlot(Frame):
         self._code2data = {}
         self._page = 0
         self._flowin = False
+        self._hasboll = False
+        self._reverse = False
         self._options = {'涨幅榜':self.riseTop,'流入榜':self.riseFlow,'活跃':self.activeTop}
         self._sel = list(self._options)[0]
         self._dataMethods = self._options[self._sel]
         self._dropdown = self.toolbox_dropdown('方法',list(self._options),self._sel,1)
         for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('指数',6,1,False),('持有',7,1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
             self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
-        self.toolbox_checkbox('净流入',self._flowin,1)
+        self.toolbox_checkbox('净流入',self._flowin,1,layout=Layout(display='block',width='80px'))
+        self.toolbox_checkbox('有通道',self._hasboll,2,layout=Layout(display='block',width='80px'))
+        self.toolbox_checkbox('反排序',self._reverse,3,layout=Layout(display='block',width='80px'))
         self.toolbox_update()
         self._prefix = ('2',)
         self._rt = 0 #0 普通60秒 1 5秒级别
@@ -2258,6 +2262,10 @@ class HotPlot(Frame):
     def on_check(self,data,check):
         if data==1:
             self._flowin = check
+        elif data==2:
+            self._hasboll = check
+        elif data==3:
+            self._reverse = check
         self.update(datetime.today(),None)
     def on_list(self,data,sel):
         if data==1:
@@ -2313,7 +2321,7 @@ class HotPlot(Frame):
                 for i in range(len(rtlist)):
                     c2i[rtlist[i][2]] = i
                     if rtlist[i][2]=='SZ399001':
-                        self._szk = k[i]
+                        self._szk = a[i]
                 for it in viewdata:
                     if it[0][1] in c2i:
                         j = c2i[it[0][1]]
@@ -2358,13 +2366,14 @@ class HotPlot(Frame):
             ma5b = source[n][6]
             ma60b = source[n][7]
             title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
-            if self._szk is not None and self._index!=1: #将指数显示上去
+            if self._szk is not None and self._index!=1 and self._szk.shape[0]==k.shape[0]: #将指数显示上去
                 x = np.arange(len(d))
                 kmax = k[:,0].max()
                 kmin = k[:,0].min()
                 szkmax = self._szk[:,0].max()
                 szkmin = self._szk[:,0].min()
-                ax[0].plot(x,(self._szk[:,0]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='back')
+                if szkmax-szkmin!=0:
+                    ax[0].plot(x,(self._szk[:,0]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',alpha=0.4)
             plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5,ma60b=ma60b)
     def getCurrentRT(self):
         """
@@ -2379,7 +2388,9 @@ class HotPlot(Frame):
         bolls = bolltrench()
         return k,d,k15,d15,bolls
     def isSelected(self,company,bolls,k):
-        return company[3] in self._prefix and company[1] in bolls and k[-1,1]>0
+        def onif(b,s):
+            return (b and s) or not b
+        return company[3] in self._prefix and onif(self._flowin,k[-1,3]+k[-1,4]>0) and onif(self._hasboll,company[1] in bolls)
     def riseTop(self,top=12):
         """
         涨幅排行,满足大资金流入，5日均线上有强通道或者返回强通道中
@@ -2388,24 +2399,17 @@ class HotPlot(Frame):
         k,d,K,D,bolls = self.getCurrentRT()
         companys = HotPlot.companys
         R = []
-        if d[-1].hour==9 and d[-1].minute<=30:
-            for i in range(len(companys)):
-                if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
-                    R.append((companys[i],k[i,-1,1],k[i,-1,1],k[i,-1,1],stock.getBollwayRange(bolls[companys[i][1]]))) #company,涨幅,量增幅比率,流入
-        else:
-            for i in range(len(companys)):
-                if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
-                    if (self._flowin==False or (self._flowin and k[i,-1,3]+k[i,-1,4]>0)): #净流入，存在通道
-                        ma5 = stock.ma(K[i,:],80)
-                        ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
-                        rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
-                        if k[i,-1,0]>=ma5[-1] and k[i,-1,1]>0: #大于5日均线并且要求增长 
-                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None)) #0company,1 涨幅,2 流入,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
-                        elif rang[0]>0 and k[i,-1,0]>rang[0]:#如果回到通道内给机会
-                            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None))
-        TOPS = sorted(R,key=lambda it:it[1],reverse=True)
+        for i in range(len(companys)):
+            if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
+                ma5 = stock.ma(K[i,:],80)
+                ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
+                rang = self.getStrongBollwaryRang(companys[i][1],bolls)
+                R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None)) #0company,1 涨幅,2 流入,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
+        TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS[:top]
+    def getStrongBollwaryRang(self,code,bolls):
+        return stock.getBollwayRange(bolls[code]) if code in bolls else (0,0)
     def riseFlow(self,top=12):
         """
         流入排行榜
@@ -2428,20 +2432,20 @@ class HotPlot(Frame):
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
                             if dhug>=0:
-                                rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
+                                rang = self.getStrongBollwaryRang(companys[i][1],bolls)
                                 ma5 = stock.ma(K[i,:],80)
                                 ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线                                
                                 R.append((companys[i],dhug,k[i,-1,1],rang,k[i],d,ma5b,None)) #0company,1  流入,2 涨幅,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
-        TOPS = sorted(R,key=lambda it:it[1],reverse=True)
+        TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS[:top]
     def activeTop(self,top=12):
         """
         最近比较活跃的
         """
-        tb = {'90':(5,3),"91":(10,3),"2":(5,3),"0":(10,3),"1":(10,3)}
+        tb = {'90':(5,3),"91":(20,4),"2":(5,3),"0":(10,3),"1":(10,3)}
         it = tb[self._prefix[0]]
-        TOPS = get10Top(self._prefix[0],it[0],it[1])
+        TOPS = get10Top(self._prefix[0],it[0],it[1],reverse=not self._reverse)
         return self.mapCode2DataSource(TOPS)
     def mapCode2DataSource(self,codes,top=12):
         """
@@ -2452,11 +2456,8 @@ class HotPlot(Frame):
         R = []
         for code in codes:
             i = HotPlot.code2i[code]
-            if companys[i][1] in bolls:
-                rang = stock.getBollwayRange(bolls[companys[i][1]]) if stock.isStrongBollway(bolls[companys[i][1]]) else (0,0)
-            else:
-                rang = (0,0)
+            rang = self.getStrongBollwaryRang(companys[i][1],bolls)
             ma5 = stock.ma(K[i,:],80)
-            ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线                                
+            ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
             R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None))
         return R[:top]
