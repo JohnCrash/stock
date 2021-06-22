@@ -1988,6 +1988,7 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
         fmt = 'h:m'
         ax[0].set_xlim(0,12*30)
         ax[1].set_xlim(0,12*30)
+        print(len(d),d)
 
     #ax[0].axhline(y=0,color='black',linestyle='dotted')
     ax[0].plot(x,k[:,0],color=style['pcolor'])
@@ -2016,9 +2017,16 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
     
     if ma5b is not None and len(k)>0:
         ma5 = np.zeros((len(k),))
-        ma5[0] = ma5b
+        ma5[0] = ma5b[0]
+        k15b = ma5b[1]
+        if dt==60:
+            N = 240*5
+            M = 15
+        elif dt==5:
+            N = 240*5*12
+            M = 15*12
         for i in range(1,len(k)):
-            ma5[i] = ma5[i-1]+(k[i,0]-ma5[i-1])/(240*5) #这是一个近似迭代
+            ma5[i] = ma5[i-1]+(k[i,0]-k15b[int(i/M)])/(N) #这是一个近似迭代
         ax[0].plot(x,ma5,linewidth=2,color='magenta',linestyle='dashed')
     if len(ax)==2:
         ax[1].axhline(y=0,color='black',linestyle='dotted')
@@ -2242,7 +2250,7 @@ class HotPlot(Frame):
         if type(data)==str:
             self._page = 0
             self._prefix = (data,)
-        self._index = 0
+            self._index = 0
         if data==3: #pageup
             self._page-=1
         elif data==4: #pagedown
@@ -2276,7 +2284,7 @@ class HotPlot(Frame):
         but = super(HotPlot,self).stock2button(code)
         data = self.code2data(code)
         if data is not None:
-            k = data[4]
+            k = data[2]
             if k.shape[0]>1:
                 if k[-1,3]+k[-1,4]>k[-2,3]+k[-2,4]: #流入
                     if k[-1,0]>k[-2,0]: #涨
@@ -2297,7 +2305,7 @@ class HotPlot(Frame):
     def code2data(self,code):
         return self._code2data[code] if code in self._code2data else None
 
-    def currentPageDataSource(self,dataSource,N): 
+    def currentPageDataSource(self,dataSource,N):
         """
         数据在显示前进行前置处理
         1 受到翻页的影响 2 切换到5秒级别的数据
@@ -2307,16 +2315,17 @@ class HotPlot(Frame):
         if self._page>=math.ceil(len(dataSource)/N):
             self._page = math.ceil(len(dataSource)/N)-1
         viewdata = dataSource[self._page*N:]
+        #viewdata ((0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls),...)
         for it in viewdata: #处理数据问题：1 价格为0
-            k = it[4]
+            k = it[2]
             for i in range(1,len(k)):
                 if k[i,0]==0:
                     k[i,0] = k[i-1,0]
+        R = []
         self._szk = None
         if self._rt==1 and len(viewdata)>0: #使用5秒级别的数据
-            b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][5][-1])
+            b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][3][-1])
             if b:
-                viewrt = []
                 c2i = {}
                 for i in range(len(rtlist)):
                     c2i[rtlist[i][2]] = i
@@ -2325,8 +2334,10 @@ class HotPlot(Frame):
                 for it in viewdata:
                     if it[0][1] in c2i:
                         j = c2i[it[0][1]]
-                        k = it[4]
-                        d = it[5]
+                        company = it[0]
+                        bolls = it[6]
+                        k = it[2]
+                        d = it[3]
                         for i in range(len(d)-1,0,-1):
                             if d[i].day!=d[-1].day:
                                 i+=1
@@ -2334,12 +2345,27 @@ class HotPlot(Frame):
                         ma60b = None
                         if i-60>0:
                             ma60b = k[i-60:i,0].sum()/60
-                        viewrt.append((it[0],it[1],it[2],it[3],a[j,:,:],ts[:],None,ma60b))
+
+                        rang = self.getStrongBollwaryRang(company[1],bolls)
+                        R.append({'company':it[0],'k':a[j,:,:],'d':ts[:],'rang':rang,'ma5b':self.getma5b(it[4],it[5],0),'ma60b':ma60b,'dt':5})
                     else:
-                        viewrt.append(it) #没发现5秒数据
-                viewdata = viewrt
-        return viewdata
-    
+                        company = it[0]
+                        rang = self.getStrongBollwaryRang(company[1],it[6])
+                        R.append({'company':company,'k':it[2],'d':it[3],'rang':rang,'ma5b':self.getma5b(it[4],it[5]),'ma60b':None,'dt':60})
+        else: #1分钟级别数据
+            for it in viewdata: #处理ma5b,和rang
+                company = it[0]
+                rang = self.getStrongBollwaryRang(company[1],it[6])
+                R.append({'company':company,'k':it[2],'d':it[3],'rang':rang,'ma5b':self.getma5b(it[4],it[5]),'ma60b':None,'dt':60})
+        return R
+    def getma5b(self,K15,D15,n=3):
+        #f返回一个plotfs2 的ma5b需要的参数，用于绘制5日均线 n = 3起点位置在3天前
+        if n==0:
+            ma5b = K15[-16*n-16*5:].sum()/80
+        else:
+            ma5b = K15[-16*n-16*5:-16*n].sum()/80
+        k15b = K15[-16*n-16*5:]
+        return (ma5b,k15b)
     def update(self,t,lastt):
         if lastt is None or (stock.isTransDay() and stock.isTransTime()):
             if lastt is not None and lastt.hour==9 and lastt.minute==29:
@@ -2360,12 +2386,15 @@ class HotPlot(Frame):
     def riseTopPlot(self,ax,i,j,source):
         n = i+3*j
         if n<len(source):
-            k = source[n][4]
-            d = source[n][5]
-            rang = source[n][3]
-            ma5b = source[n][6]
-            ma60b = source[n][7]
-            title = "%s %s"%(source[n][0][2],stock.timeString2(d[-1]))
+            s = source[n]
+            company = s['company']
+            k = s['k']
+            d = s['d']
+            rang = s['rang']
+            ma5b = s['ma5b']
+            ma60b = s['ma60b']
+            dt =  s['dt']
+            title = "%s %s"%(company[2],stock.timeString2(d[-1]))
             if self._szk is not None and self._index!=1 and self._szk.shape[0]==k.shape[0]: #将指数显示上去
                 x = np.arange(len(d))
                 kmax = k[:,0].max()
@@ -2374,7 +2403,7 @@ class HotPlot(Frame):
                 szkmin = self._szk[:,0].min()
                 if szkmax-szkmin!=0:
                     ax[0].plot(x,(self._szk[:,0]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',alpha=0.4)
-            plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=60 if self._rt==0 else 5,ma60b=ma60b)
+            plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=dt,ma60b=ma60b)
     def getCurrentRT(self):
         """
         返回当前数据
@@ -2401,10 +2430,7 @@ class HotPlot(Frame):
         R = []
         for i in range(len(companys)):
             if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
-                ma5 = stock.ma(K[i,:],80)
-                ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
-                rang = self.getStrongBollwaryRang(companys[i][1],bolls)
-                R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None)) #0company,1 涨幅,2 流入,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
+                R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS[:top]
@@ -2431,11 +2457,8 @@ class HotPlot(Frame):
                                 break
                         if j!=-1:
                             dhug = (F[-1]-m1[j])
-                            if dhug>=0:
-                                rang = self.getStrongBollwaryRang(companys[i][1],bolls)
-                                ma5 = stock.ma(K[i,:],80)
-                                ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线                                
-                                R.append((companys[i],dhug,k[i,-1,1],rang,k[i],d,ma5b,None)) #0company,1  流入,2 涨幅,3 通道,4 k,5 d,6 k起始位置的ma5,7 ma60b
+                            if dhug>=0:                              
+                                R.append((companys[i],dhug,k[i],d,K[i],D,bolls))
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS[:top]
@@ -2456,8 +2479,5 @@ class HotPlot(Frame):
         R = []
         for code in codes:
             i = HotPlot.code2i[code]
-            rang = self.getStrongBollwaryRang(companys[i][1],bolls)
-            ma5 = stock.ma(K[i,:],80)
-            ma5b = ma5[-int(len(d)/15)] #计算k开始时的5日均线
-            R.append((companys[i],k[i,-1,1],k[i,-1,3]+k[i,-1,4],rang,k[i],d,ma5b,None))
+            R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls))
         return R[:top]

@@ -889,6 +889,8 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
     while t.hour>=6 and t.hour<15:
         try:
             if stock.isTransTime():
+                if int(t.second)%5==0:
+                    emflowRT9355(t)#增加一个数据项在9:30-9:35的5秒一次的数据                
                 if t.minute!=lastUpdateFlow: #每1分钟更新一次
                     lastUpdateFlow = t.minute
                     sinaFlowRT()
@@ -898,8 +900,6 @@ def updateAllRT(ThreadCount=config.updateAllRT_thread_count):
                         update_period_plane(t,plane,[240,60,30,15,5])
                     print("emflowRT %s"%str(t))
                     shared.toRedis(datetime.today(),'runtime_update',ex=60)
-                if int(t.second)%5==0:
-                    emflowRT9355(t)#增加一个数据项在9:30-9:35的5秒一次的数据
             time.sleep(1)
             t = datetime.today()
         except Exception as e:
