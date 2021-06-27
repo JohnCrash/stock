@@ -1988,7 +1988,6 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
         fmt = 'h:m'
         ax[0].set_xlim(0,12*30)
         ax[1].set_xlim(0,12*30)
-        print(len(d),d)
 
     #ax[0].axhline(y=0,color='black',linestyle='dotted')
     ax[0].plot(x,k[:,0],color=style['pcolor'])
@@ -2153,6 +2152,7 @@ class Frame:
             dt = t-self._lastt
             self._acct += dt.seconds+dt.microseconds/1e6
         self._lastt = t
+        #print('loop',self._acct,self._interval)
         xueqiu.setTimeout(1,self.loop,'monitor.Frame_%d'%self._id)
 
     def setUpdateInterval(self,a):
@@ -2225,6 +2225,7 @@ class Frame:
         return but
 
 class HotPlot(Frame):
+    TOP = 18
     def __init__(self):
         super(HotPlot,self).__init__()
         self._code2data = {}
@@ -2324,6 +2325,7 @@ class HotPlot(Frame):
         R = []
         self._szk = None
         if self._rt==1 and len(viewdata)>0: #使用5秒级别的数据
+            print('getEmflowRT9355',viewdata[0][3][-1])
             b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][3][-1])
             if b:
                 c2i = {}
@@ -2368,9 +2370,10 @@ class HotPlot(Frame):
         return (ma5b,k15b)
     def update(self,t,lastt):
         if lastt is None or (stock.isTransDay() and stock.isTransTime()):
-            if lastt is not None and lastt.hour==9 and lastt.minute==29:
+            if lastt is not None and t.hour==9 and t.minute==29:
                 self._rt = 1
                 self.setUpdateInterval(5)
+                #print('setUpdateInterval',5)
             if self._index==1:
                 self._dataSource = self.mapCode2DataSource(['SH000001','SZ399001','SZ399006','SH000688'])
             elif self._index==2:
@@ -2380,6 +2383,7 @@ class HotPlot(Frame):
             self._code2data = {}
             for data in self._dataSource:
                 self._code2data[data[0][1]] = data
+            #print('update',t,lastt)
             self.subplots(2,3,self.riseTopPlot,source=self.currentPageDataSource(self._dataSource,2*3))
             self.listStock([it[0][1] for it in self._dataSource])
 
@@ -2420,7 +2424,7 @@ class HotPlot(Frame):
         def onif(b,s):
             return (b and s) or not b
         return company[3] in self._prefix and onif(self._flowin,k[-1,3]+k[-1,4]>0) and onif(self._hasboll,company[1] in bolls)
-    def riseTop(self,top=12):
+    def riseTop(self,top=18):
         """
         涨幅排行,满足大资金流入，5日均线上有强通道或者返回强通道中
         返回值 [(com,price,hug,rang,k,d,ma5b),...]
@@ -2436,7 +2440,7 @@ class HotPlot(Frame):
         return TOPS[:top]
     def getStrongBollwaryRang(self,code,bolls):
         return stock.getBollwayRange(bolls[code]) if code in bolls else (0,0)
-    def riseFlow(self,top=12):
+    def riseFlow(self,top=18):
         """
         流入排行榜
         """ 
@@ -2462,7 +2466,7 @@ class HotPlot(Frame):
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS[:top]
-    def activeTop(self,top=12):
+    def activeTop(self,top=18):
         """
         最近比较活跃的
         """
@@ -2470,7 +2474,7 @@ class HotPlot(Frame):
         it = tb[self._prefix[0]]
         TOPS = get10Top(self._prefix[0],it[0],it[1],reverse=not self._reverse)
         return self.mapCode2DataSource(TOPS)
-    def mapCode2DataSource(self,codes,top=12):
+    def mapCode2DataSource(self,codes,top=18):
         """
         将代码列表映射为数据源
         """
