@@ -1122,16 +1122,30 @@ def testsmooth():
     id2com = xueqiu.get_company_select_id2com()
     enumrt(bi,cb,data,None)
 
+def companyetf2em():
+    """
+    将company中的全部ETF加入到em中去
+    """
+    etfs = stock.query("select id,code,name from company where name like '%%ETF%%'")
+    em_etfs = stock.query("select id,code,name from flow_em_category where prefix='2'")
+    em_etfs2coms = {}
+    for it in em_etfs:
+        em_etfs2coms[it[1]] = it
+    for it in etfs:
+        if it[1] not in em_etfs2coms:
+            qs = "insert ignore into flow_em_category (name,code,prefix,watch,company_id) values ('%s','%s',%d,6,%d)"%(it[2],it[1],2,it[0])
+            print(qs)
+            stock.execute(qs)
 
 
-
+#companyetf2em()
 def K(code,period,pos):
     kline.Plote(code,period,mode='normal',lastday=2*365).show(figsize=(32,15),pos=pos)
 #K('BK0450',5,'2021-04-07 09:35:00')
-K("SH000001",5,'2021-04-07 09:35:00')
+#K("SH000001",5,'2021-04-07 09:35:00')
 #monitor.riseview('2021-06-16',3,17)
 #monitor.monitor_bollup()
 
-monitor.HotPlot().loop()
+#monitor.HotPlot().loop()
 
 

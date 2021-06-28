@@ -70,12 +70,7 @@ class Plot:
             if self._xticks is None:
                 self._xticks = np.linspace(self._oxmin,self._oxmax,8)
             if self._yticks is None:
-                dy = (self._oymax-self._oymin)/8
-                lg = math.log(dy,10)
-                lg = int(lg)
-                dy = math.pow(10,lg)
-                by = int(self._oymin/dy)*dy
-                self._yticks = np.linspace(by,by+9*dy,10)
+                self._yticks = np.linspace(self._oymin,self._oymax,8)
     def setTicks(self,xticks=None,yticks=None):
         """
         设置x,y轴的网格线
@@ -198,7 +193,7 @@ class MyPlot(window.frame):
         #x = np.arange(100)
         #y = np.sin(x*4*np.pi/200)
         #y2 = np.cos(x*4*np.pi/200)
-        k,d = monitor.get_rt(1)
+        k,d = monitor.get_rt(4)
         companys = xueqiu.get_company_select()
         #y = x#np.sin(x)
         for i in range(len(companys)):

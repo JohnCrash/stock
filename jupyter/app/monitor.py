@@ -14,10 +14,13 @@ import random
 from numpy.core.fromnumeric import compress
 from numpy.core.numeric import NaN
 from numpy.lib.function_base import disp
+from . import mylog
 from . import shared
 from . import stock
 from . import xueqiu
 from . import kline
+
+log = mylog.init('monitor.log',name='monitor')
 
 box_layout = Layout(display='flex',
                 flex_flow='wrap',
@@ -2043,10 +2046,12 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
             v[1:] = k[1:,2]-k[:-1,2]
             v[v!=v]= 0
             v[v<0] = 0
-            smax = k[k[:,6]==k[:,6],6].max()
-            vmax = v[v==v].max()
-            r = smax/vmax
-            ax[1].plot(x,v*r) #成交量            
+            dv = k[k[:,6]==k[:,6],6]
+            if len(dv)>0:
+                smax = np.abs(dv).max()
+                vmax = v[v==v].max()
+                r = smax/vmax
+                ax[1].plot(x,v*r) #成交量            
             ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
             ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
 
@@ -2144,15 +2149,18 @@ class Frame:
         """
 
     def loop(self):
-        t = datetime.today()
-        if self._acct>self._interval or self._lastt is None:
-            self._acct=0
-            self.update(t,self._lastt)
-        else:
-            dt = t-self._lastt
-            self._acct += dt.seconds+dt.microseconds/1e6
-        self._lastt = t
-        #print('loop',self._acct,self._interval)
+        try:
+            t = datetime.today()
+            if self._acct>self._interval or self._lastt is None:
+                self._acct=0
+                self.update(t,self._lastt)
+            else:
+                dt = t-self._lastt
+                self._acct += dt.seconds+dt.microseconds/1e6
+            self._lastt = t
+        except Exception as e:
+            log.error(str(e))
+            log.printe(e)
         xueqiu.setTimeout(1,self.loop,'monitor.Frame_%d'%self._id)
 
     def setUpdateInterval(self,a):
@@ -2325,7 +2333,6 @@ class HotPlot(Frame):
         R = []
         self._szk = None
         if self._rt==1 and len(viewdata)>0: #使用5秒级别的数据
-            print('getEmflowRT9355',viewdata[0][3][-1])
             b,a,ts,rtlist = xueqiu.getEmflowRT9355(viewdata[0][3][-1])
             if b:
                 c2i = {}
@@ -2373,7 +2380,6 @@ class HotPlot(Frame):
             if lastt is not None and t.hour==9 and t.minute==29:
                 self._rt = 1
                 self.setUpdateInterval(5)
-                #print('setUpdateInterval',5)
             if self._index==1:
                 self._dataSource = self.mapCode2DataSource(['SH000001','SZ399001','SZ399006','SH000688'])
             elif self._index==2:
@@ -2383,7 +2389,6 @@ class HotPlot(Frame):
             self._code2data = {}
             for data in self._dataSource:
                 self._code2data[data[0][1]] = data
-            #print('update',t,lastt)
             self.subplots(2,3,self.riseTopPlot,source=self.currentPageDataSource(self._dataSource,2*3))
             self.listStock([it[0][1] for it in self._dataSource])
 
