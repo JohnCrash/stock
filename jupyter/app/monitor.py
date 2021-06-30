@@ -821,6 +821,15 @@ def get_rt(n=1):
                 i = code2i[c]
                 if i<K.shape[0]:
                     K[i,-1,:] = a[j,-1,:]
+    """
+    价格等于0的问题
+    """
+    for i in range(K.shape[0]):
+        if K[i,0,0]==0:
+            for j in range(K.shape[1]):
+                if K[i,j,0]!=0:
+                    K[i,0:j,0] = K[i,j,0]
+                    break
     _rt_k = K
     _rt_d = D
     return K,D
@@ -2241,20 +2250,26 @@ class HotPlot(Frame):
         self._flowin = False
         self._hasboll = False
         self._reverse = False
-        self._options = {'涨幅榜':self.riseTop,'流入榜':self.riseFlow,'活跃':self.activeTop}
-        self._sel = list(self._options)[0]
-        self._dataMethods = self._options[self._sel]
-        self._dropdown = self.toolbox_dropdown('方法',list(self._options),self._sel,1)
-        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('指数',6,1,False),('持有',7,1,False),('上一页',3,None,False),('下一页',4,None,False),('实时',5,None,False)]:
-            self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
-        self.toolbox_checkbox('净流入',self._flowin,1,layout=Layout(display='block',width='80px'))
-        self.toolbox_checkbox('有通道',self._hasboll,2,layout=Layout(display='block',width='80px'))
-        self.toolbox_checkbox('反排序',self._reverse,3,layout=Layout(display='block',width='80px'))
-        self.toolbox_update()
+        self._ntop = '18'
         self._prefix = ('2',)
         self._rt = 0 #0 普通60秒 1 5秒级别
         self._index = 0 #0 正常 1 显示指数 2 持有
-        self._szk = None
+        self._szk = None        
+        self._options = {'涨幅榜':self.riseTop,'流入榜':self.riseFlow,'活跃':self.activeTop}
+        self._ntopoptions = ['18','36','64']
+        self._sel = list(self._options)[0]
+        self._dataMethods = self._options[self._sel]
+        self._dropdown = self.toolbox_dropdown('方法',list(self._options),self._sel,1)
+        layout=Layout(display='block',width='80px')
+        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('指数',6,1,False),('持有',7,1,False),('上一页',3,None,False),('下一页',4,None,False)]:
+            self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
+        self.toolbox_checkbox('实时',self._rt==1,0,layout=layout)
+        self.toolbox_checkbox('净流入',self._flowin,1,layout=layout)
+        self.toolbox_checkbox('有通道',self._hasboll,2,layout=layout)
+        self.toolbox_checkbox('反排序',self._reverse,3,layout=layout)
+        self.toolbox_dropdown('',self._ntopoptions,self._ntop,2,layout=layout)
+        self.toolbox_update()
+
     def on_click(self,data):
         if type(data)==str:
             self._page = 0
@@ -2283,11 +2298,19 @@ class HotPlot(Frame):
             self._hasboll = check
         elif data==3:
             self._reverse = check
+        elif data==0:
+            self._rt=1 if check else 0
+            if self._rt==1:
+                self.setUpdateInterval(5)
+            else:
+                self.setUpdateInterval(60)
         self.update(datetime.today(),None)
     def on_list(self,data,sel):
         if data==1:
             self._sel = sel
             self._dataMethods = self._options[self._sel]
+        elif data==2:
+            self._ntop = sel
         self.update(datetime.today(),None)
     def stock2button(self,code):
         but = super(HotPlot,self).stock2button(code)
@@ -2385,7 +2408,7 @@ class HotPlot(Frame):
             elif self._index==2:
                 self._dataSource = self.mapCode2DataSource(stock.getHoldStocks())
             else:
-                self._dataSource = self._dataMethods()
+                self._dataSource = self._dataMethods(int(self._ntop))
             self._code2data = {}
             for data in self._dataSource:
                 self._code2data[data[0][1]] = data
@@ -2423,6 +2446,14 @@ class HotPlot(Frame):
         k = k[:,bi:,:]
         d = d[bi:]
         k15,d15 = xueqiu.get_period_k(15)
+        for i in range(k15.shape[0]): #处理价格为0的情况
+            if k15[i,0]==0:
+                for j in range(k15.shape[1]):
+                    if k15[i,j]!=0:
+                        k15[i,:j] = k15[i,j]
+                        break
+                continue
+
         bolls = bolltrench()
         return k,d,k15,d15,bolls
     def isSelected(self,company,bolls,k):

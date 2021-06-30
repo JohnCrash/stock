@@ -398,8 +398,10 @@ def searchstrongflow():
 """
 更新period_sequence
 """
-def update_period_sequence():
+def update_period_sequence(clear=False):
     for p in [240,60,30,15,5]:
+        if clear:
+            xueqiu.clear_period_sequence(p)
         xueqiu.rebuild_period_sequence(p)
 
 """
@@ -1148,4 +1150,4 @@ def K(code,period,pos):
 
 #monitor.HotPlot().loop()
 
-
+ziprt.saveRT()
