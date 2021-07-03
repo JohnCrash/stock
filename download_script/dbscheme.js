@@ -166,7 +166,10 @@ function valueList(t,scheme){
     let values = [];
     for(let k in t){
         if(scheme[k] === 'number'){
-            keys.push(`${k}`);
+            if(k=='ignore')
+                keys.push(`\`${k}\``);
+            else
+                keys.push(`${k}`);
             values.push(`${t[k]}`);
         }else if(scheme[k] === 'string'){
             keys.push(`${k}`);

@@ -27,7 +27,8 @@ function add_new_stock(code,name,category){
             //将code加入到company
             c = {
                 code:code,
-                name:name
+                name:name,
+                ignore:0
             }
             if(category){
                 c.category = category;

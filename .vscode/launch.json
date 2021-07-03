@@ -73,7 +73,7 @@
             "request": "launch",
             "name": "Add Stock",
             "program": "${workspaceFolder}\\download_script\\addstock.js",
-            "args": ["SZ159939","信息技术ETF"]
+            "args": ["SH516150","稀土产业ETF"]
         },   
         {
             "type": "node",

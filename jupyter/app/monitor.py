@@ -2134,11 +2134,21 @@ class Frame:
     def K(self,code,period=15,pos=None,mode='auto'):
         kline.Plote(code,period,config={'index':True},mode=mode).show(figsize=(48,20),pos=pos)
     
+    def onStockSel(self,code):
+        """当对应的按键被按下时触发
+
+        Args:
+            code (str): 股票代码
+        Return:返回True表示不做默认处理，否则返回False
+        """
+        return False
     def listStock(self,ls):
         """
         将股票列表转换为按钮
         """
         def on_click(e):
+            if self.onStockSel(e._code):
+                return
             self._output.clear_output()
             with self._output:
                 self.K(e._code)
@@ -2243,6 +2253,7 @@ class Frame:
 
 class HotPlot(Frame):
     TOP = 18
+    PageN = 3*2
     def __init__(self):
         super(HotPlot,self).__init__()
         self._code2data = {}
@@ -2250,6 +2261,7 @@ class HotPlot(Frame):
         self._flowin = False
         self._hasboll = False
         self._reverse = False
+        self._sel = None
         self._ntop = '18'
         self._prefix = ('2',)
         self._rt = 0 #0 普通60秒 1 5秒级别
@@ -2261,9 +2273,10 @@ class HotPlot(Frame):
         self._dataMethods = self._options[self._sel]
         self._dropdown = self.toolbox_dropdown('方法',list(self._options),self._sel,1)
         layout=Layout(display='block',width='80px')
-        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('指数',6,1,False),('持有',7,1,False),('上一页',3,None,False),('下一页',4,None,False)]:
+        for it in [('ETF','2',1,True),('概念','91',1,False),('行业','90',1,False),('SZ','0',1,False),('SH','1',1,False),('指数',6,1,False),
+        ('持有',7,1,False),('关注',10,1,False),('昨天榜',8,1,False),('前天榜',9,1,False),('上一页',3,None,False),('下一页',4,None,False)]:
             self.toolbox_button(it[0],it[1],group=it[2],selected=it[3])
-        self.toolbox_checkbox('实时',self._rt==1,0,layout=layout)
+        self._rtcheck = self.toolbox_checkbox('实时',self._rt==1,0,layout=layout)
         self.toolbox_checkbox('净流入',self._flowin,1,layout=layout)
         self.toolbox_checkbox('有通道',self._hasboll,2,layout=layout)
         self.toolbox_checkbox('反排序',self._reverse,3,layout=layout)
@@ -2279,16 +2292,17 @@ class HotPlot(Frame):
             self._page-=1
         elif data==4: #pagedown
             self._page+=1
-        elif data==5: #实时
-            self._rt=1 if self._rt==0 else 0
-            if self._rt==1:
-                self.setUpdateInterval(5)
-            else:
-                self.setUpdateInterval(60)
         elif data==6: #指数
             self._index = 1 #
         elif data==7:
             self._index = 2 #持有
+        elif data==8: #昨日
+            self._index = 3 #
+        elif data==9: #前天
+            self._index = 4 #
+        elif data==10: #关注
+            self._index = 5
+        self._sel = None
         self._output.clear_output()
         self.update(datetime.today(),None)
     def on_check(self,data,check):
@@ -2313,7 +2327,12 @@ class HotPlot(Frame):
             self._ntop = sel
         self.update(datetime.today(),None)
     def stock2button(self,code):
-        but = super(HotPlot,self).stock2button(code)
+        p,i = self.codeinpage(code)
+        if p==self._page:
+            layout=Layout(border='2px solid red')
+        else:
+            layout=Layout()
+        but = widgets.Button(description="%s"%Frame.code2com[code][2],layout=layout)
         data = self.code2data(code)
         if data is not None:
             k = data[2]
@@ -2402,17 +2421,24 @@ class HotPlot(Frame):
         if lastt is None or (stock.isTransDay() and stock.isTransTime()):
             if lastt is not None and t.hour==9 and t.minute==29:
                 self._rt = 1
+                self._rtcheck.value = True
                 self.setUpdateInterval(5)
             if self._index==1:
                 self._dataSource = self.mapCode2DataSource(['SH000001','SZ399001','SZ399006','SH000688'])
             elif self._index==2:
                 self._dataSource = self.mapCode2DataSource(stock.getHoldStocks())
+            elif self._index==3:#昨日榜
+                self._dataSource = self.mapCode2DataSource(self.getYesterdayTop(1,int(self._ntop)))
+            elif self._index==4:#前日榜
+                self._dataSource = self.mapCode2DataSource(self.getYesterdayTop(2,int(self._ntop)))
+            elif self._index==5:#关注
+                self._dataSource = self.mapCode2DataSource(self.getFav())
             else:
                 self._dataSource = self._dataMethods(int(self._ntop))
             self._code2data = {}
             for data in self._dataSource:
                 self._code2data[data[0][1]] = data
-            self.subplots(2,3,self.riseTopPlot,source=self.currentPageDataSource(self._dataSource,2*3))
+            self.subplots(2,3,self.riseTopPlot,source=self.currentPageDataSource(self._dataSource,HotPlot.PageN))
             self.listStock([it[0][1] for it in self._dataSource])
 
     def riseTopPlot(self,ax,i,j,source):
@@ -2435,7 +2461,26 @@ class HotPlot(Frame):
                 szkmin = self._szk[:,0].min()
                 if szkmax-szkmin!=0:
                     ax[0].plot(x,(self._szk[:,0]-szkmin)*(kmax-kmin)/(szkmax-szkmin)+kmin,color='black',alpha=0.4)
+            if self._sel is not None and self._sel==n+HotPlot.PageN*self._page:
+                ax[0].set_facecolor('#eafff5')
+                ax[1].set_facecolor('#eafff5')
             plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=dt,ma60b=ma60b)
+    def codeinpage(self,code):
+        """
+        返回代码所处的页，以及它在表中的索引
+        """
+        for i in range(len(self._dataSource)):
+            it = self._dataSource[i]
+            if it[0][1]==code:
+                break
+        N = HotPlot.PageN
+        page = math.floor(i/N)
+        return page,i
+    def onStockSel(self,code):
+        #当股票按键被按下时之间切换到对应的页面
+        self._page,self._sel = self.codeinpage(code)
+        self.update(datetime.today(),None)
+        return False
     def getCurrentRT(self):
         """
         返回当前数据
@@ -2456,6 +2501,42 @@ class HotPlot(Frame):
 
         bolls = bolltrench()
         return k,d,k15,d15,bolls
+    def getFav(self):
+        """
+        返回关注
+        """
+        today = date.today()  
+        after = today-timedelta(days=20)
+        result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
+        S = {}
+        for it in result:
+            S[it[2]] = it
+        return S.keys()
+    def getYesterdayTop(self,n=1,top=18):
+        """
+        返回昨日涨幅榜
+        """
+        k,d,k15,d15,bolls = self.getCurrentRT()
+        companys = HotPlot.companys
+        t = datetime.today()
+        for i in range(len(d)-1,0,-1):
+            if d[i].day!=t.day:
+                if n==1:
+                    break
+                else:
+                    n-=1
+                    t = d[i]
+        R = []
+        if i>0:
+            TOPS = []
+            for j in range(len(companys)):
+                if j<k.shape[0] and self.isSelected(companys[j],bolls,k[j,:i]):
+                    R.append((companys[j][1],k[j,i,1]))
+            TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
+            R = []
+            for it in TOPS:
+                R.append(it[0])
+        return R[:top]
     def isSelected(self,company,bolls,k):
         def onif(b,s):
             return (b and s) or not b

@@ -1140,7 +1140,7 @@ def companyetf2em():
             stock.execute(qs)
 
 
-#companyetf2em()
+companyetf2em()
 def K(code,period,pos):
     kline.Plote(code,period,mode='normal',lastday=2*365).show(figsize=(32,15),pos=pos)
 #K('BK0450',5,'2021-04-07 09:35:00')
@@ -1149,5 +1149,3 @@ def K(code,period,pos):
 #monitor.monitor_bollup()
 
 #monitor.HotPlot().loop()
-
-ziprt.saveRT()
