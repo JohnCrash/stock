@@ -1148,4 +1148,12 @@ def K(code,period,pos):
 #monitor.riseview('2021-06-16',3,17)
 #monitor.monitor_bollup()
 
-monitor.HotPlot().loop()
+#monitor.HotPlot().loop()
+@stock.timethis
+def getrt():
+    k15,d15 = xueqiu.get_period_k(15)
+    #k,d = monitor.get_rt(4)
+
+getrt()
+getrt()
+getrt()

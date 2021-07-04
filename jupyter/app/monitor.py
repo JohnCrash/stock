@@ -797,11 +797,7 @@ def get_rt(n=1):
                 t = pt-timedelta(days=1)
             else:
                 break
-    elif t.minute==_rt_d[-1].minute and t.hour==_rt_d[-1].hour: #没有新的1分钟数据
-        #完全不需要更新
-        K = _rt_k
-        D = _rt_d
-    else: #重新加装今天的数据
+    elif stock.isTransDay() and stock.isTransTime() and t.minute!=_rt_d[-1].minute: #重新加装今天的数据
         pt,k,d = get_last_rt(t)
         for i in range(len(d)):
             if d[i]>_rt_d[-1]:
@@ -812,6 +808,10 @@ def get_rt(n=1):
             news[:_rt_k.shape[0]] = _rt_k
             _rt_k = news
         K = np.hstack((_rt_k,k[:,i:,:]))
+    else:
+        #完全不需要更新
+        K = _rt_k
+        D = _rt_d        
     if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
         b,a,ts,rtlist = xueqiu.getEmflowRT9355()
         if b:

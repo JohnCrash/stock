@@ -6,6 +6,24 @@ import math
 import sdl2
 from OpenGL import GL
 import ctypes
+
+def pone(a,f=math.ceil):
+    """
+    保留数a一位精度,例如0.123 返回0.2
+    """
+    lg = math.log10(a)
+    if lg>0:
+        n = math.pow(10,lg-int(lg))
+        e = int(lg)
+    else:
+        n = math.pow(10,lg-int(lg)+1)
+        e = int(lg)-1
+    return f(n)*math.pow(10,e),e
+def precision(a,e):
+    """
+    截断精度一下的数字例如，0.1233,-1 返回0.1
+    """
+    return int(a/math.pow(10,e))*math.pow(10,e)
 """
 绘制图表
 """
@@ -24,6 +42,8 @@ class Plot:
         self._area = [0,0,0,0]
         self._border =[0,0,0,0]
         self._grid = False
+        self._xe = None
+        self._ye = None
     def setx(self,x,labels=None):
         """
         设置x轴数据,labels=[(i,label),...]
@@ -68,9 +88,13 @@ class Plot:
         self._yb = -self._ymin*self._yk
         if self._grid:
             if self._xticks is None:
-                self._xticks = np.linspace(self._oxmin,self._oxmax,8)
+                delta,self._xe = pone((self._oxmax-self._oxmin)/5) #_ye是精度
+                bi = precision(self._oxmin-self._oxmin%delta,self._xe)
+                self._xticks = np.arange(bi,self._oxmax,delta)
             if self._yticks is None:
-                self._yticks = np.linspace(self._oymin,self._oymax,8)
+                delta,self._ye = pone((self._oymax-self._oymin)/5) #_ye是精度
+                bi = precision(self._oymin-self._oymin%delta,self._ye)
+                self._yticks = np.arange(bi,self._oymax,delta)
     def setTicks(self,xticks=None,yticks=None):
         """
         设置x,y轴的网格线
@@ -115,9 +139,25 @@ class Plot:
         wy = h0*(1-(y*self._yk+self._yb))+y0 #y反转
         return wy
     def x2AxisLabel(self,x):
-        return "%.2f"%x
+        if self._xe is None:
+            return str(x)
+        else:
+            if self._xe<0:
+                fmt = "%%.%df"%abs(self._xe)
+            else:
+                fmt = "%.0f"
+            return fmt%x
     def y2AxisLabel(self,y):
-        return "%.2f"%y
+        if self._ye is None:
+            return str(y)
+        else:
+            if self._ye<0:
+                fmt = "%%.%df"%abs(self._ye)
+            else:
+                if self._ye>3:
+                    y = int(y/math.pow(10,self._ye))
+                fmt = "%.0f"
+            return fmt%y
     def renderAxis(self,canvas):
         """
         渲染背景于坐标，包括标题
@@ -155,6 +195,9 @@ class Plot:
                     canvas.lineTo(x0+w0,y)
                     canvas.stroke()
                     canvas.text(x0-2,y,self.y2AxisLabel(oy))
+            if self._ye is not None and self._ye>3: #绘制坐标指数
+                canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
+                canvas.text(x0,y0,"1e%d"%self._ye)
         canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
         canvas.fontSize(18)
         canvas.text(x0+w0/2,y0+2,self._title)
@@ -164,8 +207,6 @@ class Plot:
     def render(self,canvas,x0,y0,w,h):
         self.prepareRender(x0,y0,w,h)
         self.renderAxis(canvas)
-
-        
         xy = np.empty((len(self._x),2),dtype=np.float32)
         xy[:,0] = self.xAxis2wx(self._x) #w*(self._x*self._xk+self._xb)+x0
         pts = xy.ctypes.data_as(Plot.c_float_p)
@@ -217,7 +258,7 @@ class MyPlot(window.frame):
         #y = x#np.sin(x)
         for i in range(len(companys)):
             com = companys[i]
-            if com[1]=='SH000001':
+            if com[1]=='SH516780':
                 self._myplot.setTitle(com[2])
                 x = np.arange(len(d))
                 self._myplot.setx(x)
@@ -227,7 +268,7 @@ class MyPlot(window.frame):
                 self._volplot.setx(x)
                 hug = np.copy(k[i,:,3]+k[i,:,4])
                 hug[hug!=hug]=0
-                self._volplot.plot(hug,color=vg.nvgRGBf(1,0,1),linewidth=3,linestyle=(4,2,0))
+                self._volplot.plot(hug,color=vg.nvgRGBf(1,0,1),linewidth=3)#,linestyle=(4,2,0))
                 ting = np.copy(k[i,:,6])
                 ting[ting!=ting]=0
                 self._volplot.plot(ting,color=vg.nvgRGBf(0,0,0.6))
@@ -237,17 +278,8 @@ class MyPlot(window.frame):
         self._myplot.setBorderSpace(80,0,0,50)
     def render(self,dt,w,h):
         self._canvas.beginFrame(w, h, w / h)
-        #self._myplot.render(self._canvas,15,15,w-30,h/2)
-        #self._volplot.render(self._canvas,15,h/2-15,w-30,h/2-30)
-        cvs = self._canvas
-        for x in range(0,1000,10):
-            cvs.beginPath()
-            c = strong2color(2*(x/1000-0.5))
-            r = 0.9
-            cvs.fillColor(vg.nvgRGB(int(c[0]*r),int(c[1]*r),int(c[2]*r)))
-            cvs.rect(x,50,10,50)
-            cvs.fill()
-
+        self._myplot.render(self._canvas,15,15,w-30,h/2)
+        self._volplot.render(self._canvas,15,h/2-15,w-30,h/2-30)
         graph.update(dt)
         graph.render(self._canvas,5,5)
         self._canvas.endFrame()
