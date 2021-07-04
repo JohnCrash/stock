@@ -398,9 +398,12 @@ def get_kc_selector():
     ...
 ]
 """
-def get_volume_slice(date):
+def get_volume_slice(date=None):
     companys = get_company_select()
     id2i = get_company_select_id2i()
+    if date is None:
+        dd = stock.query("""select date from kd_xueqiu where id=8828 order by date desc limit 1""")
+        date = stock.dateString(dd[0][0])
     v = stock.query("""select id,volume,turnoverrate,close from kd_xueqiu where date='%s'"""%(date))
     V = np.array(v).reshape(-1,4)
     V[V[:,2]==0,2] = 1
@@ -408,12 +411,17 @@ def get_volume_slice(date):
     result = np.ones((len(companys),2))
     for i in range(len(V)):
         K = V[i]
-        if K[0] in id2i:
+        if int(K[0]) in id2i:
             j = id2i[K[0]]
             result[j,0] = K[3] #price
             result[j,1] = K[1] #tv
 
     return result
+def get_last_volume():
+    """
+    返回最新的市值，日内缓存
+    [价格,市值]
+    """
 """
 返回分类的选择器表
 返回如下结构
@@ -1948,6 +1956,7 @@ f66 超大单
 f72 大单
 f78 中单
 f84 小单
+f88 DDX 主力净量 (主力流入/总市值)
 """
 def emdistribute2(codes,field='f12,f13,f14,f62',timeout=None,tryn=3):
     ts = math.floor(time.time())

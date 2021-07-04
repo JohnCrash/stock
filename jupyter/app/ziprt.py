@@ -61,9 +61,10 @@ def saveRT():
     companys = xueqiu.get_company_select()
     ids = []
     ss = np.zeros((len(companys),),dtype=np.dtype('bool'))
+    R = ['90','90','2']
     for i in range(len(companys)):
         com = companys[i]
-        if com[3]=='90' or com[3]=='91' or com[1]=='SZ399001' or com[1]=='SH000001':
+        if com[3] in R or com[1]=='SZ399001' or com[1]=='SH000001':
             ids.append(com[0])
             ss[i] = True
     

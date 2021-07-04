@@ -184,7 +184,26 @@ class Plot:
         
         canvas.restore()
 
-        
+def strong2color(s):
+    """
+    将强度映射成颜色 s = [-1,1]
+    """
+    rgb = []
+    for b in range(255,0,-1):#紫色到红到
+        rgb.append((255,0,b))
+    for g in range(255): #红到黄
+        rgb.append((255,g,0))
+    for r in range(255,0,-1): #红到绿
+        rgb.append((r,255,0))
+    for b in range(255): #绿的青
+        rgb.append((0,255,b))
+    if s>1:
+        s=1
+    if s<-1:
+        s=-1
+    i = int((1-(s+1)/2)*(len(rgb)-1))
+
+    return rgb[i]
 class MyPlot(window.frame):
     def __init__(self,title,w,h):
         super(MyPlot,self).__init__(title,w,h)
@@ -218,8 +237,17 @@ class MyPlot(window.frame):
         self._myplot.setBorderSpace(80,0,0,50)
     def render(self,dt,w,h):
         self._canvas.beginFrame(w, h, w / h)
-        self._myplot.render(self._canvas,15,15,w-30,h/2)
-        self._volplot.render(self._canvas,15,h/2-15,w-30,h/2-30)
+        #self._myplot.render(self._canvas,15,15,w-30,h/2)
+        #self._volplot.render(self._canvas,15,h/2-15,w-30,h/2-30)
+        cvs = self._canvas
+        for x in range(0,1000,10):
+            cvs.beginPath()
+            c = strong2color(2*(x/1000-0.5))
+            r = 0.9
+            cvs.fillColor(vg.nvgRGB(int(c[0]*r),int(c[1]*r),int(c[2]*r)))
+            cvs.rect(x,50,10,50)
+            cvs.fill()
+
         graph.update(dt)
         graph.render(self._canvas,5,5)
         self._canvas.endFrame()

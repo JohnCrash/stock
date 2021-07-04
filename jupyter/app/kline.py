@@ -1269,10 +1269,11 @@ class Plote:
                     eii = ds[1]
                     if (bii>=bi and bii<=ei) or (eii>=bi and eii<=ei):
                         xx = np.linspace(bii,eii-1,eii-bii)
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,3],label='ting',linewidth=1,color='purple')
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,2],label='mid',linewidth=1,color='cyan')
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,1],label='big',linewidth=1,color='yellow')
-                        axs[self._flowInx].plot(xx,self._flow[bii:eii,0],label='larg',linewidth=2,color='red')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,3],label='ting',linewidth=1,color='lightskyblue')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,2],label='mid',linewidth=1,color='orange')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,1],label='big',linewidth=1,color='red')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,0],label='larg',linewidth=2,color='darkred')
+                        axs[self._flowInx].plot(xx,self._flow[bii:eii,1]+self._flow[bii:eii,0],label='main',linewidth=2,color='magenta')
             axs[self._flowInx].axhline(color='black',linestyle='--')
 
         #绘制趋势线

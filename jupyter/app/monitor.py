@@ -2061,8 +2061,11 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
                 vmax = v[v==v].max()
                 r = smax/vmax
                 ax[1].plot(x,v*r) #成交量            
-            ax[1].plot(x,k[:,3]+k[:,4],color=style['maincolor']) #主力
-            ax[1].plot(x,k[:,6],color=style['tingcolor']) #散
+            ax[1].plot(x,k[:,3]+k[:,4],color='magenta') #主力
+            ax[1].plot(x,k[:,3],color='darkred') #超大单
+            ax[1].plot(x,k[:,4],color='red') #大单
+            ax[1].plot(x,k[:,3]+k[:,5],color='orange') #中单
+            ax[1].plot(x,k[:,6],color='lightskyblue') #散
 
         #ax[1].set_xlim(0,x[-1])
         ax[1].set_xticks(xticks)
@@ -2078,6 +2081,30 @@ def plotfs2(ax,k,d,title,rang=None,ma5b=None,fv=0,dt=60,ma60b=None,style=default
         ax[0].axhline(y=rang[0],linewidth=2,linestyle='dashed',color='green')
         ax[0].axhline(y=rang[1],linewidth=2,linestyle='dashed',color='red')
         ax[0].text(2,rang[0],"%0.2f"%(100*(rang[1]-rang[0])/rang[0]),fontsize=12,fontweight='black')
+
+_s2c = None
+def strong2color(s):
+    """
+    将强度映射成颜色 s = [-1,1]
+    """
+    global _s2c
+    if _s2c is None:
+        rgb = []
+        for b in range(255,0,-1):#紫色到红到
+            rgb.append((255,0,b))
+        for g in range(255): #红到黄
+            rgb.append((255,g,0))
+        for r in range(255,0,-1): #红到绿
+            rgb.append((r,255,0))
+        for b in range(255): #绿的青
+            rgb.append((0,255,b))
+        _s2c = rgb
+    if s>1:
+        s=1
+    if s<-1:
+        s=-1
+    i = int((1-(s+1)/2)*(len(_s2c)-1))
+    return _s2c[i]
 class Frame:
     """
     """
@@ -2179,7 +2206,7 @@ class Frame:
             self._lastt = t
         except Exception as e:
             log.error(str(e))
-            log.printe(e)
+            mylog.printe(e)
         xueqiu.setTimeout(1,self.loop,'monitor.Frame_%d'%self._id)
 
     def setUpdateInterval(self,a):
@@ -2327,28 +2354,31 @@ class HotPlot(Frame):
             self._ntop = sel
         self.update(datetime.today(),None)
     def stock2button(self,code):
+        """
+        将代码转换成按键插入到按键列表
+        """
         p,i = self.codeinpage(code)
         if p==self._page:
-            layout=Layout(border='2px solid red')
+            layout=Layout(border='2px solid blue')
         else:
             layout=Layout()
         but = widgets.Button(description="%s"%Frame.code2com[code][2],layout=layout)
         data = self.code2data(code)
         if data is not None:
             k = data[2]
-            if k.shape[0]>1:
-                if k[-1,3]+k[-1,4]>k[-2,3]+k[-2,4]: #流入
-                    if k[-1,0]>k[-2,0]: #涨
-                        color = '#FF8080' #流入涨 红
+            if k.shape[0]>1 and k[-1,2]>0:
+                if k[-1,3]+k[-1,4]>0:
+                    if k[-1,6]<0:
+                        color = '#EF0000'
                     else:
-                        color = '#FF80FF' #流入跌 紫
-                else: #流出
-                    if k[-1,0]>k[-2,0]: #涨
-                        color = '#FFA500' #流出涨 橙
+                        color = '#9F9F00'
+                else:
+                    if k[-1,6]<0:
+                        color = '#00FFFF'
                     else:
-                        color = '#00A500' #流出跌 绿         
+                        color = '#00AF00'
             else:
-                color = '#C8C8C8'            
+                color = '#C8C8C8'
             but.style.button_color = color
             but.description = "%s %.2f%%"%(Frame.code2com[code][2],k[-1,1])
         return but
