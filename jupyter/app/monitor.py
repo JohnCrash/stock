@@ -2494,6 +2494,22 @@ class HotPlot(Frame):
             if self._sel is not None and self._sel==n+HotPlot.PageN*self._page:
                 ax[0].set_facecolor('#eafff5')
                 ax[1].set_facecolor('#eafff5')
+            #简单的将流入流出数据在0处截断9:30前
+            PQ = []
+            bi = 0
+            fz = False
+            for i in range(len(d)):
+                if d[i].hour==9 and d[i].minute<30:
+                    if not fz:
+                        bi = i
+                    fz = True
+                elif fz:
+                    fz = False
+                    PQ.append((bi,i))
+            if fz:
+                PQ.append((bi,i))
+            for it in PQ:
+                k[it[0]:it[1],3:7] = NaN
             plotfs2(ax,k,d,title,rang,ma5b,fv=3,dt=dt,ma60b=ma60b)
     def codeinpage(self,code):
         """

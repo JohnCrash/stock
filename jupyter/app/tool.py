@@ -1139,7 +1139,41 @@ def companyetf2em():
             print(qs)
             stock.execute(qs)
 
+def reinitlize(code,fz=0.1):
+    """
+    重新对股票归一化处理，处理etf重新拆分，和股票配股导致的不连续
+    fz 股票的不连续不能大于阈值fz
+    """
+    code2com = xueqiu.get_company_code2com()
+    if code not in code2com:
+        print("不存的%s"%code)
+        return
+    com = code2com[code]
+    idd = com[0]
+    qs = stock.query("select date,open,high,low,close from kd_xueqiu where id=%d order by date"%idd)
+    r = 1
+    for i in range(len(qs)-1,-1,-1):
+        if i>=1 and abs(qs[i][1]-qs[i-1][4])/qs[i-1][4]>fz:
+            r = qs[i][1]/qs[i-1][4]
+            print('kd发现不一致%s'%code,i,qs[i][0],qs[i-1][4],qs[i][1],r)
+        elif r!=1:
+            qstr = "update kd_xueqiu set open=%f,high=%f,low=%f,close=%f where id=%d and date='%s'"%(qs[i][1]*r,qs[i][2]*r,qs[i][3]*r,qs[i][4]*r,idd,stock.dateString(qs[i][0]))
+            print(i,stock.dateString(qs[i][0]))
+            stock.execute(qstr)
 
+    qs = stock.query("select timestamp,open,high,low,close from k5_xueqiu where id=%d order by timestamp"%idd)
+    r = 1
+    for i in range(len(qs)-1,-1,-1):
+        if i>=1 and abs(qs[i][1]-qs[i-1][4])/qs[i-1][4]>fz:
+            r = qs[i][1]/qs[i-1][4]
+            print('k5发现不一致%s'%code,i,qs[i][0],qs[i-1][4],qs[i][1],r)
+        elif r!=1:
+            qstr = "update k5_xueqiu set open=%f,high=%f,low=%f,close=%f where id=%d and timestamp='%s'"%(qs[i][1]*r,qs[i][2]*r,qs[i][3]*r,qs[i][4]*r,idd,stock.timeString(qs[i][0]))
+            print(i,stock.timeString(qs[i][0]))
+            #print(qstr)
+            stock.execute(qstr)
+
+reinitlize('SH510150')
 #companyetf2em()
 def K(code,period,pos):
     kline.Plote(code,period,mode='normal',lastday=2*365).show(figsize=(32,15),pos=pos)
@@ -1149,11 +1183,3 @@ def K(code,period,pos):
 #monitor.monitor_bollup()
 
 #monitor.HotPlot().loop()
-@stock.timethis
-def getrt():
-    k15,d15 = xueqiu.get_period_k(15)
-    #k,d = monitor.get_rt(4)
-
-getrt()
-getrt()
-getrt()
