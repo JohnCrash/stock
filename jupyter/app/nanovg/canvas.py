@@ -10,7 +10,7 @@ class Canvas2d:
         self._ctx = vg.nvgCreateGLES(p)
         if not self._ctx:
             raise RuntimeError('nvgCreateGLES')
-    def beginFrame(self,windowWidth:float, windowHeight:float, devicePixelRatio:float):
+    def beginFrame(self,windowWidth:float, windowHeight:float, devicePixelRatio:float = 1):
         """
         Begin drawing a new frame
         Calls to nanovg drawing API should be wrapped in nvgBeginFrame() & nvgEndFrame()

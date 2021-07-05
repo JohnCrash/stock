@@ -1,4 +1,4 @@
-from app.nanovg import window,vg
+from app.nanovg import frame,vg
 from app import monitor,xueqiu,stock
 from datetime import date,datetime,timedelta
 import numpy as np
@@ -6,224 +6,6 @@ import math
 import sdl2
 from OpenGL import GL
 import ctypes
-
-def pone(a,f=math.ceil):
-    """
-    保留数a一位精度,例如0.123 返回0.2
-    """
-    lg = math.log10(a)
-    if lg>0:
-        n = math.pow(10,lg-int(lg))
-        e = int(lg)
-    else:
-        n = math.pow(10,lg-int(lg)+1)
-        e = int(lg)-1
-    return f(n)*math.pow(10,e),e
-def precision(a,e):
-    """
-    截断精度一下的数字例如，0.1233,-1 返回0.1
-    """
-    return int(a/math.pow(10,e))*math.pow(10,e)
-"""
-绘制图表
-"""
-class Plot:
-    c_float_p = ctypes.POINTER(ctypes.c_float)
-    AXISCOLOR = vg.nvgRGBf(0,0,0)
-    GRIDCOLOR = vg.nvgRGBf(0.8,0.8,0.8)
-    TEXTCOLOR = vg.nvgRGBf(0,0,0)
-    def __init__(self):
-        self._x = None
-        self._xlabels = None
-        self._y = []
-        self._title = ''
-        self._xticks = None
-        self._yticks = None
-        self._area = [0,0,0,0]
-        self._border =[0,0,0,0]
-        self._grid = False
-        self._xe = None
-        self._ye = None
-    def setx(self,x,labels=None):
-        """
-        设置x轴数据,labels=[(i,label),...]
-        """
-        self._x  = x
-        self._xlabels = labels
-    def plot(self,y,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None,label=None):
-        """
-        绘制线型图表
-        """
-        self._y.append((y,color,linewidth,linestyle,label)) #0 y,1 color,2 linewidth,3 linestyle,4 label
-    def setTitle(self,title):
-        self._title = title
-    def clear(self):
-        self._x = None
-        self._y = []
-    def prepareRender(self,x,y,w,h):
-        """
-        渲染前的准备
-        """
-        self._area[0]=x
-        self._area[1]=y
-        self._area[2]=w
-        self._area[3]=h
-        self._xmax = self._x.max()
-        self._xmin = self._x.min()
-        self._oxmin,self._oxmax = self._xmin,self._xmax
-        self._xk = 1/(self._xmax-self._xmin)
-        self._xb = -self._xmin*self._xk
-        self._ymax = -1e10
-        self._ymin = 1e10
-        for yp in self._y:
-            y = yp[0]
-            self._ymax = max(self._ymax,y.max())
-            self._ymin = min(self._ymin,y.min())
-        self._oymin,self._oymax = self._ymin,self._ymax
-        #扩大一点y范围
-        h = self._ymax-self._ymin
-        self._ymax+=0.05*h
-        self._ymin-=0.05*h
-        self._yk = 1/(self._ymax-self._ymin)
-        self._yb = -self._ymin*self._yk
-        if self._grid:
-            if self._xticks is None:
-                delta,self._xe = pone((self._oxmax-self._oxmin)/5) #_ye是精度
-                bi = precision(self._oxmin-self._oxmin%delta,self._xe)
-                self._xticks = np.arange(bi,self._oxmax,delta)
-            if self._yticks is None:
-                delta,self._ye = pone((self._oymax-self._oymin)/5) #_ye是精度
-                bi = precision(self._oymin-self._oymin%delta,self._ye)
-                self._yticks = np.arange(bi,self._oymax,delta)
-    def setTicks(self,xticks=None,yticks=None):
-        """
-        设置x,y轴的网格线
-        """
-        self._xticks = xticks
-        self._yticks = yticks
-    def setGrid(self,b):
-        """
-        自动添加网格线
-        """
-        self._grid = b
-
-    def setBorderSpace(self,right,left,top,bottom):
-        """
-        设置图表边框预留的空间
-        """
-        self._border[0] = right
-        self._border[1] = left
-        self._border[2] = top
-        self._border[3] = bottom
-    def plotRect(self):
-        """
-        返回图表矩形区域
-        """
-        x0 = self._area[0]+self._border[0]
-        y0 = self._area[1]+self._border[2]
-        w0 = self._area[2]-self._border[0]-self._border[1]
-        h0 = self._area[3]-self._border[2]-self._border[3]        
-        return x0,y0,w0,h0
-    def xAxis2wx(self,x):
-        """
-        从x轴数据空间映射到屏幕x坐标
-        """
-        x0,y0,w0,h0 = self.plotRect()
-        wx = w0*(x*self._xk+self._xb)+x0
-        return wx
-    def yAxis2wy(self,y):
-        """
-        从y轴数据空间映射到屏幕y坐标
-        """
-        x0,y0,w0,h0 = self.plotRect()
-        wy = h0*(1-(y*self._yk+self._yb))+y0 #y反转
-        return wy
-    def x2AxisLabel(self,x):
-        if self._xe is None:
-            return str(x)
-        else:
-            if self._xe<0:
-                fmt = "%%.%df"%abs(self._xe)
-            else:
-                fmt = "%.0f"
-            return fmt%x
-    def y2AxisLabel(self,y):
-        if self._ye is None:
-            return str(y)
-        else:
-            if self._ye<0:
-                fmt = "%%.%df"%abs(self._ye)
-            else:
-                if self._ye>3:
-                    y = int(y/math.pow(10,self._ye))
-                fmt = "%.0f"
-            return fmt%y
-    def renderAxis(self,canvas):
-        """
-        渲染背景于坐标，包括标题
-        """
-        a = self._area
-        b = self._border
-        x0,y0,w0,h0 = self.plotRect()
-        canvas.beginPath()
-        canvas.rect(x0,y0,w0,h0)
-        #canvas.fillColor(vg.nvgRGBA(255,255,255,255))
-        canvas.strokeColor(Plot.AXISCOLOR)
-        canvas.stroke()
-        canvas.fontFace("zh")
-        canvas.fontSize(13.0)
-        canvas.fillColor(Plot.TEXTCOLOR)
-        if self._xticks is not None:
-            canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
-            for ox in self._xticks:
-                x = self.xAxis2wx(ox)
-                if x>x0 and x<x0+w0:
-                    canvas.beginPath()
-                    canvas.strokeColor(Plot.GRIDCOLOR)
-                    canvas.moveTo(x,y0)
-                    canvas.lineTo(x,y0+h0)
-                    canvas.stroke()
-                    canvas.text(x,y0+h0+2,self.x2AxisLabel(ox))
-        if self._yticks is not None:
-            canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_MIDDLE)
-            for oy in self._yticks:
-                y = self.yAxis2wy(oy)
-                if y>y0 and y<y0+h0:
-                    canvas.beginPath()
-                    canvas.strokeColor(Plot.GRIDCOLOR)
-                    canvas.moveTo(x0,y)
-                    canvas.lineTo(x0+w0,y)
-                    canvas.stroke()
-                    canvas.text(x0-2,y,self.y2AxisLabel(oy))
-            if self._ye is not None and self._ye>3: #绘制坐标指数
-                canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
-                canvas.text(x0,y0,"1e%d"%self._ye)
-        canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
-        canvas.fontSize(18)
-        canvas.text(x0+w0/2,y0+2,self._title)
-    """
-    将图表渲染出来
-    """
-    def render(self,canvas,x0,y0,w,h):
-        self.prepareRender(x0,y0,w,h)
-        self.renderAxis(canvas)
-        xy = np.empty((len(self._x),2),dtype=np.float32)
-        xy[:,0] = self.xAxis2wx(self._x) #w*(self._x*self._xk+self._xb)+x0
-        pts = xy.ctypes.data_as(Plot.c_float_p)
-        for yp in self._y:
-            y = yp[0]
-            color = yp[1]
-            linewidth = yp[2]
-            linestyle = yp[3]
-            label = yp[4]
-            canvas.beginPath()
-            canvas.strokeColor(color)
-            canvas.strokeWidth(linewidth)
-            xy[:,1] = self.yAxis2wy(y)#xy[:,1] = h*(y*self._yk+self._yb)+y0
-            canvas.line(pts,len(self._x),linestyle)
-            canvas.stroke()
-        
-        canvas.restore()
 
 def strong2color(s):
     """
@@ -245,11 +27,193 @@ def strong2color(s):
     i = int((1-(s+1)/2)*(len(rgb)-1))
 
     return rgb[i]
-class MyPlot(window.frame):
+class StockPlot:
+    """
+    包括两个区域，分时和成交量流入流出区
+    """
+    YLABELWIDTH = 40
+    XLABELHEIGHT = 30
+    PRICE_COLOR = vg.nvgRGB(70,130,200)
+    MAIN_COLOR = vg.nvgRGB(255,0,255)
+    HUGE_COLOR = vg.nvgRGB(139,0,0)
+    LARG_COLOR = vg.nvgRGB(255,0,0)
+    MID_COLOR = vg.nvgRGB(255,215,0)
+    TING_COLOR = vg.nvgRGB(135,206,250)
+    def __init__(self):
+        self._kplot = frame.Plot()
+        self._vplot = frame.Plot()
+    def update(self,code,label,k,d):
+        x = np.arange(len(d))
+        self._kplot.setx(x)
+        self._kplot.plot(k[:,0],color=StockPlot.PRICE_COLOR)
+        self._vplot.setx(x)
+        self._vplot.plot(k[:,3]+k[:,4],color=StockPlot.MAIN_COLOR)
+        self._vplot.plot(k[:,3],color=StockPlot.HUGE_COLOR)
+        self._vplot.plot(k[:,4],color=StockPlot.LARG_COLOR)
+        self._vplot.plot(k[:,5],color=StockPlot.MID_COLOR)
+        self._vplot.plot(k[:,6],color=StockPlot.TING_COLOR)
+        self._kplot.setGrid(True,True)
+        self._vplot.setGrid(True,False)
+        self._kplot.setTitle(label)
+        self._kplot.setOuterSpace(StockPlot.YLABELWIDTH,0,0,0)
+        self._vplot.setOuterSpace(StockPlot.YLABELWIDTH,0,0,0)
+    def render(self,canvas,x,y,w,h,xaxis=False):
+        self._kplot.setAxisVisiable(False,True)
+        self._vplot.setAxisVisiable(xaxis,True)
+        self._kplot.render(canvas,x,y,w,h*2/3)
+        self._vplot.render(canvas,x,y+h*2/3,w,h/3)
+class StockOrder:
+    """
+    管理一个股票列表,(0 code,1 label,2 oder data,3 color,...)
+    """
+    WIDTH = 120
+    HEIGHT = 32
+    TEXTCOLOR = vg.nvgRGB(255,255,255)
+    FONTSIZE = 14
+    def __init__(self):
+        self._ls = []
+    def update(self,ls):
+        self._ls = ls
+    def render(self,canvas,x,y,w,h):
+        yy = y
+        canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
+        canvas.fontFace("zh")
+        canvas.fontSize(StockOrder.FONTSIZE)
+        for i in range(len(self._ls)):
+            it = self._ls[i]
+            if yy-y<h:
+                canvas.beginPath()
+                canvas.fillColor(vg.nvgRGB(*it[3]))
+                canvas.rect(x,yy,StockOrder.WIDTH,StockOrder.HEIGHT)
+                canvas.fill()
+                canvas.fillColor(StockOrder.TEXTCOLOR)
+                canvas.text(x+StockOrder.WIDTH/2,yy+StockOrder.HEIGHT/2,it[1])
+            else:
+                break
+            yy+=StockOrder.HEIGHT
+class DateLabel:
+    """
+    显示一个日期包括时间
+    """
+    TEXTCOLOR = vg.nvgRGB(0,0,0)
+    SIZE = 14
+    def __init__(self):
+        pass
+    def render(self,canvas,x,y,w,h):
+        canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
+        canvas.beginPath()
+        t = datetime.today()
+        canvas.fillColor(DateLabel.TEXTCOLOR)
+        canvas.fontFace("zh")
+        canvas.fontSize(DateLabel.SIZE)
+        canvas.text(x+w/2,y+h/2,stock.timeString2(t))
+        
+class HotPlotApp(frame.app):
+    """
+    盯盘应用 
+    Ctrl+E ETF Ctrl+G 概念 Ctrl+H 行业 Ctrl+C 持有 Ctrl+Z 关注 Ctrl+D 大盘
+    Ctrl+1，4，6 股同屏  PageDown PageUp翻页 Home首页 End尾页 , 1,2,3,4,5,6直接选择个股
+    ENTER 切换选择的个股到K图, Ctrl+ENTER 全部切换到K图
+    F5 涨幅排序 F6 净量排序 F7 流入排序 F8 量比排序 F1帮助
+    """
+    companys = xueqiu.get_company_select()
+    code2i = xueqiu.get_company_code2i()
+    code2com = xueqiu.get_company_code2com()    
     def __init__(self,title,w,h):
-        super(MyPlot,self).__init__(title,w,h)
-        self._myplot = Plot()
-        self._volplot = Plot()
+        super(HotPlotApp,self).__init__(title,w,h)
+        self._numsub = (3,2) #同屏数量 1 (1,1),4 (2,2),6 (3,2)
+        self._SO = StockOrder()
+        self._SPV = [StockPlot() for i in range(6)]
+        self.setInterval(0)
+        self._prefix = '2' #选择分类
+        self._flowin = False #净流入
+        self._hasboll = False #有通道
+        self._reverse = False #排序
+        self._topn = 64
+        self.updatedata()
+    def onLoop(self,t,dt):
+        pass
+    def render(self,dt,w,h):
+        self._canvas.beginFrame(w,h,1)
+        self._SO.render(self._canvas,0,0,StockOrder.WIDTH,h)
+        col = self._numsub[0]
+        raw = self._numsub[1]
+        dw = (w-StockOrder.WIDTH-10)/col
+        dh = (h-StockPlot.XLABELHEIGHT)/raw
+        for xi in range(col):
+            for yi in range(raw):
+                self._SPV[yi*col+xi].render(self._canvas,xi*dw+StockOrder.WIDTH,yi*dh,dw,dh,xaxis=yi==raw-1)
+
+        #graph.update(dt)
+        #graph.render(self._canvas,5,5)
+        self._canvas.endFrame()
+    def getGrowColor(self,r): #根据涨幅返回颜色tuple
+        if r>0:
+            a = r/10
+            if a>1:
+                a = 1
+            return (int(255*a),0,0)
+        else:
+            a = -r/10
+            if a>1:
+                a = 1
+            return (0,int(255*a),0)
+
+    def updatedata(self):
+        tops = self.riseTop(self._topn)
+        R = []
+        for it in tops:
+            R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
+        self._SO.update(R)
+        for i in range(self._numsub[0]*self._numsub[1]):
+            if i<len(tops):
+                it = tops[i]
+                self._SPV[i].update(it[0][1],it[0][2],it[2],it[3])
+    def getCurrentRT(self):
+        """
+        返回当前数据
+        """
+        t = datetime.today()
+        k,d = monitor.get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
+        bi = -255*3
+        k = k[:,bi:,:]
+        d = d[bi:]
+        k15,d15 = xueqiu.get_period_k(15)
+        for i in range(k15.shape[0]): #处理价格为0的情况
+            if k15[i,0]==0:
+                for j in range(k15.shape[1]):
+                    if k15[i,j]!=0:
+                        k15[i,:j] = k15[i,j]
+                        break
+                continue
+
+        bolls = monitor.bolltrench()
+        return k,d,k15,d15,bolls      
+    def isSelected(self,company,bolls,k):
+        def onif(b,s):
+            return (b and s) or not b
+        return company[3] in self._prefix and onif(self._flowin,k[-1,3]+k[-1,4]>0) and onif(self._hasboll,company[1] in bolls)          
+    def riseTop(self,top=18):
+        """
+        涨幅排行,满足大资金流入，5日均线上有强通道或者返回强通道中
+        返回值 [(com,price,hug,rang,k,d,ma5b),...]
+        """
+        k,d,K,D,bolls = self.getCurrentRT()
+        companys = HotPlotApp.companys
+        R = []
+        for i in range(len(companys)):
+            if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
+                R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
+        TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
+        #将三点指数追加在末尾
+        return TOPS[:top]        
+        
+
+class MyPlotApp(frame.app):
+    def __init__(self,title,w,h):
+        super(MyPlotApp,self).__init__(title,w,h)
+        self._myplot = frame.Plot()
+        self._volplot = frame.Plot()
         #x = np.arange(100)
         #y = np.sin(x*4*np.pi/200)
         #y2 = np.cos(x*4*np.pi/200)
@@ -274,12 +238,26 @@ class MyPlot(window.frame):
                 self._volplot.plot(ting,color=vg.nvgRGBf(0,0,0.6))
         self._myplot.setGrid(True)
         self._volplot.setGrid(True)
-        self._volplot.setBorderSpace(80,0,0,0)
-        self._myplot.setBorderSpace(80,0,0,50)
+        self._volplot.setOuterSpace(80,0,0,0)
+        self._myplot.setOuterSpace(80,0,0,50)
+
+        self._myk = frame.Plot()
+        c,k,d = stock.loadKline('SH516780','d')
+        self._myk.setTitle(c[2])
+        MA20 = stock.ma(k[:,4],20)
+        K = k[-200:,1:]
+        self._myk.setx(np.arange(K.shape[0]))
+        self._myk.plot(K,style=frame.Plot.K)
+        #self._myk.plot(MA20[-200:],color=vg.nvgRGB(0,0,255),linewidth=2)
+        self._myk.setGrid(True)
+        self._myk.setOuterSpace(80,0,0,0)
+        self._myk.setInnerSpace(10,10,0,0)
+        #self._myk.setTicksAngle(-45,-45)
     def render(self,dt,w,h):
-        self._canvas.beginFrame(w, h, w / h)
-        self._myplot.render(self._canvas,15,15,w-30,h/2)
-        self._volplot.render(self._canvas,15,h/2-15,w-30,h/2-30)
+        self._canvas.beginFrame(w, h,1)
+        #self._myplot.render(self._canvas,15,15,w-30,h/2)
+        #self._volplot.render(self._canvas,15,h/2-15,w-30,h/2-30)
+        self._myk.render(self._canvas,15,15,w-30,h/2)
         graph.update(dt)
         graph.render(self._canvas,5,5)
         self._canvas.endFrame()
@@ -288,7 +266,12 @@ class MyPlot(window.frame):
         if event.keysym.sym==ord('q'):#sdl2.SDLK_a:
             self.quit()
 
-glwin = MyPlot('图表',640,480)
-graph = window.fpsGraph()
+"""
+glwin = MyPlotApp('图表',640,480)
+graph = frame.fpsGraph()
 glwin.setInterval(10)
+glwin.run()
+"""
+glwin = HotPlotApp('图表',1280,800)
+graph = frame.fpsGraph()
 glwin.run()
