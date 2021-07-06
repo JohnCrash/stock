@@ -14,8 +14,9 @@ def isTransTime(t=None):
     return ((t.hour==9 and t.minute>=15) or t.hour==10 or (t.hour==11 and t.minute<30) or (t.hour>=13 and t.hour<15)) or (t.hour==15 and t.minute==0) and t.weekday()>=0 and t.weekday()<5
 
 #判断今天是不是可以交易
-def isTransDay():
-    t = datetime.today()
+def isTransDay(t=None):
+    if t is None:
+        t = datetime.today()
     if t.weekday()>=0 and t.weekday()<5:
         return True
     else:

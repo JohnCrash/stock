@@ -403,6 +403,8 @@ def update_period_sequence(clear=False):
         if clear:
             xueqiu.clear_period_sequence(p)
         xueqiu.rebuild_period_sequence(p)
+#xueqiu.clear_period_sequence(15)
+#xueqiu.rebuild_period_sequence(15)
 
 """
 返回最近的实时数据
@@ -1173,7 +1175,7 @@ def reinitlize(code,fz=0.1):
             #print(qstr)
             stock.execute(qstr)
 
-reinitlize('SH510150')
+#reinitlize('SH510150')
 #companyetf2em()
 def K(code,period,pos):
     kline.Plote(code,period,mode='normal',lastday=2*365).show(figsize=(32,15),pos=pos)

@@ -36,7 +36,10 @@ class app:
         self._clearColor = (1,1,1,1)
         sdl2.SDL_GL_SetSwapInterval(0)
         self.loadDemoData()
-
+        self._w = w
+        self._h = h
+    def setWindowTitle(self,title):
+        sdl2.SDL_SetWindowTitle(self._window,title.encode('utf-8'))
     def quit(self):
         self._running = False
 
@@ -63,9 +66,9 @@ class app:
                         self.quit()
                     elif event.type == sdl2.SDL_KEYDOWN:
                         #ptr = ctypes.cast(event, events.SDL_KeyboardEvent)
-                        self.keyDown(event.key)
+                        self.keyDown(event)
                     elif event.type == sdl2.SDL_KEYUP:
-                        self.keyUp(event.key)
+                        self.keyUp(event)
                     elif event.type==sdl2.SDL_WINDOWEVENT:
                         self.onWindowEvent(event)
 
@@ -104,6 +107,8 @@ class app:
     def update(self,dt=0):
         w,h = c_int(),c_int()
         video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
+        self._w = w.value
+        self._h = h.value
         fbWidth,fbHeight = w.value,h.value
         GL.glViewport(0, 0, fbWidth, fbHeight)
         c = self._clearColor
@@ -236,6 +241,7 @@ class Plot:
         self._x = None
         self._xlabels = None
         self._y = []
+        self._lwscale = 1
         self._title = ''
         self._xticks = None
         self._yticks = None
@@ -277,6 +283,8 @@ class Plot:
         """
         渲染前的准备
         """
+        if self._x is None or len(self._x)==0:
+            return
         self._area[0]=x
         self._area[1]=y
         self._area[2]=w
@@ -290,8 +298,9 @@ class Plot:
         self._ymin = 1e10
         for yp in self._y:
             y = yp[0]
-            self._ymax = max(self._ymax,y.max())
-            self._ymin = min(self._ymin,y.min())
+            ynan = y[y==y] #如果数据中存在NaN max()将返回NaN
+            self._ymax = max(self._ymax,ynan.max())
+            self._ymin = min(self._ymin,ynan.min())
         self._oymin,self._oymax = self._ymin,self._ymax
         #扩大一点y范围
         h = self._ymax-self._ymin
@@ -301,12 +310,12 @@ class Plot:
         self._yb = -self._ymin*self._yk
         if self._gridx:
             if self._xticks is None:
-                delta,self._xe = pone((self._oxmax-self._oxmin)/5) #_ye是精度
+                delta,self._xe = pone((self._oxmax-self._oxmin)/10) #_ye是精度
                 bi = precision(self._oxmin-self._oxmin%delta,self._xe)
                 self._xticks = np.arange(bi,self._oxmax,delta)
         if self._gridy:
             if self._yticks is None:
-                delta,self._ye = pone((self._oymax-self._oymin)/5) #_ye是精度
+                delta,self._ye = pone((self._oymax-self._oymin)/10) #_ye是精度
                 bi = precision(self._oymin-self._oymin%delta,self._ye)
                 self._yticks = np.arange(bi,self._oymax,delta)
     def setTicks(self,xticks=None,yticks=None):
@@ -398,6 +407,7 @@ class Plot:
         a = self._area
         b = self._border
         x0,y0,w0,h0 = self.plotRect()
+        canvas.strokeWidth(1)
         canvas.beginPath()
         canvas.rect(x0,y0,w0,h0)
         #canvas.fillColor(vg.nvgRGBA(255,255,255,255))
@@ -460,12 +470,16 @@ class Plot:
         canvas.fontFace("zh")
         canvas.fontSize(14)
         canvas.text(x0+w0/2,y0+4,self._title)
+    def setLineWidthScale(self,sc=1):
+        self._lwscale = sc
     """
     将图表渲染出来
     """
     def render(self,canvas,x0,y0,w,h):
         self.prepareRender(x0,y0,w,h)
         self.renderAxis(canvas)
+        if self._x is None or len(self._x)==0:
+            return
         xy = np.empty((len(self._x),2),dtype=np.float32)
         xy[:,0] = self.xAxis2wx(self._x) #w*(self._x*self._xk+self._xb)+x0
         for yp in self._y:
@@ -478,7 +492,7 @@ class Plot:
             if type1==Plot.LINE:
                 canvas.beginPath()
                 canvas.strokeColor(color)
-                canvas.strokeWidth(linewidth)
+                canvas.strokeWidth(linewidth*self._lwscale)
                 xy[:,1] = self.yAxis2wy(y) #xy[:,1] = h*(y*self._yk+self._yb)+y0
                 #数据使用NaN分段
                 fz = False
@@ -508,7 +522,7 @@ class Plot:
                     k = Y[i]
                     canvas.beginPath()
                     canvas.strokeColor(RED if k[3]<k[0] else GREEN)
-                    canvas.strokeWidth(2)
+                    canvas.strokeWidth(2*self._lwscale)
                     canvas.moveTo(x,k[2])
                     canvas.lineTo(x,k[1])
                     canvas.stroke()
