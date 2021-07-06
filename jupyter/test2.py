@@ -1,5 +1,6 @@
 from app.nanovg import frame,vg
 from app import monitor,xueqiu,stock
+from pypinyin import pinyin
 from datetime import date,datetime,timedelta
 import numpy as np
 import math
@@ -7,6 +8,13 @@ import sdl2
 from OpenGL import GL
 import ctypes
 
+def pinyinhead(s):
+    r = ''
+    for z in s:
+        v = pinyin(z)
+        if len(v)>0 and len(v[0])>0:
+            r += v[0][0][0]
+    return r.upper()
 def intercolor(b,e,f):
     """
     起始颜色b,结束颜色e ,f=0-1 计算中间颜色
@@ -34,23 +42,37 @@ def strong2color(s):
     i = int((1-(s+1)/2)*(len(rgb)-1))
 
     return rgb[i]
-class StockPlot:
-    """
-    包括两个区域，分时和成交量流入流出区
-    """
-    YLABELWIDTH = 40
-    XLABELHEIGHT = 30
-    MA60_COLOR = vg.nvgRGB(255,128,60)
-    PRICE_COLOR = vg.nvgRGB(70,130,200)
-    MAIN_COLOR = vg.nvgRGB(255,0,255)
+
+class Themos:
+    BGCOLOR = (0.95,0.95,0.95,1) #图表背景颜色
+
+    MA60_COLOR = vg.nvgRGB(255,128,60) #ma60颜色
+    PRICE_COLOR = vg.nvgRGB(70,130,200) #价格颜色
+    MAIN_COLOR = vg.nvgRGB(255,0,255) #主力
     HUGE_COLOR = vg.nvgRGB(139,0,0)
     LARG_COLOR = vg.nvgRGB(255,0,0)
     MA5_COLOR = vg.nvgRGB(255,0,255)
     MID_COLOR = vg.nvgRGB(255,215,0)
     TING_COLOR = vg.nvgRGB(135,206,250)
-    RED_COLOR = vg.nvgRGB(220,0,0)
-    GREEN_COLOR = vg.nvgRGB(0,160,0)
+    RED_COLOR = vg.nvgRGB(220,0,0)   #涨
+    GREEN_COLOR = vg.nvgRGB(0,120,0) #跌
     
+    YLABELWIDTH = 40   #y轴坐标轴空间
+    XLABELHEIGHT = 30  #x轴坐标轴空间
+
+    ORDER_BGCOLOR = vg.nvgRGB(220,220,220)
+    ORDER_HEADCOLOR = vg.nvgRGB(64,96,196)
+    ORDER_SELCOLOR = vg.nvgRGB(196,96,96)
+    ORDER_TEXTBGCOLOR = vg.nvgRGBA(64,64,64,255)
+    ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
+
+    ORDER_WIDTH = 150       #排序栏宽度
+    ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
+    ORDER_FONTSIZE = 14
+class StockPlot:
+    """
+    包括两个区域，分时和成交量流入流出区
+    """
     def __init__(self):
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
@@ -86,21 +108,21 @@ class StockPlot:
                 xticks.append((i,'%2d %02d:%02d'%(t.day,t.hour,t.minute)))
         self._kplot.setx(x)
         self._kplot.setTicks(xticks)
-        self._kplot.plot(k[:,0],color=StockPlot.PRICE_COLOR)
-        self._kplot.plot(stock.ma(k[:,0],60),color=StockPlot.MA60_COLOR,linestyle=(4,2,0))
+        self._kplot.plot(k[:,0],color=Themos.PRICE_COLOR)
+        self._kplot.plot(stock.ma(k[:,0],60),color=Themos.MA60_COLOR,linestyle=(4,2,0))
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
-        self._vplot.plot(k[:,3]+k[:,4],color=StockPlot.MAIN_COLOR)
-        self._vplot.plot(k[:,3],color=StockPlot.HUGE_COLOR)
-        self._vplot.plot(k[:,4],color=StockPlot.LARG_COLOR)
-        self._vplot.plot(k[:,5],color=StockPlot.MID_COLOR)
-        self._vplot.plot(k[:,6],color=StockPlot.TING_COLOR)
+        self._vplot.plot(k[:,3]+k[:,4],color=Themos.MAIN_COLOR)
+        self._vplot.plot(k[:,3],color=Themos.HUGE_COLOR)
+        self._vplot.plot(k[:,4],color=Themos.LARG_COLOR)
+        self._vplot.plot(k[:,5],color=Themos.MID_COLOR)
+        self._vplot.plot(k[:,6],color=Themos.TING_COLOR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._kplot.setTitle(label)
-        self._kplot.setOuterSpace(StockPlot.YLABELWIDTH,0,0,0)
-        self._vplot.setOuterSpace(StockPlot.YLABELWIDTH,0,0,0)
+        self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
+        self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         if ma5b is not None and len(d)>0:
             ma5 = np.zeros((len(k),))
             ma5[0] = ma5b[0]
@@ -109,7 +131,7 @@ class StockPlot:
             M = 15
             for i in range(1,len(k)):
                 ma5[i] = ma5[i-1]+(k[i,0]-k15b[int(i/M)])/(N) #这是一个近似迭代
-            self._kplot.plot(ma5,color=StockPlot.MA5_COLOR,linewidth=2,linestyle=(6,3,0))
+            self._kplot.plot(ma5,color=Themos.MA5_COLOR,linewidth=2,linestyle=(6,3,0))
     def render(self,canvas,x,y,w,h,xaxis=False,scale=1):
         self._kplot.setAxisVisiable(False,True)
         self._vplot.setAxisVisiable(xaxis,True)
@@ -117,34 +139,36 @@ class StockPlot:
         self._vplot.setLineWidthScale(scale)
         self._kplot.render(canvas,x,y,w,h*2/3)
         self._vplot.render(canvas,x,y+h*2/3,w,h/3)
-        if self._maxi is not None:
+        if self._maxi is not None and self._k.shape[0]>0:
+            lasti = self._k.shape[0]-1
             maxx = self._kplot.xAxis2wx(self._maxi)
             minx = self._kplot.xAxis2wx(self._mini)
             maxy = self._kplot.yAxis2wy(self._k[self._maxi,0])
             miny = self._kplot.yAxis2wy(self._k[self._mini,0])
-            canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
-            r = self._k[self._mini,1]
             canvas.fontFace('sans')
             canvas.fontSize(14)
-            canvas.fillColor(StockPlot.RED_COLOR if r>0 else StockPlot.GREEN_COLOR)
-            canvas.text(minx,miny+5,"%.02f%%"%r)
-            r = self._k[self._maxi,1]
-            canvas.fillColor(StockPlot.RED_COLOR if r>0 else StockPlot.GREEN_COLOR)
-            canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_BOTTOM)
-            canvas.text(maxx,maxy-5,"%.02f%%"%r)
+            if lasti-self._mini>5:
+                canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
+                r = self._k[self._mini,1]
+                canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
+                canvas.text(minx,miny+5,"%.02f%%"%r)
+            if lasti-self._maxi>5:
+                canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_BOTTOM)
+                r = self._k[self._maxi,1]
+                canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
+                canvas.text(maxx,maxy-5,"%.02f%%"%r)
+            canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_BOTTOM)
+            r = self._k[lasti,1]
+            xx = self._kplot.xAxis2wx(lasti)
+            yy = self._kplot.yAxis2wy(self._k[lasti,0])
+            canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
+            canvas.text(xx,yy-5,"%.02f%%"%r)
+
         
 class StockOrder:
     """
     管理一个股票列表,(0 code,1 label,2 oder data,3 color,...)
     """
-    WIDTH = 120
-    HEIGHT = 24
-    BGCOLOR = vg.nvgRGB(64,64,64)
-    HEADCOLOR = vg.nvgRGB(64,96,196)
-    HEADSELCOLOR = vg.nvgRGB(196,96,96)
-    TEXTBGCOLOR = vg.nvgRGBA(255,255,255,128)
-    TEXTCOLOR = vg.nvgRGB(255,255,255)
-    FONTSIZE = 14
     def __init__(self):
         self._ls = []
         self._pagei = 0
@@ -157,28 +181,33 @@ class StockOrder:
         yy = y
         canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_MIDDLE)
         canvas.fontFace("zh")
-        canvas.fontSize(StockOrder.FONTSIZE)
+        canvas.fontSize(Themos.ORDER_FONTSIZE)
         for i in range(len(self._ls)):
             it = self._ls[i]
             if yy-y<h:
                 canvas.beginPath()
-                canvas.fillColor(StockOrder.BGCOLOR)
-                canvas.rect(x,yy,StockOrder.WIDTH,StockOrder.HEIGHT)
+                canvas.fillColor(Themos.ORDER_BGCOLOR)
+                canvas.rect(x,yy,Themos.ORDER_WIDTH,Themos.ORDER_ITEM_HEIGHT)
                 canvas.fill() #绘制背景
                 canvas.beginPath()
-                canvas.fillColor(StockOrder.HEADSELCOLOR if i>=self._pagei*self._pagen and i<(self._pagei+1)*self._pagen else StockOrder.HEADCOLOR)
-                canvas.rect(x,yy,25,StockOrder.HEIGHT)
+                canvas.fillColor(Themos.ORDER_TEXTBGCOLOR)
+                canvas.rect(x+76,yy,Themos.ORDER_WIDTH-76,Themos.ORDER_ITEM_HEIGHT)
+                canvas.fill() #绘制文字背景
+                canvas.beginPath()
+                canvas.fillColor(Themos.ORDER_SELCOLOR if i>=self._pagei*self._pagen and i<(self._pagei+1)*self._pagen else Themos.ORDER_HEADCOLOR)
+                canvas.rect(x,yy,25,Themos.ORDER_ITEM_HEIGHT)
                 canvas.fill() #绘制序号背景
-                canvas.fillColor(StockOrder.TEXTCOLOR)
-                canvas.text(x+5,yy+StockOrder.HEIGHT/2,str(i+1))
-                #canvas.fontBlur(5)
-                #canvas.fillColor(StockOrder.TEXTBGCOLOR)
-                #canvas.text(x+StockOrder.WIDTH/2,yy+StockOrder.HEIGHT/2,it[1])
-                #canvas.fontBlur(0)
-                canvas.text(x+30,yy+StockOrder.HEIGHT/2,it[1])
+                canvas.fillColor(Themos.ORDER_TEXTCOLOR)
+                canvas.text(x+5,yy+Themos.ORDER_ITEM_HEIGHT/2,str(i+1))
+                canvas.fillColor(Themos.ORDER_TEXTCOLOR)
+                canvas.text(x+78,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
+                #绘制涨跌幅
+                it[2]
+                canvas.fillColor(Themos.RED_COLOR if it[2]>0 else Themos.GREEN_COLOR)
+                canvas.text(x+30,yy+Themos.ORDER_ITEM_HEIGHT/2,"%.02f%%"%it[2])
             else:
                 break
-            yy+=StockOrder.HEIGHT
+            yy+=Themos.ORDER_ITEM_HEIGHT
 class DateLabel:
     """
     显示一个日期包括时间
@@ -204,8 +233,8 @@ class DateLabel:
 class HotPlotApp(frame.app):
     """
     盯盘应用 
-    F1 ETF F2 概念 F3 行业 F5 持有 F6 关注 F4 大盘
-    Ctrl+1，4，6 股同屏  PageDown PageUp翻页 Home首页 End尾页 , 1,2,3,4,5,6直接选择个股
+    F1 ETF F2 概念 F3 行业 F4 大盘 F5 持有 F6 关注
+    Ctrl+1,4,6,8股同屏  PageDown PageUp翻页 Home首页 End尾页 ,INSERT 反转排序 1,2,3,4,5,6直接选择个股
     ENTER 切换选择的个股到K图, Ctrl+ENTER 全部切换到K图
     F5 涨幅排序 F6 净量排序 F7 流入排序 F8 量比排序 F1帮助
     """
@@ -218,6 +247,8 @@ class HotPlotApp(frame.app):
     def __init__(self,title,w,h):
         super(HotPlotApp,self).__init__(title,w,h)
         self._numsub = (3,2) #同屏数量 1 (1,1),4 (2,2),6 (3,2)
+        self._oldnumsub = self._numsub
+        self._oldpagen = 0
         self._SO = StockOrder()
         self._SPV = [StockPlot() for i in range(10)]
         self.setInterval(0)
@@ -227,7 +258,9 @@ class HotPlotApp(frame.app):
         self._reverse = False #排序
         self._pagen = 0 #页面
         self._topn = 64
-        self.setClearColor((0.95,0.95,0.95,1))
+        self._order = 0
+        self._filter = ''
+        self.setClearColor(Themos.BGCOLOR)
         self.updatedata()
         self._lastt = datetime.today()
     def onLoop(self,t,dt):
@@ -240,11 +273,11 @@ class HotPlotApp(frame.app):
                 self.update()
     def render(self,dt,w,h):
         self._canvas.beginFrame(w,h,1)
-        self._SO.render(self._canvas,0,0,StockOrder.WIDTH,h)
+        self._SO.render(self._canvas,0,0,Themos.ORDER_WIDTH,h)
         col = self._numsub[0]
         raw = self._numsub[1]
-        dw = (w-StockOrder.WIDTH-10)/col
-        dh = (h-StockPlot.XLABELHEIGHT)/raw
+        dw = (w-Themos.ORDER_WIDTH-10)/col
+        dh = (h-Themos.XLABELHEIGHT)/raw
         scale = scale=w/(720*self._numsub[0])
         if scale<1:
             scale=1
@@ -252,7 +285,7 @@ class HotPlotApp(frame.app):
             scale=2
         for xi in range(col):
             for yi in range(raw):
-                self._SPV[yi*col+xi].render(self._canvas,xi*dw+StockOrder.WIDTH,yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
+                self._SPV[yi*col+xi].render(self._canvas,xi*dw+Themos.ORDER_WIDTH,yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
 
         #graph.update(dt)
         #graph.render(self._canvas,5,5)
@@ -269,24 +302,37 @@ class HotPlotApp(frame.app):
             return f2color255(intercolor(HotPlotApp.ZEROCOLOR,HotPlotApp.GREENCOLOR,-r))
 
     def updatedata(self):
-        tops = self.riseTop(self._topn)
+        if self._order==0:
+            tops = self.riseTop(self._topn)
+        elif self._order==1: #大盘
+            tops = self.mapCode2DataSource(['SH000001','SZ399001','SZ399006','SH000688'])
         R = []
+        TOPS = []
+        F = self._filter.upper()
         for it in tops:
-            R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
-        PageNum = self._numsub[0]*self._numsub[1]
-        if self._pagen*PageNum>=len(tops):
-            a = len(tops)/PageNum
+            if len(F)>0:
+                pyh = pinyinhead(it[0][2])
+                if F in pyh:
+                    R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
+                    TOPS.append(it)
+            else:        
+                R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
+                TOPS.append(it)
+        NS = self._numsub
+        PageNum = NS[0]*NS[1]
+        if self._pagen*PageNum>=len(TOPS):
+            a = len(TOPS)/PageNum
             self._pagen = math.floor(a)
             if a==math.floor(a) and PageNum!=1:
                 self._pagen -=1
         if self._pagen<0:
             self._pagen = 0
         self._SO.update(R,self._pagen,PageNum)
-        for i in range(self._numsub[0]*self._numsub[1]):
+        for i in range(NS[0]*NS[1]):
             j = self._pagen*PageNum+i
             self._SPV[i].clear()
-            if j<len(tops):
-                it = tops[j]
+            if j<len(TOPS):
+                it = TOPS[j]
                 k = it[2] 
                 for s in range(1,len(k)):#处理价格为零的情况
                     if k[s,0]==0:
@@ -296,12 +342,24 @@ class HotPlotApp(frame.app):
         mod = event.key.keysym.mod
         sym = event.key.keysym.sym
         if sym==sdl2.SDLK_F1: #ETF
+            if self._order==1:
+                self._numsub = self._oldnumsub
+            self._order = 0
             self._prefix=('2',)
         elif sym==sdl2.SDLK_F2: #概念
+            if self._order==1:
+                self._numsub = self._oldnumsub
+            self._order = 0
             self._prefix=('91',)
         elif sym==sdl2.SDLK_F3: #行业
+            if self._order==1:
+                self._numsub = self._oldnumsub
+            self._order = 0
             self._prefix=('90',)
         elif sym==sdl2.SDLK_F4: #大盘
+            self._order = 1
+            self._oldnumsub = self._numsub
+            self._numsub = (2,2)
             self._prefix=('90',)
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_1: #单个窗口
             self._numsub = (1,1)
@@ -321,6 +379,19 @@ class HotPlotApp(frame.app):
             self._pagen = 1e10
         elif sym==sdl2.SDLK_INSERT:
             self._reverse = not self._reverse
+        elif sym==sdl2.SDLK_ESCAPE:
+            self._filter = ''
+            self._numsub = self._oldnumsub
+            self._pagen = self._oldpagen
+        elif sym==sdl2.SDLK_KP_ENTER:
+            self._filter = ''
+        elif sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z or sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9:
+            if self._filter=='':
+                self._oldpagen = self._pagen
+                self._oldnumsub = self._numsub
+            self._numsub = (1,1)
+            self._pagen = 0
+            self._filter+=chr(sym)
         self.updatedata()
         self.update()
     def getCurrentRT(self):
@@ -368,8 +439,18 @@ class HotPlotApp(frame.app):
                 R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
-        return TOPS[:top]        
-        
+        return TOPS #[:top]        
+    def mapCode2DataSource(self,codes,top=18):
+        """
+        将代码列表映射为数据源
+        """
+        k,d,K,D,bolls = self.getCurrentRT()
+        companys = HotPlotApp.companys   
+        R = []
+        for code in codes:
+            i = HotPlotApp.code2i[code]
+            R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls))
+        return R[:top]
 
 class MyPlotApp(frame.app):
     def __init__(self,title,w,h):
