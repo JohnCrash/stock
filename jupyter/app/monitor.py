@@ -691,34 +691,36 @@ def bolltrench():
     b,bolls = shared.fromRedis(ename)
     if not b:
         bolls = {}
-    isupdate = False
-    for period in [15,30,60]:
-        if period not in bolls or t-bolls[period] > timedelta(minutes=period):
-            bolls[period] = t
-            isupdate = True
-            K,D = xueqiu.get_period_k(period)
-            for i in range(len(companys)):
-                for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
-                    b,(n,mink,maxk,zfn) = stock.bollwayex(K[i,:j])
-                    if b:
-                        bi,ei,mink,maxk= stock.extway(K[i,:],j,n,mink,maxk)
-                        if ei-bi>(4*16*15)/period: #>4 day
-                            tbi = D[bi][0]
-                            tei = D[ei][0]
-                            if companys[i][1] not in bolls:
-                                bolls[companys[i][1]] = []
-                            bls = bolls[companys[i][1]]
-                            isexist=False
-                            for i in range(len(bls)):
-                                if bls[i][1]==period: #已经存在就
-                                    bls[i] = (D[-1][0],period,n,mink,maxk,mink,maxk,tbi,tei,zfn)
-                                    isexist = True
-                                    break
-                            if not isexist:
-                                bls.append((D[-1][0],period,n,mink,maxk,mink,maxk,tbi,tei,zfn))
-                            break
-    if isupdate:
-        shared.toRedis(bolls,ename,ex=2*3600)
+    
+    if t.minute%15==0 and stock.isTransDay() and stock.isTransTime():
+        isupdate = False
+        for period in [15,30,60]:
+            if period not in bolls or t-bolls[period] > timedelta(minutes=period):
+                bolls[period] = t
+                isupdate = True
+                K,D = xueqiu.get_period_k(period)
+                for i in range(len(companys)):
+                    for j in range(-3,-16,-1): #最后3根k线不参与通道的产生
+                        b,(n,mink,maxk,zfn) = stock.bollwayex(K[i,:j])
+                        if b:
+                            bi,ei,mink,maxk= stock.extway(K[i,:],j,n,mink,maxk)
+                            if ei-bi>(4*16*15)/period: #>4 day
+                                tbi = D[bi][0]
+                                tei = D[ei][0]
+                                if companys[i][1] not in bolls:
+                                    bolls[companys[i][1]] = []
+                                bls = bolls[companys[i][1]]
+                                isexist=False
+                                for i in range(len(bls)):
+                                    if bls[i][1]==period: #已经存在就
+                                        bls[i] = (D[-1][0],period,n,mink,maxk,mink,maxk,tbi,tei,zfn)
+                                        isexist = True
+                                        break
+                                if not isexist:
+                                    bls.append((D[-1][0],period,n,mink,maxk,mink,maxk,tbi,tei,zfn))
+                                break
+        if isupdate:
+            shared.toRedis(bolls,ename,ex=2*3600)
     return bolls
 
 """
@@ -2582,7 +2584,7 @@ class HotPlot(Frame):
             R = []
             for it in TOPS:
                 R.append(it[0])
-        return R[:top]
+        return R
     def isSelected(self,company,bolls,k):
         def onif(b,s):
             return (b and s) or not b

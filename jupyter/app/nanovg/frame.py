@@ -212,6 +212,8 @@ def pone(a,f=math.ceil):
     """
     if a<0:
         a = -a
+    if a==0:
+        return 0,1
     lg = math.log10(a)
     if lg>0:
         n = math.pow(10,lg-int(lg))
@@ -256,6 +258,9 @@ class Plot:
         self._gridy = False
         self._xe = None
         self._ye = None
+        self._themos = Plot
+    def setThemos(self,themos):
+        self._themos = themos
     def setx(self,x,labels=None):
         """
         设置x轴数据,labels=[(i,label),...]
@@ -309,12 +314,12 @@ class Plot:
         self._yk = 1/(self._ymax-self._ymin)
         self._yb = -self._ymin*self._yk
         if self._gridx:
-            if self._xticks is None:
+            if self._xticks is None and self._oxmax-self._oxmin>0:
                 delta,self._xe = pone((self._oxmax-self._oxmin)/10) #_ye是精度
                 bi = precision(self._oxmin-self._oxmin%delta,self._xe)
                 self._xticks = np.arange(bi,self._oxmax,delta)
         if self._gridy:
-            if self._yticks is None:
+            if self._yticks is None and self._oymax-self._oymin>0:
                 delta,self._ye = pone((self._oymax-self._oymin)/10) #_ye是精度
                 bi = precision(self._oymin-self._oymin%delta,self._ye)
                 self._yticks = np.arange(bi,self._oymax,delta)
@@ -411,11 +416,11 @@ class Plot:
         canvas.beginPath()
         canvas.rect(x0,y0,w0,h0)
         #canvas.fillColor(vg.nvgRGBA(255,255,255,255))
-        canvas.strokeColor(Plot.AXISCOLOR)
+        canvas.strokeColor(self._themos.AXISCOLOR)
         canvas.stroke()
         canvas.fontFace("sans")
         canvas.fontSize(13.0)
-        canvas.fillColor(Plot.TEXTCOLOR)
+        canvas.fillColor(self._themos.TEXTCOLOR)
         if self._xticks is not None:
             if self._xtickangle==0:
                 canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
@@ -433,7 +438,7 @@ class Plot:
                     txt = self.x2AxisLabel(ox)                    
                 if x>x0 and x<x0+w0:
                     canvas.beginPath()
-                    canvas.strokeColor(Plot.GRIDCOLOR)
+                    canvas.strokeColor(self._themos.GRIDCOLOR)
                     canvas.moveTo(x,y0)
                     canvas.lineTo(x,y0+h0)
                     canvas.stroke()
@@ -454,7 +459,7 @@ class Plot:
                 y = self.yAxis2wy(oy)
                 if y>y0 and y<y0+h0:
                     canvas.beginPath()
-                    canvas.strokeColor(Plot.GRIDCOLOR)
+                    canvas.strokeColor(self._themos.GRIDCOLOR)
                     canvas.moveTo(x0,y)
                     canvas.lineTo(x0+w0,y)
                     canvas.stroke()

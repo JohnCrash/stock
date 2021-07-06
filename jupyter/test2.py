@@ -1,6 +1,6 @@
 from app.nanovg import frame,vg
 from app import monitor,xueqiu,stock
-from pypinyin import pinyin
+from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
 import math
@@ -8,10 +8,11 @@ import sdl2
 from OpenGL import GL
 import ctypes
 
+_cacheK = {}
 def pinyinhead(s):
     r = ''
     for z in s:
-        v = pinyin(z)
+        v = pinyin(z, style=Style.TONE3)
         if len(v)>0 and len(v[0])>0:
             r += v[0][0][0]
     return r.upper()
@@ -42,8 +43,7 @@ def strong2color(s):
     i = int((1-(s+1)/2)*(len(rgb)-1))
 
     return rgb[i]
-
-class Themos:
+class ThemosDefault:
     BGCOLOR = (0.95,0.95,0.95,1) #图表背景颜色
 
     MA60_COLOR = vg.nvgRGB(255,128,60) #ma60颜色
@@ -69,6 +69,46 @@ class Themos:
     ORDER_WIDTH = 150       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
     ORDER_FONTSIZE = 14
+
+    AXISCOLOR = vg.nvgRGBf(0.9,0.9,0.9)
+    GRIDCOLOR = vg.nvgRGBf(0.15,0.15,0.15)
+    TEXTCOLOR = vg.nvgRGBf(1,1,1)
+
+    SELBGCOLOR = vg.nvgRGBf(0,0.1,0.1)
+class ThemosBlack:
+    BGCOLOR = (0.0,0.0,0.0,1) #图表背景颜色
+
+    MA60_COLOR = vg.nvgRGB(255,128,60) #ma60颜色
+    PRICE_COLOR = vg.nvgRGB(70,130,200) #价格颜色
+    MAIN_COLOR = vg.nvgRGB(255,0,255) #主力
+    HUGE_COLOR = vg.nvgRGB(139,0,0)
+    LARG_COLOR = vg.nvgRGB(255,128,0)
+    MA5_COLOR = vg.nvgRGB(255,0,255)
+    MID_COLOR = vg.nvgRGB(255,215,0)
+    TING_COLOR = vg.nvgRGB(135,206,250)
+    RED_COLOR = vg.nvgRGB(250,0,0)   #涨
+    GREEN_COLOR = vg.nvgRGB(0,200,0) #跌
+    
+    YLABELWIDTH = 40   #y轴坐标轴空间
+    XLABELHEIGHT = 30  #x轴坐标轴空间
+
+    ORDER_BGCOLOR = vg.nvgRGB(0,0,0)
+    ORDER_HEADCOLOR = vg.nvgRGB(64,96,196)
+    ORDER_SELCOLOR = vg.nvgRGB(196,96,96)
+    ORDER_TEXTBGCOLOR = vg.nvgRGBA(0,0,0,255)
+    ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
+
+    ORDER_WIDTH = 150       #排序栏宽度
+    ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
+    ORDER_FONTSIZE = 14
+
+    AXISCOLOR = vg.nvgRGBf(0.9,0.9,0.9)
+    GRIDCOLOR = vg.nvgRGBf(0.15,0.15,0.15)
+    TEXTCOLOR = vg.nvgRGBf(1,1,1)
+
+    SELBGCOLOR = vg.nvgRGBf(0,0,0.1)
+
+Themos = ThemosBlack
 class StockPlot:
     """
     包括两个区域，分时和成交量流入流出区
@@ -76,30 +116,95 @@ class StockPlot:
     def __init__(self):
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
+        self._kplot.setThemos(Themos)
+        self._vplot.setThemos(Themos)
         self._code = None
         self._k = None
         self._d = None
-        self._maxi = None
-        self._mini = None
+        self._mm = None 
+        self._forcus = False
     def clear(self):
         self._code = None
         self._k = None
         self._d = None
-        self._maxi = None
-        self._mini = None
+        self._mm = None 
         self._kplot.setTitle('')
         self._kplot.clear()
-        self._vplot.clear()        
-    def update(self,code,label,k,d,ma5b=None):
+        self._vplot.clear()
+    def forcus(self,b):
+        self._forcus = b
+    def getKlineData(self,code,period,runtime=True):
+        global _cacheK
+        if len(code)>3 and code[2]==':':
+            code = code.replace(':','')
+        if not (code in _cacheK and period in _cacheK[code]):    
+            if period == 'w':
+                after = None #全部数据
+            elif period == 'd':
+                after = stock.dateString(date.today()-timedelta(days=365)) #5年数据
+            else:
+                after = stock.dateString(date.today()-timedelta(days=40))
+            
+            if period==5 or period=='d':
+                c,k,d = stock.loadKline(code,period,after=after)
+            elif period=='w':
+                c,k,d = stock.loadKline(code,'d',after=after)
+            else:
+                if code in _cacheK and 5 in _cacheK[code]: #尽量使用缓存数据，但是没考虑after
+                    c,k,d,_ =  _cacheK[code][5]
+                else:
+                    c,k,d = stock.loadKline(code,5,after=after)
+                k,d = stock.mergeK(k,d,int(period/5))
+            
+            if len(d)==0:
+                return c,k,d
+            if code is not _cacheK:
+                _cacheK[code] = {}
+            _cacheK[code][period] = (c,k,d,after)
+        cur = _cacheK[code][period]
+        if runtime:
+            _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
+        else:
+            k,d = cur[1],cur[2]
+        return cur[0],k,d        
+    def updateK(self,code,label,period=15): #更新K线图
+        self._code = code
+        _,k,d = self.getKlineData(code,period)
+        self._k = k[-200:]
+        self._d = d[-200:]
+        x = np.arange(len(self._d))
+        self._kplot.setx(x)
+        #self._kplot.setTicks(xticks)
+        self._kplot.plot(self._k[:,1:],color=Themos.PRICE_COLOR,style=frame.Plot.K)
+        self._kplot.plot(stock.ma(k[:,4],80)[-200:],color=Themos.MAIN_COLOR,linewidth=2,linestyle=(4,2,0))
+        self._kplot.plot(stock.ma(k[:,4],320)[-200:],color=Themos.LARG_COLOR,linewidth=4,linestyle=(4,2,0))
+        self._vplot.setx(x)
+        #self._vplot.setTicks(xticks)
+        self._vplot.setTicksAngle(25)
+        self._vplot.plot(self._k[:,0],color=Themos.TING_COLOR)
+        self._kplot.setGrid(True,True)
+        self._vplot.setGrid(True,True)
+        self._kplot.setTitle(label)
+        self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
+        self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)       
+    def update(self,code,label,k,d,ma5b=None): #更新线图
         self.clear()
         self._code = code
+        self._mm = []
+        if self._forcus:
+            self.updateK(code,label)
+            return
         self._k = k
         self._d = d
+        j = len(d)-1
         for i in range(len(d)-1,1,-1):
             if d[i].day!=d[i-1].day:
-                self._maxi = np.argmax(self._k[i:,1])+i
-                self._mini = np.argmin(self._k[i:,1])+i
-                break
+                bi = i
+                for bi in range(i,len(d)):#排除盘前
+                    if d[bi].minute>29:
+                        break
+                self._mm.append((np.argmin(self._k[bi:j,1])+bi,np.argmax(self._k[bi:j,1])+bi))
+                j = i
         x = np.arange(len(d))
         xticks = []
         for i in range(len(d)):
@@ -133,30 +238,38 @@ class StockPlot:
                 ma5[i] = ma5[i-1]+(k[i,0]-k15b[int(i/M)])/(N) #这是一个近似迭代
             self._kplot.plot(ma5,color=Themos.MA5_COLOR,linewidth=2,linestyle=(6,3,0))
     def render(self,canvas,x,y,w,h,xaxis=False,scale=1):
+        if self._forcus:
+            canvas.beginPath()
+            canvas.fillColor(Themos.SELBGCOLOR)
+            canvas.rect(x+Themos.YLABELWIDTH,y,w-Themos.YLABELWIDTH,h)
+            canvas.fill()
         self._kplot.setAxisVisiable(False,True)
         self._vplot.setAxisVisiable(xaxis,True)
+        if self._forcus:
+            scale = 1
         self._kplot.setLineWidthScale(scale)
         self._vplot.setLineWidthScale(scale)
         self._kplot.render(canvas,x,y,w,h*2/3)
         self._vplot.render(canvas,x,y+h*2/3,w,h/3)
-        if self._maxi is not None and self._k.shape[0]>0:
+        if self._k is not None and self._k.shape[0]>0:
             lasti = self._k.shape[0]-1
-            maxx = self._kplot.xAxis2wx(self._maxi)
-            minx = self._kplot.xAxis2wx(self._mini)
-            maxy = self._kplot.yAxis2wy(self._k[self._maxi,0])
-            miny = self._kplot.yAxis2wy(self._k[self._mini,0])
-            canvas.fontFace('sans')
-            canvas.fontSize(14)
-            if lasti-self._mini>5:
-                canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
-                r = self._k[self._mini,1]
-                canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
-                canvas.text(minx,miny+5,"%.02f%%"%r)
-            if lasti-self._maxi>5:
-                canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_BOTTOM)
-                r = self._k[self._maxi,1]
-                canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
-                canvas.text(maxx,maxy-5,"%.02f%%"%r)
+            for it in self._mm:
+                maxx = self._kplot.xAxis2wx(it[1])
+                minx = self._kplot.xAxis2wx(it[0])
+                maxy = self._kplot.yAxis2wy(self._k[it[1],0])
+                miny = self._kplot.yAxis2wy(self._k[it[0],0])
+                canvas.fontFace('sans')
+                canvas.fontSize(14)
+                if lasti-it[0]>5:
+                    canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
+                    r = self._k[it[0],1]
+                    canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
+                    canvas.text(minx,miny+5,"%.02f%%"%r)
+                if lasti-it[1]>5:
+                    canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_BOTTOM)
+                    r = self._k[it[1],1]
+                    canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
+                    canvas.text(maxx,maxy-5,"%.02f%%"%r)
             canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_BOTTOM)
             r = self._k[lasti,1]
             xx = self._kplot.xAxis2wx(lasti)
@@ -243,7 +356,10 @@ class HotPlotApp(frame.app):
     GREENCOLOR = (0,1,0)    
     companys = xueqiu.get_company_select()
     code2i = xueqiu.get_company_code2i()
-    code2com = xueqiu.get_company_code2com()    
+    code2com = xueqiu.get_company_code2com()
+    MAP2NUM = {
+        sdl2.SDLK_KP_4:0,sdl2.SDLK_KP_5:1,sdl2.SDLK_KP_6:2,sdl2.SDLK_KP_1:3,sdl2.SDLK_KP_2:4,sdl2.SDLK_KP_3:5
+    }
     def __init__(self,title,w,h):
         super(HotPlotApp,self).__init__(title,w,h)
         self._numsub = (3,2) #同屏数量 1 (1,1),4 (2,2),6 (3,2)
@@ -259,6 +375,7 @@ class HotPlotApp(frame.app):
         self._pagen = 0 #页面
         self._topn = 64
         self._order = 0
+        self._current = None
         self._filter = ''
         self.setClearColor(Themos.BGCOLOR)
         self.updatedata()
@@ -306,6 +423,14 @@ class HotPlotApp(frame.app):
             tops = self.riseTop(self._topn)
         elif self._order==1: #大盘
             tops = self.mapCode2DataSource(['SH000001','SZ399001','SZ399006','SH000688'])
+        elif self._order==2: #持有
+            tops = self.mapCode2DataSource(stock.getHoldStocks())
+        elif self._order==3: #关注
+            tops = self.mapCode2DataSource(self.getFav())
+        elif self._order==4: #昨日
+            tops = self.mapCode2DataSource(self.getYesterdayTop(1))
+        elif self._order==5: #前天
+            tops = self.mapCode2DataSource(self.getYesterdayTop(2))                 
         R = []
         TOPS = []
         F = self._filter.upper()
@@ -337,6 +462,7 @@ class HotPlotApp(frame.app):
                 for s in range(1,len(k)):#处理价格为零的情况
                     if k[s,0]==0:
                         k[s,0] = k[s-1,0]
+                self._SPV[i].forcus(self._current is not None and i==self._current)
                 self._SPV[i].update(it[0][1],it[0][2],it[2],it[3],ma5b=self.getma5b(it[4],it[5]))
     def keyDown(self,event):
         mod = event.key.keysym.mod
@@ -345,30 +471,65 @@ class HotPlotApp(frame.app):
             if self._order==1:
                 self._numsub = self._oldnumsub
             self._order = 0
+            self._current = None
             self._prefix=('2',)
+            self.setWindowTitle('ETF')
         elif sym==sdl2.SDLK_F2: #概念
             if self._order==1:
                 self._numsub = self._oldnumsub
             self._order = 0
+            self._current = None
             self._prefix=('91',)
+            self.setWindowTitle('概念')
         elif sym==sdl2.SDLK_F3: #行业
             if self._order==1:
                 self._numsub = self._oldnumsub
             self._order = 0
+            self._current = None
             self._prefix=('90',)
+            self.setWindowTitle('行业')
         elif sym==sdl2.SDLK_F4: #大盘
             self._order = 1
+            self._current = None
             self._oldnumsub = self._numsub
             self._numsub = (2,2)
             self._prefix=('90',)
+            self.setWindowTitle('大盘')
+        elif sym==sdl2.SDLK_F5: #持有
+            self._order = 2
+            self._current = None
+            self.setWindowTitle('持有')
+        elif sym==sdl2.SDLK_F6: #关注
+            self._order = 3
+            self._current = None
+            self.setWindowTitle('关注')
+        elif sym==sdl2.SDLK_F7: #昨日排行
+            self._order = 4
+            self._current = None
+            self.setWindowTitle('昨日排行')
+        elif sym==sdl2.SDLK_F8: #前天排行
+            self._order = 5
+            self._current = None
+            self.setWindowTitle('前天排行')
+        elif sym==sdl2.SDLK_F9: #个股
+            if self._order==1:
+                self._numsub = self._oldnumsub            
+            self._order = 0
+            self._current = None
+            self._prefix=('1','0')
+            self.setWindowTitle('个股')            
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_1: #单个窗口
             self._numsub = (1,1)
+            self._current = None
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_4: #单个窗口
             self._numsub = (2,2)
+            self._current = None
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_6: #单个窗口
             self._numsub = (3,2)
+            self._current = None
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_8: #单个窗口
             self._numsub = (4,2)
+            self._current = None
         elif sym==sdl2.SDLK_PAGEUP:
             self._pagen-=1
         elif sym==sdl2.SDLK_PAGEDOWN:
@@ -379,11 +540,22 @@ class HotPlotApp(frame.app):
             self._pagen = 1e10
         elif sym==sdl2.SDLK_INSERT:
             self._reverse = not self._reverse
+        elif sym in HotPlotApp.MAP2NUM:
+            if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
+                self._current = HotPlotApp.MAP2NUM[sym]
+            elif self._numsub[0]==4 and self._numsub[1]==2:
+                self._current = HotPlotApp.MAP2NUM[sym]
+                if self._current>=3:
+                    self._current+=1
+            elif self._numsub[0]==2 and self._numsub[1]==2:
+                self._current = HotPlotApp.MAP2NUM[sym]
+                if self._current>1:
+                    self._current-=1
         elif sym==sdl2.SDLK_ESCAPE:
             self._filter = ''
             self._numsub = self._oldnumsub
             self._pagen = self._oldpagen
-        elif sym==sdl2.SDLK_KP_ENTER:
+        elif sym==sdl2.SDLK_RETURN:
             self._filter = ''
         elif sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z or sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9:
             if self._filter=='':
@@ -392,6 +564,7 @@ class HotPlotApp(frame.app):
             self._numsub = (1,1)
             self._pagen = 0
             self._filter+=chr(sym)
+            self.setWindowTitle(self._filter)
         self.updatedata()
         self.update()
     def getCurrentRT(self):
@@ -451,6 +624,50 @@ class HotPlotApp(frame.app):
             i = HotPlotApp.code2i[code]
             R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls))
         return R[:top]
+    def activeTop(self,top=18):
+        """
+        最近比较活跃的
+        """
+        tb = {'90':(5,3),"91":(20,4),"2":(5,3),"0":(10,3),"1":(10,3)}
+        it = tb[self._prefix[0]]
+        TOPS = monitor.get10Top(self._prefix[0],it[0],it[1],reverse=not self._reverse)
+        return self.mapCode2DataSource(TOPS)    
+    def getYesterdayTop(self,n=1,top=18):
+        """
+        返回昨日涨幅榜
+        """
+        k,d,k15,d15,bolls = self.getCurrentRT()
+        companys = HotPlotApp.companys
+        t = datetime.today()
+        for i in range(len(d)-1,0,-1):
+            if d[i].day!=t.day:
+                if n==1:
+                    break
+                else:
+                    n-=1
+                    t = d[i]
+        R = []
+        if i>0:
+            TOPS = []
+            for j in range(len(companys)):
+                if j<k.shape[0] and self.isSelected(companys[j],bolls,k[j,:i]):
+                    R.append((companys[j][1],k[j,i,1]))
+            TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
+            R = []
+            for it in TOPS:
+                R.append(it[0])
+        return R[:top]  
+    def getFav(self):
+        """
+        返回关注
+        """
+        today = date.today()  
+        after = today-timedelta(days=20)
+        result = stock.query("select * from notebook where date>='%s' order by date desc"%(stock.dateString(after)))
+        S = {}
+        for it in result:
+            S[it[2]] = it
+        return S.keys()                  
 
 class MyPlotApp(frame.app):
     def __init__(self,title,w,h):
