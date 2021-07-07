@@ -518,16 +518,16 @@ class Plot:
                 canvas.stroke()
             elif type1==Plot.K: #分别对应0 open 1 high 2 low 3 close
                 Y = self.yAxis2wy(y) #xy[:,1] = h*(y*self._yk+self._yb)+y0
-                RED  = vg.nvgRGB(255,0,0)
-                GREEN = vg.nvgRGB(0,128,0)
-                WHITE = vg.nvgRGB(255,255,255)
+                RED  = self._themos.RED_COLOR
+                GREEN = self._themos.GREEN_COLOR
+                WHITE = self._themos.BG_COLOR
                 dx = xy[1,0]-xy[0,0]-2
                 for i in range(len(self._x)):
                     x = xy[i,0]
                     k = Y[i]
                     canvas.beginPath()
                     canvas.strokeColor(RED if k[3]<k[0] else GREEN)
-                    canvas.strokeWidth(2*self._lwscale)
+                    canvas.strokeWidth(1*self._lwscale)
                     canvas.moveTo(x,k[2])
                     canvas.lineTo(x,k[1])
                     canvas.stroke()
@@ -541,5 +541,13 @@ class Plot:
                         canvas.fillColor(GREEN)
                         canvas.fill()
             elif type1==Plot.BAR: #条形图
-                pass
+                Y = self.yAxis2wy(y)
+                oy = self.yAxis2wy(0)
+                dx = xy[1,0]-xy[0,0]-2
+                for i in range(len(self._x)):
+                    x = xy[i,0]
+                    canvas.beginPath()
+                    canvas.fillColor(color)
+                    canvas.rect(x-dx/2,oy,dx,Y[i]-oy)
+                    canvas.fill()
         canvas.restore()

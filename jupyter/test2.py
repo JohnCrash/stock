@@ -8,7 +8,6 @@ import sdl2
 from OpenGL import GL
 import ctypes
 
-_cacheK = {}
 def pinyinhead(s):
     r = ''
     for z in s:
@@ -56,7 +55,8 @@ class ThemosDefault:
     TING_COLOR = vg.nvgRGB(135,206,250)
     RED_COLOR = vg.nvgRGB(220,0,0)   #涨
     GREEN_COLOR = vg.nvgRGB(0,120,0) #跌
-    
+    BG_COLOR = vg.nvgRGB(255,255,255) #背景
+
     YLABELWIDTH = 40   #y轴坐标轴空间
     XLABELHEIGHT = 30  #x轴坐标轴空间
 
@@ -88,7 +88,8 @@ class ThemosBlack:
     TING_COLOR = vg.nvgRGB(135,206,250)
     RED_COLOR = vg.nvgRGB(250,0,0)   #涨
     GREEN_COLOR = vg.nvgRGB(0,200,0) #跌
-    
+    BG_COLOR = vg.nvgRGB(0,0,0) #背景
+
     YLABELWIDTH = 40   #y轴坐标轴空间
     XLABELHEIGHT = 30  #x轴坐标轴空间
 
@@ -113,6 +114,7 @@ class StockPlot:
     """
     包括两个区域，分时和成交量流入流出区
     """
+    KD = stock.query("select date from kd_xueqiu where id=8828")
     def __init__(self):
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
@@ -123,6 +125,8 @@ class StockPlot:
         self._d = None
         self._mm = None 
         self._forcus = False
+        self._kbi = None
+        self._kei = None
     def clear(self):
         self._code = None
         self._k = None
@@ -133,67 +137,61 @@ class StockPlot:
         self._vplot.clear()
     def forcus(self,b):
         self._forcus = b
-    def getKlineData(self,code,period,runtime=True):
-        global _cacheK
-        if len(code)>3 and code[2]==':':
-            code = code.replace(':','')
-        if not (code in _cacheK and period in _cacheK[code]):    
-            if period == 'w':
-                after = None #全部数据
-            elif period == 'd':
-                after = stock.dateString(date.today()-timedelta(days=365)) #5年数据
-            else:
-                after = stock.dateString(date.today()-timedelta(days=40))
-            
-            if period==5 or period=='d':
-                c,k,d = stock.loadKline(code,period,after=after)
-            elif period=='w':
-                c,k,d = stock.loadKline(code,'d',after=after)
-            else:
-                if code in _cacheK and 5 in _cacheK[code]: #尽量使用缓存数据，但是没考虑after
-                    c,k,d,_ =  _cacheK[code][5]
-                else:
-                    c,k,d = stock.loadKline(code,5,after=after)
-                k,d = stock.mergeK(k,d,int(period/5))
-            
-            if len(d)==0:
-                return c,k,d
-            if code is not _cacheK:
-                _cacheK[code] = {}
-            _cacheK[code][period] = (c,k,d,after)
-        cur = _cacheK[code][period]
-        if runtime:
-            _,k,d = xueqiu.appendK(code,period,cur[1],cur[2])
+    def getKlineData(self,code,period,knum,off):
+        KDN = len(StockPlot.KD)
+        if period==5 or period=='d':
+            bi = KDN-off-knum-60 #确保60日均线计算是正确的
+            if bi<0:
+                bi=0
+            after = stock.dateString(StockPlot.KD[bi][0])
+            c,k,d = stock.loadKline(code,period,after=after)
         else:
-            k,d = cur[1],cur[2]
-        return cur[0],k,d        
-    def updateK(self,code,label,period=15): #更新K线图
+            bi = KDN-math.ceil((off+knum+320)/(240/period))
+            if bi<0:
+                bi=0
+            after = stock.dateString(StockPlot.KD[bi][0])
+            c,k,d = stock.loadKline(code,5,after=after)
+            if period!=5:
+                k,d = stock.mergeK(k,d,int(period/5))
+        
+        if off==0 and stock.isTransDay() and stock.isTransTime():
+            _,k,d = xueqiu.appendK(code,period,k,d)
+        if off==0:
+            return c,k,d
+        else:
+            return c,k[:-off],d[:-off]
+    def updateK(self,code,label,period,knum,kei): #更新K线图
         self._code = code
-        _,k,d = self.getKlineData(code,period)
-        self._k = k[-200:]
-        self._d = d[-200:]
-        x = np.arange(len(self._d))
+        _,k,d = self.getKlineData(code,period,knum,kei)
+        if period!='d':
+            ma5 = stock.ma(k[:,4],80)
+            ma20 = stock.ma(k[:,4],320)
+        else:
+            ma5 = stock.ma(k[:,4],5)
+            ma20 = stock.ma(k[:,4],20)
+        bi = -knum
+        ei = k.shape[0]
+        
+        x = np.arange(len(k[bi:ei]))
         self._kplot.setx(x)
         #self._kplot.setTicks(xticks)
-        self._kplot.plot(self._k[:,1:],color=Themos.PRICE_COLOR,style=frame.Plot.K)
-        self._kplot.plot(stock.ma(k[:,4],80)[-200:],color=Themos.MAIN_COLOR,linewidth=2,linestyle=(4,2,0))
-        self._kplot.plot(stock.ma(k[:,4],320)[-200:],color=Themos.LARG_COLOR,linewidth=4,linestyle=(4,2,0))
+        self._kplot.plot(k[bi:ei,1:],color=Themos.PRICE_COLOR,style=frame.Plot.K)
+        self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=2,linestyle=(4,2,0))
+        self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=4,linestyle=(4,2,0))
         self._vplot.setx(x)
         #self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
-        self._vplot.plot(self._k[:,0],color=Themos.TING_COLOR)
+        self._vplot.plot(k[bi:ei,0],color=Themos.TING_COLOR,style=frame.Plot.BAR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._kplot.setTitle(label)
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
-        self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)       
+        self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)    
+        return kei   
     def update(self,code,label,k,d,ma5b=None): #更新线图
         self.clear()
         self._code = code
         self._mm = []
-        if self._forcus:
-            self.updateK(code,label)
-            return
         self._k = k
         self._d = d
         j = len(d)-1
@@ -377,6 +375,9 @@ class HotPlotApp(frame.app):
         self._order = 0
         self._current = None
         self._filter = ''
+        self._knum = 200 #屏幕上放置k线的数量
+        self._kei = 0
+        self._period = 15
         self.setClearColor(Themos.BGCOLOR)
         self.updatedata()
         self._lastt = datetime.today()
@@ -462,8 +463,11 @@ class HotPlotApp(frame.app):
                 for s in range(1,len(k)):#处理价格为零的情况
                     if k[s,0]==0:
                         k[s,0] = k[s-1,0]
-                self._SPV[i].forcus(self._current is not None and i==self._current)
-                self._SPV[i].update(it[0][1],it[0][2],it[2],it[3],ma5b=self.getma5b(it[4],it[5]))
+                if self._current is not None and i==self._current:
+                    title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
+                    self._kei = self._SPV[i].updateK(it[0][1],title,self._period,self._knum,self._kei)
+                else:
+                    self._SPV[i].update(it[0][1],it[0][2],it[2],it[3],ma5b=self.getma5b(it[4],it[5]))
     def keyDown(self,event):
         mod = event.key.keysym.mod
         sym = event.key.keysym.sym
@@ -531,15 +535,39 @@ class HotPlotApp(frame.app):
             self._numsub = (4,2)
             self._current = None
         elif sym==sdl2.SDLK_PAGEUP:
+            self._current = None
+            self._kei = 0
             self._pagen-=1
         elif sym==sdl2.SDLK_PAGEDOWN:
+            self._current = None
+            self._kei = 0
             self._pagen+=1
         elif sym==sdl2.SDLK_HOME:
+            self._current = None
+            self._kei = 0
             self._pagen = 0
         elif sym==sdl2.SDLK_END:
+            self._current = None
+            self._kei = 0
             self._pagen = 1e10
         elif sym==sdl2.SDLK_INSERT:
+            self._current = None
+            self._kei = 0
             self._reverse = not self._reverse
+        elif sym==sdl2.SDLK_LEFT:
+            self._kei += int(self._knum/4)
+        elif sym==sdl2.SDLK_RIGHT:
+            self._kei -= int(self._knum/4)
+            if self._kei<0:
+                self._kei = 0
+        elif sym==sdl2.SDLK_UP:
+            self._knum += 10
+            if self._knum>400:
+                self._knum=400
+        elif sym==sdl2.SDLK_DOWN:
+            self._knum -= 10
+            if self._knum<60:
+                self._knum=60
         elif sym in HotPlotApp.MAP2NUM:
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
                 self._current = HotPlotApp.MAP2NUM[sym]
@@ -551,16 +579,20 @@ class HotPlotApp(frame.app):
                 self._current = HotPlotApp.MAP2NUM[sym]
                 if self._current>1:
                     self._current-=1
+            self._kei = 0
         elif sym==sdl2.SDLK_ESCAPE:
             self._filter = ''
             self._numsub = self._oldnumsub
             self._pagen = self._oldpagen
+            self._current = None
         elif sym==sdl2.SDLK_RETURN:
             self._filter = ''
+            self._current = None 
         elif sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z or sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9:
             if self._filter=='':
                 self._oldpagen = self._pagen
                 self._oldnumsub = self._numsub
+            self._current = None
             self._numsub = (1,1)
             self._pagen = 0
             self._filter+=chr(sym)
