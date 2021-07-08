@@ -301,11 +301,18 @@ class Plot:
         self._xb = -self._xmin*self._xk
         self._ymax = -1e10
         self._ymin = 1e10
+        hasbar = False
         for yp in self._y:
             y = yp[0]
             ynan = y[y==y] #如果数据中存在NaN max()将返回NaN
-            self._ymax = max(self._ymax,ynan.max())
-            self._ymin = min(self._ymin,ynan.min())
+            if len(ynan)>0:
+                self._ymax = max(self._ymax,ynan.max())
+                self._ymin = min(self._ymin,ynan.min())
+            if yp[5]==Plot.BAR:
+                hasbar = True
+        if hasbar and self._ymin>0:
+             self._ymin = 0
+
         self._oymin,self._oymax = self._ymin,self._ymax
         #扩大一点y范围
         h = self._ymax-self._ymin
@@ -547,7 +554,10 @@ class Plot:
                 for i in range(len(self._x)):
                     x = xy[i,0]
                     canvas.beginPath()
-                    canvas.fillColor(color)
+                    if type(color)==list:
+                        canvas.fillColor(color[i])
+                    else:
+                        canvas.fillColor(color)
                     canvas.rect(x-dx/2,oy,dx,Y[i]-oy)
                     canvas.fill()
         canvas.restore()

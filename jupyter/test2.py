@@ -115,6 +115,10 @@ class StockPlot:
     包括两个区域，分时和成交量流入流出区
     """
     KD = stock.query("select date from kd_xueqiu where id=8828")
+    MA = 1 #均线5,20,60
+    FLOW = 1 #大资金流向
+    VOL = 2  #成交量显示
+    LMR = 3  #成交量比
     def __init__(self):
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
@@ -127,6 +131,8 @@ class StockPlot:
         self._forcus = False
         self._kbi = None
         self._kei = None
+        self._kmode = StockPlot.MA
+        self._vmode = StockPlot.FLOW
     def clear(self):
         self._code = None
         self._k = None
@@ -154,7 +160,7 @@ class StockPlot:
             if period!=5:
                 k,d = stock.mergeK(k,d,int(period/5))
         
-        if off==0 and stock.isTransDay() and stock.isTransTime():
+        if off==0 and stock.isTransDay():
             _,k,d = xueqiu.appendK(code,period,k,d)
         if off==0:
             return c,k,d
@@ -173,25 +179,45 @@ class StockPlot:
         ei = k.shape[0]
         
         x = np.arange(len(k[bi:ei]))
+        xticks = []
+        D = d[bi:ei]
+        for i in range(len(D)-1):
+            if type(period)==int:
+                if (D[i][0].day!=D[i+1][0].day):
+                    t = D[i][0]
+                    xticks.append((i,'%2d-%2d'%(t.month,t.day)))        
+            else:
+                if D[i][0].weekday()==0:
+                    t = D[i][0]
+                    xticks.append((i,'%2d-%2d'%(t.month,t.day)))                   
         self._kplot.setx(x)
-        #self._kplot.setTicks(xticks)
-        self._kplot.plot(k[bi:ei,1:],color=Themos.PRICE_COLOR,style=frame.Plot.K)
+        self._kplot.setTicks(xticks)
+        K = k[bi:ei,1:]
+        self._kplot.plot(K,color=Themos.PRICE_COLOR,style=frame.Plot.K)
         self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=2,linestyle=(4,2,0))
         self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=4,linestyle=(4,2,0))
         self._vplot.setx(x)
-        #self._vplot.setTicks(xticks)
+        self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
-        self._vplot.plot(k[bi:ei,0],color=Themos.TING_COLOR,style=frame.Plot.BAR)
+        color = [Themos.RED_COLOR if K[i,0]<K[i,3] else Themos.GREEN_COLOR for i in range(K.shape[0])]
+        self._vplot.plot(k[bi:ei,0],color=color,style=frame.Plot.BAR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._kplot.setTitle(label)
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
-        self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)    
-        return kei   
-    def update(self,code,label,k,d,ma5b=None): #更新线图
+        self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
+        return kei
+    def viewMode(self,km=None,vm=None):
+        if km is not None:
+            self._kmode = km
+        if vm is not None:
+            self._vmode = vm
+    def update(self,code,label,ok,od,ma5b=None): #更新线图
         self.clear()
         self._code = code
         self._mm = []
+        k = ok[-255*3:]
+        d = od[-255*3:]
         self._k = k
         self._d = d
         j = len(d)-1
@@ -201,7 +227,8 @@ class StockPlot:
                 for bi in range(i,len(d)):#排除盘前
                     if d[bi].minute>29:
                         break
-                self._mm.append((np.argmin(self._k[bi:j,1])+bi,np.argmax(self._k[bi:j,1])+bi))
+                if bi<j:
+                    self._mm.append((np.argmin(self._k[bi:j,1])+bi,np.argmax(self._k[bi:j,1])+bi))
                 j = i
         x = np.arange(len(d))
         xticks = []
@@ -216,11 +243,26 @@ class StockPlot:
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
-        self._vplot.plot(k[:,3]+k[:,4],color=Themos.MAIN_COLOR)
-        self._vplot.plot(k[:,3],color=Themos.HUGE_COLOR)
-        self._vplot.plot(k[:,4],color=Themos.LARG_COLOR)
-        self._vplot.plot(k[:,5],color=Themos.MID_COLOR)
-        self._vplot.plot(k[:,6],color=Themos.TING_COLOR)
+        if self._vmode==StockPlot.FLOW:
+            self._vplot.plot(k[:,3]+k[:,4],color=Themos.MAIN_COLOR)
+            self._vplot.plot(k[:,3],color=Themos.HUGE_COLOR)
+            self._vplot.plot(k[:,4],color=Themos.LARG_COLOR)
+            self._vplot.plot(k[:,5],color=Themos.MID_COLOR)
+            self._vplot.plot(k[:,6],color=Themos.TING_COLOR)
+        elif self._vmode==StockPlot.VOL:
+            vol = np.zeros((k.shape[0],))
+            vol[1:] = k[1:,2]-k[:-1,2]
+            vol[vol<0] = 0
+            self._vplot.plot(vol,color=Themos.PRICE_COLOR,style=frame.Plot.BAR)
+        elif self._vmode==StockPlot.LMR: #量比
+            yv = np.zeros((k.shape[0],))
+            ov = ok[:-255,2]
+            if ov.shape[0]>yv.shape[0]:
+                yv = ov[yv.shape[0]:]
+            else:
+                yv[-ov.shape[0]:] = ov
+            self._vplot.plot(yv,color=Themos.MID_COLOR)
+            self._vplot.plot(k[:,2],color=Themos.AXISCOLOR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._kplot.setTitle(label)
@@ -349,6 +391,9 @@ class HotPlotApp(frame.app):
     ENTER 切换选择的个股到K图, Ctrl+ENTER 全部切换到K图
     F5 涨幅排序 F6 净量排序 F7 流入排序 F8 量比排序 F1帮助
     """
+    RT = 0
+    BULLWAY = 1
+    RT933 = 2
     ZEROCOLOR = (0.9,0.9,0.9)
     REDCOLOR = (1,0,0)
     GREENCOLOR = (0,1,0)    
@@ -378,14 +423,18 @@ class HotPlotApp(frame.app):
         self._knum = 200 #屏幕上放置k线的数量
         self._kei = 0
         self._period = 15
+        self._volmode = StockPlot.FLOW
+        self._kmode = HotPlotApp.RT
+        self._K = None
+        self._D = None      
         self.setClearColor(Themos.BGCOLOR)
         self.updatedata()
         self._lastt = datetime.today()
     def onLoop(self,t,dt):
         tt = datetime.today()
-        if tt.minute!=self._lastt.minute:
+        if tt.minute!=self._lastt.minute or (tt.hour==9 and tt.minute>=30 and tt.second%5==0): #每分钟更新一次
             self._lastt = tt
-            self.setWindowTitle('%d月%d日 %02d:%02d'%(tt.month,tt.day,tt.hour,tt.minute))
+            self.setWindowTitle('%d月%d日 %02d:%02d:%02d'%(tt.month,tt.day,tt.hour,tt.minute,tt.second))
             if stock.isTransDay(tt) and stock.isTransTime(tt):
                 self.updatedata()
                 self.update()
@@ -467,6 +516,7 @@ class HotPlotApp(frame.app):
                     title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
                     self._kei = self._SPV[i].updateK(it[0][1],title,self._period,self._knum,self._kei)
                 else:
+                    self._SPV[i].viewMode(vm=self._volmode)
                     self._SPV[i].update(it[0][1],it[0][2],it[2],it[3],ma5b=self.getma5b(it[4],it[5]))
     def keyDown(self,event):
         mod = event.key.keysym.mod
@@ -568,7 +618,27 @@ class HotPlotApp(frame.app):
             self._knum -= 10
             if self._knum<60:
                 self._knum=60
+        elif sym==sdl2.SDLK_KP_9:
+            p = {5:0,15:1,30:2,60:3,'d':4}
+            pp = [5,15,30,60,'d']
+            i = p[self._period]+1
+            self._period = pp[i] if i<=4 else pp[0]
+        elif sym==sdl2.SDLK_KP_8:
+            if self._volmode==StockPlot.FLOW:
+                self._volmode = StockPlot.VOL
+            elif self._volmode==StockPlot.VOL:
+                self._volmode = StockPlot.LMR
+            else:
+                self._volmode = StockPlot.FLOW
+        elif sym==sdl2.SDLK_KP_7:
+            if self._kmode==HotPlotApp.RT:#切换实时图和15分钟通道图和早盘实时图
+                self._kmode=HotPlotApp.RT933
+            elif self._kmode==HotPlotApp.RT933:
+                self._kmode=HotPlotApp.BULLWAY
+            else:
+                self._kmode=HotPlotApp.RT
         elif sym in HotPlotApp.MAP2NUM:
+            oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
                 self._current = HotPlotApp.MAP2NUM[sym]
             elif self._numsub[0]==4 and self._numsub[1]==2:
@@ -580,14 +650,16 @@ class HotPlotApp(frame.app):
                 if self._current>1:
                     self._current-=1
             self._kei = 0
+            if oldcurrent==self._current:
+                self._current = None
         elif sym==sdl2.SDLK_ESCAPE:
             self._filter = ''
             self._numsub = self._oldnumsub
             self._pagen = self._oldpagen
             self._current = None
         elif sym==sdl2.SDLK_RETURN:
-            self._filter = ''
-            self._current = None 
+            if self._numsub[0]==1:
+                self._current = 0 if self._current is None else None
         elif sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z or sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9:
             if self._filter=='':
                 self._oldpagen = self._pagen
@@ -605,9 +677,9 @@ class HotPlotApp(frame.app):
         """
         t = datetime.today()
         k,d = monitor.get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
-        bi = -255*3
-        k = k[:,bi:,:]
-        d = d[bi:]
+        #bi = -255*3
+        #k = k[:,bi:,:]
+        #d = d[bi:]
         k15,d15 = xueqiu.get_period_k(15)
         for i in range(k15.shape[0]): #处理价格为0的情况
             if k15[i,0]==0:
@@ -617,8 +689,8 @@ class HotPlotApp(frame.app):
                         break
                 continue
 
-        bolls = monitor.bolltrench()
-        return k,d,k15,d15,bolls
+        #bolls = monitor.bolltrench()
+        return k,d,k15,d15,[] #bolls
     def getma5b(self,K15,D15,n=3):
         #f返回一个plotfs2 的ma5b需要的参数，用于绘制5日均线 n = 3起点位置在3天前
         if n==0:
@@ -644,7 +716,7 @@ class HotPlotApp(frame.app):
                 R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
-        return TOPS #[:top]        
+        return TOPS #[:top]            
     def mapCode2DataSource(self,codes,top=18):
         """
         将代码列表映射为数据源
