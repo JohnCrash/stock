@@ -593,7 +593,9 @@ class HotPlotApp(frame.app):
         elif self._order==4: #昨日
             tops = self.mapCode2DataSource(self.getYesterdayTop(1))
         elif self._order==5: #前天
-            tops = self.mapCode2DataSource(self.getYesterdayTop(2))                 
+            tops = self.mapCode2DataSource(self.getYesterdayTop(2))  
+        elif self._order==6: #最近活跃               
+            tops = self.mapCode2DataSource(self.activeTop())  
         R = []
         TOPS = []
         F = self._filter.upper()
@@ -635,6 +637,7 @@ class HotPlotApp(frame.app):
                         self._SPV[i].viewMode(vm=self._volmode)
                         K,D = it[2],it[3]
                         isem933 = False
+                        title = "%s %s"%(it[0][2],it[0][1])
                         if self._em933:
                             b,k933,d933 = self.getem33flow(it[0][1])
                             if b:
@@ -649,9 +652,9 @@ class HotPlotApp(frame.app):
                                     if len(rtk)<=60: #太短
                                         rtk = None
                                     break
-                            self._SPV[i].update(it[0][1],it[0][2],K,D,isem933=True,ma60b=rtk)
+                            self._SPV[i].update(it[0][1],title,K,D,isem933=True,ma60b=rtk)
                         else:
-                            self._SPV[i].update(it[0][1],it[0][2],K,D,ma5b=self.getma5b(it[4],it[5]))
+                            self._SPV[i].update(it[0][1],title,K,D,ma5b=self.getma5b(it[4],it[5]))
                     elif self._kmode==HotPlotApp.BULLWAY:
                         if self._period==15:
                             k = it[4]
@@ -739,6 +742,12 @@ class HotPlotApp(frame.app):
             self._current = None
             self._prefix=('1','0')
             self.setWindowTitle('个股')            
+        elif sym==sdl2.SDLK_F10: #活跃的
+            if self._order==1:
+                self._numsub = self._oldnumsub              
+            self._order = 6
+            self._current = None
+            self.setWindowTitle('最近活跃')
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_1: #单个窗口
             self._numsub = (1,1)
             self._current = None
@@ -804,6 +813,10 @@ class HotPlotApp(frame.app):
                 self._kmode=HotPlotApp.BULLWAY
             else:
                 self._kmode=HotPlotApp.RT
+        elif sym==sdl2.SDLK_KP_0:
+            pass
+        elif sym==sdl2.SDLK_KP_PERIOD:
+            pass
         elif sym in HotPlotApp.MAP2NUM:
             oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
@@ -815,10 +828,28 @@ class HotPlotApp(frame.app):
             elif self._numsub[0]==2 and self._numsub[1]==2:
                 self._current = HotPlotApp.MAP2NUM[sym]
                 if self._current>1:
-                    self._current-=1
-            self._kei = 0
-            if oldcurrent==self._current:
+                    self._current-=1            
+            if mod&sdl2.KMOD_CTRL and self._order!=2:#增加持有
+                code = self._SPV[self._current]._code
+                stock.holdStock(code,True)
                 self._current = None
+            if mod&sdl2.KMOD_CTRL and self._order==2:#删除持有
+                code = self._SPV[self._current]._code
+                stock.holdStock(code,False)
+                self._current = None
+            if mod&sdl2.KMOD_ALT and self._order!=3:#增加关注
+                code = self._SPV[self._current]._code
+                name = HotPlotApp.code2com[code][2]
+                stock.execute("insert into notebook (date,code,name,context,note) values ('%s','%s','%s','%s','%s')"%(stock.dateString(date.today()),code,name,'HotPlotApp',''))
+                self._current = None
+            if mod&sdl2.KMOD_ALT and self._order==3:#删除关注
+                code = self._SPV[self._current]._code
+                stock.execute("delete from notebook where date='%s' and code='%s'"%(stock.dateString(date.today()),code))
+                self._current = None
+            else:
+                self._kei = 0
+                if oldcurrent==self._current:
+                    self._current = None
         elif sym==sdl2.SDLK_ESCAPE:
             self._filter = ''
             self._numsub = self._oldnumsub
@@ -874,7 +905,7 @@ class HotPlotApp(frame.app):
         for code in codes:
             i = HotPlotApp.code2i[code]
             R.append((companys[i],k[i,-1,1],k[i],d,K[i],D,bolls))
-        return R[:top]
+        return R#[:top]
     def activeTop(self,top=18):
         """
         最近比较活跃的
@@ -882,7 +913,7 @@ class HotPlotApp(frame.app):
         tb = {'90':(5,3),"91":(20,4),"2":(5,3),"0":(10,3),"1":(10,3)}
         it = tb[self._prefix[0]]
         TOPS = monitor.get10Top(self._prefix[0],it[0],it[1],reverse=not self._reverse)
-        return self.mapCode2DataSource(TOPS)    
+        return TOPS
     def getYesterdayTop(self,n=1,top=18):
         """
         返回昨日涨幅榜
