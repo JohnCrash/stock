@@ -818,13 +818,15 @@ def get_rt(n=1):
     if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
         b,a,ts,rtlist = xueqiu.getEmflowRT9355()
         if b:
-            emrt9355 = (b,a,ts,rtlist)
             code2i = xueqiu.get_company_code2i()
+            emcode2i = {}
             for j in range(len(rtlist)):
                 c = rtlist[j][2]
                 i = code2i[c]
                 if i<K.shape[0]:
                     K[i,-1,:] = a[j,-1,:]
+                emcode2i[c] = j
+            emrt9355 = (a,ts,emcode2i)
     """
     价格等于0的问题
     """

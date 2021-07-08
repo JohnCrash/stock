@@ -218,7 +218,7 @@ class StockPlot:
             self._kmode = km
         if vm is not None:
             self._vmode = vm
-    def update(self,code,label,ok,od,ma5b=None): #更新线图
+    def update(self,code,label,ok,od,ma5b=None,ma60b=None,isem933=False): #更新线图
         self._upmode = StockPlot.RTK
         self.clear()
         self._code = code
@@ -228,25 +228,44 @@ class StockPlot:
         self._k = k
         self._d = d
         j = len(d)-1
-        for i in range(len(d)-1,1,-1):
-            if d[i].day!=d[i-1].day:
-                bi = i
-                for bi in range(i,len(d)):#排除盘前
-                    if d[bi].minute>29:
-                        break
-                if bi<j:
-                    self._mm.append((np.argmin(self._k[bi:j,1])+bi,np.argmax(self._k[bi:j,1])+bi))
-                j = i
+        if isem933:
+            self._mm.append((np.argmin(self._k[:,1]),np.argmax(self._k[:,1])))
+        else:
+            for i in range(len(d)-1,1,-1):
+                if d[i].day!=d[i-1].day:
+                    bi = i
+                    for bi in range(i,len(d)):#排除盘前
+                        if d[bi].minute>29:
+                            break
+                    if bi<j:
+                        self._mm.append((np.argmin(self._k[bi:j,1])+bi,np.argmax(self._k[bi:j,1])+bi))
+                    j = i
         x = np.arange(len(d))
         xticks = []
-        for i in range(len(d)):
-            if (d[i].hour==9 and d[i].minute==30) or (d[i].hour==13 and d[i].minute==0):
-                t = d[i]
-                xticks.append((i,'%2d %02d:%02d'%(t.day,t.hour,t.minute)))
+        if isem933:
+            for i in range(len(d)):
+                if d[i].minute%5==0:
+                    t = d[i]
+                    if len(xticks)==0 or i-xticks[-1][0]>12:
+                        xticks.append((i,'%02d:%02d'%(t.hour,t.minute)))
+        else:
+            for i in range(len(d)):
+                if (d[i].hour==9 and d[i].minute==30) or (d[i].hour==13 and d[i].minute==0):
+                    t = d[i]
+                    xticks.append((i,'%2d %02d:%02d'%(t.day,t.hour,t.minute)))
         self._kplot.setx(x)
         self._kplot.setTicks(xticks)
         self._kplot.plot(k[:,0],color=Themos.PRICE_COLOR)
-        self._kplot.plot(stock.ma(k[:,0],60),color=Themos.MA60_COLOR,linestyle=(4,2,0))
+        if ma60b is None:
+            self._kplot.plot(stock.ma(k[:,0],60),color=Themos.MA60_COLOR,linestyle=(4,2,0))
+        else:
+            ma60 = np.zeros((len(d),)) #5秒数据更加精确的60均线
+            ma60[0] = ma60b[-1]
+            N = 240*5
+            M = 12
+            for i in range(1,len(k)):
+                ma60[i] = ma60[i-1]+(k[i,0]-ma60b[int(i/M)-60])/(N) #这是一个近似迭代
+            self._kplot.plot(ma60,color=Themos.MA60_COLOR,linestyle=(4,2,0))
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
@@ -363,12 +382,12 @@ class StockPlot:
                 miny = self._kplot.yAxis2wy(self._k[it[0],0])
                 canvas.fontFace('sans')
                 canvas.fontSize(14)
-                if lasti-it[0]>5:
+                if lasti-it[0]>10:
                     canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
                     r = self._k[it[0],1]
                     canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
                     canvas.text(minx,miny+5,"%.02f%%"%r)
-                if lasti-it[1]>5:
+                if lasti-it[1]>10:
                     canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_BOTTOM)
                     r = self._k[it[1],1]
                     canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
@@ -379,7 +398,6 @@ class StockPlot:
             yy = self._kplot.yAxis2wy(self._k[lasti,0])
             canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
             canvas.text(xx,yy-5,"%.02f%%"%r)
-
         
 class StockOrder:
     """
@@ -477,6 +495,7 @@ class HotPlotApp(frame.app):
         self._flowin = False #净流入
         self._hasboll = False #有通道
         self._reverse = False #排序
+        self._em933 = False 
         self._pagen = 0 #页面
         self._topn = 64
         self._order = 0
@@ -501,7 +520,7 @@ class HotPlotApp(frame.app):
             if self._Data is None or (b and t!=self._lut):
                 self._lut = t
                 print("update %s"%t)
-                k,d,e = monitor.get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
+                k,d,e = xueqiu.get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
                 k15,d15 = xueqiu.get_period_k(15)
                 for i in range(k15.shape[0]): #处理价格为0的情况
                     if k15[i,0]==0:
@@ -607,7 +626,23 @@ class HotPlotApp(frame.app):
                 else:
                     if self._kmode==HotPlotApp.RT:
                         self._SPV[i].viewMode(vm=self._volmode)
-                        self._SPV[i].update(it[0][1],it[0][2],it[2],it[3],ma5b=self.getma5b(it[4],it[5]))
+                        K,D = it[2],it[3]
+                        isem933 = False
+                        if self._em933:
+                            b,k933,d933 = self.getem33flow(it[0][1])
+                            if b:
+                                isem933 = True
+                                K,D = k933,d933
+                        if isem933:
+                            rtk = it[2][:,0]
+                            rtd = it[3]
+                            for s in range(len(rtd)-1,1,-1):
+                                if rtd[s].hour==9 and rtd[s].minute<=30:
+                                    rtk = rtk[:s]
+                                    break
+                            self._SPV[i].update(it[0][1],it[0][2],K,D,isem933=True,ma60b=rtk)
+                        else:
+                            self._SPV[i].update(it[0][1],it[0][2],K,D,ma5b=self.getma5b(it[4],it[5]))
                     elif self._kmode==HotPlotApp.BULLWAY:
                         if self._period==15:
                             k = it[4]
@@ -622,6 +657,14 @@ class HotPlotApp(frame.app):
                                 d = []
                         title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
                         self._SPV[i].updateBollWay(it[0][1],title,k,d,self._period)
+    def getem33flow(self,code):
+        k,d,K,D,bolls,em = self.getCurrentRT()
+        if em is not None:
+            a,ts,emcode2i = em
+            if code in emcode2i:
+                i = emcode2i[code]
+                return True,a[i,:],ts
+        return False,None,None
     def keyDown(self,event):
         mod = event.key.keysym.mod
         sym = event.key.keysym.sym
@@ -727,6 +770,8 @@ class HotPlotApp(frame.app):
             pp = [5,15,30,60,'d']
             i = p[self._period]+1
             self._period = pp[i] if i<=4 else pp[0]
+        elif sym==sdl2.SDLK_KP_DIVIDE:
+            self._em933 = not self._em933
         elif sym==sdl2.SDLK_KP_8:
             if self._volmode==StockPlot.FLOW:
                 self._volmode = StockPlot.VOL
@@ -863,7 +908,7 @@ class MyPlotApp(frame.app):
         #x = np.arange(100)
         #y = np.sin(x*4*np.pi/200)
         #y2 = np.cos(x*4*np.pi/200)
-        k,d = monitor.get_rt(4)
+        k,d = xueqiu.get_rt(4)
         companys = xueqiu.get_company_select()
         #y = x#np.sin(x)
         for i in range(len(companys)):

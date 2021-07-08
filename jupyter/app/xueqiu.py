@@ -2677,3 +2677,93 @@ def emgllist(code):
             break
 
     return False,R
+
+"""
+返回最近的实时数据
+"""
+def get_last_rt(t):
+    b,k,d = getTodayRT(t)
+    t2 = t
+    if not b:
+        for i in range(1,7):
+            t2 = t-timedelta(days=i)
+            b,k,d = getTodayRT(t2)
+            if b:
+                break
+    return t2,k,d
+
+_rt_k = None
+_rt_d = None
+_emrt9355 = None
+def get_rt(n=1):
+    """
+    取的最近n天的k,d数据，并且叠加快速更新数据
+    """
+    global _rt_k,_rt_d,_emrt9355
+    t = datetime.today()
+    K = None
+    D = []
+    if _rt_k is None:
+        for i in range(n):
+            pt,k,d = get_last_rt(t)
+            if d is not None:
+                if K is None:
+                    K = k
+                else:
+                    if k.shape[0]==K.shape[0]:
+                        K = np.hstack((k,K))
+                    else:
+                        k2 = np.zeros((K.shape[0],k.shape[1],k.shape[2]))
+                        k2[:k.shape[0],:,:] = k
+                        K = np.hstack((k2,K))
+                D = d+D
+                t = pt-timedelta(days=1)
+            else:
+                break
+    elif stock.isTransDay() and stock.isTransTime() and t.minute!=_rt_d[-1].minute: #重新加装今天的数据
+        pt,k,d = get_last_rt(t)
+        for i in range(len(d)):
+            if d[i]>_rt_d[-1]:
+                break
+        D = _rt_d+d[i:]
+        if k.shape[0]>_rt_k.shape[0]:
+            news = np.zeros((k.shape[0],_rt_k.shape[1],_rt_k.shape[2]))
+            news[:_rt_k.shape[0]] = _rt_k
+            _rt_k = news
+        K = np.hstack((_rt_k,k[:,i:,:]))
+    else:
+        #完全不需要更新
+        K = _rt_k
+        D = _rt_d
+    if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
+        b,a,ts,rtlist = getEmflowRT9355()
+        if b:
+            code2i = get_company_code2i()
+            emcode2i = {}
+            for j in range(len(rtlist)):
+                c = rtlist[j][2]
+                i = code2i[c]
+                if i<K.shape[0]:
+                    K[i,-1,:] = a[j,-1,:]
+                emcode2i[c] = j
+            _emrt9355 = (a,ts,emcode2i)
+    elif _emrt9355 is None:
+        b,a,ts,rtlist = getEmflowRT9355()
+        if b:
+            emcode2i = {}
+            for j in range(len(rtlist)):
+                c = rtlist[j][2]
+                emcode2i[c] = j
+            _emrt9355 = (a,ts,emcode2i)        
+    """
+    价格等于0的问题
+    """
+    for i in range(K.shape[0]):
+        if K[i,0,0]==0:
+            for j in range(K.shape[1]):
+                if K[i,j,0]!=0:
+                    K[i,0:j,0] = K[i,j,0]
+                    break
+    _rt_k = K
+    _rt_d = D
+    return K,D,_emrt9355
