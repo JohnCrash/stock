@@ -403,6 +403,8 @@ def update_period_sequence(clear=False):
         if clear:
             xueqiu.clear_period_sequence(p)
         xueqiu.rebuild_period_sequence(p)
+
+#update_period_sequence(True)        
 #xueqiu.clear_period_sequence(15)
 #xueqiu.rebuild_period_sequence(15)
 

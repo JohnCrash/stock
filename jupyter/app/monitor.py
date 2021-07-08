@@ -813,10 +813,12 @@ def get_rt(n=1):
     else:
         #完全不需要更新
         K = _rt_k
-        D = _rt_d        
+        D = _rt_d
+    emrt9355 = None
     if K is not None and stock.isTransTime() and stock.isTransDay() and t.hour==9 and t.minute>=30: #一般数据更新周期1分钟，这里对最后的数据做即时更新
         b,a,ts,rtlist = xueqiu.getEmflowRT9355()
         if b:
+            emrt9355 = (b,a,ts,rtlist)
             code2i = xueqiu.get_company_code2i()
             for j in range(len(rtlist)):
                 c = rtlist[j][2]
@@ -834,7 +836,7 @@ def get_rt(n=1):
                     break
     _rt_k = K
     _rt_d = D
-    return K,D
+    return K,D,emrt9355
 """
 通道突破监控
 """
@@ -2534,7 +2536,7 @@ class HotPlot(Frame):
         返回当前数据
         """
         t = datetime.today()
-        k,d = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
+        k,d,_ = get_rt(4) #取得最近3天的1分钟数据(0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting)
         bi = -255*3
         k = k[:,bi:,:]
         d = d[bi:]
