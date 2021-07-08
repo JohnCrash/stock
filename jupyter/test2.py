@@ -1,3 +1,4 @@
+from numpy.core.numeric import NaN
 from app.nanovg import frame,vg
 from app import monitor,xueqiu,stock,shared
 from pypinyin import pinyin, Style
@@ -632,13 +633,15 @@ class HotPlotApp(frame.app):
                             b,k933,d933 = self.getem33flow(it[0][1])
                             if b:
                                 isem933 = True
-                                K,D = k933,d933
+                                K,D = self.em933(k933,d933)
                         if isem933:
                             rtk = it[2][:,0]
                             rtd = it[3]
                             for s in range(len(rtd)-1,1,-1):
                                 if rtd[s].hour==9 and rtd[s].minute<=30:
                                     rtk = rtk[:s]
+                                    if len(rtk)<=60: #太短
+                                        rtk = None
                                     break
                             self._SPV[i].update(it[0][1],it[0][2],K,D,isem933=True,ma60b=rtk)
                         else:
@@ -657,6 +660,17 @@ class HotPlotApp(frame.app):
                                 d = []
                         title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
                         self._SPV[i].updateBollWay(it[0][1],title,k,d,self._period)
+    def em933(self,K,D): #补全，使得长度固定为30分钟
+        d = []
+        for i in range(len(D)):
+            d.append(D[i])
+        while d[-1].hour==9:
+            d.append(d[-1]+timedelta(seconds=5))
+        k = np.empty((len(d),K.shape[1]))
+        k[:K.shape[0],:] = K[:,:]
+        if len(d)>len(D):
+            k[K.shape[0]:,:] = NaN #NaN Plot将不显示
+        return k,d
     def getem33flow(self,code):
         k,d,K,D,bolls,em = self.getCurrentRT()
         if em is not None:
