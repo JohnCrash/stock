@@ -230,7 +230,10 @@ class StockPlot:
         self._d = d
         j = len(d)-1
         if isem933:
-            self._mm.append((np.argmin(self._k[:,1]),np.argmax(self._k[:,1])))
+            kk = self._k[:,1]
+            kk = kk[kk==kk]
+            if len(kk)>0:
+                self._mm.append((np.argmin(kk),np.argmax(kk)))
         else:
             for i in range(len(d)-1,1,-1):
                 if d[i].day!=d[i-1].day:
@@ -394,11 +397,14 @@ class StockPlot:
                     canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
                     canvas.text(maxx,maxy-5,"%.02f%%"%r)
             canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_BOTTOM)
-            r = self._k[lasti,1]
-            xx = self._kplot.xAxis2wx(lasti)
-            yy = self._kplot.yAxis2wy(self._k[lasti,0])
-            canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
-            canvas.text(xx,yy-5,"%.02f%%"%r)
+            for i in range(lasti,0,-1): #em933最后数据有可能是NaN，向前搜索直到找到正确的值
+                r = self._k[i,1]
+                if r==r:
+                    xx = self._kplot.xAxis2wx(i)
+                    yy = self._kplot.yAxis2wy(self._k[i,0])
+                    canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
+                    canvas.text(xx,yy-5,"%.02f%%"%r)
+                    break
         
 class StockOrder:
     """
