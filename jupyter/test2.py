@@ -1,6 +1,7 @@
 from numpy.core.numeric import NaN
+from sdl2.keycode import SDLK_LCTRL
 from app.nanovg import frame,vg
-from app import monitor,xueqiu,stock,shared
+from app import monitor,xueqiu,stock,shared,mylog
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
@@ -507,6 +508,8 @@ class HotPlotApp(frame.app):
         self._topn = 64
         self._order = 0
         self._current = None
+        self._help = False
+        self._helpimg = None
         self._filter = ''
         self._knum = 200 #屏幕上放置k线的数量
         self._kei = 0
@@ -548,28 +551,44 @@ class HotPlotApp(frame.app):
             self.setWindowTitle('%d月%d日 %02d:%02d:%02d'%(tt.month,tt.day,tt.hour,tt.minute,tt.second)) 
         if self._needUpdate: #每分钟更新一次
             self._needUpdate = False
-            print("onLoop Update %s"%tt)
             self.updatedata()
             self.update()
     def render(self,dt,w,h):
-        self._canvas.beginFrame(w,h,1)
-        self._SO.render(self._canvas,0,0,Themos.ORDER_WIDTH,h)
-        col = self._numsub[0]
-        raw = self._numsub[1]
-        dw = (w-Themos.ORDER_WIDTH-10)/col
-        dh = (h-Themos.XLABELHEIGHT)/raw
-        scale = scale=w/(720*self._numsub[0])
-        if scale<1:
-            scale=1
-        if scale>2:
-            scale=2
-        for xi in range(col):
-            for yi in range(raw):
-                self._SPV[yi*col+xi].render(self._canvas,xi*dw+Themos.ORDER_WIDTH,yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
+        try:
+            self._canvas.beginFrame(w,h,1)
+            self._SO.render(self._canvas,0,0,Themos.ORDER_WIDTH,h)
+            col = self._numsub[0]
+            raw = self._numsub[1]
+            dw = (w-Themos.ORDER_WIDTH-10)/col
+            dh = (h-Themos.XLABELHEIGHT)/raw
+            scale = scale=w/(720*self._numsub[0])
+            if scale<1:
+                scale=1
+            if scale>2:
+                scale=2
+            for xi in range(col):
+                for yi in range(raw):
+                    self._SPV[yi*col+xi].render(self._canvas,xi*dw+Themos.ORDER_WIDTH,yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
 
-        #graph.update(dt)
-        #graph.render(self._canvas,5,5)
-        self._canvas.endFrame()
+            #graph.update(dt)
+            #graph.render(self._canvas,5,5)
+            if self._help:
+                if self._helpimg is None:
+                    _path = '/'.join(str.split(__file__,'\\')[:-1])
+                    self._helpimg = self._canvas.createImage('%s/images/hothelp.png'%_path,0)
+                with self._canvas as canvas:
+                    imgw,imgh = canvas.imageSize(self._helpimg)
+                    paint = canvas.imagePattern(0,0,imgw,imgh,0,self._helpimg,1)
+                    canvas.beginPath()
+                    canvas.rect(0,0,w,h)
+                    canvas.fillPaint(paint)
+                    canvas.fill()
+            elif self._helpimg is not None:
+                self._canvas.deleteImage(self._helpimg)
+                self._helpimg = None
+            self._canvas.endFrame()
+        except Exception as e:
+            mylog.printe(e)
     def getGrowColor(self,r): #根据涨幅返回颜色tuple
         r = r/3
         if r>1:
@@ -582,6 +601,11 @@ class HotPlotApp(frame.app):
             return f2color255(intercolor(HotPlotApp.ZEROCOLOR,HotPlotApp.GREENCOLOR,-r))
 
     def updatedata(self):
+        try:
+            self.updatedata_imp()
+        except Exception as e:
+            mylog.printe(e)
+    def updatedata_imp(self):
         if self._order==0:
             tops = self.riseTop(self._topn)
         elif self._order==1: #大盘
@@ -692,12 +716,15 @@ class HotPlotApp(frame.app):
         mod = event.key.keysym.mod
         sym = event.key.keysym.sym
         if sym==sdl2.SDLK_F1: #ETF
-            if self._order==1:
-                self._numsub = self._oldnumsub
-            self._order = 0
-            self._current = None
-            self._prefix=('2',)
-            self.setWindowTitle('ETF')
+            if mod&sdl2.KMOD_CTRL: #ctrl+F1帮助
+                self._help = True
+            else:
+                if self._order==1:
+                    self._numsub = self._oldnumsub
+                self._order = 0
+                self._current = None
+                self._prefix=('2',)
+                self.setWindowTitle('ETF')
         elif sym==sdl2.SDLK_F2: #概念
             if self._order==1:
                 self._numsub = self._oldnumsub
@@ -855,6 +882,10 @@ class HotPlotApp(frame.app):
             self._numsub = self._oldnumsub
             self._pagen = self._oldpagen
             self._current = None
+            self._help = False
+        elif sym==sdl2.SDLK_BACKSPACE:
+            if len(self._filter)>0:
+                self._filter = self._filter[:-1]
         elif sym==sdl2.SDLK_RETURN:
             if self._numsub[0]==1:
                 self._current = 0 if self._current is None else None

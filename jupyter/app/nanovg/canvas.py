@@ -10,6 +10,10 @@ class Canvas2d:
         self._ctx = vg.nvgCreateGLES(p)
         if not self._ctx:
             raise RuntimeError('nvgCreateGLES')
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
     def beginFrame(self,windowWidth:float, windowHeight:float, devicePixelRatio:float = 1):
         """
         Begin drawing a new frame
@@ -184,8 +188,8 @@ class Canvas2d:
         w = c_int()
         h = c_int()
         vg.nvgImageSize(self._ctx, image, byref(w), byref(h))
-        return w,h
-    def nvgDeleteImage(self, image:int):
+        return w.value,h.value
+    def deleteImage(self, image:int):
         """
         Deletes created image.
         """

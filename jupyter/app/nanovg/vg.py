@@ -82,7 +82,10 @@ class NVGpaint(Structure):
         ('xform',(c_float*6)),
         ('extent',(c_float*2)),
         ('radius',c_float),
-        ('feather',c_float)
+        ('feather',c_float),
+        ('innerColor',NVGcolor),
+        ('outerColor',NVGcolor),
+        ('image',c_int)
     ]
 
 NVG_CCW = 1

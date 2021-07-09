@@ -123,13 +123,14 @@ class app:
         data = {}
         data['images'] = []
         path = 'D:/source/SDL/build/win32'
+        """
         for i in range(12):
             file = "%s/example/images/image%d.jpg"%(path,i+1)
             data['images'].append(self._canvas.createImage(file, 0))
             if data['images'][-1]==0:
                 print("Could not load %s."%file)
                 return -1
-        
+        """
         data['fontIcons'] = self._canvas.createFont("icons", "%s/example/entypo.ttf"%path)
         if data['fontIcons'] == -1:
             print("Could not add font icons.\n")
