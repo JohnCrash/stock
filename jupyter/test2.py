@@ -580,7 +580,8 @@ class HotPlotApp(frame.app):
                     imgw,imgh = canvas.imageSize(self._helpimg)
                     paint = canvas.imagePattern(0,0,imgw,imgh,0,self._helpimg,1)
                     canvas.beginPath()
-                    canvas.rect(0,0,w,h)
+                    canvas.scale(w/imgw,h/imgh)
+                    canvas.rect(0,0,imgw,imgh)
                     canvas.fillPaint(paint)
                     canvas.fill()
             elif self._helpimg is not None:
@@ -622,16 +623,21 @@ class HotPlotApp(frame.app):
             tops = self.mapCode2DataSource(self.activeTop())  
         R = []
         TOPS = []
-        F = self._filter.upper()
-        for it in tops:
-            if len(F)>0:
+        if len(self._filter)==0:
+            for it in tops:
+                R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
+                TOPS.append(it)            
+        else:
+            F = self._filter.upper()
+            i = F.find(' ')
+            if i>0:
+                F = F[:i]
+            for it in tops:
                 pyh = pinyinhead(it[0][2])
-                if F in pyh:
+                j = pyh.find(F)
+                if (i<0 and j==0) or (i>0 and j>0):
                     R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
                     TOPS.append(it)
-            else:        
-                R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
-                TOPS.append(it)
         NS = self._numsub
         PageNum = NS[0]*NS[1]
         if self._pagen*PageNum>=len(TOPS):
@@ -889,7 +895,7 @@ class HotPlotApp(frame.app):
         elif sym==sdl2.SDLK_RETURN:
             if self._numsub[0]==1:
                 self._current = 0 if self._current is None else None
-        elif sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z or sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9:
+        elif (sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z) or (sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9) or sym==sdl2.SDLK_SPACE:
             if self._filter=='':
                 self._oldpagen = self._pagen
                 self._oldnumsub = self._numsub
