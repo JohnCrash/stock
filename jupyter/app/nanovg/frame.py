@@ -14,14 +14,14 @@ class app:
     定义一个基本的VG窗口类
     初始化字体
     """    
-    def __init__(self,title,w,h):
+    def __init__(self,title,w,h,style=sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE):
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError('SDL_Init')
 
         self._window = sdl2.SDL_CreateWindow(title.encode('utf-8'),
                                     sdl2.SDL_WINDOWPOS_UNDEFINED,
                                     sdl2.SDL_WINDOWPOS_UNDEFINED, w, h,
-                                    sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE)
+                                    style)
         if not self._window:
             raise RuntimeError('SDL_CreateWindow')
         self._context = sdl2.SDL_GL_CreateContext(self._window)
