@@ -13,8 +13,12 @@ class app:
     """
     定义一个基本的VG窗口类
     初始化字体
-    """    
-    def __init__(self,title,w,h,style=sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE):
+    """
+    FCCOLOR = vg.nvgRGB(200,200,200)
+    ICONBG = vg.nvgRGB(64,64,64)
+    ICONCOLOR = vg.nvgRGB(196,196,196)
+    CAPTION_HEIGHT = 32
+    def __init__(self,title,w,h,style=sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_BORDERLESS):#sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE):
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError('SDL_Init')
 
@@ -38,11 +42,25 @@ class app:
         self.loadDemoData()
         self._w = w
         self._h = h
+        self._mouseini = -1
+        self._windowns = True
+        self._windowstyle = style
+        self._windowtitle = ''
+        self._delayupdate = False
+        self._windowx,self._windowy = 0,0
+        self._windoww,self._windowh = w,h
+        self.fullScreen()
     def setWindowTitle(self,title):
-        sdl2.SDL_SetWindowTitle(self._window,title.encode('utf-8'))
+        if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
+            self._windowtitle = title
+            self.delayUpdate()
+        else:
+            self._windowtitle = title
+            sdl2.SDL_SetWindowTitle(self._window,title.encode('utf-8'))
+    def delayUpdate(self):
+        self._delayupdate = True
     def quit(self):
         self._running = False
-
     def keyDown(self,event):
         pass
     def keyUp(self,event):
@@ -54,7 +72,6 @@ class app:
             self.update()
         elif event.window.event==sdl2.SDL_WINDOWEVENT_SHOWN:
             self.update()
-
     def run(self):
         event = sdl2.SDL_Event()
         prevt = 0
@@ -70,13 +87,20 @@ class app:
                     elif event.type == sdl2.SDL_KEYUP:
                         self.keyUp(event)
                     elif event.type==sdl2.SDL_WINDOWEVENT:
-                        self.onWindowEvent(event)
+                        self.onWindowEvent(event)                        
+                    elif event.type==sdl2.SDL_MOUSEMOTION:
+                        self.onMouseMotion(event)
+                    elif event.type==sdl2.SDL_MOUSEBUTTONDOWN:
+                        self.onMouseDown(event)
+                    elif event.type==sdl2.SDL_MOUSEBUTTONUP:
+                        self.onMouseUp(event)
 
             t = SDL_GetTicks()/1000.
             dt = t-prevt
             prevt = t
-            if self._interval>0 and acc>self._interval:
+            if (self._interval>0 and acc>self._interval) or self._delayupdate:
                 acc = 0
+                self._delayupdate = False
                 self.update(dt)
             self.onLoop(t,dt)
             acc+=dt
@@ -97,56 +121,142 @@ class app:
 
     def setClearColor(self,c):#rgba 0-1
         self._clearColor = c
-    def render(self,dt,w,h):
+    def render(self,x,y,w,h):
         pass
     def onLoop(self,t,dt):
         """
         主循环事件
         """
         pass
+    def onMouseMotion(self,event):
+        if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
+            mx=event.motion.x
+            my=event.motion.y
+            old = self._mouseini
+            self._mouseini = -1
+            if my<app.CAPTION_HEIGHT:
+                w = self._w
+                h = app.CAPTION_HEIGHT
+                for i in range(3):
+                    xx = w-(3-i)*h
+                    if mx<xx+h and mx>xx:
+                        self._mouseini = i
+                        break
+            if old!=self._mouseini:
+                self.delayUpdate()
+    def onMouseDown(self,event):
+        pass
+    def fullScreen(self):
+        m = sdl2.SDL_DisplayMode()
+        sdl2.SDL_GetDesktopDisplayMode(0,ctypes.byref(m))
+        self._windowx,self._windowy = c_int(),c_int()
+        sdl2.SDL_GetWindowPosition(self._window,ctypes.byref(self._windowx),ctypes.byref(self._windowy))
+        sdl2.SDL_SetWindowPosition(self._window,0,0)
+        self._windoww,self._windowh = c_int(),c_int()
+        sdl2.SDL_GetWindowSize(self._window, ctypes.byref(self._windoww), ctypes.byref(self._windowh))
+        sdl2.SDL_SetWindowSize(self._window,m.w,m.h-1) #如果不减去1 窗口切换更新会发生闪烁
+    def restoreWindow(self):
+        sdl2.SDL_SetWindowPosition(self._window,self._windowx.value,self._windowy.value)
+        sdl2.SDL_SetWindowSize(self._window,self._windoww.value,self._windowh.value)
+    def onMouseUp(self,event):
+        if event.button.button==sdl2.SDL_BUTTON_LEFT and self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
+            mx=event.button.x
+            my=event.button.y
+            if my<app.CAPTION_HEIGHT:
+                w = self._w
+                h = app.CAPTION_HEIGHT
+                for i in range(3):
+                    xx = w-(3-i)*h
+                    if mx<xx+h and mx>xx:
+                        if i==0: #最新化
+                            sdl2.SDL_MinimizeWindow(self._window)
+                        elif i==1: #最大化
+                            if self._windowns:
+                                #sdl2.SDL_MaximizeWindow(self._window)
+                                self.fullScreen()
+                            else:
+                                self.restoreWindow()
+                            self._windowns = not self._windowns
+                        elif i==2: #关闭
+                            self.quit()
+                        break        
+    def drawIcon(self,x,y,w,h,id,b):
+        x+=b
+        y+=b
+        w-=2*b
+        h-=2*b
+        with self._canvas as c:
+            c.beginPath()
+            c.strokeWidth(2)
+            c.strokeColor(app.ICONCOLOR)
+            if id==0: #最小化
+                c.moveTo(x,y+h*2/3)
+                c.lineTo(x+w,y+h*2/3)
+            elif id==1: #最大化
+                c.rect(x,y,w,h)
+            elif id==2: #关闭
+                c.moveTo(x,y)
+                c.lineTo(x+w,y+h)
+                c.moveTo(x+w,y)
+                c.lineTo(x,y+h)
+            c.stroke()
+    def renderCaption(self,x,y,w,h):
+        for i in range(3):
+            xx = w-(3-i)*h
+            if self._mouseini==i: #绘制选中背景
+                with self._canvas as c:
+                    c.beginPath()
+                    c.fillColor(app.ICONBG)
+                    c.rect(xx,y,h,h)
+                    c.fill()
+            self.drawIcon(xx,y,h,h,i,10)
+        with self._canvas as c: #绘制标题
+            c.fontFace('zh')
+            c.fontSize(16)
+            c.fillColor(app.FCCOLOR)
+            c.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
+            c.text(w/2,h/2,self._windowtitle)
     def update(self,dt=0):
         w,h = c_int(),c_int()
         video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
-        self._w = w.value
-        self._h = h.value
+        self._w = w.value            
         fbWidth,fbHeight = w.value,h.value
         GL.glViewport(0, 0, fbWidth, fbHeight)
         c = self._clearColor
         GL.glClearColor(c[0],c[1],c[2],c[3])
         GL.glClear(GL.GL_COLOR_BUFFER_BIT|GL.GL_STENCIL_BUFFER_BIT)# | GL.GL_DEPTH_BUFFER_BIT
-        
-        self.render(dt,fbWidth,fbHeight)
-        
+        self._canvas.beginFrame(w.value,h.value,1)
+        if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
+            self._h = h.value-app.CAPTION_HEIGHT
+            self.renderCaption(0,0,w.value,app.CAPTION_HEIGHT)
+            self.render(0,app.CAPTION_HEIGHT,self._w,self._h)
+        else:
+            self._h = h.value
+            self.render(0,0,self._w,self._h)
+        self._canvas.endFrame()
         sdl2.SDL_GL_SwapWindow(self._window)
 
     def loadDemoData(self):
         data = {}
         data['images'] = []
-        path = 'D:/source/SDL/build/win32'
-        """
-        for i in range(12):
-            file = "%s/example/images/image%d.jpg"%(path,i+1)
-            data['images'].append(self._canvas.createImage(file, 0))
-            if data['images'][-1]==0:
-                print("Could not load %s."%file)
-                return -1
-        """
-        data['fontIcons'] = self._canvas.createFont("icons", "%s/example/entypo.ttf"%path)
+        path = '/'.join(str.split(__file__,'\\')[:-1])
+
+        data['fontIcons'] = self._canvas.createFont("icons", "%s/static/entypo.ttf"%path)
         if data['fontIcons'] == -1:
             print("Could not add font icons.\n")
             return -1
 
-        data['fontNormal'] = self._canvas.createFont("sans", "%s/example/Roboto-Regular.ttf"%path)
+        data['fontNormal'] = self._canvas.createFont("sans", "%s/static/Roboto-Regular.ttf"%path)
         if data['fontNormal'] == -1:
             print("Could not add font italic.\n")
             return -1
 
-        data['fontBold'] = self._canvas.createFont("sans-bold", "%s/example/Roboto-Bold.ttf"%path)
+        data['fontBold'] = self._canvas.createFont("sans-bold", "%s/static/Roboto-Bold.ttf"%path)
         if data['fontBold'] == -1:
             print("Could not add font bold.\n")
             return -1
 
-        data['fontEmoji'] = self._canvas.createFont("emoji", "%s/example/NotoEmoji-Regular.ttf"%path)
+        data['fontEmoji'] = self._canvas.createFont("emoji", "%s/static/NotoEmoji-Regular.ttf"%path)
         if data['fontEmoji'] == -1:
             print("Could not add font emoji.\n")
             return -1
@@ -219,7 +329,7 @@ def pone(a,f=math.ceil):
     if lg>0:
         n = math.pow(10,lg-int(lg))
         e = int(lg)
-    else:
+    elif lg<0:
         n = math.pow(10,lg-int(lg)+1)
         e = int(lg)-1
     return f(n)*math.pow(10,e),e

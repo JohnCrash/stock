@@ -1,3 +1,4 @@
+from numpy.core.numeric import NaN
 from .nanovg import frame,vg
 from . import monitor,xueqiu,stock,shared,mylog
 from pypinyin import pinyin, Style
@@ -9,6 +10,7 @@ import sdl2
 from OpenGL import GL
 import ctypes
 
+log = mylog.init('nvgplot.log',name='nvgplot')
 def pinyinhead(s):
     r = ''
     for z in s:
@@ -200,8 +202,8 @@ class StockPlot:
         self._kplot.setTicks(xticks)
         K = k[bi:ei,1:]
         self._kplot.plot(K,color=Themos.PRICE_COLOR,style=frame.Plot.K)
-        self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=2,linestyle=(4,2,0))
-        self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=4,linestyle=(4,2,0))
+        self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=1,linestyle=(4,2,0))
+        self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=2,linestyle=(4,2,0))
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
@@ -429,6 +431,7 @@ class StockOrder:
         for i in range(len(self._ls)):
             it = self._ls[i]
             if yy-y<h:
+                """
                 canvas.beginPath()
                 canvas.fillColor(Themos.ORDER_BGCOLOR)
                 canvas.rect(x,yy,Themos.ORDER_WIDTH,Themos.ORDER_ITEM_HEIGHT)
@@ -441,15 +444,17 @@ class StockOrder:
                 canvas.fillColor(Themos.ORDER_SELCOLOR if i>=self._pagei*self._pagen and i<(self._pagei+1)*self._pagen else Themos.ORDER_HEADCOLOR)
                 canvas.rect(x,yy,25,Themos.ORDER_ITEM_HEIGHT)
                 canvas.fill() #绘制序号背景
+                """
+                #canvas.fillColor(Themos.ORDER_TEXTCOLOR)
+                #canvas.text(x+5,yy+Themos.ORDER_ITEM_HEIGHT/2,str(i+1))
                 canvas.fillColor(Themos.ORDER_TEXTCOLOR)
-                canvas.text(x+5,yy+Themos.ORDER_ITEM_HEIGHT/2,str(i+1))
-                canvas.fillColor(Themos.ORDER_TEXTCOLOR)
-                canvas.text(x+78,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
+                canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
+                
                 #绘制涨跌幅
                 it[2]
                 canvas.fillColor(Themos.RED_COLOR if it[2]>0 else Themos.GREEN_COLOR)
                 if self._it2==StockOrder.IT2P:
-                    canvas.text(x+30,yy+Themos.ORDER_ITEM_HEIGHT/2,"%.02f%%"%it[2])
+                    canvas.text(x+8,yy+Themos.ORDER_ITEM_HEIGHT/2,"%.02f%%"%it[2])
                 elif self._it2==StockOrder.IT2E9:
                     v = abs(it[2])
                     if v>1e9:
@@ -460,10 +465,20 @@ class StockOrder:
                         s = "%d万"%int(it[2]/1e4)
                     else:
                         s = "%d"%int(it[2])
-                    canvas.text(x+30,yy+Themos.ORDER_ITEM_HEIGHT/2,s)
+                    canvas.text(x+8,yy+Themos.ORDER_ITEM_HEIGHT/2,s)
             else:
                 break
             yy+=Themos.ORDER_ITEM_HEIGHT
+        #绘制选择区域
+        canvas.beginPath()
+        canvas.strokeColor(Themos.ORDER_SELCOLOR)
+        canvas.strokeWidth(4)
+        xx = x+1
+        yy = y+self._pagei*self._pagen*Themos.ORDER_ITEM_HEIGHT
+        canvas.moveTo(xx,yy)
+        canvas.lineTo(xx,yy+self._pagen*Themos.ORDER_ITEM_HEIGHT)
+        #canvas.rect(x+1,y+self._pagei*self._pagen*Themos.ORDER_ITEM_HEIGHT,Themos.ORDER_WIDTH,self._pagen*Themos.ORDER_ITEM_HEIGHT)
+        canvas.stroke()
 class DateLabel:
     """
     显示一个日期包括时间
@@ -491,7 +506,8 @@ class HotPlotApp(frame.app):
     热键:
     Ctrl+F1 帮助
     F1 ETF F2 概念 F3 行业 F4 大盘 F5 持有 F6 关注 F7 昨日排行 F8 前天排行 F9 个股 F10 活跃
-    NumPad 0 排行切换 日涨幅排行，主力流入排行，1分钟流入排行 (仅适用于 ETF,概念,行业,个股)
+    NumPad 0 排行切换 日涨幅排行
+    NumPad . 主力流入排行，1分钟流入排行 (仅适用于 ETF,概念,行业,个股)
     Ctrl+1,4,6,8股同屏  PageDown PageUp翻页 Home首页 End尾页 ,INSERT 反转排序
     NumPad 1,2,3,4,5,6 当天屏幕上的网格位置对应的股票切换到K线图模式
     Ctrl+(NumPad 1,2,3,4,5,6) 如果不在持有模式就是添加个股到持有，如果在持有模式就是删除
@@ -502,7 +518,6 @@ class HotPlotApp(frame.app):
     NumPad 7 看通道简图
     NumPad 9 切换时序 5,15,30,60,'d'
     NumPad 8 流入，成交量，量比，切换
-    NumPad . 重置
     Left,Right 平移K线图表
     Up,Down 缩放K线图表
     """
@@ -548,6 +563,7 @@ class HotPlotApp(frame.app):
         self._K = None
         self._D = None   
         self._Data = None   
+        self._messagebox = None
         self.setClearColor(Themos.BGCOLOR)
         self._ltt = datetime.today()
         self._lut = self._ltt
@@ -586,10 +602,9 @@ class HotPlotApp(frame.app):
         tt = datetime.today()
         title = "%s %s %d月%d日 %02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,self._filter.upper())
         self.setWindowTitle(title)
-    def render(self,dt,w,h):
+    def render(self,x,y,w,h):
         try:
-            self._canvas.beginFrame(w,h,1)
-            self._SO.render(self._canvas,0,0,Themos.ORDER_WIDTH,h)
+            self._SO.render(self._canvas,x,y,Themos.ORDER_WIDTH,h)
             col = self._numsub[0]
             raw = self._numsub[1]
             dw = (w-Themos.ORDER_WIDTH-10)/col
@@ -597,32 +612,52 @@ class HotPlotApp(frame.app):
             scale = scale=w/(720*self._numsub[0])
             if scale<1:
                 scale=1
-            if scale>2:
-                scale=2
+            if scale>1.6:
+                scale=1.6
             for xi in range(col):
                 for yi in range(raw):
-                    self._SPV[yi*col+xi].render(self._canvas,xi*dw+Themos.ORDER_WIDTH,yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
-
+                    self._SPV[yi*col+xi].render(self._canvas,x+xi*dw+Themos.ORDER_WIDTH,y+yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
             #graph.update(dt)
             #graph.render(self._canvas,5,5)
             if self._help:
                 if self._helpimg is None:
                     _path = '/'.join(str.split(__file__,'\\')[:-1])
-                    self._helpimg = self._canvas.createImage('%s/images/hothelp.png'%_path,0)
+                    self._helpimg = self._canvas.createImage('%s/../images/hothelp.png'%_path,0)
                 with self._canvas as canvas:
                     imgw,imgh = canvas.imageSize(self._helpimg)
                     paint = canvas.imagePattern(0,0,imgw,imgh,0,self._helpimg,1)
                     canvas.beginPath()
                     canvas.scale(w/imgw,h/imgh)
-                    canvas.rect(0,0,imgw,imgh)
+                    canvas.rect(x,y,imgw,imgh)
                     canvas.fillPaint(paint)
                     canvas.fill()
             elif self._helpimg is not None:
                 self._canvas.deleteImage(self._helpimg)
                 self._helpimg = None
-            self._canvas.endFrame()
+            if self._messagebox is not None: #绘制消息
+                with self._canvas as canvas:
+                    canvas.beginPath()
+                    canvas.fillColor(Themos.BG_COLOR)
+                    canvas.fontFace('zh')
+                    canvas.fontSize(16)
+                    canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
+                    prc = ctypes.pointer(ctypes.c_float(4))
+                    canvas.textBounds(w/2,h/2,self._messagebox,prc)
+                    canvas.rect(prc[0]-5,prc[1]-5,prc[2]-prc[0]+10,prc[3]-prc[1]+10)
+                    canvas.fill()
+                    canvas.beginPath()
+                    canvas.strokeWidth(1)
+                    canvas.strokeColor(Themos.TEXTCOLOR)
+                    canvas.rect(prc[0]-5,prc[1]-5,prc[2]-prc[0]+10,prc[3]-prc[1]+10)
+                    canvas.stroke()
+                    canvas.fillColor(Themos.TEXTCOLOR)
+                    canvas.text(w/2,h/2,self._messagebox)
         except Exception as e:
             mylog.printe(e)
+            log.error("render "+str(e))
+    def messagebox(self,msg):
+        self._messagebox = msg
+        #self.delayUpdate()
     def getGrowColor(self,r): #根据涨幅返回颜色tuple
         r = r/3
         if r>1:
@@ -639,6 +674,7 @@ class HotPlotApp(frame.app):
             self.updatedata_imp()
         except Exception as e:
             mylog.printe(e)
+            log.error("updatedata "+str(e))
     def updatedata_imp(self):
         self.updateTitle()
         if (self._class>=0 and self._class<3) or self._class==8:
@@ -659,7 +695,7 @@ class HotPlotApp(frame.app):
         TOPS = []
         if len(self._filter)==0:
             for it in tops:
-                R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
+                R.append((it[0][1],it[0][2],it[1],None))
                 TOPS.append(it)            
         else:
             F = self._filter.upper()
@@ -670,7 +706,7 @@ class HotPlotApp(frame.app):
                 pyh = pinyinhead(it[0][2])
                 j = pyh.find(F)
                 if (i<0 and j==0) or (i>0 and j>0):
-                    R.append((it[0][1],it[0][2],it[1],self.getGrowColor(it[1])))
+                    R.append((it[0][1],it[0][2],it[1],None))
                     TOPS.append(it)
         NS = self._numsub
         PageNum = NS[0]*NS[1]
@@ -742,7 +778,7 @@ class HotPlotApp(frame.app):
         k = np.empty((len(d),K.shape[1]))
         k[:K.shape[0],:] = K[:,:]
         if len(d)>len(D):
-            k[K.shape[0]:,:] = math.NaN #NaN Plot将不显示
+            k[K.shape[0]:,:] = NaN#NaN Plot将不显示
         return k,d
     def getem33flow(self,code):
         k,d,K,D,bolls,em = self.getCurrentRT()
@@ -755,6 +791,7 @@ class HotPlotApp(frame.app):
     def keyDown(self,event):
         mod = event.key.keysym.mod
         sym = event.key.keysym.sym
+        self._messagebox = None
         if sym==sdl2.SDLK_F1: #ETF
             if mod&sdl2.KMOD_CTRL: #ctrl+F1帮助
                 self._help = True
@@ -872,11 +909,14 @@ class HotPlotApp(frame.app):
                 self._kmode=HotPlotApp.RT
         elif sym==sdl2.SDLK_KP_0:
             self._order+=1
-            if self._order>3:
+            if self._order>1:
                 self._order = 0
         elif sym==sdl2.SDLK_KP_PERIOD:
-            self._current = None
-            self._order = 0
+            self._order+=1
+            if self._order<2:
+                self._order = 2
+            elif self._order>3:
+                self._order = 2
         elif sym in HotPlotApp.MAP2NUM:
             oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
@@ -889,12 +929,16 @@ class HotPlotApp(frame.app):
                 self._current = HotPlotApp.MAP2NUM[sym]
                 if self._current>1:
                     self._current-=1            
-            if mod&sdl2.KMOD_CTRL and self._class!=2:#增加持有
+            if mod&sdl2.KMOD_CTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code
+                name = HotPlotApp.code2com[code][2]
+                self.messagebox("增加持有:%s"%(name))
                 stock.holdStock(code,True)
                 self._current = None
-            if mod&sdl2.KMOD_CTRL and self._class==2:#删除持有
+            if mod&sdl2.KMOD_CTRL and self._class==4:#删除持有
                 code = self._SPV[self._current]._code
+                name = HotPlotApp.code2com[code][2]
+                self.messagebox("删除持有:%s"%(name))
                 stock.holdStock(code,False)
                 self._current = None
             if mod&sdl2.KMOD_ALT and self._class!=3:#增加关注
@@ -902,8 +946,11 @@ class HotPlotApp(frame.app):
                 name = HotPlotApp.code2com[code][2]
                 stock.execute("insert into notebook (date,code,name,context,note) values ('%s','%s','%s','%s','%s')"%(stock.dateString(date.today()),code,name,'HotPlotApp',''))
                 self._current = None
+                self.messagebox("增加关注:%s"%(name))
             if mod&sdl2.KMOD_ALT and self._class==3:#删除关注
                 code = self._SPV[self._current]._code
+                name = HotPlotApp.code2com[code][2]
+                self.messagebox("删除关注:%s"%(name))
                 stock.execute("delete from notebook where date='%s' and code='%s'"%(stock.dateString(date.today()),code))
                 self._current = None
             else:
@@ -931,6 +978,8 @@ class HotPlotApp(frame.app):
             self._pagen = 0
             self._filter+=chr(sym)
             self.setWindowTitle(self._filter)
+        else:
+            return
         self.updatedata()
         self.update()
     def getma5b(self,K15,D15,n=3):
