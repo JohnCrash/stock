@@ -457,10 +457,10 @@ class StockOrder:
                     canvas.text(x+8,yy+Themos.ORDER_ITEM_HEIGHT/2,"%.02f%%"%it[2])
                 elif self._it2==StockOrder.IT2E9:
                     v = abs(it[2])
-                    if v>1e9:
-                        s = "%.01f亿"%(it[2]/1e9)
-                    elif v>1e8:
-                        s = "%.01f千万"%(it[2]/1e8)
+                    if v>1e8:
+                        s = "%.01f亿"%(it[2]/1e8)
+                    elif v>1e7:
+                        s = "%.01f千万"%(it[2]/1e7)
                     elif v>1e4:
                         s = "%d万"%int(it[2]/1e4)
                     else:

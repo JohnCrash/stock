@@ -15,4 +15,4 @@ def init(filename,name='mylog'):
 def printe(e=None):
     exc_type, exc_value, exc_traceback = sys.exc_info()
     traceback.print_exception(exc_type, exc_value, exc_traceback,
-                              limit=3, file=sys.stdout)
+                              limit=5, file=sys.stdout)
