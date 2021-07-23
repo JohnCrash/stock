@@ -588,6 +588,13 @@ class HotPlotApp(frame.app):
                 self._Data = (k,d,k15,d15,[],e)
             sdl2.SDL_Delay(100)
     def getCurrentRT(self):
+        """
+        k,d,k15,d15,_,e = self._Data
+        for i in range(len(d)-1,0,-1):
+            if d[i].hour==9 and d[i].minute==31:
+                break
+        return (k[:,:i,:],d[:i],k15,d15,_,e)
+        """
         return self._Data
     def onLoop(self,t,dt):
         tt = datetime.today()
