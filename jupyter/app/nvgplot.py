@@ -1,9 +1,9 @@
-from numpy.core.numeric import NaN
 from .nanovg import frame,vg
 from . import monitor,xueqiu,stock,shared,mylog
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
+from numpy.core.numeric import NaN
 import threading
 import math
 import sdl2
@@ -532,7 +532,7 @@ class HotPlotApp(frame.app):
     MAP2NUM = {
         sdl2.SDLK_KP_4:0,sdl2.SDLK_KP_5:1,sdl2.SDLK_KP_6:2,sdl2.SDLK_KP_1:3,sdl2.SDLK_KP_2:4,sdl2.SDLK_KP_3:5
     }
-    CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃']
+    CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃','ETF热点','概念热点','行业热点']
     ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速']
     def __init__(self,title,w,h):
         super(HotPlotApp,self).__init__(title,w,h)
@@ -697,7 +697,13 @@ class HotPlotApp(frame.app):
         elif self._class==7: #前天
             tops = self.mapCode2DataSource(self.getYesterdayTop(2))  
         elif self._class==9: #最近活跃               
-            tops = self.mapCode2DataSource(self.activeTop())  
+            tops = self.mapCode2DataSource(self.activeTop())
+        elif self._class==10: #ETF热点
+            tops = self.mapCode2DataSource(stock.getHoldStocks(name='hot'))
+        elif self._class==11: #概念热点
+            tops = self.mapCode2DataSource(stock.getHoldStocks(name='gn_hot'))
+        elif self._class==12: #行业热点
+            tops = self.mapCode2DataSource(stock.getHoldStocks(name='hy_hot'))                    
         R = []
         TOPS = []
         if len(self._filter)==0:
@@ -801,25 +807,32 @@ class HotPlotApp(frame.app):
         self._messagebox = None
         if sym==sdl2.SDLK_F1: #ETF
             if mod&sdl2.KMOD_CTRL: #ctrl+F1帮助
-                self._help = True
+                #self._help = True
+                self._class = 10
             else:
                 if self._class==3:
                     self._numsub = self._oldnumsub
                 self._class = 0
-                self._current = None
                 self._prefix=('2',)
+            self._current = None
         elif sym==sdl2.SDLK_F2: #概念
-            if self._class==3:
-                self._numsub = self._oldnumsub
-            self._class = 1
+            if mod&sdl2.KMOD_CTRL:
+                self._class = 11 #概念热点
+            else:
+                if self._class==3:
+                    self._numsub = self._oldnumsub
+                self._class = 1
+                self._prefix=('91',)
             self._current = None
-            self._prefix=('91',)
         elif sym==sdl2.SDLK_F3: #行业
-            if self._class==3:
-                self._numsub = self._oldnumsub
-            self._class = 2
+            if mod&sdl2.KMOD_CTRL:
+                self._class = 12 #行业热点
+            else:
+                if self._class==3:
+                    self._numsub = self._oldnumsub
+                self._class = 2
+                self._prefix=('90',)
             self._current = None
-            self._prefix=('90',)
         elif sym==sdl2.SDLK_F4: #大盘
             self._class = 3
             self._current = None
@@ -936,25 +949,55 @@ class HotPlotApp(frame.app):
                 self._current = HotPlotApp.MAP2NUM[sym]
                 if self._current>1:
                     self._current-=1            
-            if mod&sdl2.KMOD_CTRL and self._class!=4:#增加持有
+            if mod&sdl2.KMOD_RCTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code
                 name = HotPlotApp.code2com[code][2]
                 self.messagebox("增加持有:%s"%(name))
                 stock.holdStock(code,True)
                 self._current = None
-            if mod&sdl2.KMOD_CTRL and self._class==4:#删除持有
+            if mod&sdl2.KMOD_RCTRL and self._class==4:#删除持有
                 code = self._SPV[self._current]._code
                 name = HotPlotApp.code2com[code][2]
                 self.messagebox("删除持有:%s"%(name))
                 stock.holdStock(code,False)
                 self._current = None
-            if mod&sdl2.KMOD_ALT and self._class!=3:#增加关注
+            while mod&sdl2.KMOD_LCTRL:#增加HOT
+                if self._class==0:
+                    kname = 'hot'
+                elif self._class==1:
+                    kname = 'gn_hot'
+                elif self._class==2:
+                    kname = 'hy_hot'
+                else:
+                    break
+                code = self._SPV[self._current]._code
+                name = HotPlotApp.code2com[code][2]
+                self.messagebox("增加HOT:%s"%(name))
+                stock.holdStock(code,True,name=kname)
+                self._current = None
+                break
+            while mod&sdl2.KMOD_LCTRL:#删除HOT
+                if self._class==10:
+                    kname = 'hot'
+                elif self._class==11:
+                    kname = 'gn_hot'
+                elif self._class==12:
+                    kname = 'hy_hot'
+                else:
+                    break
+                code = self._SPV[self._current]._code
+                name = HotPlotApp.code2com[code][2]
+                self.messagebox("删除HOT:%s"%(name))
+                stock.holdStock(code,False,name=kname)
+                self._current = None
+                break      
+            if mod&sdl2.KMOD_RSHIFT and self._class!=3:#增加关注
                 code = self._SPV[self._current]._code
                 name = HotPlotApp.code2com[code][2]
                 stock.execute("insert into notebook (date,code,name,context,note) values ('%s','%s','%s','%s','%s')"%(stock.dateString(date.today()),code,name,'HotPlotApp',''))
                 self._current = None
                 self.messagebox("增加关注:%s"%(name))
-            if mod&sdl2.KMOD_ALT and self._class==3:#删除关注
+            if mod&sdl2.KMOD_RSHIFT and self._class==3:#删除关注
                 code = self._SPV[self._current]._code
                 name = HotPlotApp.code2com[code][2]
                 self.messagebox("删除关注:%s"%(name))

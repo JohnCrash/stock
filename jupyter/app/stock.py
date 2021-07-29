@@ -1459,31 +1459,32 @@ def completion(k):
         if k[i]==0:
             k[i] = k[i+1]
 
-def isHoldStock(code):
+def isHoldStock(code,name='hold'):
     """
     判断是否持有该股票
     """
-    b,ls = shared.fromRedis('hold')
+    b,ls = shared.fromRedis(name)
     return b and code in ls
-def holdStock(code,b):
+def holdStock(code,b,name='hold'):
     """
     b True持有，b False不持有
     """
     try:
-        b1,ls = shared.fromRedis('hold')
+        b1,ls = shared.fromRedis(name)
         if b:
             if not b1:
                 ls = []
-            ls.append(code)
+            if code not in ls:
+                ls.append(code)
         else:
             if b1:
                 ls.remove(code)
-        shared.toRedis(ls,'hold')
+        shared.toRedis(ls,name)
     except:
         pass
-def getHoldStocks():
+def getHoldStocks(name='hold'):
     """
     返回持有的代码列表
     """
-    b,ls = shared.fromRedis('hold')
+    b,ls = shared.fromRedis(name)
     return ls if b else []
