@@ -1,4 +1,5 @@
-#from app import tool
+from app import tool
+"""
 import threading
 import time
 import sys
@@ -19,3 +20,4 @@ threading.Thread(target=loop1).start()
 threading.Thread(target=loop2).start()
 
 sys.exit(0)
+"""

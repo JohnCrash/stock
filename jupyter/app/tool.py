@@ -1187,3 +1187,4 @@ def K(code,period,pos):
 #monitor.monitor_bollup()
 
 #monitor.HotPlot().loop()
+xueqiu.emflowRT2()

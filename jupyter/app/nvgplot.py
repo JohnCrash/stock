@@ -464,7 +464,7 @@ class StockOrder:
                     elif v>1e4:
                         s = "%d万"%int(it[2]/1e4)
                     else:
-                        s = "%d"%int(it[2])
+                        s = "%s"%str(it[2])
                     canvas.text(x+8,yy+Themos.ORDER_ITEM_HEIGHT/2,s)
             else:
                 break
@@ -1086,7 +1086,7 @@ class HotPlotApp(frame.app):
         for code in codes:
             i = HotPlotApp.code2i[code]           
             R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls))
-        return R#[:top]
+        return sorted(R,key=lambda it:it[1],reverse=not self._reverse) #R#[:top]
     def activeTop(self,top=18):
         """
         最近比较活跃的

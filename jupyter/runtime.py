@@ -34,9 +34,9 @@ if __name__=='__main__':
     def launapp():
         if t.hour>=6 and t.hour==9 and t.weekday()<5 and t.weekday()>=0:
             print("启动软件并且进行多屏幕布局...")
-            subprocess.run(config.ths_app)
+            #subprocess.run(config.ths_app)
             #subprocess.run(config.tdx_app)
-            subprocess.run(config.chrome_app)
+            #subprocess.run(config.chrome_app)
 
     def risewarning():
         print("弹出式提示...")
