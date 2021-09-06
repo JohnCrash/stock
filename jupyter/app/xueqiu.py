@@ -2163,10 +2163,13 @@ def emflowRT2(alls=None,tsname=None,kname=None,ex=7*24*3600):
             codes.append(c[2])
         #每一个批量不要多于100个
         a = np.zeros((len(alls),1,7))
-        if R.shape[0]!=a.shape[0]:
-            T = np.zeros((a.shape[0],R.shape[1],R.shape[2]))
-            T[:R.shape[0],:,:] = R[:,:,:]
-            R = T
+        try:
+            if R.shape[0]!=a.shape[0]:
+                T = np.zeros((a.shape[0],R.shape[1],R.shape[2]))
+                T[:R.shape[0],:,:] = R[:,:,:]
+                R = T
+        except:
+            pass
         for i in range(0,len(codes),100):
             b,r = emdistribute2(codes[i:i+100],'f12,f13,f1,f2,f3,f5,f66,f72,f78,f84')
             if b:

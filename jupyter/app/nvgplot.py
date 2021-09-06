@@ -68,6 +68,9 @@ class ThemosDefault:
     ORDER_SELCOLOR = vg.nvgRGB(196,96,96)
     ORDER_TEXTBGCOLOR = vg.nvgRGBA(64,64,64,255)
     ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
+    ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(255,128,64)
+    ORDER_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,128,255)
+    ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,0,255)
 
     ORDER_WIDTH = 150       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
@@ -101,6 +104,9 @@ class ThemosBlack:
     ORDER_SELCOLOR = vg.nvgRGB(32,96,168)
     ORDER_TEXTBGCOLOR = vg.nvgRGBA(0,0,0,255)
     ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
+    ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(255,128,64) 
+    ORDER_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,128,255)
+    ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,0,255)
 
     ORDER_WIDTH = 150       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
@@ -413,21 +419,31 @@ class StockOrder:
     """
     IT2P = 0 #百分比
     IT2E9 = 1 #亿
-    def __init__(self):
+    def __init__(self,npt):
         self._ls = []
         self._pagei = 0
         self._pagen = 1
         self._it2 = StockOrder.IT2P
+        self._npt = npt
     def update(self,ls,pagei,pagen,it2):
         self._ls = ls
         self._pagei = pagei
         self._pagen = pagen
         self._it2 = it2
-    def render(self,canvas,x,y,w,h):
+    def render(self,canvas,x,y,w,h,_class):
         yy = y
         canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_MIDDLE)
         canvas.fontFace("zh")
         canvas.fontSize(Themos.ORDER_FONTSIZE)
+        if _class==0:
+            kn = 'hot'
+        elif _class==1:
+            kn = 'gn_hot'
+        elif _class==2:
+            kn = 'hy_hot'
+        else:
+            kn = ''
+        hotcodes = stock.getHoldStocks(kn)
         for i in range(len(self._ls)):
             it = self._ls[i]
             if yy-y<h:
@@ -447,7 +463,18 @@ class StockOrder:
                 """
                 #canvas.fillColor(Themos.ORDER_TEXTCOLOR)
                 #canvas.text(x+5,yy+Themos.ORDER_ITEM_HEIGHT/2,str(i+1))
-                canvas.fillColor(Themos.ORDER_TEXTCOLOR)
+                c = Themos.ORDER_TEXTCOLOR
+                if it[0] in hotcodes:
+                    c = Themos.ORDER_HOT_CODE_TEXTCOLOR
+                
+                if it[0] in self._npt.code2i:
+                    ii = self._npt.code2i[it[0]]
+                    ma20 = self._npt._MA20[ii]
+                    if ma20[-1]>=ma20[-2] and it[0] in hotcodes:
+                        c = Themos.ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR
+                    elif ma20[-1]>=ma20[-2]:
+                        c = Themos.ORDER_CODE_CAN_BUY_TEXTCOLOR
+                canvas.fillColor(c)
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
                 
                 #绘制涨跌幅
@@ -539,7 +566,7 @@ class HotPlotApp(frame.app):
         self._numsub = (3,2) #同屏数量 1 (1,1),4 (2,2),6 (3,2)
         self._oldnumsub = self._numsub
         self._oldpagen = 0
-        self._SO = StockOrder()
+        self._SO = StockOrder(self)
         self._SPV = [StockPlot() for i in range(10)]
         self.setInterval(0)
         self._prefix = ('2',) #选择分类
@@ -569,6 +596,9 @@ class HotPlotApp(frame.app):
         self._lut = self._ltt
         threading.Thread(target=self.update_data_loop).start()
         self._needUpdate = False
+        #一次性加载日线数据
+        self._K240,self._D240 = xueqiu.get_period_k(240)
+        self._MA20 = stock.maMatrix(self._K240,20)
     def update_data_loop(self):
         while self._running:
             b,t = shared.fromRedis('runtime_update')
@@ -611,7 +641,7 @@ class HotPlotApp(frame.app):
         self.setWindowTitle(title)
     def render(self,x,y,w,h):
         try:
-            self._SO.render(self._canvas,x,y,Themos.ORDER_WIDTH,h)
+            self._SO.render(self._canvas,x,y,Themos.ORDER_WIDTH,h,self._class)
             col = self._numsub[0]
             raw = self._numsub[1]
             dw = (w-Themos.ORDER_WIDTH-10)/col
