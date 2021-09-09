@@ -1187,4 +1187,17 @@ def K(code,period,pos):
 #monitor.monitor_bollup()
 
 #monitor.HotPlot().loop()
-xueqiu.emflowRT2()
+
+def get30codes(p,n,maN=30):
+    K,D = xueqiu.get_period_k(240)
+    c = xueqiu.get_company_select()
+    maB = stock.maMatrix(K,maN)
+    maL = stock.maMatrix(K,n)
+    R = []
+    for i in range(len(c)):
+        if maB[i,-1]>=maB[i,-2] and K[i,-1]<=maL[i,-1] and c[i][3]==p:
+            R.append(c[i])
+    return R
+
+print(get30codes('91',20))
+#xueqiu.emflowRT2()

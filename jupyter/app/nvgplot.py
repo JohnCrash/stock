@@ -45,6 +45,21 @@ def strong2color(s):
     i = int((1-(s+1)/2)*(len(rgb)-1))
 
     return rgb[i]
+"""
+返回30日均线向上，股价低于n日均线的分类或者个股
+p = '90' ,'91'
+"""
+def get30codes(p,n,maN=30):
+    K,D = xueqiu.get_period_k(240)
+    c = xueqiu.get_company_select()
+    maB = stock.maMatrix(K,maN)
+    maL = stock.maMatrix(K,n)
+    R = []
+    for i in range(len(c)):
+        if maB[i,-1]>=maB[i,-2] and K[i,-1]<=maL[i,-1] and c[i][3]==p:
+            R.append(c[i][1])
+    return R
+
 class ThemosDefault:
     BGCOLOR = (0.95,0.95,0.95,1) #图表背景颜色
 
@@ -54,6 +69,7 @@ class ThemosDefault:
     HUGE_COLOR = vg.nvgRGB(139,0,0)
     LARG_COLOR = vg.nvgRGB(255,0,0)
     MA5_COLOR = vg.nvgRGB(255,0,255)
+    MA30_COLOR = vg.nvgRGB(0,0,255)
     MID_COLOR = vg.nvgRGB(255,215,0)
     TING_COLOR = vg.nvgRGB(135,206,250)
     RED_COLOR = vg.nvgRGB(220,0,0)   #涨
@@ -90,6 +106,7 @@ class ThemosBlack:
     HUGE_COLOR = vg.nvgRGB(139,0,0)
     LARG_COLOR = vg.nvgRGB(255,128,0)
     MA5_COLOR = vg.nvgRGB(255,0,255)
+    MA30_COLOR = vg.nvgRGB(0,0,255)
     MID_COLOR = vg.nvgRGB(255,215,0)
     TING_COLOR = vg.nvgRGB(135,206,250)
     RED_COLOR = vg.nvgRGB(250,0,0)   #涨
@@ -104,7 +121,7 @@ class ThemosBlack:
     ORDER_SELCOLOR = vg.nvgRGB(32,96,168)
     ORDER_TEXTBGCOLOR = vg.nvgRGBA(0,0,0,255)
     ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
-    ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(255,128,64) 
+    ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(0,162,232) 
     ORDER_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,128,255)
     ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,0,255)
 
@@ -128,13 +145,16 @@ class StockPlot:
     FLOW = 1 #大资金流向
     VOL = 2  #成交量显示
     LMR = 3  #成交量比
-    RTK = 0  #更新RT
-    BOLLWAY = 1
+    RT = 0  #更新RT
+    K = 1 
+    BOLLWAY = 2
     def __init__(self):
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
+        self._fplot = frame.Plot()
         self._kplot.setThemos(Themos)
         self._vplot.setThemos(Themos)
+        self._fplot.setThemos(Themos)
         self._code = None
         self._k = None
         self._d = None
@@ -145,7 +165,7 @@ class StockPlot:
         self._bollway = None
         self._kmode = StockPlot.MA
         self._vmode = StockPlot.FLOW
-        self._upmode = StockPlot.RTK
+        self._upmode = StockPlot.RT
     def clear(self):
         self._code = None
         self._k = None
@@ -154,8 +174,33 @@ class StockPlot:
         self._kplot.setTitle('')
         self._kplot.clear()
         self._vplot.clear()
+        self._fplot.clear()
     def forcus(self,b):
         self._forcus = b
+    def getFlow(self,code,d,lastnday):
+        flowk,flowd = xueqiu.getFlow(code,lastnday)
+        flow = (flowk,flowd)
+        J = 0
+        k = np.zeros((len(d),4))
+        b = False
+        if type(d[0][0])==datetime:
+            b = True
+        for i in range(len(d)):
+            t = d[i][0]
+            if not b:
+                t = datetime(t.year,t.month,t.day,15,0,0)
+            for j in range(J,len(flow[1])):
+                t2 = flow[1][j][0]
+                if t<t2:
+                    k[i] = flow[0][j-1] if j-1>=0 else flow[0][j]
+                    break
+                elif t==t2:
+                    k[i] = flow[0][j]
+                    break
+            if j == len(flow[1])-1:
+                k[i] = flow[0][-1]
+            J = j
+        return k        
     def getKlineData(self,code,period,knum,off):
         KDN = len(StockPlot.KD)
         if period==5 or period=='d':
@@ -175,20 +220,32 @@ class StockPlot:
         
         if off==0 and stock.isTransDay():
             _,k,d = xueqiu.appendK(code,period,k,d)
-        if off==0:
-            return c,k,d
+        #叠加流入数据
+        if len(d)>0:
+            flow = self.getFlow(code,d,lastnday=KDN-bi)
+            if period!='d' and period!=60: #去掉一天中最后的数据，绘制的时候不然⑦链接
+                for i in range(1,len(d)):
+                    if d[i][0].day!=d[i-1][0].day:
+                        flow[i,:] = NaN
         else:
-            return c,k[:-off],d[:-off]
+            flow = None
+        if off==0:
+            return c,k,d,flow
+        else:
+            return c,k[:-off],d[:-off],flow
     def updateK(self,code,label,period,knum,kei): #更新K线图
         self._code = code
-        self._upmode = StockPlot.RTK
-        _,k,d = self.getKlineData(code,period,knum,kei)
-        if period!='d':
-            ma5 = stock.ma(k[:,4],80)
-            ma20 = stock.ma(k[:,4],320)
-        else:
+        self._upmode = StockPlot.K
+        _,k,d,flow = self.getKlineData(code,period,knum,kei)
+        if period=='d':
             ma5 = stock.ma(k[:,4],5)
             ma20 = stock.ma(k[:,4],20)
+            ma30 = stock.ma(k[:,4],30)
+        else:
+            s = int(15*80/period)
+            ma5 = stock.ma(k[:,4],s)
+            ma20 = stock.ma(k[:,4],4*s)
+            ma30 = stock.ma(k[:,4],6*s)
         bi = -knum
         ei = k.shape[0]
         
@@ -208,8 +265,17 @@ class StockPlot:
         self._kplot.setTicks(xticks)
         K = k[bi:ei,1:]
         self._kplot.plot(K,color=Themos.PRICE_COLOR,style=frame.Plot.K)
-        self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=1,linestyle=(4,2,0))
-        self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=2,linestyle=(4,2,0))
+        self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=1)
+        self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=2)
+        self._kplot.plot(ma30[bi:ei],label='ma30',color=Themos.MA30_COLOR,linewidth=3)
+        self._fplot.setx(x)
+        self._fplot.setTicks(xticks)        
+        if flow is not None:
+            self._fplot.plot(flow[bi:ei,0],label='larg',color=Themos.HUGE_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:ei,1],label='big',color=Themos.LARG_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:ei,2],label='mid',color=Themos.MID_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:ei,3],label='ting',color=Themos.TING_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:ei,0]+flow[bi:ei,1],label='main',color=Themos.MAIN_COLOR,linewidth=2)
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
@@ -217,9 +283,11 @@ class StockPlot:
         self._vplot.plot(k[bi:ei,0],color=color,style=frame.Plot.BAR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
+        self._fplot.setGrid(True,True)
         self._kplot.setTitle(label)
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
+        self._fplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         return kei
     def viewMode(self,km=None,vm=None):
         if km is not None:
@@ -227,7 +295,7 @@ class StockPlot:
         if vm is not None:
             self._vmode = vm
     def update(self,code,label,ok,od,ma5b=None,ma60b=None,isem933=False): #更新线图
-        self._upmode = StockPlot.RTK
+        self._upmode = StockPlot.RT
         self.clear()
         self._code = code
         self._mm = []
@@ -347,7 +415,7 @@ class StockPlot:
                 break
 
     def render(self,canvas,x,y,w,h,xaxis=False,scale=1):
-        if self._upmode==StockPlot.RTK:
+        if self._upmode==StockPlot.RT or self._upmode==StockPlot.K:
             self.renderRTK(canvas,x,y,w,h,xaxis=xaxis,scale=scale)
         elif self._upmode==StockPlot.BOLLWAY:
             self.renderBollWay(canvas,x,y,w,h,xaxis=xaxis,scale=scale)
@@ -382,8 +450,17 @@ class StockPlot:
             scale = 1
         self._kplot.setLineWidthScale(scale)
         self._vplot.setLineWidthScale(scale)
-        self._kplot.render(canvas,x,y,w,h*2/3)
-        self._vplot.render(canvas,x,y+h*2/3,w,h/3)
+        if self._upmode==StockPlot.RT:
+            self._kplot.render(canvas,x,y,w,h*2/3)
+            self._vplot.render(canvas,x,y+h*2/3,w,h/3)
+        else:
+            self._fplot.setAxisVisiable(xaxis,True)
+            self._fplot.setLineWidthScale(scale)
+            self._kplot.render(canvas,x,y,w,h*1/2)
+            self._vplot.render(canvas,x,y+h*1/2,w,h/4)
+            self._fplot.render(canvas,x,y+h*3/4,w,h/4)
+            
+
         if self._k is not None and self._k.shape[0]>0: #显示每天的高点和低点
             lasti = self._k.shape[0]-1
             for it in self._mm:
@@ -469,10 +546,10 @@ class StockOrder:
                 
                 if it[0] in self._npt.code2i:
                     ii = self._npt.code2i[it[0]]
-                    ma20 = self._npt._MA20[ii]
-                    if ma20[-1]>=ma20[-2] and it[0] in hotcodes:
+                    ma30 = self._npt._MA30[ii]
+                    if ma30[-1]>=ma30[-2] and it[0] in hotcodes:
                         c = Themos.ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR
-                    elif ma20[-1]>=ma20[-2]:
+                    elif ma30[-1]>=ma30[-2]:
                         c = Themos.ORDER_CODE_CAN_BUY_TEXTCOLOR
                 canvas.fillColor(c)
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
@@ -598,7 +675,7 @@ class HotPlotApp(frame.app):
         self._needUpdate = False
         #一次性加载日线数据
         self._K240,self._D240 = xueqiu.get_period_k(240)
-        self._MA20 = stock.maMatrix(self._K240,20)
+        self._MA30 = stock.maMatrix(self._K240,30)
     def update_data_loop(self):
         while self._running:
             b,t = shared.fromRedis('runtime_update')
