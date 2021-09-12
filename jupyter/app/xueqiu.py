@@ -2476,19 +2476,15 @@ def getTodayFlow(code):
 返回code的资金流数据
 如果没有发现code就使用sinaFlow数据
 """
-_getflowcache = {}
-def getFlow(code,lastday=None):
-    #这里对数据进行缓存避免多次操作数据库
-    global _getflowcache
-    if code not in _getflowcache:
-        after = stock.dateString(date.today()-timedelta(days=365 if lastday is None else lastday))
-        b,flowk,flowd = stock.loademFlow(code,after)
-        if not b:
-            flowk,flowd = stock.loadFlow(after)
-        _getflowcache[code] = [flowk,flowd]
-    
-    flowk,flowd = _getflowcache[code]
 
+def getFlow(code,lastday=None,after=None):
+    #这里对数据进行缓存避免多次操作数据库
+    if lastday is not None:
+        after = stock.dateString(date.today()-timedelta(days=365 if lastday is None else lastday))
+
+    b,flowk,flowd = stock.loademFlow(code,after)
+    if not b:
+        flowk,flowd = stock.loadFlow(after)   
     b,k,d = getTodayFlow(code)
     if b and d[-1][0]>flowd[-1][0]:#叠加
         endt = flowd[-1][0]
@@ -2499,7 +2495,6 @@ def getFlow(code,lastday=None):
                 flowd.append(d[i])
 
         flowk = np.vstack((flowk,nfk))
-        _getflowcache[code][0] = flowk
     return flowk,flowd
 
 """

@@ -4,7 +4,7 @@ from OpenGL import GL
 import sdl2
 import math
 import numpy as np
-from sdl2 import video,events
+from sdl2 import video,events,sdlmixer
 from sdl2.timer import SDL_GetTicks
 from . import vg
 from .canvas import Canvas2d
@@ -21,6 +21,9 @@ class app:
     def __init__(self,title,w,h,style=sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_BORDERLESS):#sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE):
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError('SDL_Init')
+        
+        sdlmixer.Mix_Init(sdlmixer.MIX_INIT_OGG)
+        sdlmixer.Mix_OpenAudio(22050,sdlmixer.MIX_DEFAULT_FORMAT,2,4096)
 
         self._window = sdl2.SDL_CreateWindow(title.encode('utf-8'),
                                     sdl2.SDL_WINDOWPOS_UNDEFINED,
@@ -50,6 +53,12 @@ class app:
         self._windowx,self._windowy = 0,0
         self._windoww,self._windowh = w,h
         self.fullScreen()
+    def loadWave(self,fn):
+        path = '/'.join(str.split(__file__,'\\')[:-1])
+        f = "%s/static/%s"%(path,fn)
+        return sdlmixer.Mix_LoadMUS(f.encode('utf-8'))
+    def playWave(self,wav):
+        sdlmixer.Mix_PlayMusic(wav,1)
     def setWindowTitle(self,title):
         if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
             self._windowtitle = title
@@ -107,6 +116,8 @@ class app:
             sdl2.SDL_Delay(10)
         sdl2.SDL_GL_DeleteContext(self._context)
         sdl2.SDL_DestroyWindow(self._window)
+        sdlmixer.Mix_CloseAudio()
+        sdlmixer.Mix_Quit()
         sdl2.SDL_Quit()
         
     def setInterval(self,r):

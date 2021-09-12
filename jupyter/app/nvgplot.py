@@ -1,5 +1,7 @@
+from ctypes import c_float
+from sdl2.keycode import SDLK_KP_LESS
 from .nanovg import frame,vg
-from . import monitor,xueqiu,stock,shared,mylog
+from . import monitor,xueqiu,stock,shared,mylog,trend
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
@@ -124,7 +126,8 @@ class ThemosBlack:
     ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(0,162,232) 
     ORDER_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,128,255)
     ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,0,255)
-
+    WARN_BUY_COLOR = vg.nvgRGB(64,0,0)
+    WARN_SELL_COLOR = vg.nvgRGB(0,64,0)
     ORDER_WIDTH = 150       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
     ORDER_FONTSIZE = 14
@@ -148,6 +151,8 @@ class StockPlot:
     RT = 0  #更新RT
     K = 1 
     BOLLWAY = 2
+    KVMODE = 0
+    c_float_p = ctypes.POINTER(ctypes.c_float)
     def __init__(self):
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
@@ -166,6 +171,7 @@ class StockPlot:
         self._kmode = StockPlot.MA
         self._vmode = StockPlot.FLOW
         self._upmode = StockPlot.RT
+        self._period = None
     def clear(self):
         self._code = None
         self._k = None
@@ -177,8 +183,8 @@ class StockPlot:
         self._fplot.clear()
     def forcus(self,b):
         self._forcus = b
-    def getFlow(self,code,d,lastnday):
-        flowk,flowd = xueqiu.getFlow(code,lastnday)
+    def getFlow(self,code,d,after):
+        flowk,flowd = xueqiu.getFlow(code,after=after)
         flow = (flowk,flowd)
         J = 0
         k = np.zeros((len(d),4))
@@ -220,32 +226,25 @@ class StockPlot:
         
         if off==0 and stock.isTransDay():
             _,k,d = xueqiu.appendK(code,period,k,d)
+        if off!=0:
+            k = k[:-off]
+            d = d[:-off]
         #叠加流入数据
         if len(d)>0:
-            flow = self.getFlow(code,d,lastnday=KDN-bi)
+            flow = self.getFlow(code,d,after)
             if period!='d' and period!=60: #去掉一天中最后的数据，绘制的时候不然⑦链接
                 for i in range(1,len(d)):
                     if d[i][0].day!=d[i-1][0].day:
                         flow[i,:] = NaN
         else:
             flow = None
-        if off==0:
-            return c,k,d,flow
-        else:
-            return c,k[:-off],d[:-off],flow
+        return c,k,d,flow
     def updateK(self,code,label,period,knum,kei): #更新K线图
         self._code = code
         self._upmode = StockPlot.K
+        self._period = period
         _,k,d,flow = self.getKlineData(code,period,knum,kei)
-        if period=='d':
-            ma5 = stock.ma(k[:,4],5)
-            ma20 = stock.ma(k[:,4],20)
-            ma30 = stock.ma(k[:,4],30)
-        else:
-            s = int(15*80/period)
-            ma5 = stock.ma(k[:,4],s)
-            ma20 = stock.ma(k[:,4],4*s)
-            ma30 = stock.ma(k[:,4],6*s)
+
         bi = -knum
         ei = k.shape[0]
         
@@ -264,10 +263,27 @@ class StockPlot:
         self._kplot.setx(x)
         self._kplot.setTicks(xticks)
         K = k[bi:ei,1:]
+        self._k = k[bi:ei,4]
+        self._d = d[bi:ei]
         self._kplot.plot(K,color=Themos.PRICE_COLOR,style=frame.Plot.K)
-        self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=1)
-        self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=2)
-        self._kplot.plot(ma30[bi:ei],label='ma30',color=Themos.MA30_COLOR,linewidth=3)
+        if StockPlot.KVMODE==1:
+            if period=='d':
+                ma5 = stock.ma(k[:,4],5)
+                ma20 = stock.ma(k[:,4],20)
+                ma30 = stock.ma(k[:,4],30)
+            else:
+                s = int(15*80/period)
+                ma5 = stock.ma(k[:,4],s)
+                ma20 = stock.ma(k[:,4],4*s)
+                ma30 = stock.ma(k[:,4],6*s)            
+            self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=1)
+            self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=2)
+            self._kplot.plot(ma30[bi:ei],label='ma30',color=Themos.MA30_COLOR,linewidth=3)
+        else:
+            bo = stock.boll(k[:,4])
+            self._kplot.plot(bo[bi:ei,0],label='low',color=Themos.MAIN_COLOR,linewidth=1)
+            self._kplot.plot(bo[bi:ei,1],label='mid',color=Themos.PRICE_COLOR,linewidth=1)
+            self._kplot.plot(bo[bi:ei,2],label='up',color=Themos.LARG_COLOR,linewidth=1)
         self._fplot.setx(x)
         self._fplot.setTicks(xticks)        
         if flow is not None:
@@ -296,6 +312,7 @@ class StockPlot:
             self._vmode = vm
     def update(self,code,label,ok,od,ma5b=None,ma60b=None,isem933=False): #更新线图
         self._upmode = StockPlot.RT
+        self._period = None
         self.clear()
         self._code = code
         self._mm = []
@@ -384,6 +401,7 @@ class StockPlot:
             self._kplot.plot(ma5,color=Themos.MA5_COLOR,linewidth=2,linestyle=(6,3,0))
     def updateBollWay(self,code,label,k,d,period):
         self._code = code
+        self._period = None
         self._upmode = StockPlot.BOLLWAY
         x = np.arange(len(d))
         xticks = []
@@ -414,9 +432,9 @@ class StockPlot:
                 self._bollway = (bi,ei,mink,maxk)
                 break
 
-    def render(self,canvas,x,y,w,h,xaxis=False,scale=1):
+    def render(self,canvas,x,y,w,h,xaxis=False,scale=1,warnings=None):
         if self._upmode==StockPlot.RT or self._upmode==StockPlot.K:
-            self.renderRTK(canvas,x,y,w,h,xaxis=xaxis,scale=scale)
+            self.renderRTK(canvas,x,y,w,h,xaxis=xaxis,scale=scale,warnings=warnings)
         elif self._upmode==StockPlot.BOLLWAY:
             self.renderBollWay(canvas,x,y,w,h,xaxis=xaxis,scale=scale)
     def renderBollWay(self,canvas,x,y,w,h,xaxis=False,scale=1):
@@ -438,7 +456,7 @@ class StockPlot:
             canvas.fillColor(Themos.MAIN_COLOR)
             canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_BOTTOM)
             canvas.text(xx0,yy1-5,"%.02f%%"%(100*(self._bollway[3]-self._bollway[2])/self._bollway[2]))
-    def renderRTK(self,canvas,x,y,w,h,xaxis=False,scale=1):
+    def renderRTK(self,canvas,x,y,w,h,xaxis=False,scale=1,warnings=None):
         if self._forcus:
             canvas.beginPath()
             canvas.fillColor(Themos.SELBGCOLOR)
@@ -459,9 +477,46 @@ class StockPlot:
             self._kplot.render(canvas,x,y,w,h*1/2)
             self._vplot.render(canvas,x,y+h*1/2,w,h/4)
             self._fplot.render(canvas,x,y+h*3/4,w,h/4)
-            
+        if warnings is not None and self._code in HotPlotApp.code2i and self._period==15:#绘制下滑趋势线,如果到突破临界点绘制突破线
+            i = HotPlotApp.code2i[self._code]
+            if i in warnings:
+                d = warnings[i][1]
+                k15 = warnings[i][2]
+                d15 = warnings[i][3]
+                p = self.getglidingidx(d)
+                if len(p)>1:
+                    if len(p)>2:
+                        x = np.empty((len(p),2))
+                        for j in range(len(p)):
+                            x[j,0] = p[j]
+                            x[j,1] = k15[p[j]]
+                        line = trend.lastSequaresLine(x)
+                        x0,y0 = p[0],k15[p[0]]
+                        x1 = len(d15)-1
+                        y1 = line[0] *x1+line[1]
+                    else:
+                        x0,x1 = p[0],p[-1]
+                        y0,y1 = k15[x0],k15[x1]
+                else:
+                    x0,x1 = p[0],len(d)-1
+                    y0,y1 = k15[x0],d[x1]+k15[x1]
+                x0 = self.date2period(d15[x0][0])
+                x1 = self.date2period(d15[x1][0])
+                if x0==x0 and x1==x1:
+                    xx0 = self._kplot.xAxis2wx(x0)
+                    xx1 = self._kplot.xAxis2wx(x1)
+                    yy0 = self._kplot.yAxis2wy(y0)
+                    yy1 = self._kplot.yAxis2wy(y1)
+                    canvas.beginPath()
+                    canvas.strokeColor(Themos.GREEN_COLOR)
+                    pts = np.empty((2,2),dtype=np.float32)
+                    pts[0] = (xx0,yy0)
+                    pts[1] = (xx1,yy1)
+                    canvas.strokeWidth(1)
+                    canvas.line(pts.ctypes.data_as(StockPlot.c_float_p),2,linestyle=(4,2,0))
+                    canvas.stroke()
 
-        if self._k is not None and self._k.shape[0]>0: #显示每天的高点和低点
+        if self._upmode==StockPlot.RT and self._k is not None: #显示每天的高点和低点
             lasti = self._k.shape[0]-1
             for it in self._mm:
                 maxx = self._kplot.xAxis2wx(it[1])
@@ -489,7 +544,27 @@ class StockPlot:
                     canvas.fillColor(Themos.RED_COLOR if r>0 else Themos.GREEN_COLOR)
                     canvas.text(xx,yy-5,"%.02f%%"%r)
                     break
-        
+    def getglidingidx(self,d): #返回压制点
+        p = []
+        maxd = -1e10
+        maxi = 0
+        for i in range(len(d)):
+            if d[i]>=0:
+                if d[i]>maxd:
+                    maxd = d[i]
+                    maxi = i
+            else:
+                if maxd!=-1e10:
+                    p.append(maxi)
+                maxd = -1e10
+                maxi = i
+        return p
+    def date2period(self,d): #时间映射到指定周期的x
+        if self._period==15:
+            for i in range(len(self._d)):
+                if self._d[i][0]>=d:
+                    return i
+        return NaN
 class StockOrder:
     """
     管理一个股票列表,(0 code,1 label,2 oder data,3 color,...)
@@ -546,11 +621,27 @@ class StockOrder:
                 
                 if it[0] in self._npt.code2i:
                     ii = self._npt.code2i[it[0]]
+                    if ii in self._npt._warnings:
+                        wa = self._npt._warnings[ii]
+                        if wa[0]==HotPlotApp.BUYWARNING or wa[0]==Themos.WARN_SELL_COLOR:
+                            canvas.beginPath()
+                            canvas.fillColor(Themos.WARN_BUY_COLOR if wa[0]==HotPlotApp.BUYWARNING else Themos.WARN_SELL_COLOR)
+                            canvas.rect(x,yy,Themos.ORDER_WIDTH,Themos.ORDER_ITEM_HEIGHT)
+                            canvas.fill()
+                    """
                     ma30 = self._npt._MA30[ii]
                     if ma30[-1]>=ma30[-2] and it[0] in hotcodes:
                         c = Themos.ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR
                     elif ma30[-1]>=ma30[-2]:
                         c = Themos.ORDER_CODE_CAN_BUY_TEXTCOLOR
+                    """
+                    if ii < len(self._npt._BOLL):
+                        bo = self._npt._BOLL[ii]
+                        rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]
+                        if rise and it[0] in hotcodes:
+                            c = Themos.ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR
+                        elif rise:
+                            c = Themos.ORDER_CODE_CAN_BUY_TEXTCOLOR
                 canvas.fillColor(c)
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
                 
@@ -638,6 +729,9 @@ class HotPlotApp(frame.app):
     }
     CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃','ETF热点','概念热点','行业热点']
     ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速']
+    NONEWARNING = 0
+    BUYWARNING = 1
+    SELLWARNING = 2
     def __init__(self,title,w,h):
         super(HotPlotApp,self).__init__(title,w,h)
         self._numsub = (3,2) #同屏数量 1 (1,1),4 (2,2),6 (3,2)
@@ -661,7 +755,7 @@ class HotPlotApp(frame.app):
         self._filter = ''
         self._knum = 200 #屏幕上放置k线的数量
         self._kei = 0
-        self._period = 15
+        self._period = 'd'
         self._volmode = StockPlot.FLOW
         self._kmode = HotPlotApp.RT
         self._K = None
@@ -673,10 +767,19 @@ class HotPlotApp(frame.app):
         self._lut = self._ltt
         threading.Thread(target=self.update_data_loop).start()
         self._needUpdate = False
+        self._BOLL = []
+        self._warnings = {}
+        self._bollfilter = 0 #0 不过滤,1 向上 , 2 向下
+        self._readywav = self.loadWave('lobby_notification_matchready.wav')
+        self._buywav = self.loadWave('cashreg.wav')
+        self._money_collect_05 = self.loadWave('money_collect_05.wav')
+        self.playWave(self._readywav)        
+    def update_data_loop(self):
         #一次性加载日线数据
         self._K240,self._D240 = xueqiu.get_period_k(240)
         self._MA30 = stock.maMatrix(self._K240,30)
-    def update_data_loop(self):
+        for i in range(self._K240.shape[0]):
+             self._BOLL.append(stock.boll(self._K240[i,:]))
         while self._running:
             b,t = shared.fromRedis('runtime_update')
             if self._Data is None or (b and t!=self._lut):
@@ -693,7 +796,54 @@ class HotPlotApp(frame.app):
                         continue
                 self._needUpdate = True
                 self._Data = (k,d,k15,d15,[],e)
+                #做买入和卖出预警
+                self.watchDog()
             sdl2.SDL_Delay(100)
+    def GlidingUpWarning(self,i):#买入预警,突破下滑趋势线，主力流入
+        k15 = self._Data[2][i]
+        d15 = self._Data[3]
+        rt = self._Data[0][i]
+        N = len(k15)
+        if N>160:
+            bi = np.argmax(k15[N-160:])+N-160
+            if N-bi>16: #限定调整最小周期要大于16(1天) ,主力要流入
+                try:
+                    x = np.empty((N-bi,2))
+                    x[:,0] = np.arange(bi,N)
+                    x[:,1] = k15[bi:]
+                    line = trend.lastSequaresLine(x)
+                    if line[0]<0:
+                        d = x[:,1]-(line[0]*x[:,0]+line[1])
+                        F = rt[:,3]+rt[:,4]
+                        F[F!=F]=0 #消除NaN
+                        m0 = stock.ma(F,5)
+                        m1 = stock.ma(F,30)
+                        b = m1[-1]<m0[-1] and np.argmax(d)>len(d)-3 #要求最大偏移在最近3根k线以内(突破点),确保是流入
+                        self._warnings[i] = (HotPlotApp.BUYWARNING if b else HotPlotApp.NONEWARNING,d,k15[bi:],d15[bi:])
+                except Exception as e:
+                    mylog.printe(e)
+                    log.error("GlidingUpWarning "+str(e))
+            
+    def OverflowWarning(self,i):#卖出预警,1下跌，高位放量，主力流出
+        pass
+    def watchDog(self):
+        old = self._warnings
+        self._warnings = {}
+        for i in range(len(HotPlotApp.companys)):
+            bo = self._BOLL[i]
+            rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2] #仅仅对通道上行的进行报警
+            if rise:
+                self.GlidingUpWarning(i)
+                self.OverflowWarning(i)
+        for i in range(len(HotPlotApp.companys)):
+            ob = i in old and old[i][0]
+            b = i in self._warnings and self._warnings[i][0]
+            if ob != b and HotPlotApp.companys[i][3]=='2':
+                if b:
+                    self.playWave(self._buywav)
+                else:
+                    self.playWave(self._money_collect_05)
+            
     def getCurrentRT(self):
         """
         k,d,k15,d15,_,e = self._Data
@@ -730,7 +880,7 @@ class HotPlotApp(frame.app):
                 scale=1.6
             for xi in range(col):
                 for yi in range(raw):
-                    self._SPV[yi*col+xi].render(self._canvas,x+xi*dw+Themos.ORDER_WIDTH,y+yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale)
+                    self._SPV[yi*col+xi].render(self._canvas,x+xi*dw+Themos.ORDER_WIDTH,y+yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale,warnings=self._warnings)
             #graph.update(dt)
             #graph.render(self._canvas,5,5)
             if self._help:
@@ -982,23 +1132,18 @@ class HotPlotApp(frame.app):
             self._numsub = (4,2)
             self._current = None
         elif sym==sdl2.SDLK_PAGEUP:
-            self._current = None
             self._kei = 0
             self._pagen-=1
         elif sym==sdl2.SDLK_PAGEDOWN:
-            self._current = None
             self._kei = 0
             self._pagen+=1
         elif sym==sdl2.SDLK_HOME:
-            self._current = None
             self._kei = 0
             self._pagen = 0
         elif sym==sdl2.SDLK_END:
-            self._current = None
             self._kei = 0
             self._pagen = 1e10
-        elif sym==sdl2.SDLK_INSERT:
-            self._current = None
+        elif sym==sdl2.SDLK_INSERT: #反转排序
             self._kei = 0
             self._reverse = not self._reverse
         elif sym==sdl2.SDLK_LEFT:
@@ -1015,12 +1160,14 @@ class HotPlotApp(frame.app):
             self._knum -= 10
             if self._knum<60:
                 self._knum=60
-        elif sym==sdl2.SDLK_KP_9:
+        elif sym==sdl2.SDLK_KP_9: #k线模式，切换周期
             p = {5:0,15:1,30:2,60:3,'d':4}
             pp = [5,15,30,60,'d']
             i = p[self._period]+1
             self._period = pp[i] if i<=4 else pp[0]
-        elif sym==sdl2.SDLK_KP_DIVIDE:
+        elif sym==sdl2.SDLK_KP_MULTIPLY: #k线模式，切换boll 和 ma
+            StockPlot.KVMODE = 1 if StockPlot.KVMODE==0 else 0
+        elif sym==sdl2.SDLK_KP_DIVIDE: #切换早盘的密集显示模式
             self._em933 = not self._em933
         elif sym==sdl2.SDLK_KP_8:
             if self._volmode==StockPlot.FLOW:
@@ -1034,7 +1181,7 @@ class HotPlotApp(frame.app):
                 self._kmode=HotPlotApp.BULLWAY
             else:
                 self._kmode=HotPlotApp.RT
-        elif sym==sdl2.SDLK_KP_0:
+        elif sym==sdl2.SDLK_KP_0: #切换排序
             self._order+=1
             if self._order>1:
                 self._order = 0
@@ -1044,6 +1191,10 @@ class HotPlotApp(frame.app):
                 self._order = 2
             elif self._order>3:
                 self._order = 2
+        elif sym==sdl2.SDLK_KP_PLUS:
+            self._bollfilter = 1 if self._bollfilter!=1 else 0
+        elif sym==sdl2.SDLK_KP_MINUS:
+            self._bollfilter = 2 if self._bollfilter!=2 else 0
         elif sym in HotPlotApp.MAP2NUM:
             oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
@@ -1137,6 +1288,7 @@ class HotPlotApp(frame.app):
             self.setWindowTitle(self._filter)
         else:
             return
+
         self.updatedata()
         self.update()
     def getma5b(self,K15,D15,n=3):
@@ -1179,7 +1331,10 @@ class HotPlotApp(frame.app):
         R = []
         for i in range(len(companys)):
             if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
-                R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
+                bo = self._BOLL[i]
+                isrise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]
+                if self._bollfilter==0 or (self._bollfilter==1 and isrise) or (self._bollfilter==2 and not isrise):
+                    R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS #[:top]            
@@ -1191,7 +1346,7 @@ class HotPlotApp(frame.app):
         companys = HotPlotApp.companys   
         R = []
         for code in codes:
-            i = HotPlotApp.code2i[code]           
+            i = HotPlotApp.code2i[code]
             R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls))
         return sorted(R,key=lambda it:it[1],reverse=not self._reverse) #R#[:top]
     def activeTop(self,top=18):

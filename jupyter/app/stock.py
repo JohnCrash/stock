@@ -390,15 +390,18 @@ def maMatrix(k,n):
             m[:,i+n] = m[:,i+n-1]+dk[:,i]
     return m
 def bollMatrix(k,n=20):
-    MB = maMatrix(k)
+    MB = maMatrix(k,n)
     """计算标准差"""
     MD = np.empty(k.shape)
     for i in range(k.shape[1]):
         MA = MB[:,i]
         if i-n+1>=0:
-            MD[:,i] = np.sqrt(((k[:,i-n+1:i+1]-MA)**2).sum(axis=1)/n)
+            #FIXBUG
+            a = np.sqrt(((k[:,i-n+1:i+1]-MA)**2).sum(axis=1)/n)
+            MD[:,i] = a
         else:
-            MD[:,i] = np.sqrt(((k[:,0:i+1]-MA)**2).sum(axis=1)/(i+1))
+            a = np.sqrt(((k[:,0:i+1]-MA)**2).sum(axis=1)/(i+1))
+            MD[:,i] = a
     return MB,MB-2*MD,MB+2*MD
 def slopeRatesMatrix(m):
     r = np.empty(m.shape)
