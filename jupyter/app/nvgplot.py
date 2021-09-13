@@ -623,7 +623,7 @@ class StockOrder:
                     ii = self._npt.code2i[it[0]]
                     if ii in self._npt._warnings:
                         wa = self._npt._warnings[ii]
-                        if wa[0]==HotPlotApp.BUYWARNING or wa[0]==Themos.WARN_SELL_COLOR:
+                        if wa[0]==HotPlotApp.BUYWARNING:
                             canvas.beginPath()
                             canvas.fillColor(Themos.WARN_BUY_COLOR if wa[0]==HotPlotApp.BUYWARNING else Themos.WARN_SELL_COLOR)
                             canvas.rect(x,yy,Themos.ORDER_WIDTH,Themos.ORDER_ITEM_HEIGHT)
@@ -1153,13 +1153,13 @@ class HotPlotApp(frame.app):
             if self._kei<0:
                 self._kei = 0
         elif sym==sdl2.SDLK_UP:
+            self._knum -= 10
+            if self._knum<60:
+                self._knum=60            
+        elif sym==sdl2.SDLK_DOWN:
             self._knum += 10
             if self._knum>400:
                 self._knum=400
-        elif sym==sdl2.SDLK_DOWN:
-            self._knum -= 10
-            if self._knum<60:
-                self._knum=60
         elif sym==sdl2.SDLK_KP_9: #k线模式，切换周期
             p = {5:0,15:1,30:2,60:3,'d':4}
             pp = [5,15,30,60,'d']
