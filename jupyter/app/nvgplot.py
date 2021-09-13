@@ -89,9 +89,9 @@ class ThemosDefault:
     ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(255,128,64)
     ORDER_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,128,255)
     ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,0,255)
-    WARN_BUY_COLOR = vg.nvgRGB(64,0,0)
-    WARN_BUY_COLOR2 = vg.nvgRGB(64,0,64)
-    WARN_SELL_COLOR = vg.nvgRGB(0,64,0)
+    WARN_BUY_COLOR = vg.nvgRGB(255,255,0)
+    WARN_BUY_COLOR2 = vg.nvgRGB(255,128,255)
+    WARN_SELL_COLOR = vg.nvgRGB(0,255,64)
     ORDER_WIDTH = 150       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
     ORDER_FONTSIZE = 14
@@ -130,9 +130,9 @@ class ThemosBlack:
     ORDER_HOT_CODE_TEXTCOLOR = vg.nvgRGB(0,162,232) 
     ORDER_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,128,255)
     ORDER_HOT_CODE_CAN_BUY_TEXTCOLOR = vg.nvgRGB(255,0,255)
-    WARN_BUY_COLOR = vg.nvgRGB(64,0,0)
-    WARN_BUY_COLOR2 = vg.nvgRGB(64,0,64)
-    WARN_SELL_COLOR = vg.nvgRGB(0,64,0)
+    WARN_BUY_COLOR = vg.nvgRGB(255,255,0)
+    WARN_BUY_COLOR2 = vg.nvgRGB(255,128,255)
+    WARN_SELL_COLOR = vg.nvgRGB(0,255,255)
     ORDER_WIDTH = 150       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
     ORDER_FONTSIZE = 14
@@ -743,17 +743,18 @@ class HotPlotApp(frame.app):
         threading.Thread(target=self.update_data_loop).start()
         self._needUpdate = False
         self._BOLL = []
-        self._warnings = {}
+        self._warnings = None
         self._warningbox = []
         self._warningbox_isopen = False
         self._bollfilter = 0 #0 不过滤,1 向上 , 2 向下
         self._readywav = self.loadWave('lobby_notification_matchready.wav') #测试
         self._buywav = self.loadWave('dropzone_select.wav')
-        self._sellwav = self.loadWave('rocketalarm.wav')
+        self._sellwav = self.loadWave('playerping.wav')
         self._newhighwav = self.loadWave('cashreg.wav')
         self._cancelwav = self.loadWave('money_collect_05.wav')
         self._strongwav = self.loadWave('heartbeatloop.wav')
-        self.playWave(self._readywav)        
+        self._strongsellwav = self.loadWave('rocketalarm.wav')
+        self.playWave(0,self._readywav) 
     def update_data_loop(self):
         #一次性加载日线数据
         self._K240,self._D240 = xueqiu.get_period_k(240)
@@ -794,40 +795,46 @@ class HotPlotApp(frame.app):
                 ma10 = stock.ma(k5[i],10)
                 ma20 = stock.ma(k5[i],20)
                 ma30 = stock.ma(k5[i],30)
-                if ma5[-1]>ma10[-1] and ma10[-1]>ma20[-1] and ma20[-1]>ma30[-1]:
+                if ma5[-1]>ma10[-1] and ma10[-1]>ma20[-1] and ma20[-1]>ma30[-1]: #均线多头
                     F = rtk[i,:,3]+rtk[i,:,4]
                     F[F!=F]=0 #消除NaN
                     m0 = stock.ma(F,5)
                     m1 = stock.ma(F,30)
                     self._warnings[i] = (HotPlotApp.BUYWARNING,np.argmax(k5[i])==len(d5)-1,ma5[-1]-ma20[-1],m0[-1]-m1[-1],(ma5,ma10,ma20,ma30),(m0,m1),HotPlotApp.companys[i])#0多头,1监视5个交易日新高,2价格打开，3主力流入打开，4均线，5主力均线
-                elif ma30[-1]>ma20[-1] and ma20[-1]>ma10[-1] and  ma10[-1]>ma5[-1]:
+                elif ma30[-1]>ma20[-1] and ma20[-1]>ma10[-1] and  ma10[-1]>ma5[-1]: #均线空头
                     F = rtk[i,:,3]+rtk[i,:,4]
                     F[F!=F]=0 #消除NaN
                     m0 = stock.ma(F,5)
                     m1 = stock.ma(F,30)                    
                     self._warnings[i] = (HotPlotApp.SELLWARNING,False,ma5[-1]-ma20[-1],m0[-1]-m1[-1],(ma5,ma10,ma20,ma30),(m0,m1),HotPlotApp.companys[i])
         if old is not None:
+            nc = 0
             for i in range(len(HotPlotApp.companys)):
                 if HotPlotApp.companys[i][3]=='2':# or HotPlotApp.companys[i][3]=='0' or HotPlotApp.companys[i][3]=='1':#仅仅警告ETF和个股
                     ob = i in old
                     nb = i in self._warnings
                     if not ob and nb:
                         if self._warnings[i][0]==HotPlotApp.BUYWARNING:
-                            self.playWave(self._buywav) #多头买入
+                            self.playWave(nc,self._buywav) #多头买入
+                            nc+=1
                             self._warningbox.append(('+',self._warnings[i]))
                         elif self._warnings[i][0]==HotPlotApp.SELLWARNING:
-                            self.playWave(self._sellwav) #空头卖出
+                            self.playWave(nc,self._sellwav) #空头卖出
+                            nc+=1
                             self._warningbox.append(('+',self._warnings[i]))
                     elif ob and not nb:
-                        self.playWave(self._cancelwav) #特征不稳定，又消失了
+                        self.playWave(nc,self._cancelwav) #特征不稳定，又消失了
+                        nc+=1
                         self._warningbox.append(('-',self._warnings[i]))
                     elif ob and nb:
                         if self._warnings[i][0]==HotPlotApp.BUYWARNING and self._warnings[i][2]>old[i][2] and self._warnings[i][3]>old[i][3]: #强化提示
-                            self.playWave(self._strongwav)
+                            self.playWave(nc,self._strongwav)
+                            nc+=1
                             self._warningbox.append(('++',self._warnings[i]))
                         elif self._warnings[i][0]==HotPlotApp.SELLWARNING and self._warnings[i][2]<old[i][2] and self._warnings[i][3]<old[i][3]: #强化提示
-                            self.playWave(self._strongwav)
-                            self._warningbox.append(('--',self._warnings[i]))     
+                            self.playWave(nc,self._strongsellwav)
+                            nc+=1
+                            self._warningbox.append(('--',self._warnings[i]))  
             if len(self._warningbox)>0:
                 self._warningbox_isopen = True
             
@@ -907,7 +914,6 @@ class HotPlotApp(frame.app):
                 #self._warningbox_isopen = False
                 W = 320
                 H = 240
-                cc = [vg.nvgRGB(200,0,0),vg.nvgRGB(0,200,0),vg.nvgRGB(255,0,0),vg.nvgRGB(0,255,0)]
                 tc = None
                 ox = x+(w-W*len(self._warningbox))/2
                 oy = y+(h-H)/2
@@ -916,16 +922,13 @@ class HotPlotApp(frame.app):
                     for i in range(len(self._warningbox)):
                         op = self._warningbox[i]
                         wb = op[1]
+                        rr = 128
+                        if op[0]=='++' or op[0]=='--':
+                            rr = 255
                         if wb[0]==HotPlotApp.BUYWARNING:
-                            if op[0]=='+':
-                                tc = cc[0]
-                            else:
-                                tc = cc[2]
+                            tc = vg.nvgRGB(rr,0,0)
                         else:
-                            if op[0]=='+':
-                                tc = cc[1]
-                            else:
-                                tc = cc[3]
+                            tc = vg.nvgRGB(0,rr,0)
                         canvas.beginPath()
                         canvas.fillColor(ThemosBlack.ORDER_BGCOLOR)
                         canvas.rect(ox,oy,W,H)

@@ -56,8 +56,14 @@ class app:
     def loadWave(self,fn):
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
-        return sdlmixer.Mix_LoadMUS(f.encode('utf-8'))
-    def playWave(self,wav):
+        return sdlmixer.Mix_LoadWAV(f.encode('utf-8'))
+    def playWave(self,n,wav):
+        sdlmixer.Mix_PlayChannel(n,wav,0)
+    def loadMusic(self,fn):
+        path = '/'.join(str.split(__file__,'\\')[:-1])
+        f = "%s/static/%s"%(path,fn)
+        return sdlmixer.Mix_LoadMUS(f.encode('utf-8'))        
+    def playMusic(self,wav):
         sdlmixer.Mix_PlayMusic(wav,1)
     def setWindowTitle(self,title):
         if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
