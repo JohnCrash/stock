@@ -380,6 +380,8 @@ class Plot:
         self._gridy = False
         self._xe = None
         self._ye = None
+        self._titleColor = None
+        self._titleSize = 14
         self._themos = Plot
     def setThemos(self,themos):
         self._themos = themos
@@ -396,6 +398,10 @@ class Plot:
         self._y.append((y,color,linewidth,linestyle,label,style)) #0 y,1 color,2 linewidth,3 linestyle,4 label
     def setTitle(self,title):
         self._title = title
+    def setTitleColor(self,c):
+        self._titleColor = c
+    def setTitleSize(self,s):
+        self._titleSize = s
     def clear(self):
         """
         清除图表中的全部曲线，重新设置数据
@@ -600,9 +606,11 @@ class Plot:
             if self._ye is not None and self._ye>3: #绘制坐标指数
                 canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
                 canvas.text(x0,y0,"1e%d"%self._ye)
+        if self._titleColor is not None:
+            canvas.fillColor(self._titleColor)
         canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
         canvas.fontFace("zh")
-        canvas.fontSize(14)
+        canvas.fontSize(self._titleSize)
         canvas.text(x0+w0/2,y0+4,self._title)
     def setLineWidthScale(self,sc=1):
         self._lwscale = sc
