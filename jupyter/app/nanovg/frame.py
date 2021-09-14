@@ -57,8 +57,8 @@ class app:
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
         return sdlmixer.Mix_LoadWAV(f.encode('utf-8'))
-    def playWave(self,n,wav):
-        sdlmixer.Mix_PlayChannel(n,wav,0)
+    def playWave(self,channel,wav,n=0):
+        sdlmixer.Mix_PlayChannel(channel,wav,n)
     def loadMusic(self,fn):
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
