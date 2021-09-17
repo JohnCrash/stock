@@ -292,9 +292,9 @@ class StockPlot:
         x = np.arange(len(k[bi:ei]))
         xticks = []
         D = d[bi:ei]
-        for i in range(len(D)-1):
+        for i in range(1,len(D)):
             if type(period)==int:
-                if (D[i][0].day!=D[i+1][0].day):
+                if (D[i][0].day!=D[i-1][0].day):
                     t = D[i][0]
                     xticks.append((i,'%2d-%2d'%(t.month,t.day)))        
             else:
@@ -326,7 +326,8 @@ class StockPlot:
             self._kplot.plot(bo[bi:ei,1],label='mid',color=Themos.PRICE_COLOR,linewidth=1)
             self._kplot.plot(bo[bi:ei,2],label='up',color=Themos.LARG_COLOR,linewidth=1)
         self._fplot.setx(x)
-        self._fplot.setTicks(xticks)        
+        self._fplot.setTicks(xticks)      
+        self._fplot.setTicksAngle(25)  
         if flow is not None:
             self._fplot.plot(flow[bi:ei,0],label='larg',color=Themos.HUGE_COLOR,linewidth=1)
             self._fplot.plot(flow[bi:ei,1],label='big',color=Themos.LARG_COLOR,linewidth=1)
@@ -504,16 +505,19 @@ class StockPlot:
             canvas.rect(x+Themos.YLABELWIDTH,y,w-Themos.YLABELWIDTH,h)
             canvas.fill()
         self._kplot.setAxisVisiable(False,True)
-        self._vplot.setAxisVisiable(xaxis,True)
+
         if self._forcus:
             scale = 1
         self._kplot.setLineWidthScale(scale)
         self._vplot.setLineWidthScale(scale)
         if self._upmode==StockPlot.RT:
+            self._vplot.setAxisVisiable(xaxis,True)
+            self._fplot.setAxisVisiable(False,True)
             self._kplot.render(canvas,x,y,w,h*2/3)
             self._vplot.render(canvas,x,y+h*2/3,w,h/3)
         else:
-            self._fplot.setAxisVisiable(xaxis,True)
+            self._vplot.setAxisVisiable(False,True)
+            self._fplot.setAxisVisiable(xaxis,True)            
             self._fplot.setLineWidthScale(scale)
             self._kplot.render(canvas,x,y,w,h*1/2)
             self._vplot.render(canvas,x,y+h*1/2,w,h/4)
