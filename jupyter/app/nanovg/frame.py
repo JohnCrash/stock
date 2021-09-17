@@ -57,6 +57,8 @@ class app:
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
         return sdlmixer.Mix_LoadWAV(f.encode('utf-8'))
+    def setMixVolume(self,ch,vo=1):
+        sdlmixer.Mix_Volume(ch,int(vo*sdlmixer.MIX_MAX_VOLUME))
     def playWave(self,channel,wav,n=0):
         sdlmixer.Mix_PlayChannel(channel,wav,n)
     def loadMusic(self,fn):

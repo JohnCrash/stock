@@ -226,14 +226,14 @@ def loadFlow(after=None,dd=None):
         flow.append(data[i][1:])
     flowk = np.array(flow).reshape(-1,4)
     return flowk,flowdate
-
+ 
 def loademFlow(code,after=None,dd=None):
     qs = query("select id from flow_em_category where code='%s' and watch!=-1"%(code))
     if len(qs)==1:
         id = int(qs[0][0])
         if after is None:
             if dd is None:
-                data = query("select timestamp,larg,big,mid,tiny from flow_em order by timestamp where id=%d"%(id))
+                data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d order by timestamp"%(id))
             else:
                 data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' and timestamp<'%s' order by timestamp"%(id,dateString(dd),dateString(dd+timedelta(days=1))))
         else:

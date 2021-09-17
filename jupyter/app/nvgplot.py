@@ -72,6 +72,29 @@ def ismafashan(mas):
     if ma5[-1]<ma5[-2] and ma10[-1]<ma10[-2] and ma20[-1]<ma20[-2] and ma30[-1]<ma30[-2]: 
         return True
     return False
+
+"""
+分析早盘情况
+k5 (0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
+"""
+def zpfx(k5,d5):
+    R = []
+    mx = -1
+    for i in range(len(d5)-1):
+        if d5[i][0].day!=d5[i+1][0].day or i==0:
+            for j in range(i,i+48,12):
+                if j+12<len(d5) and k5[j]>0:
+                    r = (k5[j+12]-k5[j])/k5[j]
+                    if abs(r)>mx:
+                        mx = abs(r)
+                    R.append((r,i,j-i))
+    if mx!=-1:
+        fz = mx*0.8
+        for i in range(len(R)-1,0,-1):
+            if R[i][2]==0 and abs(R[i][0])>fz:
+                return (R[i][0],(len(R)-1-i)/4)
+    return None
+
 class ThemosDefault:
     BGCOLOR = (0.95,0.95,0.95,1) #图表背景颜色
 
@@ -122,7 +145,7 @@ class ThemosBlack:
     MA5_COLOR = vg.nvgRGB(255,0,255)
     MA10_COLOR = vg.nvgRGB(240,248,136)
     MA20_COLOR = vg.nvgRGB(0,178,240)
-    MA30_COLOR = vg.nvgRGB(255,0,255)
+    MA30_COLOR = vg.nvgRGB(0,128,255)
     MID_COLOR = vg.nvgRGB(255,215,0)
     TING_COLOR = vg.nvgRGB(135,206,250)
     RED_COLOR = vg.nvgRGB(250,0,0)   #涨
@@ -581,9 +604,11 @@ class StockOrder:
             if yy-y<h:
                 if it[0] in self._npt.code2i:
                     ii = self._npt.code2i[it[0]]
+                    """
+                    1 5分钟均线向上发散买入提示，2 5分钟均线向下发散卖出提示
+                    """
                     if ii in self._npt._warnings:
                         wa = self._npt._warnings[ii]
-                        canvas.beginPath()
                         ma5 = wa[4][0]
                         ma10 = wa[4][1]
                         ma20 = wa[4][2]
@@ -600,14 +625,16 @@ class StockOrder:
                             cc = Themos.WARN_NEWHIGH_COLOR
                         else:
                             cc = Themos.BGCOLOR
+                        canvas.beginPath()
                         canvas.fillColor(cc)
                         canvas.rect(x,yy,64,Themos.ORDER_ITEM_HEIGHT)
                         canvas.fill()
-                    canvas.beginPath()
+                    """
+                    1 日线boll通道上轨中轨向上 2 都向上 3 下轨向上
+                    """
                     if ii < len(self._npt._BOLL):
                         bo = self._npt._BOLL[ii]
                         rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
-
                         if rise and bo[-1,0]>=bo[-2,0]: #都向上
                             cc = Themos.CAN_BUY_TEXTCOLOR2
                         elif rise: #通道上行
@@ -616,8 +643,21 @@ class StockOrder:
                             cc = Themos.CAN_BUY_TEXTCOLOR3
                         else:
                             cc = Themos.ORDER_BGCOLOR
+                        canvas.beginPath()
                         canvas.fillColor(cc)
-                        canvas.rect(x+64,yy,Themos.ORDER_WIDTH-64,Themos.ORDER_ITEM_HEIGHT)
+                        canvas.rect(x+64,yy,Themos.ORDER_WIDTH-54,Themos.ORDER_ITEM_HEIGHT)
+                        canvas.fill()        
+                    """
+                    1 最近5个交易日早盘有上涨提示 2 最近5个交易日早盘有下跌提示
+                    """
+                    if ii in self._npt._zp and self._npt._zp[ii] is not None:
+                        if self._npt._zp[ii][0]>0:
+                            cc = Themos.RED_COLOR
+                        else:
+                            cc = Themos.GREEN_COLOR
+                        canvas.beginPath()
+                        canvas.fillColor(cc)
+                        canvas.rect(x+10+Themos.ORDER_WIDTH,yy,10,Themos.ORDER_ITEM_HEIGHT)
                         canvas.fill()                        
                 canvas.fillColor(Themos.ORDER_TEXTCOLOR)
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
@@ -739,6 +779,7 @@ class HotPlotApp(frame.app):
         self._K = None
         self._D = None   
         self._Data = None   
+        self._rtk = 0 #0 rt 1 k
         self._messagebox = None
         self.setClearColor(Themos.BGCOLOR)
         self._ltt = datetime.today()
@@ -746,7 +787,8 @@ class HotPlotApp(frame.app):
         threading.Thread(target=self.update_data_loop).start()
         self._needUpdate = False
         self._BOLL = []
-        self._warnings = {}
+        self._warnings = None
+        self._zp = {}
         self._warningbox = []
         self._warningbox_isopen = False
         self._bollfilter = 0 #0 不过滤,1 向上 , 2 向下
@@ -757,6 +799,7 @@ class HotPlotApp(frame.app):
         self._cancelwav = self.loadWave('money_collect_05.wav')
         self._strongwav = self.loadWave('heartbeatloop.wav')
         self._strongsellwav = self.loadWave('rocketalarm.wav')
+        self.setMixVolume(-1,0.1)
         self.playWave(0,self._readywav) 
     def update_data_loop(self):
         #一次性加载日线数据
@@ -803,13 +846,13 @@ class HotPlotApp(frame.app):
                     F[F!=F]=0 #消除NaN
                     m0 = stock.ma(F,5)
                     m1 = stock.ma(F,30)
-                    self._warnings[i] = (HotPlotApp.BUYWARNING,np.argmax(k5[i])==len(d5)-1,ma5[-1]-ma20[-1],m0[-1]-m1[-1],(ma5,ma10,ma20,ma30),(m0,m1),HotPlotApp.companys[i])#0多头,1监视5个交易日新高,2价格打开，3主力流入打开，4均线，5主力均线
+                    self._warnings[i] = (HotPlotApp.BUYWARNING,np.argmax(k5[i])==len(d5)-1,0,0,(ma5,ma10,ma20,ma30),(m0,m1),HotPlotApp.companys[i])#0多头,1监视5个交易日新高,2价格打开，3主力流入打开，4均线，5主力均线
                 elif ma30[-1]>ma20[-1] and ma20[-1]>ma10[-1] and  ma10[-1]>ma5[-1]: #均线空头
                     F = rtk[i,:,3]+rtk[i,:,4]
                     F[F!=F]=0 #消除NaN
                     m0 = stock.ma(F,5)
                     m1 = stock.ma(F,30)                    
-                    self._warnings[i] = (HotPlotApp.SELLWARNING,False,ma5[-1]-ma20[-1],m0[-1]-m1[-1],(ma5,ma10,ma20,ma30),(m0,m1),HotPlotApp.companys[i])
+                    self._warnings[i] = (HotPlotApp.SELLWARNING,False,0,0,(ma5,ma10,ma20,ma30),(m0,m1),HotPlotApp.companys[i])
         if old is not None:
             nc = 0
             for i in range(len(HotPlotApp.companys)):
@@ -830,15 +873,22 @@ class HotPlotApp(frame.app):
                             self.playWave(nc,self._cancelwav) #特征不稳定，又消失了
                             nc+=1
                     elif ob and nb:
-                        if self._warnings[i][0]==HotPlotApp.BUYWARNING and not ismafashan(old[i][4]) and ismafashan(self._warings[i][4]): #强化提示
+                        if self._warnings[i][0]==HotPlotApp.BUYWARNING and not ismafashan(old[i][4]) and ismafashan(self._warnings[i][4]): #强化提示
                             if self.warning('++',i,self._warnings[i]):
                                 self.playWave(nc,self._strongwav,2)
                                 nc+=1
-                        elif self._warnings[i][0]==HotPlotApp.SELLWARNING and not ismafashan(old[i][4]) and ismafashan(self._warings[i][4]): #强化提示
+                        elif self._warnings[i][0]==HotPlotApp.SELLWARNING and not ismafashan(old[i][4]) and ismafashan(self._warnings[i][4]): #强化提示
                             if self.warning('--',i,self._warnings[i]):
                                 self.playWave(nc,self._strongsellwav)
                                 nc+=1
-
+        """
+        对最近的早盘进行分析，如果早盘1小时最大跌幅在最近5个交易日较大-1,反之+1
+        """
+        for i in range(len(HotPlotApp.companys)):
+            if HotPlotApp.companys[i][3]==self._prefix[0]:
+                self._zp[i] = zpfx(k5[i],d5)
+                #print(HotPlotApp.companys[i],self._zp[i])
+                
     def warning(self,typ,i,warning):
         """
         加入一个警报，最近5分钟没发生过此类警报
@@ -1047,7 +1097,7 @@ class HotPlotApp(frame.app):
                 for s in range(1,len(k)):#处理价格为零的情况
                     if k[s,0]==0:
                         k[s,0] = k[s-1,0]
-                if self._current is not None and i==self._current:
+                if self._rtk==1 or (self._current is not None and i==self._current):
                     title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
                     self._kei = self._SPV[i].updateK(it[0][1],title,self._period,self._knum,self._kei)
                 else:
@@ -1245,6 +1295,8 @@ class HotPlotApp(frame.app):
             self._bollfilter = 1 if self._bollfilter!=1 else 0
         elif sym==sdl2.SDLK_KP_MINUS:
             self._bollfilter = 2 if self._bollfilter!=2 else 0
+        elif sym==sdl2.SDLK_KP_ENTER:
+            self._rtk = 1 if self._rtk==0 else 0
         elif sym in HotPlotApp.MAP2NUM:
             oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
