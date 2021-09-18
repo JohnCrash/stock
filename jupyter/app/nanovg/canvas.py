@@ -14,6 +14,12 @@ class Canvas2d:
         return self
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
+    def createFramebuffer(self,width:int,height:int,imageFlags:int):
+        return vg.nvgluCreateFramebuffer(self._ctx,width,height,imageFlags)
+    def bindFramebuffer(self,fbo):
+        vg.nvgluBindFramebuffer(fbo)
+    def nvgluDeleteFramebuffer(self,fbo):
+        vg.nvgluDeleteFramebuffer(fbo)
     def beginFrame(self,windowWidth:float, windowHeight:float, devicePixelRatio:float = 1):
         """
         Begin drawing a new frame

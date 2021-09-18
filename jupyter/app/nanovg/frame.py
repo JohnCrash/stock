@@ -53,6 +53,10 @@ class app:
         self._windowx,self._windowy = 0,0
         self._windoww,self._windowh = w,h
         self.fullScreen()
+        w,h = c_int(),c_int()
+        video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))        
+        self._mainFrameBuffer = self._canvas.createFramebuffer(w.value,h.value-app.CAPTION_HEIGHT,0)
+        self._captionFrameBuffer = self._canvas.createFramebuffer(w.value,app.CAPTION_HEIGHT,0)
     def loadWave(self,fn):
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
@@ -162,6 +166,7 @@ class app:
                         self._mouseini = i
                         break
             if old!=self._mouseini:
+                self.renderCaption(0,0,self._w,app.CAPTION_HEIGHT)
                 self.delayUpdate()
     def onMouseDown(self,event):
         pass
@@ -220,27 +225,50 @@ class app:
                 c.lineTo(x,y+h)
             c.stroke()
     def renderCaption(self,x,y,w,h):
-        for i in range(3):
-            xx = w-(3-i)*h
-            if self._mouseini==i: #绘制选中背景
-                with self._canvas as c:
+        self._canvas.bindFramebuffer(self._captionFrameBuffer)
+        GL.glViewport(0, 0, w,h)
+        GL.glClearColor(0,0,0,255)
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT|GL.GL_STENCIL_BUFFER_BIT)           
+        with self._canvas as c:
+            #c.beginFrame(w,h,1)
+            for i in range(3):
+                xx = w-(3-i)*h
+                if self._mouseini==i: #绘制选中背景
                     c.beginPath()
                     c.fillColor(app.ICONBG)
                     c.rect(xx,y,h,h)
                     c.fill()
-            self.drawIcon(xx,y,h,h,i,10)
-        with self._canvas as c: #绘制标题
+                self.drawIcon(xx,y,h,h,i,10)
+
             c.fontFace('zh')
             c.fontSize(16)
             c.fillColor(app.FCCOLOR)
             c.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
             c.text(w/2,h/2,self._windowtitle)
+            #c.endFrame()
     def update(self,dt=0):
         w,h = c_int(),c_int()
         video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
         self._w = w.value            
         fbWidth,fbHeight = w.value,h.value
+        vg.nvgluBindFramebuffer(None) #默认FBO
+        GL.glClearColor(255,0,0,255)
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT|GL.GL_STENCIL_BUFFER_BIT)        
         GL.glViewport(0, 0, fbWidth, fbHeight)
+        with self._canvas as canvas:
+            canvas.beginFrame(w.value,h.value,1)
+            canvas.beginPath()
+            cfp = canvas.imagePattern(0,0,w.value,app.CAPTION_HEIGHT,0,self._captionFrameBuffer.contents.image,0)
+            canvas.fillPaint(cfp)
+            canvas.rect(0,0,w.value,app.CAPTION_HEIGHT)
+            canvas.fill()
+            canvas.beginPath()
+            cfp = canvas.imagePattern(0,0,w.value,h.value,0,self._mainFrameBuffer.contents.image,0)
+            canvas.fillPaint(cfp)
+            canvas.rect(0,0,w.value,h.value)
+            canvas.fill()            
+            canvas.endFrame()
+        """
         c = self._clearColor
         GL.glClearColor(c[0],c[1],c[2],c[3])
         GL.glClear(GL.GL_COLOR_BUFFER_BIT|GL.GL_STENCIL_BUFFER_BIT)# | GL.GL_DEPTH_BUFFER_BIT
@@ -253,6 +281,7 @@ class app:
             self._h = h.value
             self.render(0,0,self._w,self._h)
         self._canvas.endFrame()
+        """
         sdl2.SDL_GL_SwapWindow(self._window)
 
     def loadDemoData(self):
