@@ -152,8 +152,8 @@ class ThemosBlack:
     GREEN_COLOR = vg.nvgRGB(0,200,0) #跌
     BG_COLOR = vg.nvgRGB(0,0,0) #背景
 
-    YLABELWIDTH = 40   #y轴坐标轴空间
-    XLABELHEIGHT = 30  #x轴坐标轴空间
+    YLABELWIDTH = 42   #y轴坐标轴空间
+    XLABELHEIGHT = 36  #x轴坐标轴空间
 
     ORDER_BGCOLOR = vg.nvgRGB(0,0,0)
     ORDER_HEADCOLOR = vg.nvgRGB(0,0,0)
@@ -169,7 +169,7 @@ class ThemosBlack:
     WARN_NEWHIGH_COLOR = vg.nvgRGB(64,64,0)
     WARN_SELL_COLOR = vg.nvgRGB(0,64,0)
     WARN_SELL_COLOR2 = vg.nvgRGB(0,128,0)
-    ORDER_WIDTH = 150       #排序栏宽度
+    ORDER_WIDTH = 160       #排序栏宽度
     ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
     ORDER_FONTSIZE = 14
 
@@ -225,7 +225,9 @@ class StockPlot:
     def forcus(self,b):
         self._forcus = b
     def getFlow(self,code,d,after):
-        flowk,flowd = xueqiu.getFlow(code,after=after)
+        flowk,flowd = xueqiu.getFlowCache(code,bi=after)
+        if flowk is None or flowd is None:
+            return None
         flow = (flowk,flowd)
         J = 0
         k = np.zeros((len(d),4))
@@ -255,13 +257,13 @@ class StockPlot:
             if bi<0:
                 bi=0
             after = stock.dateString(StockPlot.KD[bi][0])
-            c,k,d = stock.loadKline(code,period,after=after)
+            c,k,d = stock.loadKlineCache(code,period,bi=after)
         else:
             bi = KDN-math.ceil((off+knum+320)/(240/period))
             if bi<0:
                 bi=0
             after = stock.dateString(StockPlot.KD[bi][0])
-            c,k,d = stock.loadKline(code,5,after=after)
+            c,k,d = stock.loadKlineCache(code,5,bi=after)
             if period!=5:
                 k,d = stock.mergeK(k,d,int(period/5))
         
@@ -271,9 +273,9 @@ class StockPlot:
             k = k[:-off]
             d = d[:-off]
         #叠加流入数据
-        if len(d)>0:
+        if d is not None and len(d)>0:
             flow = self.getFlow(code,d,after)
-            if period!='d' and period!=60: #去掉一天中最后的数据，绘制的时候不然⑦链接
+            if flow is not None and period!='d' and period!=60: #去掉一天中最后的数据，绘制的时候不然⑦链接
                 for i in range(1,len(d)):
                     if d[i][0].day!=d[i-1][0].day:
                         flow[i,:] = NaN
@@ -649,7 +651,7 @@ class StockOrder:
                             cc = Themos.ORDER_BGCOLOR
                         canvas.beginPath()
                         canvas.fillColor(cc)
-                        canvas.rect(x+64,yy,Themos.ORDER_WIDTH-54,Themos.ORDER_ITEM_HEIGHT)
+                        canvas.rect(x+64,yy,Themos.ORDER_WIDTH-64-5,Themos.ORDER_ITEM_HEIGHT)
                         canvas.fill()        
                     """
                     1 最近5个交易日早盘有上涨提示 2 最近5个交易日早盘有下跌提示
@@ -661,7 +663,7 @@ class StockOrder:
                             cc = Themos.GREEN_COLOR
                         canvas.beginPath()
                         canvas.fillColor(cc)
-                        canvas.rect(x+10+Themos.ORDER_WIDTH,yy,10,Themos.ORDER_ITEM_HEIGHT)
+                        canvas.rect(x-5+Themos.ORDER_WIDTH,yy,5,Themos.ORDER_ITEM_HEIGHT)
                         canvas.fill()                        
                 canvas.fillColor(Themos.ORDER_TEXTCOLOR)
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
@@ -761,7 +763,6 @@ class HotPlotApp(frame.app):
         self._oldpagen = 0
         self._SO = StockOrder(self)
         self._SPV = [StockPlot() for i in range(10)]
-        self.setInterval(0)
         self._prefix = ('2',) #选择分类
         self._flowin = False #净流入
         self._hasboll = False #有通道
@@ -785,7 +786,7 @@ class HotPlotApp(frame.app):
         self._Data = None   
         self._rtk = 0 #0 rt 1 k
         self._messagebox = None
-        self.setClearColor(Themos.BGCOLOR)
+        self.setClearColor(Themos.BG_COLOR)
         self._ltt = datetime.today()
         self._lut = self._ltt
         threading.Thread(target=self.update_data_loop).start()
@@ -796,6 +797,9 @@ class HotPlotApp(frame.app):
         self._warningbox = []
         self._warningbox_isopen = False
         self._bollfilter = 0 #0 不过滤,1 向上 , 2 向下
+        self.updateTitle()
+        self.createFrame(0,0,Themos.ORDER_WIDTH,self._h,'list')
+        self.createFrame(Themos.ORDER_WIDTH,self.CAPTION_HEIGHT,self._w-Themos.ORDER_WIDTH,self._h-self.CAPTION_HEIGHT,'graph')
         self._readywav = self.loadWave('lobby_notification_matchready.wav') #测试
         self._buywav = self.loadWave('dropzone_select.wav')
         self._sellwav = self.loadWave('playerping.wav')
@@ -804,7 +808,7 @@ class HotPlotApp(frame.app):
         self._strongwav = self.loadWave('heartbeatloop.wav')
         self._strongsellwav = self.loadWave('rocketalarm.wav')
         self.setMixVolume(-1,0.1)
-        self.playWave(0,self._readywav) 
+        self.playWave(0,self._readywav)
     def update_data_loop(self):
         #一次性加载日线数据
         self._K240,self._D240 = xueqiu.get_period_k(240)
@@ -923,18 +927,30 @@ class HotPlotApp(frame.app):
         if self._needUpdate: #每分钟更新一次
             self._needUpdate = False
             self.updatedata()
-            self.update()
     def updateTitle(self):
         tt = datetime.today()
         title = "%s %s %d月%d日 %02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,self._filter.upper())
         self.setWindowTitle(title)
-    def render(self,x,y,w,h):
+    def render(self):
         try:
-            self._SO.render(self._canvas,x,y,Themos.ORDER_WIDTH,h,self._class)
+            canvas,w,h = self.beginFrame('list')
+            canvas.beginPath()
+            canvas.fillColor(Themos.BG_COLOR)
+            canvas.rect(0,0,w,h)
+            canvas.fill()
+            self._SO.render(canvas,0,0,Themos.ORDER_WIDTH,h,self._class)
+            self.endFrame()
+            canvas,w,h = self.beginFrame('graph')
+            x = 0
+            y = 0
+            canvas.beginPath()
+            canvas.fillColor(Themos.BG_COLOR)
+            canvas.rect(0,0,w,h)
+            canvas.fill()            
             col = self._numsub[0]
             raw = self._numsub[1]
-            dw = (w-Themos.ORDER_WIDTH-10)/col
-            dh = (h-Themos.XLABELHEIGHT)/raw
+            dw = int(w/col)
+            dh = int((h-Themos.XLABELHEIGHT)/raw)
             scale = scale=w/(720*self._numsub[0])
             if scale<1:
                 scale=1
@@ -942,42 +958,38 @@ class HotPlotApp(frame.app):
                 scale=1.6
             for xi in range(col):
                 for yi in range(raw):
-                    self._SPV[yi*col+xi].render(self._canvas,x+xi*dw+Themos.ORDER_WIDTH,y+yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale,warnings=self._warnings)
-            #graph.update(dt)
-            #graph.render(self._canvas,5,5)
+                    self._SPV[yi*col+xi].render(canvas,x+xi*dw,y+yi*dh,dw,dh,xaxis=yi==raw-1,scale=scale,warnings=self._warnings)
             if self._help:
                 if self._helpimg is None:
                     _path = '/'.join(str.split(__file__,'\\')[:-1])
                     self._helpimg = self._canvas.createImage('%s/../images/hothelp.png'%_path,0)
-                with self._canvas as canvas:
-                    imgw,imgh = canvas.imageSize(self._helpimg)
-                    paint = canvas.imagePattern(0,0,imgw,imgh,0,self._helpimg,1)
-                    canvas.beginPath()
-                    canvas.scale(w/imgw,h/imgh)
-                    canvas.rect(x,y,imgw,imgh)
-                    canvas.fillPaint(paint)
-                    canvas.fill()
+                imgw,imgh = canvas.imageSize(self._helpimg)
+                paint = canvas.imagePattern(0,0,imgw,imgh,0,self._helpimg,1)
+                canvas.beginPath()
+                canvas.scale(w/imgw,h/imgh)
+                canvas.rect(x,y,imgw,imgh)
+                canvas.fillPaint(paint)
+                canvas.fill()
             elif self._helpimg is not None:
-                self._canvas.deleteImage(self._helpimg)
+                canvas.deleteImage(self._helpimg)
                 self._helpimg = None
             if self._messagebox is not None: #绘制消息
-                with self._canvas as canvas:
-                    canvas.beginPath()
-                    canvas.fillColor(Themos.BG_COLOR)
-                    canvas.fontFace('zh')
-                    canvas.fontSize(16)
-                    canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
-                    prc = ctypes.pointer(ctypes.c_float(4))
-                    canvas.textBounds(w/2,h/2,self._messagebox,prc)
-                    canvas.rect(prc[0]-5,prc[1]-5,prc[2]-prc[0]+10,prc[3]-prc[1]+10)
-                    canvas.fill()
-                    canvas.beginPath()
-                    canvas.strokeWidth(1)
-                    canvas.strokeColor(Themos.TEXTCOLOR)
-                    canvas.rect(prc[0]-5,prc[1]-5,prc[2]-prc[0]+10,prc[3]-prc[1]+10)
-                    canvas.stroke()
-                    canvas.fillColor(Themos.TEXTCOLOR)
-                    canvas.text(w/2,h/2,self._messagebox)
+                canvas.beginPath()
+                canvas.fillColor(Themos.BG_COLOR)
+                canvas.fontFace('zh')
+                canvas.fontSize(16)
+                canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
+                prc = ctypes.pointer(ctypes.c_float(4))
+                canvas.textBounds(w/2,h/2,self._messagebox,prc)
+                canvas.rect(prc[0]-5,prc[1]-5,prc[2]-prc[0]+10,prc[3]-prc[1]+10)
+                canvas.fill()
+                canvas.beginPath()
+                canvas.strokeWidth(1)
+                canvas.strokeColor(Themos.TEXTCOLOR)
+                canvas.rect(prc[0]-5,prc[1]-5,prc[2]-prc[0]+10,prc[3]-prc[1]+10)
+                canvas.stroke()
+                canvas.fillColor(Themos.TEXTCOLOR)
+                canvas.text(w/2,h/2,self._messagebox)
             if self._warningbox_isopen:
                 #self._warningbox_isopen = False
                 W = 320
@@ -989,35 +1001,33 @@ class HotPlotApp(frame.app):
                 ox = x+(w-W*N)/2
                 oy = y+(h-H)/2
                 xx = np.arange(48*3)
-                with self._canvas as canvas:
-                    for i in range(N):
-                        op = self._warningbox[len(self._warningbox)-i-1]
-                        wb = op[1]
-                        rr = 128
-                        if op[0]=='++' or op[0]=='--':
-                            rr = 255
-                        if wb[0]==HotPlotApp.BUYWARNING:
-                            tc = vg.nvgRGB(rr,0,0)
-                        else:
-                            tc = vg.nvgRGB(0,rr,0)
-                        canvas.beginPath()
-                        canvas.fillColor(ThemosBlack.ORDER_BGCOLOR)
-                        canvas.rect(ox,oy,W,H)
-                        canvas.fill()
-                        plot = frame.Plot()
-                        plot.setTitleColor(tc)
-                        plot.setTitleSize(20)
-                        plot.setTitle("%s%s"%(op[0],wb[6][2]))
-                        plot.setx(xx)
-                        plot.plot(wb[4][0][-48*3:],color=ThemosBlack.MA5_COLOR)
-                        plot.plot(wb[4][1][-48*3:],color=ThemosBlack.MA10_COLOR,linewidth=2)
-                        plot.plot(wb[4][2][-48*3:],color=ThemosBlack.MA20_COLOR,linewidth=3)
-                        plot.plot(wb[4][3][-48*3:],color=ThemosBlack.MA30_COLOR,linewidth=4)
-                        plot.setThemos(ThemosBlack)
-                        plot.render(canvas,ox,oy,W,H)
-                        ox+=W
-                    
-
+                for i in range(N):
+                    op = self._warningbox[len(self._warningbox)-i-1]
+                    wb = op[1]
+                    rr = 128
+                    if op[0]=='++' or op[0]=='--':
+                        rr = 255
+                    if wb[0]==HotPlotApp.BUYWARNING:
+                        tc = vg.nvgRGB(rr,0,0)
+                    else:
+                        tc = vg.nvgRGB(0,rr,0)
+                    canvas.beginPath()
+                    canvas.fillColor(ThemosBlack.ORDER_BGCOLOR)
+                    canvas.rect(ox,oy,W,H)
+                    canvas.fill()
+                    plot = frame.Plot()
+                    plot.setTitleColor(tc)
+                    plot.setTitleSize(20)
+                    plot.setTitle("%s%s"%(op[0],wb[6][2]))
+                    plot.setx(xx)
+                    plot.plot(wb[4][0][-48*3:],color=ThemosBlack.MA5_COLOR)
+                    plot.plot(wb[4][1][-48*3:],color=ThemosBlack.MA10_COLOR,linewidth=2)
+                    plot.plot(wb[4][2][-48*3:],color=ThemosBlack.MA20_COLOR,linewidth=3)
+                    plot.plot(wb[4][3][-48*3:],color=ThemosBlack.MA30_COLOR,linewidth=4)
+                    plot.setThemos(ThemosBlack)
+                    plot.render(canvas,ox,oy,W,H)
+                    ox+=W
+            self.endFrame()
         except Exception as e:
             mylog.printe(e)
             log.error("render "+str(e))
@@ -1141,6 +1151,10 @@ class HotPlotApp(frame.app):
                                 d = []
                         title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
                         self._SPV[i].updateBollWay(it[0][1],title,k,d,self._period)
+        """
+        将数据渲染到FBO中
+        """
+        self.render()
     def em933(self,K,D): #补全，使得长度固定为30分钟
         d = []
         for i in range(len(D)):
@@ -1396,7 +1410,6 @@ class HotPlotApp(frame.app):
             return
 
         self.updatedata()
-        self.update()
     def getma5b(self,K15,D15,n=3):
         #f返回一个plotfs2 的ma5b需要的参数，用于绘制5日均线 n = 3起点位置在3天前
         if n==0:

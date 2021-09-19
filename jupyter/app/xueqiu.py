@@ -2476,15 +2476,14 @@ def getTodayFlow(code):
 返回code的资金流数据
 如果没有发现code就使用sinaFlow数据
 """
-
-def getFlow(code,lastday=None,after=None):
+def getFlow(code,lastday=None,after=None,ei=None):
     #这里对数据进行缓存避免多次操作数据库
     if lastday is not None:
         after = stock.dateString(date.today()-timedelta(days=365 if lastday is None else lastday))
 
-    b,flowk,flowd = stock.loademFlow(code,after)
+    b,flowk,flowd = stock.loademFlow(code,after=after,ei=ei)
     if not b:
-        flowk,flowd = stock.loadFlow(after)   
+        flowk,flowd = stock.loadFlow(after=after,ei=ei)
     b,k,d = getTodayFlow(code)
     if b and d[-1][0]>flowd[-1][0]:#叠加
         endt = flowd[-1][0]
@@ -2497,6 +2496,31 @@ def getFlow(code,lastday=None,after=None):
         flowk = np.vstack((flowk,nfk))
     return flowk,flowd
 
+"""
+带有缓存功能的getFlow
+"""
+def getFlowCache(code,bi):
+    name = '%s.fcache'%(code)
+    b,z = shared.fromRedis(name)
+    if b and z[0] is not None and z[1] is not None:
+        (f,d) = z
+        tbi = datetime.fromisoformat(bi)
+        if d[0][0]>tbi:
+            #加载新数据，组合
+            nf,nd = getFlow(code,after=bi,ei=stock.timeString(d[0][0]))
+            if nd[-1][0]==d[0][0]: #重叠一个
+                f = np.vstack((nf[:-1],f))
+                d = nd[:-1] + d
+            else:
+                f = np.vstack((nf,f))
+                d = nd + d
+        else:
+            return f,d
+    else:
+        f,d = getFlow(code,after=bi)
+    
+    shared.toRedis((f,d),name,ex=3600*12) #存储12小时
+    return f,d
 """
 取得今天的分时
 [[0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting]]

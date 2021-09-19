@@ -18,7 +18,7 @@ class Canvas2d:
         return vg.nvgluCreateFramebuffer(self._ctx,width,height,imageFlags)
     def bindFramebuffer(self,fbo):
         vg.nvgluBindFramebuffer(fbo)
-    def nvgluDeleteFramebuffer(self,fbo):
+    def deleteFramebuffer(self,fbo):
         vg.nvgluDeleteFramebuffer(fbo)
     def beginFrame(self,windowWidth:float, windowHeight:float, devicePixelRatio:float = 1):
         """
