@@ -273,15 +273,20 @@ def loadKlineMM():
 和loadKline一样只是增加redis缓存
 缓存数据(c,k,d)
 """
+g_kd = {}
 def loadKlineCache(code,period,bi):
-    name = '%s_%s.kcache'%(code,period)
+    global g_kd
+    name = '%s_%s.kcach'%(code,period)
+    if period=='d':
+        tbi = date.fromisoformat(bi)
+    else:
+        tbi = datetime.fromisoformat(bi)    
+    if name in g_kd and (g_kd[name][2][0][0]-tbi<=timedelta(days=1) or g_kd[name][3]):
+        return g_kd[name][:3]
     b,z = shared.fromRedis(name)
     if b and z[1] is not None and z[2] is not None:
         (c,k,d) = z
-        if period=='d':
-            tbi = date.fromisoformat(bi)
-        else:
-            tbi = datetime.fromisoformat(bi)
+
         if d[0][0]>tbi:
             nc,nk,nd = loadKline(code,period,after=bi,ei= dateString(d[0][0]) if period=='d' else timeString(d[0][0]))
             #加载新数据，组合
@@ -292,11 +297,14 @@ def loadKlineCache(code,period,bi):
                 k = np.vstack((nk,k))
                 d = nd + d
         else: #直接返回数据，数据量可能更多
+            g_kd[name] = (c,k,d)
             return c,k,d
     else:
         c,k,d = loadKline(code,period,after=bi)
     
     shared.toRedis((c,k,d),name,ex=3600*12) #存储12小时
+    isall = (d[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
+    g_kd[name] = (c,k,d,isall)
     return c,k,d
 
 """

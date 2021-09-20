@@ -267,7 +267,7 @@ class StockPlot:
             if period!=5:
                 k,d = stock.mergeK(k,d,int(period/5))
         
-        if off==0 and stock.isTransDay():
+        if off==0 and stock.isTransDay() and stock.isTransTime():
             _,k,d = xueqiu.appendK(code,period,k,d)
         if off!=0:
             k = k[:-off]
