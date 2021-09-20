@@ -74,6 +74,15 @@ def ismafashan(mas):
     return False
 
 """
+用来判断多点拟合线
+"""
+def isrise(k):
+    x = np.empty((len(k),2))
+    x[:,0] = np.arange(len(k))
+    x[:,1] = k
+    line = trend.lastSequaresLine(x)
+    return line[0]>=0
+"""
 分析早盘情况
 k5 (0 price,1 当日涨幅,2 volume,3 larg,4 big,5 mid,6 ting
 """
@@ -223,6 +232,7 @@ class StockPlot:
         self._kplot.clear()
         self._vplot.clear()
         self._fplot.clear()
+        self._needrender = True
     def forcus(self,b):
         self._forcus = b
     def getFlow(self,code,d,after):
@@ -658,13 +668,14 @@ class StockOrder:
                     """
                     if ii < len(self._npt._BOLL):
                         bo = self._npt._BOLL[ii]
-                        rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
-                        if rise and bo[-1,0]>=bo[-2,0]: #都向上
-                            cc = Themos.CAN_BUY_TEXTCOLOR2
-                        elif rise: #通道上行
-                            cc = Themos.CAN_BUY_TEXTCOLOR                            
+                        #rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
+                        rise = isrise(bo[-5:,1]) #and isrise(bo[-5:,2])
+                        if rise and isrise(bo[-5:,0]):
+                            cc = Themos.CAN_BUY_TEXTCOLOR2  #紫色
+                        elif rise:
+                            cc = Themos.CAN_BUY_TEXTCOLOR   #红色                      
                         elif bo[-1,0]>=bo[-2,0]: #下轨向上
-                            cc = Themos.CAN_BUY_TEXTCOLOR3
+                            cc = Themos.CAN_BUY_TEXTCOLOR3  #棕色
                         else:
                             cc = Themos.ORDER_BGCOLOR
                         canvas.beginPath()
@@ -866,7 +877,7 @@ class HotPlotApp(frame.app):
         rtk = self._Data[0]
         for i in range(len(HotPlotApp.companys)):
             bo = self._BOLL[i]
-            rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
+            #rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
             rise = True
             if rise:
                 #监视上升趋势中的5分钟空头排列和5分钟多头排列
@@ -936,23 +947,16 @@ class HotPlotApp(frame.app):
         self._warningbox.append((typ,warning,i,datetime.today()))
         return True
     def getCurrentRT(self):
-        """
-        k,d,k15,d15,_,e = self._Data
-        for i in range(len(d)-1,0,-1):
-            if d[i].hour==9 and d[i].minute==31:
-                break
-        return (k[:,:i,:],d[:i],k15,d15,_,e)
-        """
         return self._Data
     def onLoop(self,t,dt):
         tt = datetime.today()
-        if tt.minute!=self._ltt.minute:
+        if tt.second!=self._ltt.second:
             self._ltt = tt
             self.updateTitle()
         self.render()
     def updateTitle(self):
         tt = datetime.today()
-        title = "%s %s %d月%d日 %02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,self._filter.upper())
+        title = "%s %s %d月%d日 %02d:%02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper())
         self.setWindowTitle(title)
     def render(self):
         try:
@@ -1400,7 +1404,7 @@ class HotPlotApp(frame.app):
         for i in range(len(companys)):
             if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
                 bo = self._BOLL[i]
-                rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
+                rise = isrise(bo[-5:,1]) #and isrise(bo[-5:,2])
                 if self._bollfilter==0 or (self._bollfilter==1 and rise) or (self._bollfilter==2 and not rise):
                     R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
