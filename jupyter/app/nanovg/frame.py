@@ -147,11 +147,11 @@ class app:
             t = SDL_GetTicks()/1000.
             dt = t-prevt
             prevt = t
+            self.onLoop(t,dt)
             if (self._interval>0 and acc>self._interval) or self._delayupdate:
                 acc = 0
                 self.update(dt)
                 self._delayupdate = False
-            self.onLoop(t,dt)
             acc+=dt
             sdl2.SDL_Delay(10)
         sdl2.SDL_GL_DeleteContext(self._context)
