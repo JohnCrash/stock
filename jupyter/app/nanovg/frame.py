@@ -67,6 +67,11 @@ class app:
             fbo = self._fbos[name]
             del self._fbos[name]
             self._canvas.deleteFramebuffer(fbo[4])
+    def getFrame(self,name):
+        if name in self._fbos:
+            return self._fbos[name]
+        else:
+            return None
     def beginFrame(self,name):
         if name in self._fbos:
             fbo = self._fbos[name]
@@ -271,6 +276,8 @@ class app:
         c.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
         c.text(w/2,h/2,self._windowtitle)
         self.endFrame()
+    def render(self,canvas,x,y,w,h):
+        pass
     def update(self,dt=0):
         if self._updatefbo or self._delayupdate:
             w,h = c_int(),c_int()
@@ -288,6 +295,7 @@ class app:
                 canvas.fillPaint(cfp)
                 canvas.rect(fbo[0],fbo[1],fbo[2],fbo[3])
                 canvas.fill()
+            self.render(canvas,0,0,w.value,h.value)
             canvas.endFrame()
             sdl2.SDL_GL_SwapWindow(self._window)
             self._updatefbo = False
@@ -410,6 +418,8 @@ class Plot:
         self._x = None
         self._xlabels = None
         self._y = []
+        self._hline = []
+        self._vline = []
         self._lwscale = 1
         self._title = ''
         self._xticks = None
@@ -441,6 +451,16 @@ class Plot:
         绘制线型图表
         """
         self._y.append((y,color,linewidth,linestyle,label,style)) #0 y,1 color,2 linewidth,3 linestyle,4 label
+    def hline(self,y,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None):
+        """
+        绘制横线
+        """
+        self._hline.append((y,color,linewidth,linestyle))
+    def vline(self,x,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None):
+        """
+        绘制竖线
+        """
+        self._vline.append((x,color,linewidth,linestyle))
     def setTitle(self,title):
         self._title = title
     def setTitleColor(self,c):
@@ -453,6 +473,8 @@ class Plot:
         """
         self._x = None
         self._y = []
+        self._hline = []
+        self._vline = []
         self._ye = None
         self._xe = None
         self._xticks = None
@@ -556,6 +578,14 @@ class Plot:
         w0-=self._inner[0]+self._inner[1]
         wx = w0*(x*self._xk+self._xb)+x0
         return wx
+    def wx2x(self,wx):
+        """
+        将屏幕坐标映射到数据
+        """
+        x0,y0,w0,h0 = self.plotRect()
+        x0+=self._inner[0]
+        w0-=self._inner[0]+self._inner[1]
+        return ((wx-x0)/w0-self._xb)/self._xk
     def yAxis2wy(self,y):
         """
         从y轴数据空间映射到屏幕y坐标
@@ -565,6 +595,11 @@ class Plot:
         h0-=self._inner[2]+self._inner[3]
         wy = h0*(1-(y*self._yk+self._yb))+y0 #y反转
         return wy
+    def wy2y(self,wy):
+        x0,y0,w0,h0 = self.plotRect()
+        y0+=self._inner[2]
+        h0-=self._inner[2]+self._inner[3]
+        return (1-(wy-y0)/h0-self._yb)/self._yk
     def x2AxisLabel(self,x):
         if self._xe is None:
             return str(x)
@@ -735,4 +770,29 @@ class Plot:
                         canvas.fillColor(color)
                     canvas.rect(x-dx/2,oy,dx,Y[i]-oy)
                     canvas.fill()
+        if len(self._hline)>0 or len(self._vline)>0:
+            xy = np.empty((2,2),dtype=np.float32)
+            xy[0,0] = self.xAxis2wx(self._x.min())
+            xy[1,0] = self.xAxis2wx(self._x.max())
+            for hl in self._hline:
+                xy[:,1] = self.yAxis2wy(hl[0])
+                canvas.beginPath()
+                canvas.strokeColor(hl[1])
+                canvas.strokeWidth(hl[2]*self._lwscale)
+                pts = xy.ctypes.data_as(Plot.c_float_p)
+                canvas.line(pts,2,hl[3])
+                canvas.stroke()
+            """
+            xy[0,1] = self.xAxis2wx(self._y.min())
+            xy[1,1] = self.xAxis2wx(self._y.max())
+            for hl in self._vline:
+                xy[:,0] = self.xAxis2wx(hl[0])
+                canvas.beginPath()
+                canvas.strokeColor(hl[1])
+                canvas.strokeWidth(hl[2]*self._lwscale)
+                pts = xy.ctypes.data_as(Plot.c_float_p)
+                canvas.line(pts,2,hl[3])
+                canvas.stroke()               
+            """
+         
         canvas.restore()

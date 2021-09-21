@@ -119,7 +119,7 @@ class ThemosDefault:
     RED_COLOR = vg.nvgRGB(220,0,0)   #涨
     GREEN_COLOR = vg.nvgRGB(0,120,0) #跌
     BG_COLOR = vg.nvgRGB(255,255,255) #背景
-
+    CROSS_COLOR = vg.nvgRGBAf(1,1,1,0.5)
     YLABELWIDTH = 40   #y轴坐标轴空间
     XLABELHEIGHT = 30  #x轴坐标轴空间
 
@@ -160,7 +160,7 @@ class ThemosBlack:
     RED_COLOR = vg.nvgRGB(250,0,0)   #涨
     GREEN_COLOR = vg.nvgRGB(0,200,0) #跌
     BG_COLOR = vg.nvgRGB(0,0,0) #背景
-
+    CROSS_COLOR = vg.nvgRGBAf(1,1,1,0.5)
     YLABELWIDTH = 42   #y轴坐标轴空间
     XLABELHEIGHT = 36  #x轴坐标轴空间
 
@@ -339,13 +339,29 @@ class StockPlot:
             self._kplot.plot(bo[bi:,2],label='up',color=Themos.LARG_COLOR,linewidth=1)
         self._fplot.setx(x)
         self._fplot.setTicks(xticks)      
-        self._fplot.setTicksAngle(25)  
-        if flow is not None:
-            self._fplot.plot(flow[bi:,0],label='larg',color=Themos.HUGE_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:,1],label='big',color=Themos.LARG_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:,2],label='mid',color=Themos.MID_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:,3],label='ting',color=Themos.TING_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:,0]+flow[bi:,1],label='main',color=Themos.MAIN_COLOR,linewidth=2)
+        self._fplot.setTicksAngle(25)
+        if self._vmode==StockPlot.FLOW:
+            if flow is not None:
+                self._fplot.plot(flow[bi:,0],label='larg',color=Themos.HUGE_COLOR,linewidth=1)
+                self._fplot.plot(flow[bi:,1],label='big',color=Themos.LARG_COLOR,linewidth=1)
+                self._fplot.plot(flow[bi:,2],label='mid',color=Themos.MID_COLOR,linewidth=1)
+                self._fplot.plot(flow[bi:,3],label='ting',color=Themos.TING_COLOR,linewidth=1)
+                self._fplot.plot(flow[bi:,0]+flow[bi:,1],label='main',color=Themos.MAIN_COLOR,linewidth=2)
+        elif self._vmode==StockPlot.VOL: #这里解释为MACD
+            macd,dif,dea = stock.macd(k)
+            mp = np.copy(macd[bi:])
+            mp[mp<0] = 0
+            mn = np.copy(macd[bi:])
+            mn[mn>0] = 0            
+            self._fplot.plot(mp[bi:],label='macd',color=Themos.RED_COLOR,linewidth=1,style=frame.Plot.BAR)
+            self._fplot.plot(mn[bi:],label='macd',color=Themos.GREEN_COLOR,linewidth=1,style=frame.Plot.BAR)
+            self._fplot.plot(dif[bi:],label='DIF',color=Themos.LARG_COLOR,linewidth=1)
+            self._fplot.plot(dea[bi:],label='DEA',color=Themos.PRICE_COLOR,linewidth=1)
+        elif self._vmode==StockPlot.LMR: #这里解释为RSI
+            rsi = stock.rsi(k[:,4],6)
+            self._fplot.plot(rsi[bi:],label='RSI',color=Themos.LARG_COLOR,linewidth=1)
+            self._fplot.hline(20,color=Themos.RED_COLOR,linestyle=(4,2,0))
+            self._fplot.hline(80,color=Themos.GREEN_COLOR,linestyle=(4,2,0))
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
@@ -829,6 +845,8 @@ class HotPlotApp(frame.app):
         self._BOLL = []
         self._warnings = None
         self._zp = {}
+        self._msl = {}
+        self._mslb = False
         self._warningbox = []
         self._warningbox_isopen = False
         self._bollfilter = 0 #0 不过滤,1 向上 , 2 向下
@@ -958,12 +976,12 @@ class HotPlotApp(frame.app):
         if tt.second!=self._ltt.second:
             self._ltt = tt
             self.updateTitle()
-        self.render()
+        self.renderfbo()
     def updateTitle(self):
         tt = datetime.today()
         title = "%s %s %d月%d日 %02d:%02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper())
         self.setWindowTitle(title)
-    def render(self):
+    def renderfbo(self):
         try:
             if self._SO._needrender:
                 canvas,w,h = self.beginFrame('list')
@@ -994,6 +1012,16 @@ class HotPlotApp(frame.app):
         except Exception as e:
             mylog.printe(e)
             log.error("render "+str(e))
+    def render(self,canvas,x,y,w,h):
+        if 'spv' in self._msl:
+            canvas.beginPath()
+            canvas.strokeColor(Themos.CROSS_COLOR)
+            canvas.strokeWidth(1)
+            canvas.moveTo(self._msl['mx'],self._msl['y'])
+            canvas.lineTo(self._msl['mx'],self._msl['y']+self._msl['h'])
+            canvas.moveTo(self._msl['x'],self._msl['my'])
+            canvas.lineTo(self._msl['x']+self._msl['w'],self._msl['my']) 
+            canvas.stroke()
     def messagebox(self,msg):
         self._messagebox = msg
         #self.delayUpdate()
@@ -1074,6 +1102,7 @@ class HotPlotApp(frame.app):
                         k[s,0] = k[s-1,0]
                 if self._rtk==1 or (self._current is not None and i==self._current):
                     title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
+                    self._SPV[i].viewMode(vm=self._volmode)
                     self._kei = self._SPV[i].updateK(it[0][1],title,self._period,self._knum,self._kei)
                 else:
                     if self._kmode==HotPlotApp.RT:
@@ -1471,4 +1500,38 @@ class HotPlotApp(frame.app):
         S = {}
         for it in result:
             S[it[2]] = it
-        return S.keys()                  
+        return S.keys()
+    def onMouseMotion(self,event):
+        """
+        显示数据细节
+        """
+        if self._mslb:
+            mx = event.motion.x
+            my = event.motion.y
+            self._msl = {}
+            if mx>Themos.ORDER_WIDTH:
+                col = self._numsub[0]
+                raw = self._numsub[1]
+                (x,y,w,h,fbo,name) = self.getFrame("graph")
+                dw = int(w/col)
+                dh = int((h-Themos.XLABELHEIGHT)/raw)
+                for xi in range(col):
+                    for yi in range(raw):
+                        spv = self._SPV[yi*col+xi]
+                        if spv._k is not None and mx>x+xi*dw and mx<x+(xi+1)*dw and my>y+yi*dh and my<y+yi*dh+dh:
+                            self._msl['spv'] = spv
+                            self._msl['mx'] = mx
+                            self._msl['my'] = my
+                            self._msl['x'] = x+xi*dw
+                            self._msl['y'] = y+yi*dh
+                            self._msl['w'] = dw
+                            self._msl['h'] = dh
+                            self.delayUpdate()
+                            break
+        super(HotPlotApp,self).onMouseMotion(event)
+    def onMouseUp(self,event):
+        if event.button.button==sdl2.SDL_BUTTON_LEFT:
+            self._mslb = not self._mslb
+            self._msl = {}
+            self.delayUpdate()
+        super(HotPlotApp,self).onMouseUp(event)
