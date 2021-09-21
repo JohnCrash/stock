@@ -232,7 +232,6 @@ class StockPlot:
         self._kplot.clear()
         self._vplot.clear()
         self._fplot.clear()
-        self._needrender = True
     def forcus(self,b):
         self._forcus = b
     def getFlow(self,code,d,after):
@@ -304,7 +303,7 @@ class StockPlot:
         
         x = np.arange(len(k[bi:ei]))
         xticks = []
-        D = d[bi:ei]
+        D = d[bi:]
         for i in range(1,len(D)):
             if type(period)==int:
                 if (D[i][0].day!=D[i-1][0].day):
@@ -316,9 +315,9 @@ class StockPlot:
                     xticks.append((i,'%2d-%2d'%(t.month,t.day)))                   
         self._kplot.setx(x)
         self._kplot.setTicks(xticks)
-        K = k[bi:ei,1:]
-        self._k = k[bi:ei,4]
-        self._d = d[bi:ei]
+        K = k[bi:,1:]
+        self._k = k[bi:,4]
+        self._d = d[bi:]
         self._kplot.plot(K,color=Themos.PRICE_COLOR,style=frame.Plot.K)
         if StockPlot.KVMODE==1:
             if period=='d':
@@ -330,28 +329,28 @@ class StockPlot:
                 ma5 = stock.ma(k[:,4],s)
                 ma20 = stock.ma(k[:,4],4*s)
                 ma30 = stock.ma(k[:,4],6*s)            
-            self._kplot.plot(ma5[bi:ei],label='ma5',color=Themos.MAIN_COLOR,linewidth=1)
-            self._kplot.plot(ma20[bi:ei],label='ma20',color=Themos.LARG_COLOR,linewidth=2)
-            self._kplot.plot(ma30[bi:ei],label='ma30',color=Themos.MA30_COLOR,linewidth=3)
+            self._kplot.plot(ma5[bi:],label='ma5',color=Themos.MAIN_COLOR,linewidth=1)
+            self._kplot.plot(ma20[bi:],label='ma20',color=Themos.LARG_COLOR,linewidth=2)
+            self._kplot.plot(ma30[bi:],label='ma30',color=Themos.MA30_COLOR,linewidth=3)
         else:
             bo = stock.boll(k[:,4])
-            self._kplot.plot(bo[bi:ei,0],label='low',color=Themos.MAIN_COLOR,linewidth=1)
-            self._kplot.plot(bo[bi:ei,1],label='mid',color=Themos.PRICE_COLOR,linewidth=1)
-            self._kplot.plot(bo[bi:ei,2],label='up',color=Themos.LARG_COLOR,linewidth=1)
+            self._kplot.plot(bo[bi:,0],label='low',color=Themos.MAIN_COLOR,linewidth=1)
+            self._kplot.plot(bo[bi:,1],label='mid',color=Themos.PRICE_COLOR,linewidth=1)
+            self._kplot.plot(bo[bi:,2],label='up',color=Themos.LARG_COLOR,linewidth=1)
         self._fplot.setx(x)
         self._fplot.setTicks(xticks)      
         self._fplot.setTicksAngle(25)  
         if flow is not None:
-            self._fplot.plot(flow[bi:ei,0],label='larg',color=Themos.HUGE_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:ei,1],label='big',color=Themos.LARG_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:ei,2],label='mid',color=Themos.MID_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:ei,3],label='ting',color=Themos.TING_COLOR,linewidth=1)
-            self._fplot.plot(flow[bi:ei,0]+flow[bi:ei,1],label='main',color=Themos.MAIN_COLOR,linewidth=2)
+            self._fplot.plot(flow[bi:,0],label='larg',color=Themos.HUGE_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:,1],label='big',color=Themos.LARG_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:,2],label='mid',color=Themos.MID_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:,3],label='ting',color=Themos.TING_COLOR,linewidth=1)
+            self._fplot.plot(flow[bi:,0]+flow[bi:,1],label='main',color=Themos.MAIN_COLOR,linewidth=2)
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
         color = [Themos.RED_COLOR if K[i,0]<K[i,3] else Themos.GREEN_COLOR for i in range(K.shape[0])]
-        self._vplot.plot(k[bi:ei,0],color=color,style=frame.Plot.BAR)
+        self._vplot.plot(k[bi:,0],color=color,style=frame.Plot.BAR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._fplot.setGrid(True,True)
@@ -359,6 +358,10 @@ class StockPlot:
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._fplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
+        self._kplot.setInnerSpace(5,5,0,0)
+        self._vplot.setInnerSpace(5,5,0,0)
+        self._fplot.setInnerSpace(5,5,0,0)
+        
         self._needrender = True
         return kei
     def viewMode(self,km=None,vm=None):
@@ -446,6 +449,8 @@ class StockPlot:
         self._kplot.setTitle(label)
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
+        self._kplot.setInnerSpace(0,0,0,0)
+        self._vplot.setInnerSpace(0,0,0,0)    
         if ma5b is not None and len(d)>0:
             ma5 = np.zeros((len(k),))
             ma5[0] = ma5b[0]
@@ -1107,6 +1112,8 @@ class HotPlotApp(frame.app):
                                 d = []
                         title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
                         self._SPV[i].updateBollWay(it[0][1],title,k,d,self._period)
+            else:
+                self._SPV[i]._needrender = True
 
     def em933(self,K,D): #补全，使得长度固定为30分钟
         d = []

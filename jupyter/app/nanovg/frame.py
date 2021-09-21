@@ -695,8 +695,8 @@ class Plot:
                             canvas.line(pts,i-bi,linestyle)
                         fz = False
                 if fz:
-                    pts = xy[bi:i].ctypes.data_as(Plot.c_float_p)
-                    canvas.line(pts,i-bi,linestyle)
+                    pts = xy[bi:i+1].ctypes.data_as(Plot.c_float_p)
+                    canvas.line(pts,i+1-bi,linestyle)
                 canvas.stroke()
             elif type1==Plot.K: #分别对应0 open 1 high 2 low 3 close
                 Y = self.yAxis2wy(y) #xy[:,1] = h*(y*self._yk+self._yb)+y0
