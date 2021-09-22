@@ -2519,12 +2519,16 @@ g_fds = {}
 def getFlowCache(code,bi):
     name = '%s.fcach'%(code)
     tbi = datetime.fromisoformat(bi)
-    if name in g_fds and (g_fds[name][1][0][0]<=tbi or g_fds[name][2]):
+    t = datetime.today()
+    if name in g_fds and (g_fds[name][1][0][0]<=tbi or g_fds[name][2]) and (t.hour<15 or (t.hour>=15 and g_fds[name][1][-1][0].day==t.day)):
         return g_fds[name][0],g_fds[name][1]
     b,z = shared.fromRedis(name)
     if b and z[0] is not None and z[1] is not None:
         (f,d) = z
-        if d[0][0]>tbi:
+        if stock.isTransDay() and t.hour>=15 and d[-1][0].day != t.day: #有新的数据更新，需要重新加载
+            f,d = getFlowRaw(code,after=bi)
+            shared.toRedis((f,d),name,ex=3600*12) #存储12小时
+        elif d[0][0]>tbi:
             #加载新数据，组合
             nf,nd = getFlowRaw(code,after=bi,ei=stock.timeString(d[0][0]))
             if nd[-1][0]==d[0][0]: #重叠一个

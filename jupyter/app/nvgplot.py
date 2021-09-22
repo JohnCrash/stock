@@ -128,6 +128,8 @@ class ThemosDefault:
     ORDER_SELCOLOR = vg.nvgRGB(196,96,96)
     ORDER_TEXTBGCOLOR = vg.nvgRGBA(64,64,64,255)
     ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
+    ORDER_TEXTCOLOR2 = vg.nvgRGB(255,255,0)
+    ORDER_TEXTCOLOR3 = vg.nvgRGB(0,255,0)
     CAN_BUY_TEXTCOLOR = vg.nvgRGB(170,0,0)  #上轨和中轨向上
     CAN_BUY_TEXTCOLOR2 = vg.nvgRGB(70,0,140)  #都向上
     CAN_BUY_TEXTCOLOR3 = vg.nvgRGB(187,61,0)  #仅仅下轨向上
@@ -168,7 +170,9 @@ class ThemosBlack:
     ORDER_HEADCOLOR = vg.nvgRGB(0,0,0)
     ORDER_SELCOLOR = vg.nvgRGB(32,96,168)
     ORDER_TEXTBGCOLOR = vg.nvgRGBA(0,0,0,255)
-    ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
+    ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255) 
+    ORDER_TEXTCOLOR2 = vg.nvgRGB(255,255,0) 
+    ORDER_TEXTCOLOR3 = vg.nvgRGB(0,255,0)
     CAN_BUY_TEXTCOLOR = vg.nvgRGB(170,0,0)  #上轨和中轨向上
     CAN_BUY_TEXTCOLOR2 = vg.nvgRGB(70,0,140)  #都向上
     CAN_BUY_TEXTCOLOR3 = vg.nvgRGB(100,50,0)  #仅仅下轨向上
@@ -362,6 +366,8 @@ class StockPlot:
             self._fplot.plot(rsi[bi:],label='RSI',color=Themos.LARG_COLOR,linewidth=1)
             self._fplot.hline(20,color=Themos.RED_COLOR,linestyle=(4,2,0))
             self._fplot.hline(80,color=Themos.GREEN_COLOR,linestyle=(4,2,0))
+            cci = stock.cci(k)
+            self._fplot.plot(stock.zoomrange(cci[bi:],0,100),label='CCI',color=Themos.PRICE_COLOR,linewidth=1)
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
@@ -714,12 +720,16 @@ class StockOrder:
                         canvas.beginPath()
                         canvas.fillColor(cc)
                         canvas.rect(x-5+Themos.ORDER_WIDTH,yy,5,Themos.ORDER_ITEM_HEIGHT)
-                        canvas.fill()                        
-                canvas.fillColor(Themos.ORDER_TEXTCOLOR)
+                        canvas.fill()
+                if self._npt._RSI[ii][-1]<25:
+                    canvas.fillColor(Themos.ORDER_TEXTCOLOR2)
+                elif self._npt._RSI[ii][-1]>80:
+                    canvas.fillColor(Themos.ORDER_TEXTCOLOR3)
+                else:
+                    canvas.fillColor(Themos.ORDER_TEXTCOLOR)
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
                 
                 #绘制涨跌幅
-                it[2]
                 canvas.fillColor(Themos.RED_COLOR if it[2]>0 else Themos.GREEN_COLOR)
                 if self._it2==StockOrder.IT2P:
                     canvas.text(x+8,yy+Themos.ORDER_ITEM_HEIGHT/2,"%.02f%%"%it[2])
@@ -843,6 +853,7 @@ class HotPlotApp(frame.app):
         self._needUpdate = False
         threading.Thread(target=self.update_data_loop).start()
         self._BOLL = []
+        self._RSI = []
         self._warnings = None
         self._zp = {}
         self._msl = {}
@@ -862,12 +873,24 @@ class HotPlotApp(frame.app):
         self._strongsellwav = self.loadWave('rocketalarm.wav')
         self.setMixVolume(-1,0.1)
         self.playWave(0,self._readywav)
-    def update_data_loop(self):
-        #一次性加载日线数据
+    def update60(self):
+        """
+        一个小时更新一次,这包括日BOLL,CCI(标准化到0-100),RSI
+        """
         self._K240,self._D240 = xueqiu.get_period_k(240)
         self._MA30 = stock.maMatrix(self._K240,30)
+        BOLL = []
+        RSI = []
         for i in range(self._K240.shape[0]):
-             self._BOLL.append(stock.boll(self._K240[i,:]))
+             BOLL.append(stock.boll(self._K240[i,:]))
+             RSI.append(stock.rsi(self._K240[i,:],6))
+        self._BOLL = BOLL
+        self._RSI = RSI
+
+    def update_data_loop(self):
+        #一次性加载日线数据
+        t60 = datetime.today()
+        self.update60()
         n = 0
         while self._running:
             if n>10:
@@ -889,6 +912,9 @@ class HotPlotApp(frame.app):
                     self.watchDog()
                     self.updatedata()
             if self._needUpdate: #每分钟更新一次
+                if stock.isTransDay() and stock.isTransTime() and datetime.today().hour!=t60.hour:
+                    self.update60()
+                    t60 = datetime.today()
                 self.updatedata()
                 self._needUpdate = False
             sdl2.SDL_Delay(10)
@@ -1019,7 +1045,7 @@ class HotPlotApp(frame.app):
             canvas.strokeWidth(1)
             canvas.moveTo(self._msl['mx'],self._msl['y'])
             canvas.lineTo(self._msl['mx'],self._msl['y']+self._msl['h'])
-            canvas.moveTo(self._msl['x'],self._msl['my'])
+            canvas.moveTo(self._msl['x']+Themos.YLABELWIDTH,self._msl['my'])
             canvas.lineTo(self._msl['x']+self._msl['w'],self._msl['my']) 
             canvas.stroke()
     def messagebox(self,msg):
@@ -1304,6 +1330,10 @@ class HotPlotApp(frame.app):
             self._bollfilter = 2 if self._bollfilter!=2 else 0
         elif sym==sdl2.SDLK_KP_ENTER:
             self._rtk = 1 if self._rtk==0 else 0
+            if self._rtk==0:
+                self._volmode = StockPlot.FLOW
+            else:
+                 self._volmode = StockPlot.VOL
         elif sym in HotPlotApp.MAP2NUM:
             oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:

@@ -1199,5 +1199,6 @@ def get30codes(p,n,maN=30):
             R.append(c[i])
     return R
 
-print(get30codes('91',20))
+#print(get30codes('91',20))
 #xueqiu.emflowRT2()
+#print(stock.roll_std(np.array([5, 5, 6, 7, 5, 5, 5]),3))

@@ -280,14 +280,16 @@ def loadKlineCache(code,period,bi):
     if period=='d':
         tbi = date.fromisoformat(bi)
     else:
-        tbi = datetime.fromisoformat(bi)    
-    if name in g_kd and (g_kd[name][2][0][0]-tbi<=timedelta(days=1) or g_kd[name][3]):
+        tbi = datetime.fromisoformat(bi)
+    t = datetime.today()
+    if name in g_kd and (g_kd[name][2][0][0]-tbi<=timedelta(days=1) or g_kd[name][3]) and (t.hour<15 or (t.hour>=15 and g_kd[name][2][-1][0].day==t.day)):
         return g_kd[name][:3]
     b,z = shared.fromRedis(name)
     if b and z[1] is not None and z[2] is not None:
         (c,k,d) = z
-
-        if d[0][0]>tbi:
+        if isTransDay() and t.hour>=15 and d[-1][0].day != t.day: #有新的数据更新，需要重新加载
+            c,k,d = loadKline(code,period,after=bi)
+        elif d[0][0]>tbi:
             nc,nk,nd = loadKline(code,period,after=bi,ei= dateString(d[0][0]) if period=='d' else timeString(d[0][0]))
             #加载新数据，组合
             if nd[-1][0]==d[0][0]: #重叠一个
@@ -524,12 +526,25 @@ def rsi(k,n=6):
     result[1:] = RSI*100
     return result
 
+def roll_std(a,n):
+    """
+    计算滚动标准差
+    """
+    mean = ma(a,n)
+    std = np.ones((len(a),))
+    for i in range(n-1,len(a)):
+        std[i] = ((a[i-n+1:i+1]-mean[i])**2).sum()/(n-1)
+    return np.sqrt(std)
 """
 CCI（Commodity Channel lndex）顺势指标是测量股价是否已超出常态分布范围的一个指数，
 由唐纳德·R.兰伯特（DonaldLambert）所创，属于超买超卖类指标中较特殊的一种，波动于正无限大和负无限小之间。
 """
-def cci():
-    pass
+def cci(k,n=14):
+    TP = (k[:,2]+k[:,3]+k[:,4])/3
+    MA = ma(TP,n)
+    #MD = ma(np.abs(TP-MA),n)*0.015 #baidu百科公式，有问题
+    MD = roll_std(TP,n)*0.015 #该公式在python cci搜索中找到基本吻合
+    return (TP-MA)/MD
 
 """
 成交量能量
@@ -1535,3 +1550,11 @@ def getHoldStocks(name='hold'):
     """
     b,ls = shared.fromRedis(name)
     return ls if b else []
+
+def zoomrange(a,mi,mx):
+    """
+    将数据a缩放到指定范围
+    """
+    k = (mx-mi)/(a.max()-a.min())
+    b = mi-k*a.min()
+    return k*a+b
