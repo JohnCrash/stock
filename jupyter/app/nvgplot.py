@@ -320,7 +320,7 @@ class StockPlot:
         self._kplot.setx(x)
         self._kplot.setTicks(xticks)
         K = k[bi:,1:]
-        self._k = k[bi:,4]
+        self._k = k[bi:]
         self._d = d[bi:]
         self._kplot.plot(K,color=Themos.PRICE_COLOR,style=frame.Plot.K)
         if StockPlot.KVMODE==1:
@@ -723,10 +723,13 @@ class StockOrder:
                         canvas.fill()
                 if self._npt._RSI[ii][-1]<25:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR2)
+                    canvas.fontFace('zhb')
                 elif self._npt._RSI[ii][-1]>80:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR3)
+                    canvas.fontFace('zhb')
                 else:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR)
+                    canvas.fontFace("zh")
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
                 
                 #绘制涨跌幅
@@ -1046,8 +1049,24 @@ class HotPlotApp(frame.app):
             canvas.moveTo(self._msl['mx'],self._msl['y'])
             canvas.lineTo(self._msl['mx'],self._msl['y']+self._msl['h'])
             canvas.moveTo(self._msl['x']+Themos.YLABELWIDTH,self._msl['my'])
-            canvas.lineTo(self._msl['x']+self._msl['w'],self._msl['my']) 
+            canvas.lineTo(self._msl['x']+self._msl['w'],self._msl['my'])
             canvas.stroke()
+            if self._msl['xlabel'] is not None:
+                canvas.fontFace('zh')
+                canvas.fontSize(14)
+                canvas.fillColor(Themos.TEXTCOLOR)
+                if self._msl['mx']<self._msl['x']+self._msl['w']/2:
+                    canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_BOTTOM)
+                else:
+                    canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_BOTTOM)
+                canvas.text(self._msl['mx'],self._msl['y']+self._msl['h']-2,self._msl['xlabel'])
+            if self._msl['ylabel'] is not None:
+                canvas.fontFace('zh')
+                canvas.fontSize(14)
+                canvas.fillColor(Themos.TEXTCOLOR)
+                canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_BOTTOM)
+                canvas.text(self._msl['x']+Themos.YLABELWIDTH,self._msl['my'],self._msl['ylabel'])
+            
     def messagebox(self,msg):
         self._messagebox = msg
         #self.delayUpdate()
@@ -1127,7 +1146,7 @@ class HotPlotApp(frame.app):
                     if k[s,0]==0:
                         k[s,0] = k[s-1,0]
                 if self._rtk==1 or (self._current is not None and i==self._current):
-                    title = "%s %s"%(it[0][2],"%d分钟"%self._period if type(self._period)==int else "日线")
+                    title = "%s %s %s"%(it[0][2],it[0][1],"%d分钟"%self._period if type(self._period)==int else "日线")
                     self._SPV[i].viewMode(vm=self._volmode)
                     self._kei = self._SPV[i].updateK(it[0][1],title,self._period,self._knum,self._kei)
                 else:
@@ -1333,7 +1352,7 @@ class HotPlotApp(frame.app):
             if self._rtk==0:
                 self._volmode = StockPlot.FLOW
             else:
-                 self._volmode = StockPlot.VOL
+                 self._volmode = StockPlot.LMR
         elif sym in HotPlotApp.MAP2NUM:
             oldcurrent = self._current
             if (self._numsub[0]==3 and self._numsub[1]==2) or self._numsub[0]==1:
@@ -1556,6 +1575,34 @@ class HotPlotApp(frame.app):
                             self._msl['y'] = y+yi*dh
                             self._msl['w'] = dw
                             self._msl['h'] = dh
+                            self._msl['xlabel'] = None
+                            self._msl['ylabel'] = None
+                            dx = 0.5*dw/len(spv._d)
+                            ix = int(spv._kplot.wx2x(mx-x+dx))
+                            if ix>=0 and ix<len(spv._d):
+                                t = spv._d[ix]
+                                if type(t)==tuple:
+                                    if type(t[0])==date:
+                                        self._msl['xlabel'] = stock.dateString(t[0])
+                                    else:
+                                        self._msl['xlabel'] = stock.timeString(t[0])
+                                else:
+                                    self._msl['xlabel'] = stock.timeString(t)
+                            yy = my-self._msl['y']
+                            if spv._upmode==StockPlot.RT:
+                                if yy<2*dh/3:
+                                    self._msl['ylabel'] = "%.3f"%spv._kplot.wy2y(my-y)
+                                else:
+                                    self._msl['ylabel'] = "%.2e"%spv._vplot.wy2y(my-y)
+                            elif spv._upmode==StockPlot.K:
+                                if yy<dh/2:
+                                    self._msl['ylabel'] = "%.3f"%spv._kplot.wy2y(my-y)
+                                elif yy<dh/2+dh/4:
+                                    self._msl['ylabel'] = "%.2e"%spv._vplot.wy2y(my-y)
+                                else:
+                                    self._msl['ylabel'] = "%.2f"%spv._fplot.wy2y(my-y)
+                            elif spv._upmode==StockPlot.BOLLWAY:
+                                pass
                             self.delayUpdate()
                             break
         super(HotPlotApp,self).onMouseMotion(event)

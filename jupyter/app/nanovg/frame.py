@@ -329,6 +329,10 @@ class app:
         if zh == -1:
             print("Could not add font zh.\n")
             return -1
+        zhb = self._canvas.createFont("zhb", "c:/windows/fonts/msyhbd.ttc")
+        if zhb == -1:
+            print("Could not add font zhb.\n")
+            return -1        
         self._canvas.addFallbackFontId(data['fontNormal'], data['fontEmoji'])
         self._canvas.addFallbackFontId(data['fontBold'], data['fontEmoji'])
         return data    
@@ -435,6 +439,8 @@ class Plot:
         self._gridy = False
         self._xe = None
         self._ye = None
+        self._xk = None
+        self._xb = None
         self._titleColor = None
         self._titleSize = 14
         self._themos = Plot
@@ -450,16 +456,22 @@ class Plot:
         """
         绘制线型图表
         """
+        self._xk = None
+        self._xb = None
         self._y.append((y,color,linewidth,linestyle,label,style)) #0 y,1 color,2 linewidth,3 linestyle,4 label
     def hline(self,y,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None):
         """
         绘制横线
         """
+        self._xk = None
+        self._xb = None
         self._hline.append((y,color,linewidth,linestyle))
     def vline(self,x,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None):
         """
         绘制竖线
         """
+        self._xk = None
+        self._xb = None
         self._vline.append((x,color,linewidth,linestyle))
     def setTitle(self,title):
         self._title = title
@@ -569,19 +581,28 @@ class Plot:
         w0 = self._area[2]-self._border[0]-self._border[1]
         h0 = self._area[3]-self._border[2]-self._border[3]        
         return x0,y0,w0,h0
+    def calcxkxb(self):
+        if self._xk is None:
+            self._xmax = self._x.max()
+            self._xmin = self._x.min()
+            self._oxmin,self._oxmax = self._xmin,self._xmax
+            self._xk = 1/(self._xmax-self._xmin)
+            self._xb = -self._xmin*self._xk
     def xAxis2wx(self,x):
         """
         从x轴数据空间映射到屏幕x坐标
         """
+        self.calcxkxb()
         x0,y0,w0,h0 = self.plotRect()
         x0+=self._inner[0]
         w0-=self._inner[0]+self._inner[1]
         wx = w0*(x*self._xk+self._xb)+x0
-        return wx
+        return wx      
     def wx2x(self,wx):
         """
         将屏幕坐标映射到数据
         """
+        self.calcxkxb()
         x0,y0,w0,h0 = self.plotRect()
         x0+=self._inner[0]
         w0-=self._inner[0]+self._inner[1]
@@ -590,12 +611,14 @@ class Plot:
         """
         从y轴数据空间映射到屏幕y坐标
         """
+        self.calcxkxb()
         x0,y0,w0,h0 = self.plotRect()
         y0+=self._inner[2]
         h0-=self._inner[2]+self._inner[3]
         wy = h0*(1-(y*self._yk+self._yb))+y0 #y反转
         return wy
     def wy2y(self,wy):
+        self.calcxkxb()
         x0,y0,w0,h0 = self.plotRect()
         y0+=self._inner[2]
         h0-=self._inner[2]+self._inner[3]
