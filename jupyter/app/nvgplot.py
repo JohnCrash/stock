@@ -118,6 +118,8 @@ class ThemosDefault:
     TING_COLOR = vg.nvgRGB(135,206,250)
     RED_COLOR = vg.nvgRGB(220,0,0)   #涨
     GREEN_COLOR = vg.nvgRGB(0,120,0) #跌
+    RED_KCOLOR = vg.nvgRGB(250,0,0)  
+    GREEN_KCOLOR = vg.nvgRGB(0,244,244)      
     BG_COLOR = vg.nvgRGB(255,255,255) #背景
     CROSS_COLOR = vg.nvgRGBAf(1,1,1,0.5)
     YLABELWIDTH = 40   #y轴坐标轴空间
@@ -159,8 +161,10 @@ class ThemosBlack:
     MA30_COLOR = vg.nvgRGB(0,128,255)
     MID_COLOR = vg.nvgRGB(255,215,0)
     TING_COLOR = vg.nvgRGB(135,206,250)
-    RED_COLOR = vg.nvgRGB(250,0,0)   #涨
-    GREEN_COLOR = vg.nvgRGB(0,200,0) #跌
+    RED_COLOR = vg.nvgRGB(250,0,0)  
+    GREEN_COLOR = vg.nvgRGB(0,200,0) 
+    RED_KCOLOR = vg.nvgRGB(250,0,0)  
+    GREEN_KCOLOR = vg.nvgRGB(0,244,244)  
     BG_COLOR = vg.nvgRGB(0,0,0) #背景
     CROSS_COLOR = vg.nvgRGBAf(1,1,1,0.5)
     YLABELWIDTH = 42   #y轴坐标轴空间
@@ -371,7 +375,7 @@ class StockPlot:
         self._vplot.setx(x)
         self._vplot.setTicks(xticks)
         self._vplot.setTicksAngle(25)
-        color = [Themos.RED_COLOR if K[i,0]<K[i,3] else Themos.GREEN_COLOR for i in range(K.shape[0])]
+        color = [Themos.RED_COLOR if K[i,0]<K[i,3] else Themos.GREEN_KCOLOR for i in range(K.shape[0])]
         self._vplot.plot(k[bi:,0],color=color,style=frame.Plot.BAR)
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
@@ -380,9 +384,9 @@ class StockPlot:
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._fplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
-        self._kplot.setInnerSpace(5,5,0,0)
-        self._vplot.setInnerSpace(5,5,0,0)
-        self._fplot.setInnerSpace(5,5,0,0)
+        self._kplot.setInnerSpace(10,10,0,0)
+        self._vplot.setInnerSpace(10,10,0,0)
+        self._fplot.setInnerSpace(10,10,0,0)
         
         self._needrender = True
         return kei
@@ -840,7 +844,7 @@ class HotPlotApp(frame.app):
         self._help = False
         self._helpimg = None
         self._filter = ''
-        self._knum = 200 #屏幕上放置k线的数量
+        self._kwidth = 10 #k线宽度
         self._kei = 0
         self._period = 'd'
         self._volmode = StockPlot.FLOW
@@ -1008,7 +1012,10 @@ class HotPlotApp(frame.app):
         self.renderfbo()
     def updateTitle(self):
         tt = datetime.today()
-        title = "%s %s %d月%d日 %02d:%02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper())
+        if self._messagebox:
+            title = "%s %s %d月%d日 %02d:%02d:%02d %s %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper(),self._messagebox)
+        else:
+            title = "%s %s %d月%d日 %02d:%02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper())
         self.setWindowTitle(title)
     def renderfbo(self):
         try:
@@ -1069,6 +1076,7 @@ class HotPlotApp(frame.app):
             
     def messagebox(self,msg):
         self._messagebox = msg
+        self.updateTitle()
         #self.delayUpdate()
     def getGrowColor(self,r): #根据涨幅返回颜色tuple
         r = r/3
@@ -1136,6 +1144,7 @@ class HotPlotApp(frame.app):
         self._SO.update(R,self._pagen,PageNum,StockOrder.IT2P if self._order==0 or self._order==3 else StockOrder.IT2E9)
         if self._period!=15 and self._kmode==HotPlotApp.BULLWAY:
             K,D = xueqiu.get_period_k(240 if self._period=='d' else self._period)
+        ww = (self._w-Themos.ORDER_WIDTH)/NS[0] #视口宽度
         for i in range(NS[0]*NS[1]):
             j = self._pagen*PageNum+i
             self._SPV[i].clear()
@@ -1148,7 +1157,7 @@ class HotPlotApp(frame.app):
                 if self._rtk==1 or (self._current is not None and i==self._current):
                     title = "%s %s %s"%(it[0][2],it[0][1],"%d分钟"%self._period if type(self._period)==int else "日线")
                     self._SPV[i].viewMode(vm=self._volmode)
-                    self._kei = self._SPV[i].updateK(it[0][1],title,self._period,self._knum,self._kei)
+                    self._kei = self._SPV[i].updateK(it[0][1],title,self._period,int(ww/self._kwidth),self._kei)
                 else:
                     if self._kmode==HotPlotApp.RT:
                         self._SPV[i].viewMode(vm=self._volmode)
@@ -1297,28 +1306,33 @@ class HotPlotApp(frame.app):
             self._kei = 0
             self._reverse = not self._reverse
         elif sym==sdl2.SDLK_LEFT:
-            self._kei += int(self._knum/4)
+            knum = (self._w-Themos.ORDER_WIDTH)/(self._kwidth*self._numsub[0])
+            self._kei += int(knum/2)
         elif sym==sdl2.SDLK_RIGHT:
-            self._kei -= int(self._knum/4)
+            knum = (self._w-Themos.ORDER_WIDTH)/(self._kwidth*self._numsub[0])
+            self._kei -= int(knum/4)
             if self._kei<0:
-                self._kei = 0
+                self._kei = 0            
         elif sym==sdl2.SDLK_UP:
-            self._knum -= 10
-            if self._knum<60:
-                self._knum=60            
+            self._kwidth += 1
+            if self._kwidth>20:
+                self._kwidth = 20          
         elif sym==sdl2.SDLK_DOWN:
-            self._knum += 10
-            if self._knum>400:
-                self._knum=400
+            self._kwidth -= 1
+            if self._kwidth<8:
+                self._kwidth = 8
         elif sym==sdl2.SDLK_KP_9: #k线模式，切换周期
             p = {5:0,15:1,30:2,60:3,'d':4}
             pp = [5,15,30,60,'d']
             i = p[self._period]+1
             self._period = pp[i] if i<=4 else pp[0]
+            self.messagebox("切换到%s周期"%(p[self._period]))
         elif sym==sdl2.SDLK_KP_MULTIPLY: #k线模式，切换boll 和 ma
             StockPlot.KVMODE = 1 if StockPlot.KVMODE==0 else 0
+            self.messagebox("%s"%('均线显示' if StockPlot.KVMODE==1 else 'BOLL显示'))
         elif sym==sdl2.SDLK_KP_DIVIDE: #切换早盘的密集显示模式
             self._em933 = not self._em933
+            self.messagebox("%s"%('早盘快速更新' if self._em933 else '关闭快速更新'))
         elif sym==sdl2.SDLK_KP_8:
             if self._volmode==StockPlot.FLOW:
                 self._volmode = StockPlot.VOL
@@ -1326,6 +1340,11 @@ class HotPlotApp(frame.app):
                 self._volmode = StockPlot.LMR
             else:
                 self._volmode = StockPlot.FLOW
+            if self._rtk == 0:
+                msg = {StockPlot.FLOW:"FLOW",StockPlot.VOL:"成交量",StockPlot.LMR:"量比"}[self._volmode]
+            else:
+                msg = {StockPlot.FLOW:"FLOW",StockPlot.VOL:"MACD",StockPlot.LMR:"RSI"}[self._volmode]
+            self.messagebox(msg)
         elif sym==sdl2.SDLK_KP_7:
             if self._kmode==HotPlotApp.RT:#切换实时图和15分钟通道图和早盘实时图
                 self._kmode=HotPlotApp.BULLWAY
@@ -1335,6 +1354,7 @@ class HotPlotApp(frame.app):
             self._order+=1
             if self._order>1:
                 self._order = 0
+            self.messagebox("成交量排序" if self._order==1 else "涨幅排序")
         elif sym==sdl2.SDLK_KP_PERIOD:
             self._order+=1
             if self._order<2:
@@ -1345,8 +1365,10 @@ class HotPlotApp(frame.app):
             self._warningbox_isopen = not self._warningbox_isopen
         elif sym==sdl2.SDLK_KP_PLUS:
             self._bollfilter = 1 if self._bollfilter!=1 else 0
+            self.messagebox("%s"%('仅显示通道向上的' if self._bollfilter==1 else '关闭过滤'))
         elif sym==sdl2.SDLK_KP_MINUS:
             self._bollfilter = 2 if self._bollfilter!=2 else 0
+            self.messagebox("%s"%('仅显示通道向下的' if self._bollfilter==2 else '关闭过滤'))
         elif sym==sdl2.SDLK_KP_ENTER:
             self._rtk = 1 if self._rtk==0 else 0
             if self._rtk==0:

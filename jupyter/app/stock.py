@@ -276,7 +276,7 @@ def loadKlineMM():
 g_kd = {}
 def loadKlineCache(code,period,bi):
     global g_kd
-    name = '%s_%s.kcach'%(code,period)
+    name = '%s_%s.kcache'%(code,period)
     if period=='d':
         tbi = date.fromisoformat(bi)
     else:
@@ -299,7 +299,8 @@ def loadKlineCache(code,period,bi):
                 k = np.vstack((nk,k))
                 d = nd + d
         else: #直接返回数据，数据量可能更多
-            g_kd[name] = (c,k,d)
+            isall = (d[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
+            g_kd[name] = (c,k,d,isall)
             return c,k,d
     else:
         c,k,d = loadKline(code,period,after=bi)

@@ -758,8 +758,8 @@ class Plot:
                 canvas.stroke()
             elif type1==Plot.K: #分别对应0 open 1 high 2 low 3 close
                 Y = self.yAxis2wy(y) #xy[:,1] = h*(y*self._yk+self._yb)+y0
-                RED  = self._themos.RED_COLOR
-                GREEN = self._themos.GREEN_COLOR
+                RED  = self._themos.RED_KCOLOR
+                GREEN = self._themos.GREEN_KCOLOR
                 WHITE = self._themos.BG_COLOR
                 dx = xy[1,0]-xy[0,0]-2
                 for i in range(len(self._x)):
