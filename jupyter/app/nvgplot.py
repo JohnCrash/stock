@@ -10,6 +10,7 @@ import threading
 import math
 import sdl2
 from OpenGL import GL
+import win32api
 import ctypes
 
 log = mylog.init('nvgplot.log',name='nvgplot')
@@ -1073,6 +1074,18 @@ class HotPlotApp(frame.app):
                 canvas.fillColor(Themos.TEXTCOLOR)
                 canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_BOTTOM)
                 canvas.text(self._msl['x']+Themos.YLABELWIDTH,self._msl['my'],self._msl['ylabel'])
+            if self._msl['k'] is not None:
+                canvas.fontFace('zh')
+                canvas.fontSize(14)
+                canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
+                mx = self._msl['mx']
+                my = self._msl['my']
+                k = self._msl['k']
+                tx = ['开','高','低','收']
+                for i in range(1,5):
+                    canvas.fillColor(Themos.RED_COLOR if k[i]>0 else Themos.GREEN_COLOR)
+                    canvas.text(mx,my,"%s %.2f%%"%(tx[i-1],k[i]))
+                    my+=20
             
     def messagebox(self,msg):
         self._messagebox = msg
@@ -1599,6 +1612,7 @@ class HotPlotApp(frame.app):
                             self._msl['h'] = dh
                             self._msl['xlabel'] = None
                             self._msl['ylabel'] = None
+                            self._msl['k'] = None
                             dx = 0.5*dw/len(spv._d)
                             ix = int(spv._kplot.wx2x(mx-x+dx))
                             if ix>=0 and ix<len(spv._d):
@@ -1610,6 +1624,9 @@ class HotPlotApp(frame.app):
                                         self._msl['xlabel'] = stock.timeString(t[0])
                                 else:
                                     self._msl['xlabel'] = stock.timeString(t)
+                                if ix-1>=0 and len(spv._k.shape)>1 and spv._k.shape[1]==5:
+                                    c = spv._k[ix-1][4]
+                                    self._msl['k'] = (spv._k[ix]-c)*100/c
                             yy = my-self._msl['y']
                             if spv._upmode==StockPlot.RT:
                                 if yy<2*dh/3:
@@ -1631,6 +1648,7 @@ class HotPlotApp(frame.app):
     def onMouseUp(self,event):
         if event.button.button==sdl2.SDL_BUTTON_LEFT:
             self._mslb = not self._mslb
+            win32api.ShowCursor(not self._mslb)
             self._msl = {}
             self.delayUpdate()
         super(HotPlotApp,self).onMouseUp(event)
