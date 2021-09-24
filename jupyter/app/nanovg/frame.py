@@ -426,6 +426,7 @@ class Plot:
         self._vline = []
         self._lwscale = 1
         self._title = ''
+        self._zd = 0
         self._xticks = None
         self._yticks = None
         self._xtickshow = True
@@ -477,6 +478,11 @@ class Plot:
         self._title = title
     def setTitleColor(self,c):
         self._titleColor = c
+    def setZD(self,r):
+        """
+        涨跌幅0.01 = 1% ,绘制在标题后面
+        """
+        self._zd = r
     def setTitleSize(self,s):
         self._titleSize = s
     def clear(self):
@@ -709,12 +715,20 @@ class Plot:
             if self._ye is not None and self._ye>3: #绘制坐标指数
                 canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
                 canvas.text(x0,y0,"1e%d"%self._ye)
-        if self._titleColor is not None:
-            canvas.fillColor(self._titleColor)
-        canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
-        canvas.fontFace("zh")
-        canvas.fontSize(self._titleSize)
-        canvas.text(x0+w0/2,y0+4,self._title)
+        if len(self._title)>0:
+            if self._titleColor is not None:
+                canvas.fillColor(self._titleColor)
+            canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
+            canvas.fontFace("zh")
+            canvas.fontSize(self._titleSize)
+            canvas.text(x0+w0/2,y0+4,self._title)
+            canvas.fontFace("zhb")
+            canvas.fillColor(self._themos.RED_COLOR if self._zd>0 else self._themos.GREEN_COLOR)
+            rounds = np.empty((4,),dtype=np.float32)
+            canvas.textBounds(x0+w0/2,y0+4,self._title,rounds.ctypes.data_as(Plot.c_float_p))
+            canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
+            canvas.text(rounds[2]+5,rounds[1],"%.2f%%"%(self._zd))
+
     def setLineWidthScale(self,sc=1):
         self._lwscale = sc
     """

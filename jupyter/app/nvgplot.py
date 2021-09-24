@@ -286,7 +286,7 @@ class StockPlot:
             if period!=5:
                 k,d = stock.mergeK(k,d,int(period/5))
         
-        if off==0 and stock.isTransDay() and stock.isTransTime():
+        if off==0 and stock.isTransDay():
             _,k,d = xueqiu.appendK(code,period,k,d)
         if off!=0:
             k = k[:-off]
@@ -301,7 +301,7 @@ class StockPlot:
         else:
             flow = None
         return c,k,d,flow
-    def updateK(self,code,label,period,knum,kei): #更新K线图
+    def updateK(self,code,label,period,knum,kei,item=None): #更新K线图
         self._code = code
         self._upmode = StockPlot.K
         self._period = period
@@ -382,6 +382,7 @@ class StockPlot:
         self._vplot.setGrid(True,True)
         self._fplot.setGrid(True,True)
         self._kplot.setTitle(label)
+        self._kplot.setZD(item[1])
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._fplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
@@ -396,7 +397,7 @@ class StockPlot:
             self._kmode = km
         if vm is not None:
             self._vmode = vm
-    def update(self,code,label,ok,od,ma5b=None,ma60b=None,isem933=False): #更新线图
+    def update(self,code,label,ok,od,ma5b=None,ma60b=None,isem933=False,item=None): #更新线图
         self._upmode = StockPlot.RT
         self._period = None
         self.clear()
@@ -474,6 +475,7 @@ class StockPlot:
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._kplot.setTitle(label)
+        self._kplot.setZD(item[1])
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._kplot.setInnerSpace(0,0,0,0)
@@ -726,7 +728,7 @@ class StockOrder:
                         canvas.fillColor(cc)
                         canvas.rect(x-5+Themos.ORDER_WIDTH,yy,5,Themos.ORDER_ITEM_HEIGHT)
                         canvas.fill()
-                if self._npt._RSI[ii][-1]<25:
+                if self._npt._RSI[ii][-1]<30:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR2)
                     canvas.fontFace('zhb')
                 elif self._npt._RSI[ii][-1]>80:
@@ -1075,9 +1077,12 @@ class HotPlotApp(frame.app):
                 canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_BOTTOM)
                 canvas.text(self._msl['x']+Themos.YLABELWIDTH,self._msl['my'],self._msl['ylabel'])
             if self._msl['k'] is not None:
-                canvas.fontFace('zh')
+                canvas.fontFace('zhb')
                 canvas.fontSize(14)
-                canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
+                if self._msl['mx']<self._msl['x']+self._msl['w']/2:
+                    canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_BOTTOM)
+                else:
+                    canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_BOTTOM)                
                 mx = self._msl['mx']
                 my = self._msl['my']
                 k = self._msl['k']
@@ -1170,7 +1175,7 @@ class HotPlotApp(frame.app):
                 if self._rtk==1 or (self._current is not None and i==self._current):
                     title = "%s %s %s"%(it[0][2],it[0][1],"%d分钟"%self._period if type(self._period)==int else "日线")
                     self._SPV[i].viewMode(vm=self._volmode)
-                    self._kei = self._SPV[i].updateK(it[0][1],title,self._period,int(ww/self._kwidth),self._kei)
+                    self._kei = self._SPV[i].updateK(it[0][1],title,self._period,int(ww/self._kwidth),self._kei,item=it)
                 else:
                     if self._kmode==HotPlotApp.RT:
                         self._SPV[i].viewMode(vm=self._volmode)
@@ -1191,9 +1196,9 @@ class HotPlotApp(frame.app):
                                     if len(rtk)<=60: #太短
                                         rtk = None
                                     break
-                            self._SPV[i].update(it[0][1],title,K,D,isem933=True,ma60b=rtk)
+                            self._SPV[i].update(it[0][1],title,K,D,isem933=True,ma60b=rtk,item=it)
                         else:
-                            self._SPV[i].update(it[0][1],title,K,D,ma5b=self.getma5b(it[4],it[5]))
+                            self._SPV[i].update(it[0][1],title,K,D,ma5b=self.getma5b(it[4],it[5]),item=it)
                     elif self._kmode==HotPlotApp.BULLWAY:
                         if self._period==15:
                             k = it[4]
@@ -1613,6 +1618,25 @@ class HotPlotApp(frame.app):
                             self._msl['xlabel'] = None
                             self._msl['ylabel'] = None
                             self._msl['k'] = None
+
+                            yy = my-self._msl['y']
+                            iskplot = False
+                            if spv._upmode==StockPlot.RT:
+                                if yy<2*dh/3:
+                                    self._msl['ylabel'] = "%.3f"%spv._kplot.wy2y(my-y)
+                                else:
+                                    self._msl['ylabel'] = "%.2e"%spv._vplot.wy2y(my-y)
+                            elif spv._upmode==StockPlot.K:
+                                if yy<dh/2:
+                                    iskplot = True
+                                    self._msl['ylabel'] = "%.3f"%spv._kplot.wy2y(my-y)
+                                elif yy<dh/2+dh/4:
+                                    self._msl['ylabel'] = "%.2e"%spv._vplot.wy2y(my-y)
+                                else:
+                                    self._msl['ylabel'] = "%.2f"%spv._fplot.wy2y(my-y)
+                            elif spv._upmode==StockPlot.BOLLWAY:
+                                pass
+
                             dx = 0.5*dw/len(spv._d)
                             ix = int(spv._kplot.wx2x(mx-x+dx))
                             if ix>=0 and ix<len(spv._d):
@@ -1624,31 +1648,20 @@ class HotPlotApp(frame.app):
                                         self._msl['xlabel'] = stock.timeString(t[0])
                                 else:
                                     self._msl['xlabel'] = stock.timeString(t)
-                                if ix-1>=0 and len(spv._k.shape)>1 and spv._k.shape[1]==5:
+                                if iskplot and ix-1>=0 and len(spv._k.shape)>1 and spv._k.shape[1]==5:
                                     c = spv._k[ix-1][4]
-                                    self._msl['k'] = (spv._k[ix]-c)*100/c
-                            yy = my-self._msl['y']
-                            if spv._upmode==StockPlot.RT:
-                                if yy<2*dh/3:
-                                    self._msl['ylabel'] = "%.3f"%spv._kplot.wy2y(my-y)
-                                else:
-                                    self._msl['ylabel'] = "%.2e"%spv._vplot.wy2y(my-y)
-                            elif spv._upmode==StockPlot.K:
-                                if yy<dh/2:
-                                    self._msl['ylabel'] = "%.3f"%spv._kplot.wy2y(my-y)
-                                elif yy<dh/2+dh/4:
-                                    self._msl['ylabel'] = "%.2e"%spv._vplot.wy2y(my-y)
-                                else:
-                                    self._msl['ylabel'] = "%.2f"%spv._fplot.wy2y(my-y)
-                            elif spv._upmode==StockPlot.BOLLWAY:
-                                pass
+                                    self._msl['k'] = (spv._k[ix]-c)*100/c                            
                             self.delayUpdate()
                             break
         super(HotPlotApp,self).onMouseMotion(event)
     def onMouseUp(self,event):
         if event.button.button==sdl2.SDL_BUTTON_LEFT:
-            self._mslb = not self._mslb
-            win32api.ShowCursor(not self._mslb)
-            self._msl = {}
-            self.delayUpdate()
+            if event.button.x<Themos.ORDER_WIDTH:
+                self._pagen = int(int(event.button.y/Themos.ORDER_ITEM_HEIGHT)/(self._numsub[0]*self._numsub[1]))
+                self._needUpdate = True
+            else:
+                self._mslb = not self._mslb
+                win32api.ShowCursor(not self._mslb)
+                self._msl = {}
+                self.delayUpdate()
         super(HotPlotApp,self).onMouseUp(event)
