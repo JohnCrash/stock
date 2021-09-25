@@ -36,15 +36,12 @@ class app:
         if vg.glewInit()!=vg.GLEW_OK:
             raise RuntimeError('glewInit')
         self._canvas = Canvas2d()
-        self._render  = None
         self._running = True
         self._fps = 0
         self._interval = -1
         self._clearColor = (1,1,1,1)
         sdl2.SDL_GL_SetSwapInterval(0)
         self.loadDemoData()
-        self._w = w
-        self._h = h
         self._mouseini = -1
         self._windowns = True
         self._windowstyle = style
@@ -53,6 +50,46 @@ class app:
         self._windowx,self._windowy = 0,0
         self._windoww,self._windowh = w,h
         self.fullScreen()
+        w,h = c_int(),c_int()
+        video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
+        self._fbos = {}
+        self._updatefbo = False
+        self._w = w.value
+        self._h = h.value        
+        self.createFrame(0,0,w.value,app.CAPTION_HEIGHT,'title')
+        self.setInterval(60)
+    def createFrame(self,x,y,w,h,name=None):
+        fbo = self._canvas.createFramebuffer(w,h,vg.NVG_IMAGE_REPEATX | vg.NVG_IMAGE_REPEATY)
+        self._fbos[name] = (x,y,w,h,fbo,name)
+        return self._fbos[name]
+    def deleteFrame(self,name):
+        if name in self._fbos:
+            fbo = self._fbos[name]
+            del self._fbos[name]
+            self._canvas.deleteFramebuffer(fbo[4])
+    def getFrame(self,name):
+        if name in self._fbos:
+            return self._fbos[name]
+        else:
+            return None
+    def beginFrame(self,name):
+        if name in self._fbos:
+            fbo = self._fbos[name]
+            self._updatefbo = True
+            self._canvas.bindFramebuffer(fbo[4])
+            GL.glViewport(0,0,fbo[2],fbo[3])
+            self._canvas.beginFrame(fbo[2],fbo[3],1)
+            return self._canvas,fbo[2],fbo[3]
+        else:
+            return None,None,None
+    def endFrame(self):
+        self._canvas.endFrame()
+    def movefbo(self,name,x,y):
+        if name in self._fbos:
+            fbo = self._fbos[name]
+            self._updatefbo = True
+            fbo[0] = x
+            fbo[1] = y
     def loadWave(self,fn):
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
@@ -70,7 +107,7 @@ class app:
     def setWindowTitle(self,title):
         if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
             self._windowtitle = title
-            self.delayUpdate()
+            self.renderCaption()
         else:
             self._windowtitle = title
             sdl2.SDL_SetWindowTitle(self._window,title.encode('utf-8'))
@@ -115,11 +152,11 @@ class app:
             t = SDL_GetTicks()/1000.
             dt = t-prevt
             prevt = t
+            self.onLoop(t,dt)
             if (self._interval>0 and acc>self._interval) or self._delayupdate:
                 acc = 0
-                self._delayupdate = False
                 self.update(dt)
-            self.onLoop(t,dt)
+                self._delayupdate = False
             acc+=dt
             sdl2.SDL_Delay(10)
         sdl2.SDL_GL_DeleteContext(self._context)
@@ -140,8 +177,6 @@ class app:
 
     def setClearColor(self,c):#rgba 0-1
         self._clearColor = c
-    def render(self,x,y,w,h):
-        pass
     def onLoop(self,t,dt):
         """
         主循环事件
@@ -162,7 +197,7 @@ class app:
                         self._mouseini = i
                         break
             if old!=self._mouseini:
-                self.delayUpdate()
+                self.renderCaption()
     def onMouseDown(self,event):
         pass
     def fullScreen(self):
@@ -219,41 +254,51 @@ class app:
                 c.moveTo(x+w,y)
                 c.lineTo(x,y+h)
             c.stroke()
-    def renderCaption(self,x,y,w,h):
+    def renderCaption(self):
+        c,w,h = self.beginFrame('title')
+        x,y = 0,0
+        c.beginPath()
+        c.fillColor(self._clearColor)
+        c.rect(x,y,w,h)
+        c.fill()        
         for i in range(3):
             xx = w-(3-i)*h
             if self._mouseini==i: #绘制选中背景
-                with self._canvas as c:
-                    c.beginPath()
-                    c.fillColor(app.ICONBG)
-                    c.rect(xx,y,h,h)
-                    c.fill()
+                c.beginPath()
+                c.fillColor(app.ICONBG)
+                c.rect(xx,y,h,h)
+                c.fill()
             self.drawIcon(xx,y,h,h,i,10)
-        with self._canvas as c: #绘制标题
-            c.fontFace('zh')
-            c.fontSize(16)
-            c.fillColor(app.FCCOLOR)
-            c.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
-            c.text(w/2,h/2,self._windowtitle)
+
+        c.fontFace('zh')
+        c.fontSize(16)
+        c.fillColor(app.FCCOLOR)
+        c.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
+        c.text(w/2,h/2,self._windowtitle)
+        self.endFrame()
+    def render(self,canvas,x,y,w,h):
+        pass
     def update(self,dt=0):
-        w,h = c_int(),c_int()
-        video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
-        self._w = w.value            
-        fbWidth,fbHeight = w.value,h.value
-        GL.glViewport(0, 0, fbWidth, fbHeight)
-        c = self._clearColor
-        GL.glClearColor(c[0],c[1],c[2],c[3])
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT|GL.GL_STENCIL_BUFFER_BIT)# | GL.GL_DEPTH_BUFFER_BIT
-        self._canvas.beginFrame(w.value,h.value,1)
-        if self._windowstyle&sdl2.SDL_WINDOW_BORDERLESS:
-            self._h = h.value-app.CAPTION_HEIGHT
-            self.renderCaption(0,0,w.value,app.CAPTION_HEIGHT)
-            self.render(0,app.CAPTION_HEIGHT,self._w,self._h)
-        else:
-            self._h = h.value
-            self.render(0,0,self._w,self._h)
-        self._canvas.endFrame()
-        sdl2.SDL_GL_SwapWindow(self._window)
+        if self._updatefbo or self._delayupdate:
+            w,h = c_int(),c_int()
+            video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
+            self._w = w.value            
+            fbWidth,fbHeight = w.value,h.value
+            vg.nvgluBindFramebuffer(None) #默认FBO
+            GL.glViewport(0, 0, fbWidth, fbHeight)
+            canvas = self._canvas
+            canvas.beginFrame(fbWidth,fbHeight,1)
+            for k in self._fbos:
+                fbo = self._fbos[k]
+                canvas.beginPath()
+                cfp = canvas.imagePattern(fbo[0],fbo[1],fbo[2],fbo[3],0,fbo[4].contents.image,1)
+                canvas.fillPaint(cfp)
+                canvas.rect(fbo[0],fbo[1],fbo[2],fbo[3])
+                canvas.fill()
+            self.render(canvas,0,0,w.value,h.value)
+            canvas.endFrame()
+            sdl2.SDL_GL_SwapWindow(self._window)
+            self._updatefbo = False
 
     def loadDemoData(self):
         data = {}
@@ -284,6 +329,10 @@ class app:
         if zh == -1:
             print("Could not add font zh.\n")
             return -1
+        zhb = self._canvas.createFont("zhb", "c:/windows/fonts/msyhbd.ttc")
+        if zhb == -1:
+            print("Could not add font zhb.\n")
+            return -1        
         self._canvas.addFallbackFontId(data['fontNormal'], data['fontEmoji'])
         self._canvas.addFallbackFontId(data['fontBold'], data['fontEmoji'])
         return data    
@@ -373,8 +422,11 @@ class Plot:
         self._x = None
         self._xlabels = None
         self._y = []
+        self._hline = []
+        self._vline = []
         self._lwscale = 1
         self._title = ''
+        self._zd = 0
         self._xticks = None
         self._yticks = None
         self._xtickshow = True
@@ -388,6 +440,8 @@ class Plot:
         self._gridy = False
         self._xe = None
         self._ye = None
+        self._xk = None
+        self._xb = None
         self._titleColor = None
         self._titleSize = 14
         self._themos = Plot
@@ -403,11 +457,32 @@ class Plot:
         """
         绘制线型图表
         """
+        self._xk = None
+        self._xb = None
         self._y.append((y,color,linewidth,linestyle,label,style)) #0 y,1 color,2 linewidth,3 linestyle,4 label
+    def hline(self,y,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None):
+        """
+        绘制横线
+        """
+        self._xk = None
+        self._xb = None
+        self._hline.append((y,color,linewidth,linestyle))
+    def vline(self,x,color=vg.nvgRGBA(0,0,0,255),linewidth=1,linestyle=None):
+        """
+        绘制竖线
+        """
+        self._xk = None
+        self._xb = None
+        self._vline.append((x,color,linewidth,linestyle))
     def setTitle(self,title):
         self._title = title
     def setTitleColor(self,c):
         self._titleColor = c
+    def setZD(self,r):
+        """
+        涨跌幅0.01 = 1% ,绘制在标题后面
+        """
+        self._zd = r
     def setTitleSize(self,s):
         self._titleSize = s
     def clear(self):
@@ -416,6 +491,8 @@ class Plot:
         """
         self._x = None
         self._y = []
+        self._hline = []
+        self._vline = []
         self._ye = None
         self._xe = None
         self._xticks = None
@@ -510,24 +587,48 @@ class Plot:
         w0 = self._area[2]-self._border[0]-self._border[1]
         h0 = self._area[3]-self._border[2]-self._border[3]        
         return x0,y0,w0,h0
+    def calcxkxb(self):
+        if self._xk is None:
+            self._xmax = self._x.max()
+            self._xmin = self._x.min()
+            self._oxmin,self._oxmax = self._xmin,self._xmax
+            self._xk = 1/(self._xmax-self._xmin)
+            self._xb = -self._xmin*self._xk
     def xAxis2wx(self,x):
         """
         从x轴数据空间映射到屏幕x坐标
         """
+        self.calcxkxb()
         x0,y0,w0,h0 = self.plotRect()
         x0+=self._inner[0]
         w0-=self._inner[0]+self._inner[1]
         wx = w0*(x*self._xk+self._xb)+x0
-        return wx
+        return wx      
+    def wx2x(self,wx):
+        """
+        将屏幕坐标映射到数据
+        """
+        self.calcxkxb()
+        x0,y0,w0,h0 = self.plotRect()
+        x0+=self._inner[0]
+        w0-=self._inner[0]+self._inner[1]
+        return ((wx-x0)/w0-self._xb)/self._xk
     def yAxis2wy(self,y):
         """
         从y轴数据空间映射到屏幕y坐标
         """
+        self.calcxkxb()
         x0,y0,w0,h0 = self.plotRect()
         y0+=self._inner[2]
         h0-=self._inner[2]+self._inner[3]
         wy = h0*(1-(y*self._yk+self._yb))+y0 #y反转
         return wy
+    def wy2y(self,wy):
+        self.calcxkxb()
+        x0,y0,w0,h0 = self.plotRect()
+        y0+=self._inner[2]
+        h0-=self._inner[2]+self._inner[3]
+        return (1-(wy-y0)/h0-self._yb)/self._yk
     def x2AxisLabel(self,x):
         if self._xe is None:
             return str(x)
@@ -614,12 +715,20 @@ class Plot:
             if self._ye is not None and self._ye>3: #绘制坐标指数
                 canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
                 canvas.text(x0,y0,"1e%d"%self._ye)
-        if self._titleColor is not None:
-            canvas.fillColor(self._titleColor)
-        canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
-        canvas.fontFace("zh")
-        canvas.fontSize(self._titleSize)
-        canvas.text(x0+w0/2,y0+4,self._title)
+        if len(self._title)>0:
+            if self._titleColor is not None:
+                canvas.fillColor(self._titleColor)
+            canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_TOP)
+            canvas.fontFace("zh")
+            canvas.fontSize(self._titleSize)
+            canvas.text(x0+w0/2,y0+4,self._title)
+            canvas.fontFace("zhb")
+            canvas.fillColor(self._themos.RED_COLOR if self._zd>0 else self._themos.GREEN_COLOR)
+            rounds = np.empty((4,),dtype=np.float32)
+            canvas.textBounds(x0+w0/2,y0+4,self._title,rounds.ctypes.data_as(Plot.c_float_p))
+            canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
+            canvas.text(rounds[2]+5,rounds[1],"%.2f%%"%(self._zd))
+
     def setLineWidthScale(self,sc=1):
         self._lwscale = sc
     """
@@ -658,13 +767,13 @@ class Plot:
                             canvas.line(pts,i-bi,linestyle)
                         fz = False
                 if fz:
-                    pts = xy[bi:i].ctypes.data_as(Plot.c_float_p)
-                    canvas.line(pts,i-bi,linestyle)
+                    pts = xy[bi:i+1].ctypes.data_as(Plot.c_float_p)
+                    canvas.line(pts,i+1-bi,linestyle)
                 canvas.stroke()
             elif type1==Plot.K: #分别对应0 open 1 high 2 low 3 close
                 Y = self.yAxis2wy(y) #xy[:,1] = h*(y*self._yk+self._yb)+y0
-                RED  = self._themos.RED_COLOR
-                GREEN = self._themos.GREEN_COLOR
+                RED  = self._themos.RED_KCOLOR
+                GREEN = self._themos.GREEN_KCOLOR
                 WHITE = self._themos.BG_COLOR
                 dx = xy[1,0]-xy[0,0]-2
                 for i in range(len(self._x)):
@@ -698,4 +807,29 @@ class Plot:
                         canvas.fillColor(color)
                     canvas.rect(x-dx/2,oy,dx,Y[i]-oy)
                     canvas.fill()
+        if len(self._hline)>0 or len(self._vline)>0:
+            xy = np.empty((2,2),dtype=np.float32)
+            xy[0,0] = self.xAxis2wx(self._x.min())
+            xy[1,0] = self.xAxis2wx(self._x.max())
+            for hl in self._hline:
+                xy[:,1] = self.yAxis2wy(hl[0])
+                canvas.beginPath()
+                canvas.strokeColor(hl[1])
+                canvas.strokeWidth(hl[2]*self._lwscale)
+                pts = xy.ctypes.data_as(Plot.c_float_p)
+                canvas.line(pts,2,hl[3])
+                canvas.stroke()
+            """
+            xy[0,1] = self.xAxis2wx(self._y.min())
+            xy[1,1] = self.xAxis2wx(self._y.max())
+            for hl in self._vline:
+                xy[:,0] = self.xAxis2wx(hl[0])
+                canvas.beginPath()
+                canvas.strokeColor(hl[1])
+                canvas.strokeWidth(hl[2]*self._lwscale)
+                pts = xy.ctypes.data_as(Plot.c_float_p)
+                canvas.line(pts,2,hl[3])
+                canvas.stroke()               
+            """
+         
         canvas.restore()

@@ -23,11 +23,11 @@ def isTransDay(t=None):
         return False
 
 def dateString(t):
-    return '%s-%s-%s'%(t.year,t.month,t.day)
+    return '%d-%02d-%02d'%(t.year,t.month,t.day)
 def timeString(t):
-    return '%s-%s-%s %s:%s:%s'%(t.year,t.month,t.day,t.hour,t.minute,t.second)
+    return '%d-%02d-%02d %02d:%02d:%02d'%(t.year,t.month,t.day,t.hour,t.minute,t.second)
 def timeString2(t):
-    return '%s:%s:%s'%(t.hour,t.minute,t.second)
+    return '%02d:%02d:%02d'%(t.hour,t.minute,t.second)
 
 def date2time(d):
     return datetime(year=d.year,month=d.month,day=d.day)
@@ -72,7 +72,6 @@ def execute(s):
         mylog.printe(e)
         gdb.rollback()
         print(s)
-
 """
 加载股票数据
 返回的第一个数据
@@ -178,7 +177,7 @@ def loadKline(code,period='d',after=None,ei=None,expire=None):
             if ei is None:
                 data = query("""select date,volume,open,high,low,close from %s where id=%s and date>='%s'"""%(db,company[0][0],after))
             else:
-                data = query("""select date,volume,open,high,low,close from %s where id=%s and date>='%s' and date<='%s"""%(db,company[0][0],after,ei))
+                data = query("""select date,volume,open,high,low,close from %s where id=%s and date>='%s' and date<='%s'"""%(db,company[0][0],after,ei))
     else:
         if after is None:
             data = query("""select timestamp,volume,open,high,low,close from %s where id=%s"""%(db,company[0][0]))
@@ -211,14 +210,17 @@ date {
     0 - [date,]
 }
 """
-def loadFlow(after=None,dd=None):
+def loadFlow(after=None,dd=None,ei=None):
     if after is None:
         if dd is None:
             data = query("select date,larg,big,mid,tiny from flow order by date")
         else:
             data = query("select date,larg,big,mid,tiny from flow where date>='%s' and date<'%s' order by date"%(dateString(dd),dateString(dd+timedelta(days=1))))
     else:
-        data = query("select date,larg,big,mid,tiny from flow where date>='%s' order by date"%(after))
+        if ei is None:
+            data = query("select date,larg,big,mid,tiny from flow where date>='%s' order by date"%(after))
+        else:
+            data = query("select date,larg,big,mid,tiny from flow where date>='%s' and date<='%s' order by date"%(after,ei))
     flowdate = []
     flow = []
     for i in range(len(data)):
@@ -227,7 +229,7 @@ def loadFlow(after=None,dd=None):
     flowk = np.array(flow).reshape(-1,4)
     return flowk,flowdate
  
-def loademFlow(code,after=None,dd=None):
+def loademFlow(code,after=None,dd=None,ei=None):
     qs = query("select id from flow_em_category where code='%s' and watch!=-1"%(code))
     if len(qs)==1:
         id = int(qs[0][0])
@@ -237,7 +239,10 @@ def loademFlow(code,after=None,dd=None):
             else:
                 data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' and timestamp<'%s' order by timestamp"%(id,dateString(dd),dateString(dd+timedelta(days=1))))
         else:
-            data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' order by timestamp"%(id,after))
+            if ei is None:
+                data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' order by timestamp"%(id,after))
+            else:
+                data = query("select timestamp,larg,big,mid,tiny from flow_em where id=%d and timestamp>='%s' and timestamp<='%s' order by timestamp"%(id,after,ei))
         flowdate = []
         flow = []
         for i in range(len(data)):
@@ -250,7 +255,7 @@ def loademFlow(code,after=None,dd=None):
 """
 从共享内存加载k线数据
 """
-def loadKlineCache():
+def loadKlineMM():
     K = np.memmap('d:/temp/K',dtype='float32',mode='r')
     C = np.memmap('d:/temp/C',dtype='<U11',mode='r')
     D = np.memmap('d:/temp/D',dtype='float32',mode='r')
@@ -263,6 +268,48 @@ def loadKlineCache():
     Kline[:] = Kmm[:]
     Companys = C.reshape((nCom,7))
     return Companys,Kline,Date
+
+"""
+和loadKline一样只是增加redis缓存
+缓存数据(c,k,d)
+"""
+g_kd = {}
+def loadKlineCache(code,period,bi):
+    global g_kd
+    name = '%s_%s.kcache'%(code,period)
+    if period=='d':
+        tbi = date.fromisoformat(bi)
+    else:
+        tbi = datetime.fromisoformat(bi)
+    t = datetime.today()
+    if name in g_kd and (g_kd[name][2][0][0]-tbi<=timedelta(days=1) or g_kd[name][3]) and (t.hour<15 or (t.hour>=15 and g_kd[name][2][-1][0].day==t.day)):
+        return g_kd[name][:3]
+    b,z = shared.fromRedis(name)
+    if b and z[1] is not None and z[2] is not None:
+        (c,k,d) = z
+        if isTransDay() and t.hour>=15 and d[-1][0].day != t.day: #有新的数据更新，需要重新加载
+            c,k,d = loadKline(code,period,after=bi)
+        elif d[0][0]>tbi:
+            nc,nk,nd = loadKline(code,period,after=bi,ei= dateString(d[0][0]) if period=='d' else timeString(d[0][0]))
+            #加载新数据，组合
+            if nd[-1][0]==d[0][0]: #重叠一个
+                k = np.vstack((nk[:-1],k))
+                d = nd[:-1] + d
+            else:
+                k = np.vstack((nk,k))
+                d = nd + d
+        else: #直接返回数据，数据量可能更多
+            isall = (d[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
+            g_kd[name] = (c,k,d,isall)
+            return c,k,d
+    else:
+        c,k,d = loadKline(code,period,after=bi)
+    
+    shared.toRedis((c,k,d),name,ex=3600*12) #存储12小时
+    isall = (d[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
+    g_kd[name] = (c,k,d,isall)
+    return c,k,d
+
 """
 将最新的数据存入到Cache中去
 """
@@ -271,7 +318,7 @@ def updateKlineCache():
 """
 创建共享内存k线数据
 """
-def createKlineCache(beginDate):
+def createKlineMM(beginDate):
     companys = query("select company_id,code,name,category,ttm,pb from company_select")
     drs = query("select id,date,volume,open,high,low,close from kd_xueqiu where date>='%s'"%(beginDate))
     """
@@ -480,12 +527,25 @@ def rsi(k,n=6):
     result[1:] = RSI*100
     return result
 
+def roll_std(a,n):
+    """
+    计算滚动标准差
+    """
+    mean = ma(a,n)
+    std = np.ones((len(a),))
+    for i in range(n-1,len(a)):
+        std[i] = ((a[i-n+1:i+1]-mean[i])**2).sum()/(n-1)
+    return np.sqrt(std)
 """
 CCI（Commodity Channel lndex）顺势指标是测量股价是否已超出常态分布范围的一个指数，
 由唐纳德·R.兰伯特（DonaldLambert）所创，属于超买超卖类指标中较特殊的一种，波动于正无限大和负无限小之间。
 """
-def cci():
-    pass
+def cci(k,n=14):
+    TP = (k[:,2]+k[:,3]+k[:,4])/3
+    MA = ma(TP,n)
+    #MD = ma(np.abs(TP-MA),n)*0.015 #baidu百科公式，有问题
+    MD = roll_std(TP,n)*0.015 #该公式在python cci搜索中找到基本吻合
+    return (TP-MA)/MD
 
 """
 成交量能量
@@ -1491,3 +1551,11 @@ def getHoldStocks(name='hold'):
     """
     b,ls = shared.fromRedis(name)
     return ls if b else []
+
+def zoomrange(a,mi,mx):
+    """
+    将数据a缩放到指定范围
+    """
+    k = (mx-mi)/(a.max()-a.min())
+    b = mi-k*a.min()
+    return k*a+b
