@@ -64,3 +64,5 @@ jupyter/app/nanovg/static/NotoEmoji-Regular.ttf
 jupyter/app/nanovg/static/Roboto-Bold.ttf
 jupyter/app/nanovg/static/Roboto-Light.ttf
 jupyter/app/nanovg/static/Roboto-Regular.ttf
+jupyter/app/nanovg/__pycache__/frame.cpython-37.pyc
+jupyter/app/nanovg/__pycache__/canvas.cpython-37.pyc
