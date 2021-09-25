@@ -1,7 +1,7 @@
 from ctypes import c_float
 from sdl2.keycode import SDLK_KP_LESS
 from .nanovg import frame,vg
-from . import monitor,xueqiu,stock,shared,mylog,trend
+from . import monitor,xueqiu,stock,shared,mylog,trend,themos
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
@@ -105,99 +105,8 @@ def zpfx(k5,d5):
                 return (R[i][0],(len(R)-1-i)/4)
     return None
 
-class ThemosDefault:
-    BGCOLOR = (0.95,0.95,0.95,1) #图表背景颜色
 
-    MA60_COLOR = vg.nvgRGB(255,128,60) #ma60颜色
-    PRICE_COLOR = vg.nvgRGB(70,130,200) #价格颜色
-    MAIN_COLOR = vg.nvgRGB(255,0,255) #主力
-    HUGE_COLOR = vg.nvgRGB(139,0,0)
-    LARG_COLOR = vg.nvgRGB(255,0,0)
-    MA5_COLOR = vg.nvgRGB(255,0,255)
-    MA30_COLOR = vg.nvgRGB(0,0,255)
-    MID_COLOR = vg.nvgRGB(255,215,0)
-    TING_COLOR = vg.nvgRGB(135,206,250)
-    RED_COLOR = vg.nvgRGB(220,0,0)   #涨
-    GREEN_COLOR = vg.nvgRGB(0,120,0) #跌
-    RED_KCOLOR = vg.nvgRGB(250,0,0)  
-    GREEN_KCOLOR = vg.nvgRGB(0,244,244)      
-    BG_COLOR = vg.nvgRGB(255,255,255) #背景
-    CROSS_COLOR = vg.nvgRGBAf(1,1,1,0.5)
-    YLABELWIDTH = 40   #y轴坐标轴空间
-    XLABELHEIGHT = 30  #x轴坐标轴空间
-
-    ORDER_BGCOLOR = vg.nvgRGB(220,220,220)
-    ORDER_HEADCOLOR = vg.nvgRGB(64,96,196)
-    ORDER_SELCOLOR = vg.nvgRGB(196,96,96)
-    ORDER_TEXTBGCOLOR = vg.nvgRGBA(64,64,64,255)
-    ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255)  
-    ORDER_TEXTCOLOR2 = vg.nvgRGB(255,255,0)
-    ORDER_TEXTCOLOR3 = vg.nvgRGB(0,255,0)
-    CAN_BUY_TEXTCOLOR = vg.nvgRGB(170,0,0)  #上轨和中轨向上
-    CAN_BUY_TEXTCOLOR2 = vg.nvgRGB(70,0,140)  #都向上
-    CAN_BUY_TEXTCOLOR3 = vg.nvgRGB(187,61,0)  #仅仅下轨向上
-    WARN_BUY_COLOR = vg.nvgRGB(255,255,0)
-    WARN_NEWHIGH_COLOR = vg.nvgRGB(255,128,255)
-    WARN_SELL_COLOR = vg.nvgRGB(0,255,64)
-    ORDER_WIDTH = 150       #排序栏宽度
-    ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
-    ORDER_FONTSIZE = 14
-
-    AXISCOLOR = vg.nvgRGBf(0.9,0.9,0.9)
-    GRIDCOLOR = vg.nvgRGBf(0.15,0.15,0.15)
-    TEXTCOLOR = vg.nvgRGBf(1,1,1)
-
-    SELBGCOLOR = vg.nvgRGBf(0,0.1,0.1)
-class ThemosBlack:
-    BGCOLOR = (0.0,0.0,0.0,1) #图表背景颜色
-
-    MA60_COLOR = vg.nvgRGB(255,128,60) #ma60颜色
-    PRICE_COLOR = vg.nvgRGB(70,130,200) #价格颜色
-    MAIN_COLOR = vg.nvgRGB(255,0,255) #主力
-    HUGE_COLOR = vg.nvgRGB(139,0,0)
-    LARG_COLOR = vg.nvgRGB(255,128,0)
-    MA5_COLOR = vg.nvgRGB(255,0,255)
-    MA10_COLOR = vg.nvgRGB(240,248,136)
-    MA20_COLOR = vg.nvgRGB(0,178,240)
-    MA30_COLOR = vg.nvgRGB(0,128,255)
-    MID_COLOR = vg.nvgRGB(255,215,0)
-    TING_COLOR = vg.nvgRGB(135,206,250)
-    RED_COLOR = vg.nvgRGB(250,0,0)  
-    GREEN_COLOR = vg.nvgRGB(0,200,0) 
-    RED_KCOLOR = vg.nvgRGB(250,0,0)  
-    GREEN_KCOLOR = vg.nvgRGB(0,244,244)  
-    BG_COLOR = vg.nvgRGB(0,0,0) #背景
-    CROSS_COLOR = vg.nvgRGBAf(1,1,1,0.5)
-    YLABELWIDTH = 42   #y轴坐标轴空间
-    XLABELHEIGHT = 36  #x轴坐标轴空间
-
-    ORDER_BGCOLOR = vg.nvgRGB(0,0,0)
-    ORDER_HEADCOLOR = vg.nvgRGB(0,0,0)
-    ORDER_SELCOLOR = vg.nvgRGB(32,96,168)
-    ORDER_TEXTBGCOLOR = vg.nvgRGBA(0,0,0,255)
-    ORDER_TEXTCOLOR = vg.nvgRGB(255,255,255) 
-    ORDER_TEXTCOLOR2 = vg.nvgRGB(255,255,0) 
-    ORDER_TEXTCOLOR3 = vg.nvgRGB(0,255,0)
-    CAN_BUY_TEXTCOLOR = vg.nvgRGB(170,0,0)  #上轨和中轨向上
-    CAN_BUY_TEXTCOLOR2 = vg.nvgRGB(70,0,140)  #都向上
-    CAN_BUY_TEXTCOLOR3 = vg.nvgRGB(100,50,0)  #仅仅下轨向上
-
-    WARN_BUY_COLOR = vg.nvgRGB(64,0,0)
-    WARN_BUY_COLOR2 = vg.nvgRGB(128,0,0)
-    WARN_NEWHIGH_COLOR = vg.nvgRGB(64,64,0)
-    WARN_SELL_COLOR = vg.nvgRGB(0,64,0)
-    WARN_SELL_COLOR2 = vg.nvgRGB(0,128,0)
-    ORDER_WIDTH = 160       #排序栏宽度
-    ORDER_ITEM_HEIGHT = 24  #排序栏按钮高度
-    ORDER_FONTSIZE = 14
-
-    AXISCOLOR = vg.nvgRGBf(0.9,0.9,0.9)
-    GRIDCOLOR = vg.nvgRGBf(0.15,0.15,0.15)
-    TEXTCOLOR = vg.nvgRGBf(1,1,1)
-
-    SELBGCOLOR = vg.nvgRGBf(0,0,0.1)
-
-Themos = ThemosBlack
+Themos = themos.ThemosBlack
 class StockPlot:
     """
     包括两个区域，分时和成交量流入流出区
@@ -382,7 +291,7 @@ class StockPlot:
         self._vplot.setGrid(True,True)
         self._fplot.setGrid(True,True)
         self._kplot.setTitle(label)
-        self._kplot.setZD(item[1])
+        self._kplot.setZD(item[2][-1,1])
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._fplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
@@ -475,7 +384,7 @@ class StockPlot:
         self._kplot.setGrid(True,True)
         self._vplot.setGrid(True,True)
         self._kplot.setTitle(label)
-        self._kplot.setZD(item[1])
+        self._kplot.setZD(item[2][-1,1])
         self._kplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._vplot.setOuterSpace(Themos.YLABELWIDTH,0,0,0)
         self._kplot.setInnerSpace(0,0,0,0)
@@ -767,29 +676,7 @@ class StockOrder:
         canvas.lineTo(xx,yy+self._pagen*Themos.ORDER_ITEM_HEIGHT)
         #canvas.rect(x+1,y+self._pagei*self._pagen*Themos.ORDER_ITEM_HEIGHT,Themos.ORDER_WIDTH,self._pagen*Themos.ORDER_ITEM_HEIGHT)
         canvas.stroke()
-        self._needrender = False
-class DateLabel:
-    """
-    显示一个日期包括时间
-    """
-    TEXTCOLOR = vg.nvgRGB(255,255,255)
-    TEXTBGCOLOR = vg.nvgRGB(0,0,0)
-    SIZE = 14
-    def __init__(self):
-        pass
-    def render(self,canvas,x,y,w,h):
-        canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
-        canvas.beginPath()
-        t = datetime.today()
-        canvas.fillColor(DateLabel.TEXTBGCOLOR)
-        canvas.fontFace("zh")
-        canvas.fontBlur(5)
-        canvas.fontSize(DateLabel.SIZE)
-        canvas.fontBlur(0)
-        canvas.text(x+w/2,y+h/2,stock.timeString2(t))
-        canvas.fillColor(DateLabel.TEXTCOLOR)
-        canvas.text(x+w/2,y+h/2,stock.timeString2(t))
-        
+        self._needrender = False        
 class HotPlotApp(frame.app):
     """
     热键:
@@ -822,7 +709,7 @@ class HotPlotApp(frame.app):
         sdl2.SDLK_KP_4:0,sdl2.SDLK_KP_5:1,sdl2.SDLK_KP_6:2,sdl2.SDLK_KP_1:3,sdl2.SDLK_KP_2:4,sdl2.SDLK_KP_3:5
     }
     CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃','ETF热点','概念热点','行业热点']
-    ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速']
+    ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速','5日乖离','20日乖离']
     NONEWARNING = 0
     BUYWARNING = 1
     SELLWARNING = 2
@@ -1159,7 +1046,7 @@ class HotPlotApp(frame.app):
                 self._pagen -=1
         if self._pagen<0:
             self._pagen = 0
-        self._SO.update(R,self._pagen,PageNum,StockOrder.IT2P if self._order==0 or self._order==3 else StockOrder.IT2E9)
+        self._SO.update(R,self._pagen,PageNum,StockOrder.IT2P if self._order==0 or self._order==3 or self._order==4 else StockOrder.IT2E9)
         if self._period!=15 and self._kmode==HotPlotApp.BULLWAY:
             K,D = xueqiu.get_period_k(240 if self._period=='d' else self._period)
         ww = (self._w-Themos.ORDER_WIDTH)/NS[0] #视口宽度
@@ -1369,16 +1256,21 @@ class HotPlotApp(frame.app):
             else:
                 self._kmode=HotPlotApp.RT
         elif sym==sdl2.SDLK_KP_0: #切换排序
-            self._order+=1
-            if self._order>1:
+            if self._order==0:
+                self._order = 1
+            elif self._order==1:
+                self._order = 4
+            else:
                 self._order = 0
-            self.messagebox("成交量排序" if self._order==1 else "涨幅排序")
+            self.messagebox("%s排序"%HotPlotApp.ORDER[self._order])
         elif sym==sdl2.SDLK_KP_PERIOD:
-            self._order+=1
-            if self._order<2:
+            if self._order==2:
+                self._order = 3
+            elif self._order==3:
                 self._order = 2
-            elif self._order>3:
+            else:
                 self._order = 2
+            self.messagebox("%s排序"%HotPlotApp.ORDER[self._order])
         elif sym==sdl2.SDLK_TAB:
             self._warningbox_isopen = not self._warningbox_isopen
         elif sym==sdl2.SDLK_KP_PLUS:
@@ -1500,7 +1392,7 @@ class HotPlotApp(frame.app):
         def onif(b,s):
             return (b and s) or not b
         return company[3] in self._prefix and onif(self._flowin,k[-1,3]+k[-1,4]>0) and onif(self._hasboll,company[1] in bolls)      
-    def it2order(self,i,k): #一个便利函数,更加_order选择要排序的项
+    def it2order(self,i,k,k15): #一个便利函数,更加_order选择要排序的项
         if self._order==0:
             order = k[i,-1,1] #日涨幅
         elif self._order==1:
@@ -1515,6 +1407,9 @@ class HotPlotApp(frame.app):
                 order = k[i,-1,1]-k[i,-2,1]
             else:
                 order = k[i,-1,3]+k[i,-1,4]
+        elif self._order==4: #5日线乖离率排序
+            ma5 = k15[-80:].sum()/80
+            order = (k[i,-1,0]-ma5)*100/ma5
         else:
             order = k[i,-1,1] #日涨幅
         return order
@@ -1531,7 +1426,7 @@ class HotPlotApp(frame.app):
                 bo = self._BOLL[i]
                 rise = isrise(bo[-5:,1]) #and isrise(bo[-5:,2])
                 if self._bollfilter==0 or (self._bollfilter==1 and rise) or (self._bollfilter==2 and not rise):
-                    R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls)) #0 company,1 涨幅(排序项) 2 k 3 d 4 K15 5 D15 6 bolls
+                    R.append((companys[i],self.it2order(i,k,K[i]),k[i],d,K[i],D,bolls)) #0 company,1 排序项 2 k 3 d 4 K15 5 D15 6 bolls 7 涨幅
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
         #将三点指数追加在末尾
         return TOPS #[:top]            
@@ -1544,7 +1439,7 @@ class HotPlotApp(frame.app):
         R = []
         for code in codes:
             i = HotPlotApp.code2i[code]
-            R.append((companys[i],self.it2order(i,k),k[i],d,K[i],D,bolls))
+            R.append((companys[i],self.it2order(i,k,K[i]),k[i],d,K[i],D,bolls))
         return sorted(R,key=lambda it:it[1],reverse=not self._reverse) #R#[:top]
     def activeTop(self,top=18):
         """
