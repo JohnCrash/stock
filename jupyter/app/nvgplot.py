@@ -1,7 +1,5 @@
-from ctypes import c_float
-from sdl2.keycode import SDLK_KP_LESS
-from .nanovg import frame,vg
-from . import monitor,xueqiu,stock,shared,mylog,trend,themos
+from .nanovg import frame,vg,themos
+from . import monitor,xueqiu,stock,shared,mylog,trend
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np

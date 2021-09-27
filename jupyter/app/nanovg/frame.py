@@ -36,6 +36,7 @@ class app:
         if vg.glewInit()!=vg.GLEW_OK:
             raise RuntimeError('glewInit')
         self._canvas = Canvas2d()
+        self._hooks = {}
         self._running = True
         self._fps = 0
         self._interval = -1
@@ -59,6 +60,9 @@ class app:
         self.createFrame(0,0,w.value,app.CAPTION_HEIGHT,'title')
         self.setInterval(60)
     def createFrame(self,x,y,w,h,name=None):
+        """
+        创建一个后缓存对象
+        """
         fbo = self._canvas.createFramebuffer(w,h,vg.NVG_IMAGE_REPEATX | vg.NVG_IMAGE_REPEATY)
         self._fbos[name] = (x,y,w,h,fbo,name)
         return self._fbos[name]
@@ -73,6 +77,9 @@ class app:
         else:
             return None
     def beginFrame(self,name):
+        """
+        返回该后缓存对象，以便向里面绘制图形，绘制完成调用endFrame
+        """
         if name in self._fbos:
             fbo = self._fbos[name]
             self._updatefbo = True
@@ -133,7 +140,9 @@ class app:
         while self._running:
             while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
                 if not self.handleEvent(event):
-                    if event.type == sdl2.SDL_QUIT:
+                    if self.callhook('event',(event,)):
+                        pass
+                    elif event.type == sdl2.SDL_QUIT:
                         self.quit()
                     elif event.type == sdl2.SDL_KEYDOWN:
                         #ptr = ctypes.cast(event, events.SDL_KeyboardEvent)
@@ -295,11 +304,39 @@ class app:
                 canvas.fillPaint(cfp)
                 canvas.rect(fbo[0],fbo[1],fbo[2],fbo[3])
                 canvas.fill()
+            self.callhook('render',(canvas,0,0,w.value,h.value))
             self.render(canvas,0,0,w.value,h.value)
             canvas.endFrame()
             sdl2.SDL_GL_SwapWindow(self._window)
             self._updatefbo = False
-
+    def registerHook(self,name,hook):
+        """
+        向环境中注册挂钩函数
+        """
+        if name not in self._hooks:
+            self._hooks[name] = []
+        self._hooks[name].append(hook)
+    def unregisterHook(self,name,hook):
+        """
+        解除挂钩
+        """
+        if name not in self._hooks:
+            for i in range(len(self._hooks[name])):
+                if self._hooks[name][i]==hook:
+                    self._hooks[name].remove(i)
+                    return
+    def callhook(self,name,args):
+        """
+        调用挂钩函数,只要返回值有True就返回True，否则返回False
+        """
+        b = False
+        if name in self._hooks:
+            try:
+                for hook in self._hooks[name]:
+                    b |= hook(args)
+            except Exception as e:
+                print(e)
+        return b
     def loadDemoData(self):
         data = {}
         data['images'] = []
@@ -656,12 +693,6 @@ class Plot:
         a = self._area
         b = self._border
         x0,y0,w0,h0 = self.plotRect()
-        canvas.strokeWidth(1)
-        canvas.beginPath()
-        canvas.rect(x0,y0,w0,h0)
-        #canvas.fillColor(vg.nvgRGBA(255,255,255,255))
-        canvas.strokeColor(self._themos.AXISCOLOR)
-        canvas.stroke()
         canvas.fontFace("sans")
         canvas.fontSize(13.0)
         canvas.fillColor(self._themos.TEXTCOLOR)
@@ -690,7 +721,7 @@ class Plot:
                         canvas.translate(x,y0+h0+2)
                         canvas.rotate(-self._xtickangle)
                         canvas.text(0,0,txt)
-                        canvas.resetTransform()
+                        canvas.resetTransform()                       
         if self._yticks is not None:
             canvas.textAlign(vg.NVG_ALIGN_RIGHT|vg.NVG_ALIGN_MIDDLE)
             for oy in self._yticks:
@@ -715,6 +746,11 @@ class Plot:
             if self._ye is not None and self._ye>3: #绘制坐标指数
                 canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
                 canvas.text(x0,y0,"1e%d"%self._ye)
+        canvas.strokeWidth(1)
+        canvas.beginPath()
+        canvas.rect(x0,y0,w0,h0)
+        canvas.strokeColor(self._themos.AXISCOLOR)
+        canvas.stroke() 
         if len(self._title)>0:
             if self._titleColor is not None:
                 canvas.fillColor(self._titleColor)

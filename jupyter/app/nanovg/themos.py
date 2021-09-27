@@ -1,4 +1,4 @@
-from .nanovg import vg
+from . import vg
 
 class ThemosDefault:
     BGCOLOR = (0.95,0.95,0.95,1) #图表背景颜色
