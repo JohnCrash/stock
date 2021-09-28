@@ -1,4 +1,4 @@
-from .nanovg import frame,vg,themos
+from .nanovg import frame,vg,themos,ui
 from . import monitor,xueqiu,stock,shared,mylog,trend
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
@@ -103,8 +103,16 @@ def zpfx(k5,d5):
                 return (R[i][0],(len(R)-1-i)/4)
     return None
 
-
 Themos = themos.ThemosBlack
+
+def drawStockTips(canvas,x,y,title,price,zf):
+    global Themos
+    canvas.fontFace('zhb')
+    canvas.fontSize(14)
+    canvas.fillColor(Themos.RED_COLOR if zf>0 else Themos.GREEN_COLOR)
+    canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_MIDDLE)
+    canvas.text(x,y,"%s  %.1f  %.2f%%"%(title,price,zf))
+
 class StockPlot:
     """
     包括两个区域，分时和成交量流入流出区
@@ -756,6 +764,9 @@ class HotPlotApp(frame.app):
         self._warningbox = []
         self._warningbox_isopen = False
         self._bollfilter = 0 #0 不过滤,1 向上 , 2 向下
+        self._tips = []
+        for c in ['SH000001','SZ399001','SZ399006','SH000688']:
+            self._tips.append((HotPlotApp.code2com[c][2],HotPlotApp.code2i[c]))
         self.updateTitle()
         self.createFrame(0,0,Themos.ORDER_WIDTH,self._h,'list')
         self.createFrame(Themos.ORDER_WIDTH,self.CAPTION_HEIGHT,self._w-Themos.ORDER_WIDTH,self._h-self.CAPTION_HEIGHT,'graph')
@@ -768,6 +779,7 @@ class HotPlotApp(frame.app):
         self._strongsellwav = self.loadWave('rocketalarm.wav')
         self.setMixVolume(-1,0.1)
         self.playWave(0,self._readywav)
+        ui.test(self)
     def update60(self):
         """
         一个小时更新一次,这包括日BOLL,CCI(标准化到0-100),RSI
@@ -905,6 +917,17 @@ class HotPlotApp(frame.app):
         else:
             title = "%s %s %d月%d日 %02d:%02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper())
         self.setWindowTitle(title)
+        #将大盘指数显示在标题栏上
+        if self._Data is not None:
+            k,d,K,D,bolls,em = self._Data
+        
+            c,w,h = self.beginFrame('title')
+            x = Themos.ORDER_WIDTH+48
+            y = h/2
+            for s in self._tips:
+                drawStockTips(c,x,y,s[0],k[s[1],-1,0],k[s[1],-1,1])
+                x += Themos.ORDER_WIDTH+32
+            self.endFrame()
     def renderfbo(self):
         try:
             if self._SO._needrender:

@@ -105,6 +105,12 @@
             "request": "launch",
             "name": "Debug test2.py",
             "program": "${workspaceFolder}\\jupyter\\test2.py"
-        }           
+        },
+        {
+            "type": "python",
+            "request": "launch",
+            "name": "test ui",
+            "program": "${workspaceFolder}\\jupyter\\test3.py"
+        }          
     ]
 }

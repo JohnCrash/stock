@@ -224,7 +224,7 @@ nvgUpdateImage = _bind('nvgUpdateImage',[POINTER(NVGcontext),c_int,POINTER(c_uby
 nvgImageSize = _bind('nvgImageSize',[POINTER(NVGcontext),c_int,POINTER(c_int),POINTER(c_int)])
 nvgDeleteImage = _bind('nvgDeleteImage',[POINTER(NVGcontext),c_int])
 #Paints
-nvgLinearGradient = _bind('nvgLinearGradient',[POINTER(NVGcontext),c_float,c_float,c_float,NVGcolor,NVGcolor],NVGpaint)
+nvgLinearGradient = _bind('nvgLinearGradient',[POINTER(NVGcontext),c_float,c_float,c_float,c_float,NVGcolor,NVGcolor],NVGpaint)
 nvgBoxGradient = _bind('nvgBoxGradient',[POINTER(NVGcontext),c_float,c_float,c_float,c_float,c_float,c_float,NVGcolor,NVGcolor],NVGpaint)
 nvgRadialGradient = _bind('nvgRadialGradient',[POINTER(NVGcontext),c_float,c_float,c_float,c_float,NVGcolor,NVGcolor],NVGpaint)
 nvgImagePattern = _bind('nvgImagePattern',[POINTER(NVGcontext),c_float,c_float,c_float,c_float,c_float,c_int,c_float],NVGpaint)

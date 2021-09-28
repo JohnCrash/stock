@@ -40,7 +40,7 @@ class app:
         self._running = True
         self._fps = 0
         self._interval = -1
-        self._clearColor = (1,1,1,1)
+        self._clearColor = vg.nvgRGBAf(0,0,0,1)
         sdl2.SDL_GL_SetSwapInterval(0)
         self.loadDemoData()
         self._mouseini = -1
@@ -64,13 +64,14 @@ class app:
         创建一个后缓存对象
         """
         fbo = self._canvas.createFramebuffer(w,h,vg.NVG_IMAGE_REPEATX | vg.NVG_IMAGE_REPEATY)
-        self._fbos[name] = (x,y,w,h,fbo,name)
+        self._fbos[name] = [x,y,w,h,fbo,name]
         return self._fbos[name]
     def deleteFrame(self,name):
         if name in self._fbos:
             fbo = self._fbos[name]
             del self._fbos[name]
             self._canvas.deleteFramebuffer(fbo[4])
+            self._updatefbo = True
     def getFrame(self,name):
         if name in self._fbos:
             return self._fbos[name]
@@ -320,10 +321,10 @@ class app:
         """
         解除挂钩
         """
-        if name not in self._hooks:
+        if name in self._hooks:
             for i in range(len(self._hooks[name])):
                 if self._hooks[name][i]==hook:
-                    self._hooks[name].remove(i)
+                    del self._hooks[name][i]
                     return
     def callhook(self,name,args):
         """
@@ -332,8 +333,9 @@ class app:
         b = False
         if name in self._hooks:
             try:
-                for hook in self._hooks[name]:
-                    b |= hook(args)
+                hooks = self._hooks
+                for hook in hooks[name]:
+                    b |= hook(name,args)
             except Exception as e:
                 print(e)
         return b

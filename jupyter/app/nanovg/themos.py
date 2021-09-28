@@ -47,7 +47,7 @@ class ThemosDefault:
     SELBGCOLOR = vg.nvgRGBf(0,0.1,0.1)
 
 class ThemosBlack:
-    BGCOLOR = (0.0,0.0,0.0,1) #图表背景颜色
+    BGCOLOR = (0.,0.,0.,1) #图表背景颜色
 
     MA60_COLOR = vg.nvgRGB(255,128,60) #ma60颜色
     PRICE_COLOR = vg.nvgRGB(70,130,200) #价格颜色
