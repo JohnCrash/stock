@@ -40,6 +40,7 @@ class app:
         self._running = True
         self._fps = 0
         self._interval = -1
+        self._mousexy = [0,0]
         self._clearColor = vg.nvgRGBAf(0,0,0,1)
         sdl2.SDL_GL_SetSwapInterval(0)
         self.loadDemoData()
@@ -59,6 +60,8 @@ class app:
         self._h = h.value        
         self.createFrame(0,0,w.value,app.CAPTION_HEIGHT,'title')
         self.setInterval(60)
+    def getCursorPt(self):
+        return self._mousexy[0],self._mousexy[1]
     def createFrame(self,x,y,w,h,name=None):
         """
         创建一个后缓存对象
@@ -144,6 +147,9 @@ class app:
         while self._running:
             while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
                 if not self.handleEvent(event):
+                    if event.type==sdl2.SDL_MOUSEMOTION:
+                        self._mousexy[0] = event.motion.x
+                        self._mousexy[1] = event.motion.y                    
                     if self.callhook('event',(event,)):
                         pass
                     elif event.type == sdl2.SDL_QUIT:
@@ -306,7 +312,7 @@ class app:
                 fbo = self._fbos[k]
                 canvas.beginPath()
                 imgw,imgh = canvas.imageSize(fbo[4].contents.image)
-                cfp = canvas.imagePattern(fbo[0],fbo[1],imgw,imgh,0,fbo[4].contents.image,1)
+                cfp = canvas.imagePattern(fbo[0],fbo[1],fbo[2],fbo[3],0,fbo[4].contents.image,1)
                 canvas.fillPaint(cfp)
                 canvas.rect(fbo[0],fbo[1],fbo[2],fbo[3])
                 canvas.fill()

@@ -18,21 +18,28 @@ def cubic_bezier(x0,y0,x1,y1):
     ease-out:cubic_bezier(0,0,.58,1)
     ease-in-out:cubic_bezier(0.42,0,.58,1)
     """
-    n = 200
+    n = 100
     xs = [0,x0,x1,1]
     ys = [0,y0,y1,1]
     xy = [0]*(n+1)
+    a = []
     for i in range(n+1):
         t = i/n
         x = n_bezier_curve(xs,3,0,t)
         y = n_bezier_curve(ys,3,0,t)
-        xy[int(x*100)] = y
-    def f(t):
-        return xy[int(t*100)]
+        a.append((x,y))
+    def getrange(x):
+        for i in range(len(a)):
+            if a[i][0]>x:
+                break
+        return a[i-1][0],a[i-1][1],a[i][0],a[i][1]
+    def f(x):
+        x0,y0,x1,y1 = getrange(x)
+        return one_bezier_curve(y0,y1,(x-x0)/(x1-x0)) #插值
     return f
-#ease_out = cubic_bezier(0,0,.58,1)
-#ease_in= cubic_bezier(0.42,0,1,1)
-ease_in_out = cubic_bezier(0.42,0,.58,1)
+#ease_out = cubic_bezier(0,0,.3,1)
+#ease_in= cubic_bezier(0.7,0,1,1)
+ease_in_out = cubic_bezier(0.7,0,.3,1)
 """
 使用方法：
 childs = [
@@ -77,7 +84,7 @@ class ui:
     def onloop(self,t,dt):
         return False
 class window(ui):
-    OPENDT = 0.4 #打开耗时
+    OPENDT = .4 #打开耗时
     def __init__(self,app,ps):
         self._app = app
         self._ps = ps
@@ -88,18 +95,22 @@ class window(ui):
         self._pt = pt
         self._size = size
         self._opent = 0
+        self._openxy = [0,0]
         app.registerHook("event",self.eventCallback)
         app.registerHook("loop",self.onloop)
         app.createFrame(pt[0],pt[1],size[0],size[1],self._name)
         self._child = self.parse(ps)
         self.renderSelf()
         
-    def openAnimation(self,x,y):
+    def openAnimation(self,x=None,y=None):
         """
         打开动画
         """
         self._opent = window.OPENDT
-        self._openxy = (x,y)
+        if x is not None:
+            self._openxy = (x,y)
+        else: #从鼠标点击位置弹出
+            self._openxy[0],self._openxy[1] = self._app.getCursorPt()
         self._endxy = self._pt
     def parse(self,ps):
         """
@@ -318,7 +329,7 @@ def test(self):
         nonlocal win
         win.close()
         w = createwin()
-        w.openAnimation(0,0)   
+        w.openAnimation()   
         win = w
     W = 800
     H = 480
