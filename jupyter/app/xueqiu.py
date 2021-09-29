@@ -2517,7 +2517,7 @@ def getFlowRaw(code,lastday=None,after=None,ei=None):
 """
 g_fds = {}
 def getFlowCache(code,bi):
-    name = '%s.fcache'%(code)
+    name = '%s.fcache2'%(code)
     tbi = datetime.fromisoformat(bi)
     t = datetime.today()
     if name in g_fds and (g_fds[name][1][0][0]<=tbi or g_fds[name][2]) and (t.hour<15 or (t.hour>=15 and g_fds[name][1][-1][0].day==t.day)):

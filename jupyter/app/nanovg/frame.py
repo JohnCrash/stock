@@ -85,19 +85,22 @@ class app:
             fbo = self._fbos[name]
             self._updatefbo = True
             self._canvas.bindFramebuffer(fbo[4])
-            GL.glViewport(0,0,fbo[2],fbo[3])
+            GL.glViewport(0,0,int(fbo[2]),int(fbo[3]))
             self._canvas.beginFrame(fbo[2],fbo[3],1)
             return self._canvas,fbo[2],fbo[3]
         else:
             return None,None,None
     def endFrame(self):
         self._canvas.endFrame()
-    def movefbo(self,name,x,y):
+    def movefbo(self,name,x,y,w=None,h=None):
         if name in self._fbos:
             fbo = self._fbos[name]
             self._updatefbo = True
             fbo[0] = x
             fbo[1] = y
+            if w is not None:
+                fbo[2] = w
+                fbo[3] = h
     def loadWave(self,fn):
         path = '/'.join(str.split(__file__,'\\')[:-1])
         f = "%s/static/%s"%(path,fn)
@@ -162,6 +165,7 @@ class app:
             t = SDL_GetTicks()/1000.
             dt = t-prevt
             prevt = t
+            self.callhook('loop',(t,dt))
             self.onLoop(t,dt)
             if (self._interval>0 and acc>self._interval) or self._delayupdate:
                 acc = 0
@@ -301,7 +305,8 @@ class app:
             for k in self._fbos:
                 fbo = self._fbos[k]
                 canvas.beginPath()
-                cfp = canvas.imagePattern(fbo[0],fbo[1],fbo[2],fbo[3],0,fbo[4].contents.image,1)
+                imgw,imgh = canvas.imageSize(fbo[4].contents.image)
+                cfp = canvas.imagePattern(fbo[0],fbo[1],imgw,imgh,0,fbo[4].contents.image,1)
                 canvas.fillPaint(cfp)
                 canvas.rect(fbo[0],fbo[1],fbo[2],fbo[3])
                 canvas.fill()

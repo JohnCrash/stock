@@ -276,7 +276,7 @@ def loadKlineMM():
 g_kd = {}
 def loadKlineCache(code,period,bi):
     global g_kd
-    name = '%s_%s.kcache'%(code,period)
+    name = '%s_%s.kcache2'%(code,period)
     if period=='d':
         tbi = date.fromisoformat(bi)
     else:

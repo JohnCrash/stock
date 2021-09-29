@@ -469,3 +469,4 @@ class Canvas2d:
         Words longer than the max width are slit at nearest character (i.e. no hyphenation).
         """
         return vg.gTextBreakLines(self._ctx, string.encode('utf-8'), breakRowWidth, rows, maxRows)
+

@@ -779,7 +779,7 @@ class HotPlotApp(frame.app):
         self._strongsellwav = self.loadWave('rocketalarm.wav')
         self.setMixVolume(-1,0.1)
         self.playWave(0,self._readywav)
-        ui.test(self)
+
     def update60(self):
         """
         一个小时更新一次,这包括日BOLL,CCI(标准化到0-100),RSI

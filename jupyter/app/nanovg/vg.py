@@ -274,3 +274,32 @@ nvgTextGlyphPositions = _bind('nvgTextGlyphPositions',[POINTER(NVGcontext),c_flo
 nvgTextMetrics = _bind('nvgTextMetrics',[POINTER(NVGcontext),POINTER(c_float),POINTER(c_float),POINTER(c_float)])
 nvgTextBreakLines = _bind('nvgTextBreakLines',[POINTER(NVGcontext),c_char_p,c_char_p,c_float,POINTER(NVGtextRow),c_int],c_int)
 #Internal Render API
+
+def rgb2hsl(r,g,b):
+    Min = min(r,g,b)
+    Max = max(r,g,b)
+    del_Max = Max-Min
+    L = (Max+Min)/2
+    if del_Max==0:
+        H = 0
+        S = 0
+    else:
+        if L<0.5:
+            S = del_Max/(Max+Min)
+        else:
+            S = del_Max/(2-Max-Min)
+        del_R = (((Max - r) / 6.0) + (del_Max / 2.0)) / del_Max
+        del_G = (((Max - g) / 6.0) + (del_Max / 2.0)) / del_Max
+        del_B = (((Max - b) / 6.0) + (del_Max / 2.0)) / del_Max
+        if r == Max:
+            H = del_B - del_G
+        elif g == Max:
+            H = (1.0 / 3.0) + del_R - del_B
+        elif b == Max:
+            H = (2.0 / 3.0) + del_G - del_R
+
+        if H < 0:
+            H += 1
+        if H > 1:
+            H -= 1
+    return (H,S,L)
