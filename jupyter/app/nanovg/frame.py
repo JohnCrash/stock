@@ -51,7 +51,7 @@ class app:
         self._delayupdate = False
         self._windowx,self._windowy = 0,0
         self._windoww,self._windowh = w,h
-        self.fullScreen()
+        #self.fullScreen()
         w,h = c_int(),c_int()
         video.SDL_GetWindowSize(self._window, ctypes.byref(w), ctypes.byref(h))
         self._fbos = {}
@@ -354,7 +354,7 @@ class app:
         data = {}
         data['images'] = []
         path = '/'.join(str.split(__file__,'\\')[:-1])
-
+        """
         data['fontIcons'] = self._canvas.createFont("icons", "%s/static/entypo.ttf"%path)
         if data['fontIcons'] == -1:
             print("Could not add font icons.\n")
@@ -374,7 +374,7 @@ class app:
         if data['fontEmoji'] == -1:
             print("Could not add font emoji.\n")
             return -1
-
+        """
         zh = self._canvas.createFont("zh", "c:/windows/fonts/msyh.ttc")
         if zh == -1:
             print("Could not add font zh.\n")
@@ -383,8 +383,8 @@ class app:
         if zhb == -1:
             print("Could not add font zhb.\n")
             return -1        
-        self._canvas.addFallbackFontId(data['fontNormal'], data['fontEmoji'])
-        self._canvas.addFallbackFontId(data['fontBold'], data['fontEmoji'])
+        #self._canvas.addFallbackFontId(data['fontNormal'], data['fontEmoji'])
+        #self._canvas.addFallbackFontId(data['fontBold'], data['fontEmoji'])
         return data    
 
 class fpsGraph:

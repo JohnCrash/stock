@@ -423,7 +423,7 @@ class Canvas2d:
         Sets the font face based on specified name of current text style.
         """
         vg.nvgFontFace(self._ctx, font.encode('utf-8'))
-    def text(self, x:float , y:float , string:str): #Fixme: 长字符串通过指针取片段
+    def text(self, x:float , y:float , string:str): #c语言指针结束点，python使用切片，因此不需要结束指针
         """
         Draws text string at specified location. If end is specified only the sub-string up to the end is drawn.
         """
@@ -468,5 +468,5 @@ class Canvas2d:
         White space is stripped at the beginning of the rows, the text is split at word boundaries or when new-line characters are encountered.
         Words longer than the max width are slit at nearest character (i.e. no hyphenation).
         """
-        return vg.gTextBreakLines(self._ctx, string.encode('utf-8'), breakRowWidth, rows, maxRows)
+        return vg.gTextBreakLines(self._ctx, string.encode('utf-8'),None,breakRowWidth, rows, maxRows)
 
