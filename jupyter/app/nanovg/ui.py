@@ -153,7 +153,7 @@ class window(ui):
         elif event.type==sdl2.SDL_TEXTINPUT:
             self.input(event.text)
         elif event.type==sdl2.SDL_TEXTEDITING:
-            self.editing(event.text)
+            self.editing(event.edit)
         else:
             return False
         return True
@@ -388,7 +388,10 @@ class input(ui):
         self._parent = parent
         self._ps = ps
         self._text = self._ps['label']
+        self._edittext = ''
+        self._edittimestamp = 0
         self._n = 0 #光标后面有多少字符
+        self._curx = 2
     def font(self):
         return 'zh' if 'font' not in self._ps else self._ps['font']
     def fontSize(self):
@@ -419,13 +422,30 @@ class input(ui):
         canvas.fontFace(self.font())
         canvas.fontSize(self.fontSize())
         canvas.fillColor(self.fontColor())
-        canvas.textLetterSpacing(1)
         canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_MIDDLE)
-        canvas.text(x+2,y+h/2,self._text)
+        if len(self._edittext)==0:
+            canvas.text(x+2,y+h/2,self._text)
+        else:
+            if self._n==0:
+                prefix = self._text
+                suffix = ''
+            else:
+                prefix = self._text[:-self._n]
+                suffix = self._text[-self._n:]
+            canvas.text(x+2,y+h/2,prefix)
+            rounds = np.empty((4,),dtype=np.float32)
+            canvas.textBounds(x+2,y+h/2,prefix,rounds.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+            c = self.fontColor()
+            hsl = vg.rgb2hsl(c.r,c.g,c.b)
+            canvas.fillColor(vg.nvgHSL(hsl[0],hsl[1],hsl[2]+(1-hsl[2])*0.2))
+            canvas.text(rounds[2],y+h/2,self._edittext)
+            canvas.fillColor(c)
+            canvas.textBounds(rounds[2],y+h/2,self._edittext,rounds.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+            canvas.text(rounds[2],y+h/2,suffix)
         #绘制光标
         if self._isfocus:
             rounds = np.empty((4,),dtype=np.float32)
-            txt = self._text if self._n==0 else self._text[:-self._n]
+            txt = (self._text if self._n==0 else self._text[:-self._n])+self._edittext
             if len(txt)>0 and txt[-1]==' ':#fixbug 最后一个如果是空格长度计算有问题
                 txt = txt[:-1]+'i'
             canvas.textBounds(x+2,y,txt,rounds.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
@@ -433,6 +453,7 @@ class input(ui):
             canvas.strokeColor(vg.nvgRGB(0,0,0))
             canvas.moveTo(rounds[2],y+2)
             canvas.lineTo(rounds[2],y+h-4)
+            self._curx = rounds[2]
             canvas.stroke()
 
     def mouse(self,action,mx,my):
@@ -442,13 +463,16 @@ class input(ui):
             if mx>x and mx<x+w and my>y and my<y+h and action==ui.MouseDown:            
                 self._parent.focusChild(self)
                 self._parent.renderChild(self)
-    def editing(self,text):
+    def editing(self,edit):
+        self._edittext = str(edit.text,'utf-8')
+        self._edittimestamp = edit.timestamp
+        self._parent.renderChild(self)
         return True
     def input(self,text):
         self.insertText(str(text.text,'utf-8'))
         return True
     def keydown(self,key):
-        if self._isfocus is True:
+        if self._isfocus is True and len(self._edittext)==0 and key.timestamp-self._edittimestamp>5: #fixbug 删除拼音输入后连带多删除一个字符
             if key.keysym.sym==sdl2.SDLK_BACKSPACE:
                 if self._n==0:
                     self._text = self._text[:-1]
@@ -471,16 +495,21 @@ class input(ui):
                     else:
                         self._text = self._text[:-self._n]
                     self._n-=1
+            self.updateImexy()
             #select cute copy past
             self._parent.renderChild(self)
-        return False          
+        return False       
+    def updateImexy(self):
+        if self._isfocus is True:
+            x,y = self._ps['pos']
+            w,h = self._ps['size'] 
+            wx= self._parent._pt[0]
+            wy= self._parent._pt[1]
+            rc = sdl2.SDL_Rect(int(wx+self._curx),int(wy+y+h/2),w,h)
+            sdl2.SDL_SetTextInputRect(ctypes.byref(rc))            
     def focus(self, b):
         if b:
-            x,y = self._ps['pos']
-            w,h = self._ps['size']              
             sdl2.SDL_StartTextInput()
-            rc = sdl2.SDL_Rect(-x,y+h,w,w)
-            sdl2.SDL_SetTextInputRect(ctypes.byref(rc))
         else:
             sdl2.SDL_StopTextInput()
         super().focus(b)
@@ -518,7 +547,7 @@ def test(self):
         w = window(self,{'pos':((self._w-W)/2,(self._h-H)/2),'size':(W,H),'title':'测试窗口','bgcolor':(220,220,220,255),'font':'zhb','fontcolor':(255,255,255,255),
             'child':[{'class':'label','label':'提示:','pos':(24,48+32),'size':(W-48,48),'fontcolor':(0,0,0,255)},
             {'class':'input','label':'输入','pos':(24,48+32+48),'size':(W-48,24),'fontcolor':(128,128,128,255)},
-            {'class':'input','label':'条件','pos':(24,48+32+48+32),'size':(W-48,24),'fontcolor':(128,128,128,255)},
+            {'class':'input','label':'条件','pos':(24,48+32+48+32),'size':(W-48,48),'fontcolor':(128,128,128,255)},
             {'class':'image','img':'xueqiu.png','pos':(24,48+32+48+128),'size':(W-48,48)},
             {'class':'button','label':'关闭','pos':(W-128-24,H-48-24),'size':(128,48),'onclick':onclose},
             {'class':'button','label':'打开','pos':(128-24,H-48-24),'size':(128,48),'onclick':onopen}]})

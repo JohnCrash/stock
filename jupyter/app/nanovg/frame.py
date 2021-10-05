@@ -21,7 +21,7 @@ class app:
     def __init__(self,title,w,h,style=sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_BORDERLESS):#sdl2.SDL_WINDOW_OPENGL|sdl2.SDL_WINDOW_RESIZABLE):
         if sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO) != 0:
             raise RuntimeError('SDL_Init')
-        
+        sdl2.SDL_SetHint(b'SDL_IME_SHOW_UI',b'1') #打开输入法选项窗口
         sdlmixer.Mix_Init(sdlmixer.MIX_INIT_OGG)
         sdlmixer.Mix_OpenAudio(22050,sdlmixer.MIX_DEFAULT_FORMAT,2,4096)
 
