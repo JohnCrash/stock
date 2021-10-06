@@ -1,5 +1,5 @@
 from .nanovg import frame,vg,themos,ui
-from . import monitor,xueqiu,stock,shared,mylog,trend
+from . import monitor,xueqiu,stock,shared,mylog,trend,alert
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
@@ -147,11 +147,19 @@ class StockPlot:
         self._upmode = StockPlot.RT
         self._period = None
         self._needrender = False
+        self._rx = None
+        self._ry = None
+        self._rw = None
+        self._rh = None      
     def clear(self):
         self._code = None
         self._k = None
         self._d = None
         self._mm = None 
+        self._rx = None
+        self._ry = None
+        self._rw = None
+        self._rh = None          
         self._kplot.setTitle('')
         self._kplot.clear()
         self._vplot.clear()
@@ -440,6 +448,10 @@ class StockPlot:
         self._needrender = True
 
     def render(self,canvas,x,y,w,h,xaxis=False,scale=1,warnings=None):
+        self._rx = x
+        self._ry = y
+        self._rw = w
+        self._rh = h
         if self._needrender:
             #绘制背景
             canvas.beginPath()
@@ -750,6 +762,7 @@ class HotPlotApp(frame.app):
         self._Data = None   
         self._rtk = 0 #0 rt 1 k
         self._messagebox = None
+        self._alertmgr = alert.AlertManager(self)
         self.setClearColor(Themos.BG_COLOR)
         self._ltt = datetime.today()
         self._lut = self._ltt
@@ -1317,19 +1330,27 @@ class HotPlotApp(frame.app):
             elif self._numsub[0]==2 and self._numsub[1]==2:
                 self._current = HotPlotApp.MAP2NUM[sym]
                 if self._current>1:
-                    self._current-=1            
+                    self._current-=1
+            if mod&sdl2.KMOD_ALT: #打开提示界面
+                code = self._SPV[self._current]._code
+                if code is not None:
+                    spv = self._SPV[self._current]
+                    self._alertmgr.openui((code,),spv._rx+spv._rw/2,spv._ry+spv._rh/2)
+                    self._current = None
             if mod&sdl2.KMOD_RCTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code
-                name = HotPlotApp.code2com[code][2]
-                self.messagebox("增加持有:%s"%(name))
-                stock.holdStock(code,True)
-                self._current = None
+                if code is not None:
+                    name = HotPlotApp.code2com[code][2]
+                    self.messagebox("增加持有:%s"%(name))
+                    stock.holdStock(code,True)
+                    self._current = None
             if mod&sdl2.KMOD_RCTRL and self._class==4:#删除持有
                 code = self._SPV[self._current]._code
-                name = HotPlotApp.code2com[code][2]
-                self.messagebox("删除持有:%s"%(name))
-                stock.holdStock(code,False)
-                self._current = None
+                if code is not None:
+                    name = HotPlotApp.code2com[code][2]
+                    self.messagebox("删除持有:%s"%(name))
+                    stock.holdStock(code,False)
+                    self._current = None
             while mod&sdl2.KMOD_LCTRL:#增加HOT
                 if self._class==0:
                     kname = 'hot'

@@ -42,6 +42,25 @@ class Canvas2d:
         Ends drawing flushing remaining render state.
         """
         vg.nvgEndFrame(self._ctx)
+    def globalCompositeOperation(self,op:int):
+        """
+        Composite operation
+        The composite operations in NanoVG are modeled after HTML Canvas API, and
+        the blend func is based on OpenGL (see corresponding manuals for more info).
+        The colors in the blending state have premultiplied alpha.
+        Sets the composite operation. The op parameter should be one of NVGcompositeOperation.     
+        """   
+        vg.nvgGlobalCompositeOperation(self._ctx,op)
+    def globalCompositeBlendFunc(self,sfactor:int,dfactor:int):
+        """
+        Sets the composite operation with custom pixel arithmetic. The parameters should be one of NVGblendFactor.
+        """
+        vg.nvgGlobalCompositeBlendFunc(self._ctx,sfactor,dfactor)
+    def globalCompositeBlendFuncSeparate(self,srcRGB:int, dstRGB:int, srcAlpha:int, dstAlpha:int):
+        """
+        Sets the composite operation with custom pixel arithmetic for RGB and alpha components separately. The parameters should be one of NVGblendFactor.
+        """
+        vg.nvgGlobalCompositeBlendFuncSeparate(self._ctx,srcRGB, dstRGB, srcAlpha, dstAlpha)
     def save(self):
         """
         State Handling

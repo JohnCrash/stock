@@ -45,7 +45,26 @@ class ThemosDefault:
     TEXTCOLOR = vg.nvgRGBf(0,0,0)
 
     SELBGCOLOR = vg.nvgRGBf(0,0.1,0.1)
+    #下面是UI界面
 
+    UI_WINDOW_BGCOLOR = vg.nvgRGB(255,255,255)
+    UI_WINDOW_ROUND = 3
+    UI_TITLE_BGCOLOR = vg.nvgRGB(25,118,210)
+    UI_TITLE_COLOR = vg.nvgRGB(255,255,255)
+    UI_TITLE_FONT = 'zhb'
+    UI_TITLE_FONTSIZE = 16
+    UI_TITLE_HEIGHT = 36
+    UI_LABEL_COLOR = vg.nvgRGB(0,0,0)
+    UI_LABEL_FONT = 'zh'
+    UI_LABEL_FONTSIZE = 14
+    UI_BUTTON_LABEL_COLOR = vg.nvgRGB(255,255,255)
+    UI_BUTTON_FONT = 'zhb'
+    UI_BUTTON_FONTSIZE = 15
+    UI_BUTTON_COLOR = vg.nvgRGB(25,118,210)
+    UI_EDITLINE_COLOR = vg.nvgRGB(72,72,72)
+    UI_FOUCSLINE_COLOR = vg.nvgRGB(25,118,210)
+    UI_EDIT_FONT = 'zh'
+    UI_EDIT_FONTSIZE = 14
 class ThemosBlack:
     BGCOLOR = (0.,0.,0.,1) #图表背景颜色
 
@@ -94,3 +113,23 @@ class ThemosBlack:
     TEXTCOLOR = vg.nvgRGBf(1,1,1)
 
     SELBGCOLOR = vg.nvgRGBf(0,0,0.1)
+    #下面是UI界面
+
+    UI_WINDOW_BGCOLOR = vg.nvgRGB(255,255,255)
+    UI_WINDOW_ROUND = 3
+    UI_TITLE_BGCOLOR = vg.nvgRGB(25,118,210)
+    UI_TITLE_COLOR = vg.nvgRGB(255,255,255)
+    UI_TITLE_FONT = 'zhb'
+    UI_TITLE_FONTSIZE = 16
+    UI_TITLE_HEIGHT = 36
+    UI_LABEL_COLOR = vg.nvgRGB(0,0,0)
+    UI_LABEL_FONT = 'zh'
+    UI_LABEL_FONTSIZE = 14
+    UI_BUTTON_LABEL_COLOR = vg.nvgRGB(255,255,255)
+    UI_BUTTON_FONT = 'zhb'
+    UI_BUTTON_FONTSIZE = 15
+    UI_BUTTON_COLOR = vg.nvgRGB(25,118,210)
+    UI_EDITLINE_COLOR = vg.nvgRGB(96,96,96)
+    UI_FOUCSLINE_COLOR = vg.nvgRGB(25,118,210)
+    UI_EDIT_FONT = 'zh'
+    UI_EDIT_FONTSIZE = 14
