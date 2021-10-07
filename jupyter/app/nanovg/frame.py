@@ -669,6 +669,8 @@ class Plot:
         x0,y0,w0,h0 = self.plotRect()
         x0+=self._inner[0]
         w0-=self._inner[0]+self._inner[1]
+        if self._xk==0:
+            return 0
         return ((wx-x0)/w0-self._xb)/self._xk
     def yAxis2wy(self,y):
         """
@@ -685,6 +687,8 @@ class Plot:
         x0,y0,w0,h0 = self.plotRect()
         y0+=self._inner[2]
         h0-=self._inner[2]+self._inner[3]
+        if self._yk==0:
+            return 0
         return (1-(wy-y0)/h0-self._yb)/self._yk
     def x2AxisLabel(self,x):
         if self._xe is None:
@@ -715,6 +719,7 @@ class Plot:
         x0,y0,w0,h0 = self.plotRect()
         canvas.fontFace("sans")
         canvas.fontSize(13.0)
+        canvas.strokeWidth(1)
         canvas.fillColor(self._themos.TEXTCOLOR)
         if self._xticks is not None:
             if self._xtickangle==0:

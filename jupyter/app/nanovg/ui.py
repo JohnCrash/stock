@@ -74,8 +74,10 @@ class ui:
     MouseDown = 0
     MouseUp = 1
     MouseMove = 2
-    def __init__(self):
+    def __init__(self,parent,ps):
         self._isfocus = False
+        self._parent = parent
+        self._ps = ps
     def mouse(self,action,x,y):
         """
         如果成功处理了返回True
@@ -93,12 +95,13 @@ class ui:
         return False
     def focus(self,b):
         self._isfocus = b
+    def getName(self):
+        return self._ps['name'] if 'name' in self._ps else None
 class window(ui):
     OPENDT = .4 #打开耗时
     def __init__(self,app,ps):
-        super().__init__()
+        super().__init__(None,ps)
         self._app = app
-        self._ps = ps
         self._drop = False
         self._name = "window%s"%str(datetime.today())
         size = ps["size"]
@@ -330,34 +333,44 @@ class window(ui):
             self._focus = child
             if child is not None:
                 self._focus.focus(True)
+    def getChildByName(self,name):
+        for kit in self._child:
+            if kit.getName()==name:
+                return kit
+        return None
 
 class label(ui):
     def __init__(self,parent,ps):
-        super().__init__()
-        self._parent = parent
-        self._ps = ps
+        super().__init__(parent,ps)
     def font(self):
         return Themos.UI_LABEL_FONT if 'font' not in self._ps else self._ps['font']
     def fontSize(self):
         return Themos.UI_LABEL_FONTSIZE if 'fontsize' not in self._ps else self._ps['fontsize']
     def fontColor(self):
         return Themos.UI_LABEL_COLOR if 'fontcolor' not in self._ps else vg.nvgRGBA(*self._ps['fontcolor'])
+    def setLabel(self,label):
+        self._ps['label'] = label
+        self._parent.renderChild(self)
     def render(self,canvas):
+        x,y = self._ps['pos']
+        w,h = self._ps['size']
+        canvas.beginPath() #绘制阴影背景
+        canvas.fillColor(self._parent.bgcolor())
+        canvas.rect(x,y,w,h)
+        canvas.fill()        
         canvas.fontFace(self.font())
         canvas.fontSize(self.fontSize())
         canvas.fillColor(self.fontColor())
         canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
-        x,y = self._ps['pos']
         canvas.text(x,y,self._ps['label'])
 class button(ui):
     CLICKDT = 0.4 #点击动画时间
     def __init__(self,parent,ps):
-        super().__init__()
+        super().__init__(parent,ps)
         self._isdown = False
         self._ismousein = False
-        self._parent = parent
-        self._ps = ps
         self._dht = 0
+        self._delayClick = False
     def focus(self, b):       
         super().focus(b)
         self._parent.renderChild(self)        
@@ -371,6 +384,9 @@ class button(ui):
         return vg.nvgRGBA(*self._ps['bgcolor']) if 'bgcolor' in self._ps else Themos.UI_BUTTON_COLOR
     def label(self):
         return self._ps['label']
+    def setLabel(self,label):
+        self._ps['label'] = label
+        self._parent.renderChild(self)
     def rectRound(self):
         """
         返回窗口圆角半径
@@ -417,8 +433,12 @@ class button(ui):
         canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
         canvas.text(x+w/2,y+h/2,self.label())
     def keydown(self, key):
-        if key.keysym.sym==sdl2.SDLK_KP_ENTER:
-            self._ps['onclick'](self)
+        if self._isfocus and key.keysym.sym==sdl2.SDLK_RETURN:
+            x,y = self._ps['pos']
+            w,h = self._ps['size']             
+            self._clickpt = (x+w/2,y+h/2)
+            self._dht = button.CLICKDT
+            self._delayClick = True
             return True
         return super().keydown(key)
     def mouse(self,action,mx,my):
@@ -428,7 +448,7 @@ class button(ui):
             if mx>x and mx<x+w and my>y and my<y+h and action==ui.MouseDown:
                 self._isdown = True
                 self._clickpt = (mx,my)
-                self._dht = button.CLICKDT                
+                self._dht = button.CLICKDT
                 self._parent.focusChild(self)
                 self._parent.renderChild(self)
                 return True
@@ -451,13 +471,14 @@ class button(ui):
         if self._dht>0:
             self._dht-=dt
             self._parent.renderChild(self)
+        elif self._delayClick:
+            self._delayClick = False
+            self._ps['onclick'](self)
 class input(ui):
     def __init__(self,parent,ps):
-        super().__init__()
-        self._parent = parent
-        self._ps = ps
+        super().__init__(parent,ps)
         self._label = self._ps['label'] if 'label' in self._ps else ''
-        self._text = ''
+        self._text = self._ps['text'] if 'text' in self._ps else ''
         self._edittext = ''
         self._edittimestamp = 0
         self._n = 0 #光标后面有多少字符
@@ -572,6 +593,7 @@ class input(ui):
             self.updateImexy()
             #select cute copy past
             self._parent.renderChild(self)
+        if self._isfocus:
             return True
         return False       
     def updateImexy(self):
@@ -597,20 +619,25 @@ class input(ui):
         self._parent.renderChild(self)
 class image(ui):
     def __init__(self,parent,ps):
-        super().__init__()
-        self._parent = parent
-        self._ps = ps
+        super().__init__(parent,ps)
         self._img = None
         self._imgcolor = None
+        self._img = self._parent._app.loadImage(self._ps['img'])
     def setImageColor(self,c):
         self._imgcolor = c
     def getImageColor(self):
-        return vg.nvgRGBAf(*self._ps['color']) if 'color' in self._ps else self._imgcolor
+        return vg.nvgRGBA(*self._ps['color']) if 'color' in self._ps else self._imgcolor
+    def setImage(self,img):
+        self._ps['img'] = img
+        self._img = self._parent._app.loadImage(self._ps['img'])
+        self._parent.renderChild(self)
     def render(self,canvas):
         x,y = self._ps['pos']
         w,h = self._ps['size']
-        if self._img is None:
-            self._img = self._parent._app.loadImage(self._ps['img'])
+        canvas.beginPath() #绘制阴影背景
+        canvas.fillColor(self._parent.bgcolor())
+        canvas.rect(x,y, w,h)
+        canvas.fill()        
         imgw,imgh = canvas.imageSize(self._img)
         canvas.save()
         paint = canvas.imagePattern(x,y,w,h,0,self._img,1)

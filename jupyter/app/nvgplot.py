@@ -127,7 +127,8 @@ class StockPlot:
     BOLLWAY = 2
     KVMODE = 0
     c_float_p = ctypes.POINTER(ctypes.c_float)
-    def __init__(self):
+    def __init__(self,npt):
+        self._npt = npt
         self._kplot = frame.Plot()
         self._vplot = frame.Plot()
         self._fplot = frame.Plot()
@@ -462,6 +463,10 @@ class StockPlot:
                 self.renderRTK(canvas,x,y,w,h,xaxis=xaxis,scale=scale,warnings=warnings)
             elif self._upmode==StockPlot.BOLLWAY:
                 self.renderBollWay(canvas,x,y,w,h,xaxis=xaxis,scale=scale)
+
+            alert = self._npt._alertmgr.getAlertByCode(self._code)
+            if alert is not None: #绘制报警标志
+                self._npt._alertmgr.renderAlert(canvas,x+45,y+5,Themos.ORDER_ITEM_HEIGHT,Themos.ORDER_ITEM_HEIGHT,alert)
             self._needrender = False
     def renderBollWay(self,canvas,x,y,w,h,xaxis=False,scale=1):
         self._kplot.setAxisVisiable(xaxis,True)
@@ -593,6 +598,7 @@ class StockOrder:
             kn = 'hy_hot'
         else:
             kn = ''
+
         hotcodes = stock.getHoldStocks(kn)
         for i in range(len(self._ls)):
             it = self._ls[i]
@@ -665,6 +671,10 @@ class StockOrder:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR)
                     canvas.fontFace("zh")
                 canvas.text(x+64,yy+Themos.ORDER_ITEM_HEIGHT/2,it[1])
+               
+                alert = self._npt._alertmgr.getAlertByCode(it[0])
+                if alert is not None: #绘制报警标志
+                    self._npt._alertmgr.renderAlert(canvas,x+Themos.ORDER_WIDTH-Themos.ORDER_ITEM_HEIGHT,yy+2,Themos.ORDER_ITEM_HEIGHT-4,Themos.ORDER_ITEM_HEIGHT-4,alert)
                 
                 #绘制涨跌幅
                 canvas.fillColor(Themos.RED_COLOR if it[2]>0 else Themos.GREEN_COLOR)
@@ -738,7 +748,7 @@ class HotPlotApp(frame.app):
         self._oldnumsub = self._numsub
         self._oldpagen = 0
         self._SO = StockOrder(self)
-        self._SPV = [StockPlot() for i in range(10)]
+        self._SPV = [StockPlot(self) for i in range(10)]
         self._prefix = ('2',) #选择分类
         self._flowin = False #净流入
         self._hasboll = False #有通道
@@ -1335,7 +1345,10 @@ class HotPlotApp(frame.app):
                 code = self._SPV[self._current]._code
                 if code is not None:
                     spv = self._SPV[self._current]
-                    self._alertmgr.openui((code,),spv._rx+spv._rw/2,spv._ry+spv._rh/2)
+                    def rer():
+                        spv._needrender = True
+                        self._SO._needrender = True
+                    self._alertmgr.openui(code,rer,spv._rx+spv._rw/2,spv._ry+spv._rh/2)
                     self._current = None
             if mod&sdl2.KMOD_RCTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code
@@ -1544,7 +1557,7 @@ class HotPlotApp(frame.app):
                 for xi in range(col):
                     for yi in range(raw):
                         spv = self._SPV[yi*col+xi]
-                        if spv._k is not None and mx>x+xi*dw and mx<x+(xi+1)*dw and my>y+yi*dh and my<y+yi*dh+dh:
+                        if spv._rx is not None and mx>x+xi*dw and mx<x+(xi+1)*dw and my>y+yi*dh and my<y+yi*dh+dh:
                             self._msl['spv'] = spv
                             self._msl['mx'] = mx
                             self._msl['my'] = my
