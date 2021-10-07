@@ -674,7 +674,7 @@ class StockOrder:
                
                 alert = self._npt._alertmgr.getAlertByCode(it[0])
                 if alert is not None: #绘制报警标志
-                    self._npt._alertmgr.renderAlert(canvas,x+Themos.ORDER_WIDTH-Themos.ORDER_ITEM_HEIGHT,yy+2,Themos.ORDER_ITEM_HEIGHT-4,Themos.ORDER_ITEM_HEIGHT-4,alert)
+                    self._npt._alertmgr.renderAlert(canvas,x+Themos.ORDER_WIDTH-Themos.ORDER_ITEM_HEIGHT,yy+2,Themos.ORDER_ITEM_HEIGHT-4,Themos.ORDER_ITEM_HEIGHT-4,alert,code=it[0])
                 
                 #绘制涨跌幅
                 canvas.fillColor(Themos.RED_COLOR if it[2]>0 else Themos.GREEN_COLOR)
@@ -930,6 +930,8 @@ class HotPlotApp(frame.app):
     def onLoop(self,t,dt):
         tt = datetime.today()
         if tt.second!=self._ltt.second:
+            if tt.minute!=self._ltt.minute:
+                self._alertmgr.alertLoop()            
             self._ltt = tt
             self.updateTitle()
         self.renderfbo()
@@ -1557,7 +1559,7 @@ class HotPlotApp(frame.app):
                 for xi in range(col):
                     for yi in range(raw):
                         spv = self._SPV[yi*col+xi]
-                        if spv._rx is not None and mx>x+xi*dw and mx<x+(xi+1)*dw and my>y+yi*dh and my<y+yi*dh+dh:
+                        if spv._rx is not None and spv._d is not None and mx>x+xi*dw and mx<x+(xi+1)*dw and my>y+yi*dh and my<y+yi*dh+dh:
                             self._msl['spv'] = spv
                             self._msl['mx'] = mx
                             self._msl['my'] = my

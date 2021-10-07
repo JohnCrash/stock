@@ -18,6 +18,8 @@ class AlertManager:
         self._k = None
         self._d = None
         self._isopen = False
+        self._cooldown = {}
+        self._code2rect = {}
         self._globals = {'macd':stock.macdV,'boll':stock.boll,'ma':stock.ma,'rsi':stock.rsi,'cci':stock.cci,'np':np,'stock':stock} #条件判断需要使用的函数
         b,ls = shared.fromRedis('alert')
         if not b:
@@ -47,11 +49,29 @@ class AlertManager:
         #将删除的可以保存到数据库中
         if alert is not None and alert[0] in self._alerts:
             del self._alerts[alert[0]]
-    def alertLoop(self,condf):
+    def alertLoop(self):
         """
-        报警循环，将现有报警放入如条件函数判断是不是达到报警条件
-        condf(code,cond)
+        当有报警被触发后，在主循环中弹出界面。当报警触发后5分钟内不要再次显示该报警
         """
+        R = []
+        t = datetime.today()
+        for a in self._alerts.values():
+            if len(a)>5 and a[5] is not None:
+                if a[0] not in self._cooldown or t-self._cooldown[a[0]]>timedelta(seconds=5*60):
+                    R.append(a)
+        if len(R)>0:
+            a = R[0]
+            self._cooldown[a[0]] = t #设置打开冷却时间
+            def done():
+                pass
+            if a[0] in self._code2rect:
+                ax = self._code2rect[a[0]][0]
+                ay = self._code2rect[a[0]][1]
+            else:
+                ax = None
+                ay = None
+            self.openui(a[0],done,ax,ay)
+        
     def test_loop(self):
         n = 0
         ot = 0
@@ -75,7 +95,7 @@ class AlertManager:
                                 a[5] = datetime.today()
             sdl2.SDL_Delay(10)
             n+=1
-    def renderAlert(self,canvas,x,y,w,h,alert):
+    def renderAlert(self,canvas,x,y,w,h,alert,code=None):
         """
         绘制报警
         """
@@ -96,6 +116,8 @@ class AlertManager:
             canvas.rect(x,y,w,h)
             canvas.fill()
             canvas.restore()
+            if code is not None:
+                self._code2rect[code] = (x,y,w,h)
     def openui(self,code,done,ax=None,ay=None,w=1024,h=240):
         """
         打开一个界面用来报警或者编辑报警
@@ -163,7 +185,7 @@ class AlertManager:
             {'class':'input','name':'desc','label':'说明','text':desc,'pos':(2*dw+128,dw+th),'size':(w-3*dw-128,dw)},
             {'class':'input','name':'cond','label':'条件','text':cond,'pos':(2*dw+128,3*dw+th),'size':(w-3*dw-128,dw)},
             {'class':'label','name':'msg','label':'','font':'zhb','fontcolor':(128,0,0,255),'pos':(2*dw+128,5*dw+th),'size':(w-3*dw-128,dw)},
-            {'class':'image','name':'icon','img':'alert2.png' if state==ENABLE else 'alert5.png','pos':(dw,dw+th),'size':(128,128),'color':(0,0,0,255)},
+            {'class':'image','name':'icon','img':'alert2.png' if state==ENABLE else 'alert5.png','pos':(dw+24,dw+th+24),'size':(64,64),'color':(0,0,0,255)},
             {'class':'button','label':'确定','pos':(w-dw-96,h-dw-36),'size':(96,36),'onclick':onok},
             {'class':'button','label':'取消','pos':(w-2*dw-2*96,h-dw-36),'size':(96,36),'onclick':oncancel},
             {'class':'button','label':'禁用' if state==ENABLE else '解禁','pos':(w-3*dw-3*96,h-dw-36),'size':(96,36),'bgcolor':(72,72,72,255),'onclick':ondisable},
