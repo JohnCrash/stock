@@ -54,7 +54,7 @@ class AlertManager:
         #将删除的可以保存到数据库中
         if alert is not None and alert[0] in self._alerts:
             del self._alerts[alert[0]]
-    def alertLoop(self):
+    def alertLoop(self,viewcb,donecb):
         """
         当有报警被触发后，在主循环中弹出界面。当报警触发后5分钟内不要再次显示该报警
         """
@@ -68,8 +68,9 @@ class AlertManager:
             if len(R)>0:
                 a = R[0]
                 self._cooldown[a[0]] = t #设置打开冷却时间
+                viewcb(a[0])
                 def done():
-                    pass
+                    donecb()
                 if a[0] in self._code2rect:
                     ax = self._code2rect[a[0]][0]
                     ay = self._code2rect[a[0]][1]

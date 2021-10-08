@@ -736,7 +736,7 @@ class HotPlotApp(frame.app):
     MAP2NUM = {
         sdl2.SDLK_KP_4:0,sdl2.SDLK_KP_5:1,sdl2.SDLK_KP_6:2,sdl2.SDLK_KP_1:3,sdl2.SDLK_KP_2:4,sdl2.SDLK_KP_3:5
     }
-    CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃','ETF热点','概念热点','行业热点']
+    CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃','ETF热点','概念热点','行业热点','']
     ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速','5日乖离','20日乖离']
     NONEWARNING = 0
     BUYWARNING = 1
@@ -762,6 +762,7 @@ class HotPlotApp(frame.app):
         self._help = False
         self._helpimg = None
         self._filter = ''
+        self._shiftcmd = ''
         self._kwidth = 10 #k线宽度
         self._kei = 0
         self._period = 'd'
@@ -931,7 +932,7 @@ class HotPlotApp(frame.app):
         tt = datetime.today()
         if tt.second!=self._ltt.second:
             if tt.minute!=self._ltt.minute:
-                self._alertmgr.alertLoop()            
+                self._alertmgr.alertLoop(self.oneview,self.retoreLayout)
             self._ltt = tt
             self.updateTitle()
         self.renderfbo()
@@ -1065,7 +1066,9 @@ class HotPlotApp(frame.app):
         elif self._class==11: #概念热点
             tops = self.mapCode2DataSource(stock.getHoldStocks(name='gn_hot'))
         elif self._class==12: #行业热点
-            tops = self.mapCode2DataSource(stock.getHoldStocks(name='hy_hot'))                    
+            tops = self.mapCode2DataSource(stock.getHoldStocks(name='hy_hot'))
+        elif self._class==13: #聚焦单一code
+            tops = self.mapCode2DataSource([self._oneviewcode])
         R = []
         TOPS = []
         if len(self._filter)==0:
@@ -1277,7 +1280,7 @@ class HotPlotApp(frame.app):
             pp = [5,15,30,60,'d']
             i = p[self._period]+1
             self._period = pp[i] if i<=4 else pp[0]
-            self.messagebox("切换到%s周期"%(p[self._period]))
+            self.messagebox("切换到%s周期"%(self._period))
         elif sym==sdl2.SDLK_KP_MULTIPLY: #k线模式，切换boll 和 ma
             StockPlot.KVMODE = 1 if StockPlot.KVMODE==0 else 0
             self.messagebox("%s"%('均线显示' if StockPlot.KVMODE==1 else 'BOLL显示'))
@@ -1347,11 +1350,15 @@ class HotPlotApp(frame.app):
                 code = self._SPV[self._current]._code
                 if code is not None:
                     spv = self._SPV[self._current]
-                    def rer():
+                    self._current = None
+                    #首先保存当前的界面布局
+                    self.oneview(code)
+                    def done():
+                        self.retoreLayout()
                         spv._needrender = True
                         self._SO._needrender = True
-                    self._alertmgr.openui(code,rer,spv._rx+spv._rw/2,spv._ry+spv._rh/2)
-                    self._current = None
+                    self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)
+                    
             if mod&sdl2.KMOD_RCTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code
                 if code is not None:
@@ -1425,17 +1432,64 @@ class HotPlotApp(frame.app):
             if self._numsub[0]==1:
                 self._current = 0 if self._current is None else None
         elif (sym>=sdl2.SDLK_a and sym<=sdl2.SDLK_z) or (sym>=sdl2.SDLK_0 and sym<=sdl2.SDLK_9) or sym==sdl2.SDLK_SPACE:
-            if self._filter=='':
-                self._oldpagen = self._pagen
-                self._oldnumsub = self._numsub
-            self._current = None
-            self._numsub = (1,1)
-            self._pagen = 0
-            self._filter+=chr(sym)
-            self.setWindowTitle(self._filter)
+            if mod&sdl2.KMOD_SHIFT:
+                self._shiftcmd+=chr(sym)
+                self.messagebox("命令:%s"%self._shiftcmd)
+                return
+            else:
+                if self._filter=='':
+                    self._oldpagen = self._pagen
+                    self._oldnumsub = self._numsub
+                self._current = None
+                self._numsub = (1,1)
+                self._pagen = 0
+                self._filter+=chr(sym)
+                self.setWindowTitle(self._filter)
         else:
             return
-
+        self._needUpdate = True
+    def keyUp(self,event):
+        mod = event.key.keysym.mod
+        sym = event.key.keysym.sym
+        if sym==sdl2.SDLK_LSHIFT or sym==sdl2.SDLK_RSHIFT:
+            if len(self._shiftcmd)>0:
+                if self._shiftcmd=='5':
+                    self._period = 5
+                elif self._shiftcmd=='15':
+                    self._period = 15
+                elif self._shiftcmd=='30':
+                    self._period = 30
+                elif self._shiftcmd=='60':
+                    self._period = 60
+                elif self._shiftcmd=='d':
+                    self._period = 'd'
+                p = {5:0,15:1,30:2,60:3,'d':4}
+                self.messagebox("切换到%s周期"%(self._period))
+                self._needUpdate = True
+                self._shiftcmd = ''
+    def saveLayout(self): #将当前窗口的布局状态保存
+        shared.toRedis({'numsub':self._numsub,'oldnumsub':self._oldnumsub,'current':self._current,'class':self._class,'rtk':self._rtk,
+        'pagen':self._pagen,'volmode':self._volmode,'period':self._period,'kmode':self._kmode},'dlayout')
+    def retoreLayout(self): #回复当前的布局状态
+        b,S = shared.fromRedis('dlayout')
+        if b:
+            self._numsub = S['numsub']
+            self._oldnumsub = S['oldnumsub']
+            self._current = S['current']
+            self._pagen = S['pagen']
+            self._period = S['period']
+            self._volmode = S['volmode']
+            self._kmode = S['kmode']
+            self._class = S['class']
+            self._rtk = S['rtk']
+            self._needUpdate = True
+    def oneview(self,code): #使用一个窗口观察
+        self.saveLayout()
+        self._numsub = (1,1)
+        self._oldnumsub = (1,1)
+        self._pagen = 0
+        self._oneviewcode = code
+        self._class = 13
         self._needUpdate = True
     def getma5b(self,K15,D15,n=3):
         #f返回一个plotfs2 的ma5b需要的参数，用于绘制5日均线 n = 3起点位置在3天前
