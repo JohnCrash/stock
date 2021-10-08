@@ -488,7 +488,10 @@ class input(ui):
         self._edittext = ''
         self._edittimestamp = 0
         self._n = 0 #光标后面有多少字符
+        self._sel = -1 #选择
         self._curx = 2
+        self._gps = None
+        self._isdown = False
     def font(self):
         return Themos.UI_EDIT_FONT if 'font' not in self._ps else self._ps['font']
     def fontSize(self):
@@ -524,6 +527,17 @@ class input(ui):
         canvas.fillColor(self.fontColor())
         canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_MIDDLE)
         if len(self._text)>0 or self._isfocus:
+            self._gps = (vg.NVGglyphPosition*len(self._text))()
+            canvas.textGlyphPositions(x+2,y+h/2,self._text,self._gps,len(self._text))
+            if self._sel>=0 and self._sel!=self._n: #绘制选择
+                canvas.save()
+                canvas.beginPath()
+                canvas.fillColor(Themos.UI_TEXT_SELECT_COLOR)
+                nx = self.n2x(self._n)
+                selx = self.n2x(self._sel)
+                canvas.rect(min(nx,selx),y,abs(nx-selx),h-2)
+                canvas.fill()
+                canvas.restore()
             if len(self._edittext)==0:
                 canvas.text(x+2,y+h/2,self._text)
             else:
@@ -559,53 +573,136 @@ class input(ui):
         else:
             canvas.fillColor(vg.nvgRGBAf(0,0,0,0.5))
             canvas.text(x+2,y+h/2,self._label)
-
+    def n2x(self,n):
+        if self._gps is not None:
+            if n==0:
+                return self._gps[-1].x+self.fontSize()
+            else:
+                return self._gps[len(self._text)-n].x
+        return 0
+    def pt2n(self,mx,my):
+        n = 0
+        if self._gps is not None:
+            x,y = self._ps['pos']      
+            N = len(self._gps)
+            if mx<x:
+                return len(self._text)
+            for i in range(N):
+                if i==0:
+                    x0 = x
+                else:
+                    x0 = self._gps[i].x-(self._gps[i].x-self._gps[i-1].x)/2
+                if i+1==N:
+                    x1 = self._gps[i].x+self.fontSize()/2 #fixbug
+                else:
+                    x1 = self._gps[i].x+(self._gps[i+1].x-self._gps[i].x)/2
+                if mx<=x1 and mx>=x0:
+                    n = len(self._text)-i
+                    break
+        return n
     def mouse(self,action,mx,my):
         x,y = self._ps['pos']
-        w,h = self._ps['size']        
+        w,h = self._ps['size']
         if action==ui.MouseDown or action==ui.MouseUp:
-            if mx>x and mx<x+w and my>y and my<y+h and action==ui.MouseDown:            
+            if mx>x and mx<x+w and my>y and my<y+h and action==ui.MouseDown:
+                self._n = self.pt2n(mx,my)
+                self._sel = -1
+                self._isdown = True
                 self._parent.focusChild(self)
                 self._parent.renderChild(self)
                 return True
+            if self._isdown and action==ui.MouseUp:
+                self._isdown = False
+                return True
+        elif self._isdown and action==ui.MouseMove:
+            self._sel = self.pt2n(mx,my)
+            self._parent.renderChild(self)
+            return True
     def editing(self,edit):
+        self.deleteSelect()
         self._edittext = str(edit.text,'utf-8')
         self._edittimestamp = edit.timestamp
         self._parent.renderChild(self)
         return True
     def input(self,text):
+        self.deleteSelect()
         self.insertText(str(text.text,'utf-8'))
         return True
+    def deleteSelect(self):
+        if self._sel>=0:
+            if self._n!=self._sel:
+                bi = len(self._text)-max(self._sel,self._n)
+                ei = len(self._text)-min(self._sel,self._n)
+                self._text = self._text[:bi]+self._text[ei:]
+            self._n = min(self._n,self._sel)
+            self._sel = -1
     def keydown(self,key):
         if self._isfocus is True and len(self._edittext)==0 and key.timestamp-self._edittimestamp>5: #fixbug 删除拼音输入后连带多删除一个字符
             if key.keysym.sym==sdl2.SDLK_BACKSPACE:
-                if self._n==0:
-                    self._text = self._text[:-1]
+                if self._sel>=0:
+                    self.deleteSelect()
                 else:
-                    self._text = self._text[:-self._n-1]+self._text[-self._n:]
+                    if self._n==0:
+                        self._text = self._text[:-1]
+                    else:
+                        self._text = self._text[:-self._n-1]+self._text[-self._n:]
             elif key.keysym.sym==sdl2.SDLK_HOME:
+                if key.keysym.mod&sdl2.KMOD_SHIFT:
+                    self._sel = self._n
+                else:
+                    self._sel = -1
                 self._n = len(self._text)
             elif key.keysym.sym==sdl2.SDLK_END:
+                if key.keysym.mod&sdl2.KMOD_SHIFT:
+                    self._sel = self._n
+                else:
+                    self._sel = -1
                 self._n = 0
             elif key.keysym.sym==sdl2.SDLK_LEFT:
+                if key.keysym.mod&sdl2.KMOD_SHIFT:
+                    if self._sel==-1:
+                        self._sel = self._n
+                else:
+                    self._sel = -1
                 if self._n<len(self._text):
                     self._n+=1
             elif key.keysym.sym==sdl2.SDLK_RIGHT:
+                if key.keysym.mod&sdl2.KMOD_SHIFT:
+                    if self._sel==-1:
+                        self._sel=self._n
+                else:
+                    self._sel = -1
                 if self._n>0:
                     self._n-=1
             elif key.keysym.sym==sdl2.SDLK_DELETE:
-                if self._n>0:
+                if self._sel>=0:
+                    self.deleteSelect()
+                elif self._n>0:
                     if -self._n+1<0:
                         self._text = self._text[:-self._n]+self._text[-self._n+1:]
                     else:
                         self._text = self._text[:-self._n]
                     self._n-=1
+            elif self._sel>=0 and key.keysym.mod&sdl2.KMOD_CTRL and key.keysym.sym==sdl2.SDLK_c: #ctrl+c
+                self.copyselect()
+            elif self._sel>=0 and key.keysym.mod&sdl2.KMOD_CTRL and key.keysym.sym==sdl2.SDLK_x: #ctrl+x
+                self.copyselect()
+                self.deleteSelect()
+            elif key.keysym.mod&sdl2.KMOD_CTRL and key.keysym.sym==sdl2.SDLK_v: #ctrl+v
+                self.insertText(str(sdl2.SDL_GetClipboardText(),'utf-8'))
+            elif self._sel>=0 and key.keysym.mod&sdl2.KMOD_CTRL and key.keysym.sym==sdl2.SDLK_z: #ctrl+z
+                pass            
             self.updateImexy()
-            #select cute copy past
             self._parent.renderChild(self)
         if self._isfocus:
             return True
-        return False       
+        return False
+    def copyselect(self):
+        if self._sel>=0:
+            bi = len(self._text)-max(self._sel,self._n)
+            ei = len(self._text)-min(self._sel,self._n)
+            if bi!=ei:
+                sdl2.SDL_SetClipboardText(self._text[bi:ei].encode('utf-8'))
     def updateImexy(self):
         if self._isfocus is True:
             x,y = self._ps['pos']
@@ -619,6 +716,7 @@ class input(ui):
             sdl2.SDL_StartTextInput()
         else:
             sdl2.SDL_StopTextInput()
+        self._sel = -1
         super().focus(b)
         self._parent.renderChild(self)
     def insertText(self,txt):

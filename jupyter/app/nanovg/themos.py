@@ -65,6 +65,7 @@ class ThemosDefault:
     UI_FOUCSLINE_COLOR = vg.nvgRGB(25,118,210)
     UI_EDIT_FONT = 'zh'
     UI_EDIT_FONTSIZE = 14
+    UI_TEXT_SELECT_COLOR = vg.nvgRGB(25,118,255,128)
 class ThemosBlack:
     BGCOLOR = (0.,0.,0.,1) #图表背景颜色
 
@@ -133,3 +134,4 @@ class ThemosBlack:
     UI_FOUCSLINE_COLOR = vg.nvgRGB(25,118,210)
     UI_EDIT_FONT = 'zh'
     UI_EDIT_FONTSIZE = 14
+    UI_TEXT_SELECT_COLOR = vg.nvgRGB(25,118,255,128)

@@ -137,17 +137,17 @@ class AlertManager:
             return
         self._isopen = True
         a = copy.copy(self.getAlertByCode(code))
+        needAppend = False
+        if a is None:
+            a = [code,['','',''],['','',''],datetime.today(),ENABLE,None]
+            needAppend = True
         if a[5] is not None:#如果有报警设置第一个报警
             for j in range(len(a[5])):
                 if a[5][j]!=None:
                     i = j
                     break
         else:
-            i = 0 
-        needAppend = False
-        if a is None:
-            a = [code,['','',''],['','',''],datetime.today(),ENABLE,None]
-            needAppend = True
+            i = 0             
         desc = a[1] if type(a[1])==str else a[1][i]
         cond = a[2] if type(a[2])==str else a[2][i]
         dw = 24
@@ -164,10 +164,7 @@ class AlertManager:
             return False
         def onok(but):
             if storeInput2i():
-                if needAppend:
-                    self._alerts.append(a)
-                else:
-                    self._alerts[code] = a #覆盖
+                self._alerts[code] = a
                 self.toRedis()
                 win.close()
                 done()
