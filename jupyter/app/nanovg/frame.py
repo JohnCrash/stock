@@ -382,14 +382,15 @@ class app:
             print("Could not add font emoji.\n")
             return -1
 
-        zh = self._canvas.createFont("zh", "c:/windows/fonts/msyh.ttc")
-        if zh == -1:
-            print("Could not add font zh.\n")
-            return -1
-        zhb = self._canvas.createFont("zhb", "c:/windows/fonts/msyhbd.ttc")
-        if zhb == -1:
-            print("Could not add font zhb.\n")
-            return -1        
+        for f in [('zh','msyh.ttc','msyhbd.ttc'),('consola','consola.ttf','consolab.ttf')]:
+            zh = self._canvas.createFont(f[0], "c:/windows/fonts/%s"%f[1])
+            if zh == -1:
+                print("Could not add font %s.\n"%f[0])
+                return -1
+            zhb = self._canvas.createFont("%sb"%f[0], "c:/windows/fonts/%s"%f[2])
+            if zhb == -1:
+                print("Could not add font %sb.\n"%f[0])
+                return -1
         self._canvas.addFallbackFontId(data['fontNormal'], data['fontEmoji'])
         self._canvas.addFallbackFontId(data['fontBold'], data['fontEmoji'])
         return data    

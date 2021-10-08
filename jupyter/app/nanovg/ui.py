@@ -241,6 +241,7 @@ class window(ui):
                 if action==ui.MouseDown and mx>x and mx<x+w and my>y and my<y+titleh:
                     self._drop = True
                     self._dropxy = (mx,my)
+                    self.focusChild(None)
                 elif self._drop and action==ui.MouseUp:
                     self._drop = False
                 elif self._drop and action==ui.MouseMove:
@@ -249,7 +250,9 @@ class window(ui):
                     self._app.movefbo(self._name,self._pt[0],self._pt[1])
             for kit in self._child:
                 if kit.mouse(action,mx-x,my-y):
-                    break
+                    return True
+            if action==ui.MouseDown:
+                self.focusChild(None)
             return True
         return False
     def bgcolor(self):
@@ -387,6 +390,9 @@ class button(ui):
     def setLabel(self,label):
         self._ps['label'] = label
         self._parent.renderChild(self)
+    def setButtonColor(self,c):
+        self._ps['bgcolor'] = c
+        self._parent.renderChild(self)
     def rectRound(self):
         """
         返回窗口圆角半径
@@ -493,6 +499,9 @@ class input(ui):
         return Themos.UI_EDITLINE_COLOR if 'linecolor' not in self._ps else vg.nvgRGBA(*self._ps['linecolor'])
     def focuslineColor(self):
         return Themos.UI_FOUCSLINE_COLOR if 'focuscolor' not in self._ps else vg.nvgRGBA(*self._ps['focuscolor'])
+    def setText(self,txt):
+        self._text = txt
+        self._parent.renderChild(self)
     def render(self,canvas):
         x,y = self._ps['pos']
         w,h = self._ps['size']
@@ -558,6 +567,7 @@ class input(ui):
             if mx>x and mx<x+w and my>y and my<y+h and action==ui.MouseDown:            
                 self._parent.focusChild(self)
                 self._parent.renderChild(self)
+                return True
     def editing(self,edit):
         self._edittext = str(edit.text,'utf-8')
         self._edittimestamp = edit.timestamp

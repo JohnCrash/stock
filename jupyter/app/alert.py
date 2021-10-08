@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import threading
 import sdl2
 from .nanovg import ui,vg
@@ -29,6 +30,12 @@ class AlertManager:
         for a in ls.values():
             if c-a[3]>timedelta(days=7):#将太久前的给删除了
                 self.deleteAlert(a)
+        #将老的格式转换为新格式
+        for a in ls.values():
+            if type(a[1])==str:
+                a[1] = [a[1],'','']
+                a[2] = [a[2],'','']
+            a[5] = None
         #0 ENABLE 1 DISABLE 2 ALERT 3 STROKE 4 WRONG
         self._imgs = [frame.loadImage('alert%d.png'%n) for n in [2,5,1,4,3]]
         #开启一个后台测试线程
@@ -40,8 +47,6 @@ class AlertManager:
         返回对应的报警设置，[[0.code,1.txt,2.cond,3.ts,4.state,5.active ts],..] 5检测成立触发时间
         """
         return self._alerts[code] if code in self._alerts else None
-    def addAlert(self,code,txt,cond,state=ENABLE):
-        self._alerts[code] = [code,txt,cond,datetime.today(),state,None]
     def deleteAlert(self,alert):
         """
         从列表中删除报警器
@@ -53,24 +58,26 @@ class AlertManager:
         """
         当有报警被触发后，在主循环中弹出界面。当报警触发后5分钟内不要再次显示该报警
         """
-        R = []
-        t = datetime.today()
-        for a in self._alerts.values():
-            if len(a)>5 and a[5] is not None:
-                if a[0] not in self._cooldown or t-self._cooldown[a[0]]>timedelta(seconds=5*60):
-                    R.append(a)
-        if len(R)>0:
-            a = R[0]
-            self._cooldown[a[0]] = t #设置打开冷却时间
-            def done():
-                pass
-            if a[0] in self._code2rect:
-                ax = self._code2rect[a[0]][0]
-                ay = self._code2rect[a[0]][1]
-            else:
-                ax = None
-                ay = None
-            self.openui(a[0],done,ax,ay)
+        if stock.isTransDay() and stock.isTransTime():
+            R = []
+            t = datetime.today()
+            for a in self._alerts.values():
+                if len(a)>5 and a[5] is not None and a[4]==ENABLE:
+                    if a[0] not in self._cooldown or t-self._cooldown[a[0]]>timedelta(seconds=5*60):
+                        R.append(a)
+            if len(R)>0:
+                a = R[0]
+                self._cooldown[a[0]] = t #设置打开冷却时间
+                def done():
+                    pass
+                if a[0] in self._code2rect:
+                    ax = self._code2rect[a[0]][0]
+                    ay = self._code2rect[a[0]][1]
+                else:
+                    ax = None
+                    ay = None
+                self._frame.playWave(0,self._frame._sellwav)
+                self.openui(a[0],done,ax,ay)
         
     def test_loop(self):
         n = 0
@@ -89,10 +96,14 @@ class AlertManager:
                     self._k = (k,k60,k30,k15,k5)
                     self._d = (d,d60,d30,d15,d5)
                     for a in self._alerts.values():
+                        a[5] = None
                         if a[4]==ENABLE:
-                            b,msg = self.testCondition(a)
-                            if b:
-                                a[5] = datetime.today()
+                            for i in range(3):
+                                b,msg = self.testCondition(a[0],a[2][i])
+                                if b:
+                                    if a[5] is None:
+                                        a[5] = [None,None,None]
+                                    a[5][i] = datetime.today()
             sdl2.SDL_Delay(10)
             n+=1
     def renderAlert(self,canvas,x,y,w,h,alert,code=None):
@@ -125,53 +136,53 @@ class AlertManager:
         if self._isopen:
             return
         self._isopen = True
-        a = self.getAlertByCode(code)
-        if a is not None:
-            desc = a[1]
-            cond = a[2]
-            state = a[4]
+        a = copy.copy(self.getAlertByCode(code))
+        if a[5] is not None:#如果有报警设置第一个报警
+            for j in range(len(a[5])):
+                if a[5][j]!=None:
+                    i = j
+                    break
         else:
-            desc = ''
-            cond = ''
-            state = ENABLE
+            i = 0 
+        needAppend = False
+        if a is None:
+            a = [code,['','',''],['','',''],datetime.today(),ENABLE,None]
+            needAppend = True
+        desc = a[1] if type(a[1])==str else a[1][i]
+        cond = a[2] if type(a[2])==str else a[2][i]
         dw = 24
         th = ui.Themos.UI_TITLE_HEIGHT
-        def onok(but):
-            if a is not None:
-                #在修改前做一次检查看看有没有错误
-                A = [code,win.getChildByName('desc')._text,win.getChildByName('cond')._text,datetime.today(),state,None]
-                b,msg = self.testCondition(A)
-                if msg is None:
-                    a[1] = win.getChildByName('desc')._text
-                    a[2] = win.getChildByName('cond')._text
-                    a[4] = state
-                else:
-                    win.getChildByName('msg').setLabel(msg)
-                    return
+        def storeInput2i():
+            b,msg = self.testCondition(None,win.getChildByName('cond')._text)
+            if msg is None:
+                a[1][i] = win.getChildByName('desc')._text
+                a[2][i] = win.getChildByName('cond')._text
+                win.getChildByName('msg').setLabel('')
+                return True
             else:
-                A = [code,win.getChildByName('desc')._text,win.getChildByName('cond')._text,datetime.today(),state,None]
-                b,msg = self.testCondition(A)
-                if msg is None:
-                    self.addAlert(code,win.getChildByName('desc')._text,win.getChildByName('cond')._text,state)
+                win.getChildByName('msg').setLabel(msg)
+            return False
+        def onok(but):
+            if storeInput2i():
+                if needAppend:
+                    self._alerts.append(a)
                 else:
-                    win.getChildByName('msg').setLabel(msg)
-                    return
-            self.toRedis()
-            win.close()
-            done()
-            self._isopen = False
+                    self._alerts[code] = a #覆盖
+                self.toRedis()
+                win.close()
+                done()
+                self._isopen = False
         def oncancel(but):
             win.close()
             done()
             self._isopen = False
         def ondisable(but):
-            nonlocal state
-            if state==ENABLE:
-                state = DISABLE
+            if a[4]==ENABLE:
+                a[4] = DISABLE
                 but.setLabel('解禁')
                 win.getChildByName('icon').setImage('alert5.png')
             else:
-                state = ENABLE
+                a[4] = ENABLE
                 but.setLabel('禁用')
                 win.getChildByName('icon').setImage('alert2.png')
         def ondelete(but):
@@ -180,34 +191,57 @@ class AlertManager:
             win.close()
             done()
             self._isopen = False
+        def onclear(but): #清除当前输入
+            win.getChildByName('desc').setText('')
+            win.getChildByName('cond').setText('')
+        def updatebuttoncolor():
+            for i in range(3):
+                win.getChildByName(str(i)).setButtonColor((192,0,0,255) if len(a[1][i])>0 or len(a[2][i])>0 else (192,192,192,255))
+        def onswitch(but):
+            nonlocal i
+            if storeInput2i():
+                i = int(but.label())-1
+                updatebuttoncolor()
+                win.getChildByName('desc').setText(a[1][i])
+                win.getChildByName('cond').setText(a[2][i])
+                win.getChildByName('icon').setImage('alert_%d.png'%(i+1))
+                win.focusChild(win.getChildByName('desc'))
         winps = {'size':(w,h),'title':'%s %s'%(AlertManager.code2com[code][2],code),
             'child':[
-            {'class':'input','name':'desc','label':'说明','text':desc,'pos':(2*dw+128,dw+th),'size':(w-3*dw-128,dw)},
-            {'class':'input','name':'cond','label':'条件','text':cond,'pos':(2*dw+128,3*dw+th),'size':(w-3*dw-128,dw)},
-            {'class':'label','name':'msg','label':'','font':'zhb','fontcolor':(128,0,0,255),'pos':(2*dw+128,5*dw+th),'size':(w-3*dw-128,dw)},
-            {'class':'image','name':'icon','img':'alert2.png' if state==ENABLE else 'alert5.png','pos':(dw+24,dw+th+24),'size':(64,64),'color':(0,0,0,255)},
+            {'class':'input','name':'desc','label':'说明','text':desc,'fontsize':16,'pos':(2*dw+64,dw+th),'size':(w-3*dw-64,dw)},
+            {'class':'input','name':'cond','label':'condition','text':cond,'font':'consola','fontsize':16,'pos':(2*dw+64,3*dw+th),'size':(w-3*dw-64,dw)},
+            {'class':'label','name':'msg','label':'','font':'zhb','fontcolor':(64,0,0,255),'pos':(2*dw+64,5*dw+th-5),'size':(w-3*dw-64,dw)},
+            {'class':'image','name':'icon','img':'alert_%d.png'%(i+1) if a[4]==ENABLE else 'alert5.png','pos':(dw,dw+th),'size':(64,64),'color':(0,0,0,255)},
             {'class':'button','label':'确定','pos':(w-dw-96,h-dw-36),'size':(96,36),'onclick':onok},
             {'class':'button','label':'取消','pos':(w-2*dw-2*96,h-dw-36),'size':(96,36),'onclick':oncancel},
-            {'class':'button','label':'禁用' if state==ENABLE else '解禁','pos':(w-3*dw-3*96,h-dw-36),'size':(96,36),'bgcolor':(72,72,72,255),'onclick':ondisable},
-            {'class':'button','label':'删除','pos':(w-4*dw-4*96,h-dw-36),'size':(96,36),'bgcolor':(255,128,64,255),'onclick':ondelete}]}
-        if a is not None and len(a)>5 and a[5] is not None:
-            winps['titlecolor'] = (196,0,0,255)
-            winps['child'][3]['img'] = 'alert1.png'
-            winps['child'][3]['color'] = (196,0,0,255)
+            {'class':'button','label':'禁用' if a[4]==ENABLE else '解禁','pos':(w-3*dw-3*96,h-dw-36),'size':(96,36),'bgcolor':(72,72,72,255),'onclick':ondisable},
+            {'class':'button','label':'删除','pos':(w-4*dw-4*96,h-dw-36),'size':(96,36),'bgcolor':(255,128,64,255),'onclick':ondelete},
+            {'class':'button','label':'清除','pos':(w-5*dw-5*96,h-dw-36),'size':(96,36),'bgcolor':(255,128,64,255),'onclick':onclear},
+            {'class':'button','name':'2','label':'3','pos':(w-6*dw-5*96-48,h-dw-36),'size':(48,36),'onclick':onswitch},
+            {'class':'button','name':'1','label':'2','pos':(w-7*dw-5*96-2*48,h-dw-36),'size':(48,36),'onclick':onswitch},
+            {'class':'button','name':'0','label':'1','pos':(w-8*dw-5*96-3*48,h-dw-36),'size':(48,36),'onclick':onswitch}]}
+        
+        if a[5] is not None: #报警设置
+            for j in range(len(a[5])):
+                if a[5][j] is not None:
+                    winps['titlecolor'] = (196,0,0,255)
+                    winps['child'][3]['color'] = (255,0,0,255) #icon设置颜色
+                    winps['child'][11-j]['bgcolor'] = (255,0,0,255) #2->9 1->10 0->11
         win = ui.window(self._frame,winps)
+        updatebuttoncolor()
         if ax is not None:
             win.openAnimation(ax,ay)
-    def testCondition(self,alert):
+    def testCondition(self,code,cond):
         """
         条件中可以出现的变量：k,k60,k30,k15,k5,d,d60,d30,d15,d5
         条件中出现的函数: ma,macd,boll,rsi,cci,
         """
-        if len(alert[2])==0:
+        if len(cond)==0:
             return False,None
-        if self._k is not None:
+        if self._k is not None and code in AlertManager.code2i:
             K = self._k
             D = self._d
-            i = AlertManager.code2i[alert[0]]
+            i = AlertManager.code2i[code]
             locals = {'k':K[0][i,:],'k60':K[1][i,:],'k30':K[2][i,:],'k15':K[3][i,:],'k5':K[4][i,:],
                     'd':D[0],'d60':D[1],'d30':D[2],'d15':D[3],'d5':D[4]}
         else:
@@ -217,7 +251,7 @@ class AlertManager:
                     'd':D,'d60':D,'d30':D,'d15':D,'d5':D}            
 
         try:
-            if eval(alert[2],self._globals,locals):
+            if eval(cond,self._globals,locals):
                 return True,None
         except Exception as e:
             #code = alert[0]
