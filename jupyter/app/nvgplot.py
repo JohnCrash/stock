@@ -600,6 +600,7 @@ class StockOrder:
             kn = ''
 
         hotcodes = stock.getHoldStocks(kn)
+        self._npt._alertmgr.beginRenderAlert() #清空报警绘制位置
         for i in range(len(self._ls)):
             it = self._ls[i]
             if yy-y<h:
@@ -886,24 +887,24 @@ class HotPlotApp(frame.app):
                     if not ob and nb:
                         if self._warnings[i][0]==HotPlotApp.BUYWARNING:
                             if self.warning('+',i,self._warnings[i]):
-                                self.playWave(nc,self._buywav) #多头买入
+                                #self.playWave(nc,self._buywav) #多头买入
                                 nc+=1
                         elif self._warnings[i][0]==HotPlotApp.SELLWARNING:
                             if self.warning('+',i,self._warnings[i]):
-                                self.playWave(nc,self._sellwav) #空头卖出
+                                #self.playWave(nc,self._sellwav) #空头卖出
                                 nc+=1
                     elif ob and not nb:
                         if self.warning('-',i,old[i]):
-                            self.playWave(nc,self._cancelwav) #特征不稳定，又消失了
+                            #self.playWave(nc,self._cancelwav) #特征不稳定，又消失了
                             nc+=1
                     elif ob and nb:
                         if self._warnings[i][0]==HotPlotApp.BUYWARNING and not ismafashan(old[i][4]) and ismafashan(self._warnings[i][4]): #强化提示
                             if self.warning('++',i,self._warnings[i]):
-                                self.playWave(nc,self._strongwav,2)
+                                #self.playWave(nc,self._strongwav,2)
                                 nc+=1
                         elif self._warnings[i][0]==HotPlotApp.SELLWARNING and not ismafashan(old[i][4]) and ismafashan(self._warnings[i][4]): #强化提示
                             if self.warning('--',i,self._warnings[i]):
-                                self.playWave(nc,self._strongsellwav)
+                                #self.playWave(nc,self._strongsellwav)
                                 nc+=1
         """
         对最近的早盘进行分析，如果早盘1小时最大跌幅在最近5个交易日较大-1,反之+1
@@ -930,9 +931,8 @@ class HotPlotApp(frame.app):
         return self._Data
     def onLoop(self,t,dt):
         tt = datetime.today()
-        if tt.second!=self._ltt.second:
-            if tt.minute!=self._ltt.minute:
-                self._alertmgr.alertLoop(self.oneview,self.retoreLayout)
+        self._alertmgr.alertLoop(tt.second!=self._ltt.second,self.oneview,self.retoreLayout)
+        if tt.second!=self._ltt.second:     
             self._ltt = tt
             self.updateTitle()
         self.renderfbo()
@@ -1025,6 +1025,7 @@ class HotPlotApp(frame.app):
                     canvas.fillColor(Themos.RED_COLOR if k[i]>0 else Themos.GREEN_COLOR)
                     canvas.text(mx,my,"%s %.2f%%"%(tx[i-1],k[i]))
                     my+=20
+        self._alertmgr.render(canvas,x,y,w,h) #绘制报警动画
             
     def messagebox(self,msg):
         self._messagebox = msg

@@ -196,10 +196,18 @@ class window(ui):
         return False
     def keydown(self,key):
         if key.keysym.sym==sdl2.SDLK_TAB:
-            self.nextFocus()
+            if key.keysym.mod&sdl2.KMOD_CTRL or key.keysym.mod&sdl2.KMOD_SHIFT:
+                if 'onswitch' in self._ps:
+                    self._ps['onswitch']()
+            else:
+                self.nextFocus()
             return True
         elif key.keysym.sym==sdl2.SDLK_ESCAPE:
-            self.focusChild(None)
+            if self._focus is not None:
+                self.focusChild(None)
+            else:
+                if 'onclose' in self._ps:
+                    self._ps['onclose']()
         for kit in self._child:
             if kit.keydown(key):
                 return True
@@ -354,6 +362,9 @@ class label(ui):
     def setLabel(self,label):
         self._ps['label'] = label
         self._parent.renderChild(self)
+    def setFontColor(self,c):
+        self._ps['fontcolor'] = c
+        self._parent.renderChild(self)
     def render(self,canvas):
         x,y = self._ps['pos']
         w,h = self._ps['size']
@@ -437,7 +448,10 @@ class button(ui):
         canvas.fontSize(self.fontSize())
         canvas.fillColor(self.fontColor())
         canvas.textAlign(vg.NVG_ALIGN_CENTER|vg.NVG_ALIGN_MIDDLE)
-        canvas.text(x+w/2,y+h/2,self.label())
+        if self._isfocus:
+            canvas.text(x+w/2,y+h/2,"[%s]"%self.label())
+        else:
+            canvas.text(x+w/2,y+h/2,self.label())
     def keydown(self, key):
         if self._isfocus and key.keysym.sym==sdl2.SDLK_RETURN:
             x,y = self._ps['pos']
@@ -637,7 +651,8 @@ class input(ui):
             self._n = min(self._n,self._sel)
             self._sel = -1
     def keydown(self,key):
-        if self._isfocus is True and len(self._edittext)==0 and key.timestamp-self._edittimestamp>5: #fixbug 删除拼音输入后连带多删除一个字符
+        isfocus = self._isfocus
+        if isfocus is True and len(self._edittext)==0 and key.timestamp-self._edittimestamp>5: #fixbug 删除拼音输入后连带多删除一个字符
             if key.keysym.sym==sdl2.SDLK_BACKSPACE:
                 if self._sel>=0:
                     self.deleteSelect()
@@ -691,10 +706,13 @@ class input(ui):
             elif key.keysym.mod&sdl2.KMOD_CTRL and key.keysym.sym==sdl2.SDLK_v: #ctrl+v
                 self.insertText(str(sdl2.SDL_GetClipboardText(),'utf-8'))
             elif self._sel>=0 and key.keysym.mod&sdl2.KMOD_CTRL and key.keysym.sym==sdl2.SDLK_z: #ctrl+z
-                pass            
+                pass
+            elif key.keysym.sym==sdl2.SDLK_RETURN:
+                if 'onenter' in self._ps:
+                    self._ps['onenter'](self)
             self.updateImexy()
             self._parent.renderChild(self)
-        if self._isfocus:
+        if isfocus:
             return True
         return False
     def copyselect(self):
@@ -772,7 +790,7 @@ def test(self):
         'child':[
         {'class':'input','label':'说明','pos':(2*dw+128,dw+th),'size':(w-3*dw-128,dw)},
         {'class':'input','label':'条件','pos':(2*dw+128,3*dw+th),'size':(w-3*dw-128,dw)},
-        {'class':'image','img':'alert1.png','pos':(dw,dw+th),'size':(128,128),'color':(0,0,0,1)},
+        {'class':'image','img':'alert1.png','pos':(dw,dw+th),'size':(128,128),'color':(0,0,0,255)},
         {'class':'button','label':'确定','pos':(w-dw-96,h-dw-36),'size':(96,36),'onclick':onok},
         {'class':'button','label':'取消','pos':(w-2*dw-2*96,h-dw-36),'size':(96,36),'onclick':oncancel}]})    
 def test2(self):

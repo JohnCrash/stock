@@ -1,7 +1,9 @@
 import numpy as np
+import math
 import copy
 import threading
 import sdl2
+from sdl2.timer import SDL_GetTicks
 from .nanovg import ui,vg
 from . import xueqiu,stock,shared,mylog,trend
 from datetime import date,datetime,timedelta
@@ -21,7 +23,8 @@ class AlertManager:
         self._isopen = False
         self._cooldown = {}
         self._code2rect = {}
-        self._globals = {'macd':stock.macdV,'boll':stock.boll,'ma':stock.ma,'rsi':stock.rsi,'cci':stock.cci,'np':np,'stock':stock} #条件判断需要使用的函数
+        self._alertrc = {}
+        self._globals = {'macd':stock.macdV,'boll':stock.boll,'ma':stock.ma,'rsi':stock.rsi,'cci':stock.cci,'kdj':stock.kdj,'np':np,'stock':stock} #条件判断需要使用的函数
         b,ls = shared.fromRedis('alert')
         if not b:
             ls = {}
@@ -54,11 +57,11 @@ class AlertManager:
         #将删除的可以保存到数据库中
         if alert is not None and alert[0] in self._alerts:
             del self._alerts[alert[0]]
-    def alertLoop(self,viewcb,donecb):
+    def alertLoop(self,b,viewcb,donecb):
         """
         当有报警被触发后，在主循环中弹出界面。当报警触发后5分钟内不要再次显示该报警
         """
-        if stock.isTransDay() and stock.isTransTime():
+        if b and not self._isopen and len(self._alerts)>0 and stock.isTransDay() and stock.isTransTime():
             R = []
             t = datetime.today()
             for a in self._alerts.values():
@@ -67,7 +70,7 @@ class AlertManager:
                         R.append(a)
             if len(R)>0:
                 a = R[0]
-                self._cooldown[a[0]] = t #设置打开冷却时间
+                self._cooldown[a[0]] = datetime.today() #设置打开冷却时间
                 viewcb(a[0])
                 def done():
                     donecb()
@@ -79,6 +82,17 @@ class AlertManager:
                     ay = None
                 self._frame.playWave(0,self._frame._sellwav)
                 self.openui(a[0],done,ax,ay)
+        elif len(self._alertrc)>0:#动画报警
+            dt = SDL_GetTicks()-self._bt
+            if dt>1*1000: #3s
+                self._bt = SDL_GetTicks()
+            if dt<400:
+                self._r = (math.pi/3)*math.sin(4*math.pi*dt/400)
+                self._frame.delayUpdate()
+            elif self._pdt<400:
+                self._r = 0
+                self._frame.delayUpdate()
+            self._pdt = dt
         
     def test_loop(self):
         n = 0
@@ -87,7 +101,7 @@ class AlertManager:
             if n>1000 and len(self._alerts)>0: #10秒检查一次
                 n = 0
                 b,t = shared.fromRedis('runtime_update')
-                if b and t!=ot:
+                if t!=ot or self._k is None:
                     ot = t
                     k,d = xueqiu.get_period_k(240)
                     k60,d60 = xueqiu.get_period_k(60)
@@ -107,7 +121,30 @@ class AlertManager:
                                     a[5][i] = datetime.today()
             sdl2.SDL_Delay(10)
             n+=1
-    def renderAlert(self,canvas,x,y,w,h,alert,code=None):
+    def render(self,canvas,x,y,w,h): #绘制报警动画，在所有fbo之上
+        if len(self._alertrc)>0:
+            t = datetime.today()
+            delt = timedelta(seconds=5*60)
+            canvas.save()
+            for (code,it) in self._alertrc.items():
+                canvas.beginPath()
+                r = 0 if code in self._cooldown and t-self._cooldown[code]<delt else self._r
+                canvas.resetTransform()
+                canvas.translate(it[0]+it[2]/2,it[1]+it[3]/2)
+                canvas.rotate(r)
+                canvas.translate(-it[2]/2,-it[3]/2)
+                paint = canvas.imagePattern(0,0,it[2],it[3],0,self._imgs[0],1)
+                paint.innerColor = vg.nvgRGB(255,0,0)
+                canvas.fillPaint(paint)
+                canvas.rect(0,0,it[2],it[3])
+                canvas.fill()
+            canvas.restore()
+    def beginRenderAlert(self):
+        self._alertrc = {}
+        self._bt = SDL_GetTicks()
+        self._r = 0
+        self._pdt = 0
+    def renderAlert(self,canvas,x,y,w,h,alert,color=None,code=None):
         """
         绘制报警
         """
@@ -120,10 +157,13 @@ class AlertManager:
                 img = self._imgs[1]
             paint = canvas.imagePattern(x,y,w,h,0,img,1)
             if len(alert)>5 and alert[5] is not None:
-                color = vg.nvgRGB(255,0,0)
+                c = vg.nvgRGBA(255,0,0,255) 
+                if code is not None:
+                    c = vg.nvgRGBA(255,0,0,0)#绘制个完全透明的
+                    self._alertrc[code] = (x,y,w,h)
             else:
-                color = vg.nvgRGB(255,255,255)
-            paint.innerColor = color
+                c = vg.nvgRGB(255,255,255)
+            paint.innerColor = c if color is None else color
             canvas.fillPaint(paint)
             canvas.rect(x,y,w,h)
             canvas.fill()
@@ -138,10 +178,14 @@ class AlertManager:
             return
         self._isopen = True
         a = copy.copy(self.getAlertByCode(code))
-        needAppend = False
         if a is None:
             a = [code,['','',''],['','',''],datetime.today(),ENABLE,None]
-            needAppend = True
+        else:
+            if code in self._alerts:#主动打开一个报警的
+                A = self._alerts[code]
+                if len(A)>5 and A[5] is not None and A[4]==ENABLE:
+                    self._cooldown[code] = datetime.today() #设置打开冷却时间
+
         if a[5] is not None:#如果有报警设置第一个报警
             for j in range(len(a[5])):
                 if a[5][j]!=None:
@@ -161,6 +205,7 @@ class AlertManager:
                 win.getChildByName('msg').setLabel('')
                 return True
             else:
+                win.getChildByName('msg').setFontColor((64,0,0,255))
                 win.getChildByName('msg').setLabel(msg)
             return False
         def onok(but):
@@ -170,7 +215,7 @@ class AlertManager:
                 win.close()
                 done()
                 self._isopen = False
-        def oncancel(but):
+        def oncancel(but=None):
             win.close()
             done()
             self._isopen = False
@@ -195,6 +240,17 @@ class AlertManager:
         def updatebuttoncolor():
             for i in range(3):
                 win.getChildByName(str(i)).setButtonColor((192,0,0,255) if len(a[1][i])>0 or len(a[2][i])>0 else (192,192,192,255))
+        def onswitchi():
+            nonlocal i
+            if storeInput2i():
+                i = i+1
+                if i>2:
+                    i = 0
+                updatebuttoncolor()
+                win.getChildByName('desc').setText(a[1][i])
+                win.getChildByName('cond').setText(a[2][i])
+                win.getChildByName('icon').setImage('alert_%d.png'%(i+1))
+                win.focusChild(win.getChildByName('desc'))            
         def onswitch(but):
             nonlocal i
             if storeInput2i():
@@ -204,11 +260,25 @@ class AlertManager:
                 win.getChildByName('cond').setText(a[2][i])
                 win.getChildByName('icon').setImage('alert_%d.png'%(i+1))
                 win.focusChild(win.getChildByName('desc'))
-        winps = {'size':(w,h),'title':'%s %s'%(AlertManager.code2com[code][2],code),
+        def onenter(input):
+            if input.getName()=='cond':
+                r,msg = self.testCondition(code,win.getChildByName('cond')._text)
+                label=win.getChildByName('msg')
+                if msg is None:
+                    label.setFontColor((0,128,0,255))
+                    label.setLabel(str(r))
+                else:
+                    label.setFontColor((128,0,0,255))
+                    label.setLabel(msg)
+                win.renderSelf()
+            else:
+                win.nextFocus()
+
+        winps = {'size':(w,h),'title':'%s %s'%(AlertManager.code2com[code][2],code),'onclose':oncancel,'onswitch':onswitchi,
             'child':[
-            {'class':'input','name':'desc','label':'说明','text':desc,'fontsize':16,'pos':(2*dw+64,dw+th),'size':(w-3*dw-64,dw)},
-            {'class':'input','name':'cond','label':'condition','text':cond,'font':'consola','fontsize':16,'pos':(2*dw+64,3*dw+th),'size':(w-3*dw-64,dw)},
-            {'class':'label','name':'msg','label':'','font':'zhb','fontcolor':(64,0,0,255),'pos':(2*dw+64,5*dw+th-5),'size':(w-3*dw-64,dw)},
+            {'class':'input','name':'desc','label':'说明','text':desc,'fontsize':16,'pos':(2*dw+64,dw+th),'size':(w-3*dw-64,dw),'onenter':onenter},
+            {'class':'input','name':'cond','label':'condition','text':cond,'font':'consola','fontsize':16,'pos':(2*dw+64,3*dw+th),'size':(w-3*dw-64,dw),'onenter':onenter},
+            {'class':'label','name':'msg','label':'','font':'zhb','pos':(2*dw+64,5*dw+th-5),'size':(w-3*dw-64,dw)},
             {'class':'image','name':'icon','img':'alert_%d.png'%(i+1) if a[4]==ENABLE else 'alert5.png','pos':(dw,dw+th),'size':(64,64),'color':(0,0,0,255)},
             {'class':'button','label':'确定','pos':(w-dw-96,h-dw-36),'size':(96,36),'onclick':onok},
             {'class':'button','label':'取消','pos':(w-2*dw-2*96,h-dw-36),'size':(96,36),'onclick':oncancel},
@@ -241,16 +311,15 @@ class AlertManager:
             D = self._d
             i = AlertManager.code2i[code]
             locals = {'k':K[0][i,:],'k60':K[1][i,:],'k30':K[2][i,:],'k15':K[3][i,:],'k5':K[4][i,:],
-                    'd':D[0],'d60':D[1],'d30':D[2],'d15':D[3],'d5':D[4]}
+                    'd':D[0],'d60':D[1],'d30':D[2],'d15':D[3],'d5':D[4],'price':K[0][i,:][-1]}
         else:
             K = np.ones((240,))#测试数据
             D = K
             locals = {'k':K,'k60':K,'k30':K,'k15':K,'k5':K,
-                    'd':D,'d60':D,'d30':D,'d15':D,'d5':D}            
+                    'd':D,'d60':D,'d30':D,'d15':D,'d5':D,'price':K[-1]}
 
         try:
-            if eval(cond,self._globals,locals):
-                return True,None
+            return eval(cond,self._globals,locals),None
         except Exception as e:
             #code = alert[0]
             #print(AlertManager.code2com[code][2],alert,str(e))
