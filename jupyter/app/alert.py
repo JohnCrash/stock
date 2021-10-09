@@ -24,7 +24,7 @@ class AlertManager:
         self._cooldown = {}
         self._code2rect = {}
         self._alertrc = {}
-        self._globals = {'macd':stock.macdV,'boll':stock.boll,'ma':stock.ma,'rsi':stock.rsi,'cci':stock.cci,'kdj':stock.kdj,'np':np,'stock':stock} #条件判断需要使用的函数
+        self._globals = {'macd':stock.macdV,'boll':stock.boll,'ma':stock.ma,'rsi':stock.rsi,'cci':stock.cci,'kdj':stock.kdj,'dev':stock.dev,'np':np,'stock':stock} #条件判断需要使用的函数
         b,ls = shared.fromRedis('alert')
         if not b:
             ls = {}

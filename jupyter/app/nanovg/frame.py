@@ -1,5 +1,6 @@
 import ctypes
 from ctypes import c_int
+from datetime import datetime
 from OpenGL import GL
 import sdl2
 import math
@@ -168,7 +169,6 @@ class app:
                         self.onMouseDown(event)
                     elif event.type==sdl2.SDL_MOUSEBUTTONUP:
                         self.onMouseUp(event)
-
             t = SDL_GetTicks()/1000.
             dt = t-prevt
             prevt = t

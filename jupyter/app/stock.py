@@ -548,6 +548,12 @@ def cci(k,n=14):
     return (TP-MA)/MD
 
 """
+乖离率
+"""
+def dev(k,n=5):
+    m = ma(k,n)
+    return (k-m)/m
+"""
 成交量能量
 """
 def volumeEnergy(k,n=20):

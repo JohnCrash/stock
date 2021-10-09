@@ -208,6 +208,7 @@ class window(ui):
             else:
                 if 'onclose' in self._ps:
                     self._ps['onclose']()
+                    return True
         for kit in self._child:
             if kit.keydown(key):
                 return True
@@ -349,7 +350,7 @@ class window(ui):
             if kit.getName()==name:
                 return kit
         return None
-
+   
 class label(ui):
     def __init__(self,parent,ps):
         super().__init__(parent,ps)
@@ -773,6 +774,28 @@ class image(ui):
         canvas.rect(x,y,w,h)
         canvas.fill()
         canvas.restore()
+
+class Circular:
+    """
+    绘制一个转动的进度条
+    """
+    def __init__(self):
+        pass
+    def render(self,canvas,ox,oy,r):
+        """
+        ox,oy 中心点位置 r 半径
+        """
+        x,y = self._ps['pos']
+        w,h = self._ps['size']
+        canvas.beginPath() #绘制阴影背景
+        canvas.fillColor(self._parent.bgcolor())
+        canvas.rect(x,y,w,h)
+        canvas.fill()        
+        canvas.fontFace(self.font())
+        canvas.fontSize(self.fontSize())
+        canvas.fillColor(self.fontColor())
+        canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
+        canvas.text(x,y,self._ps['label']) 
 
 def test(self):
     """
