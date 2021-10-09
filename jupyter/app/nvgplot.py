@@ -609,7 +609,7 @@ class StockOrder:
                     """
                     1 5分钟均线向上发散买入提示，2 5分钟均线向下发散卖出提示
                     """
-                    if ii in self._npt._warnings:
+                    if self._npt._warnings is not None and ii in self._npt._warnings:
                         wa = self._npt._warnings[ii]
                         ma5 = wa[4][0]
                         ma10 = wa[4][1]
@@ -662,10 +662,10 @@ class StockOrder:
                         canvas.fillColor(cc)
                         canvas.rect(x-5+Themos.ORDER_WIDTH,yy,5,Themos.ORDER_ITEM_HEIGHT)
                         canvas.fill()
-                if self._npt._RSI[ii][-1]<30:
+                if ii<len(self._npt._RSI) and self._npt._RSI[ii][-1]<30:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR2)
                     canvas.fontFace('zhb')
-                elif self._npt._RSI[ii][-1]>80:
+                elif ii<len(self._npt._RSI) and self._npt._RSI[ii][-1]>80:
                     canvas.fillColor(Themos.ORDER_TEXTCOLOR3)
                     canvas.fontFace('zhb')
                 else:
@@ -816,14 +816,15 @@ class HotPlotApp(frame.app):
         for i in range(self._K240.shape[0]):
              BOLL.append(stock.boll(self._K240[i,:]))
              RSI.append(stock.rsi(self._K240[i,:],6))
+             sdl2.SDL_Delay(1)
         self._BOLL = BOLL
-        self._RSI = RSI
-
+        self._RSI = RSI    
     def update_data_loop(self):
         #一次性加载日线数据
         t60 = datetime.today()
-        self.update60()
+        #self.update60()
         n = 0
+        isFirst = True
         while self._running:
             if n>10:
                 b,t = shared.fromRedis('runtime_update')
@@ -839,25 +840,30 @@ class HotPlotApp(frame.app):
                                     k15[i,:j] = k15[i,j]
                                     break
                             continue
+                    isFirst = self._Data is None
                     self._Data = (k,d,k15,d15,[],e)
                     #做买入和卖出预警
-                    self.watchDog()
+                    if not isFirst:
+                        self.watchDog()
                     self.updatedata()
-            if self._needUpdate: #每分钟更新一次
+                    if isFirst: #快速启动
+                        self.update60()
+                        self.watchDog()
+                        self._needUpdate = True
                 if stock.isTransDay() and stock.isTransTime() and datetime.today().hour!=t60.hour:
                     self.update60()
+                    self._needUpdate = True
                     t60 = datetime.today()
-                self.updatedata()
-                self._needUpdate = False
             sdl2.SDL_Delay(10)
             n+=1
+
     def watchDog(self):
         old = self._warnings
         self._warnings = {}
         k5,d5 = xueqiu.get_period_k(5)
         rtk = self._Data[0]
         for i in range(len(HotPlotApp.companys)):
-            bo = self._BOLL[i]
+            #bo = self._BOLL[i]
             #rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
             rise = True
             if rise:
@@ -931,8 +937,11 @@ class HotPlotApp(frame.app):
         return self._Data
     def onLoop(self,t,dt):
         tt = datetime.today()
-        self._alertmgr.alertLoop(tt.second!=self._ltt.second,self.oneview,self.retoreLayout)
-        if tt.second!=self._ltt.second:     
+        if self._needUpdate:
+            self.updatedata()
+            self._needUpdate = False
+        self._alertmgr.alertLoop(tt.second!=self._ltt.second,self.oneview,self.retoreLayout)    
+        if tt.second!=self._ltt.second:
             self._ltt = tt
             self.updateTitle()
         self.renderfbo()
@@ -1449,6 +1458,7 @@ class HotPlotApp(frame.app):
         else:
             return
         self._needUpdate = True
+        
     def keyUp(self,event):
         mod = event.key.keysym.mod
         sym = event.key.keysym.sym
@@ -1535,8 +1545,11 @@ class HotPlotApp(frame.app):
         R = []
         for i in range(len(companys)):
             if i<k.shape[0] and self.isSelected(companys[i],bolls,k[i]):
-                bo = self._BOLL[i]
-                rise = isrise(bo[-5:,1]) #and isrise(bo[-5:,2])
+                if i<len(self._BOLL):
+                    bo = self._BOLL[i]
+                    rise = isrise(bo[-5:,1]) #and isrise(bo[-5:,2])
+                else:
+                    rise = True
                 if self._bollfilter==0 or (self._bollfilter==1 and rise) or (self._bollfilter==2 and not rise):
                     R.append((companys[i],self.it2order(i,k,K[i]),k[i],d,K[i],D,bolls)) #0 company,1 排序项 2 k 3 d 4 K15 5 D15 6 bolls 7 涨幅
         TOPS = sorted(R,key=lambda it:it[1],reverse=not self._reverse)
