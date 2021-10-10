@@ -1,5 +1,5 @@
 from .nanovg import frame,vg,themos,ui
-from . import monitor,xueqiu,stock,shared,mylog,trend,alert
+from . import monitor,xueqiu,stock,shared,mylog,trend,alert,ext
 from pypinyin import pinyin, Style
 from datetime import date,datetime,timedelta
 import numpy as np
@@ -866,7 +866,7 @@ class HotPlotApp(frame.app):
             #bo = self._BOLL[i]
             #rise = bo[-1,1]>=bo[-2,1] and bo[-1,2]>=bo[-2,2]#仅仅对通道上行的进行报警
             rise = True
-            if rise:
+            if rise and i<k5.shape[0] and i<rtk.shape[0]:
                 #监视上升趋势中的5分钟空头排列和5分钟多头排列
                 ma5 = stock.ma(k5[i],5)
                 ma10 = stock.ma(k5[i],10)
@@ -1118,7 +1118,7 @@ class HotPlotApp(frame.app):
                 for s in range(1,len(k)):#处理价格为零的情况
                     if k[s,0]==0:
                         k[s,0] = k[s-1,0]
-                if self._rtk==1 or (self._current is not None and i==self._current):
+                if self._rtk==1:# or (self._current is not None and i==self._current):
                     title = "%s %s %s"%(it[0][2],it[0][1],"%d分钟"%self._period if type(self._period)==int else "日线")
                     self._SPV[i].viewMode(vm=self._volmode)
                     self._kei = self._SPV[i].updateK(it[0][1],title,self._period,int(ww/self._kwidth),self._kei,item=it)
@@ -1242,6 +1242,8 @@ class HotPlotApp(frame.app):
                 self._numsub = self._oldnumsub              
             self._class = 9
             self._current = None
+        elif sym==sdl2.SDLK_F12:
+            ext.extrans()
         elif mod&sdl2.KMOD_CTRL and sym==sdl2.SDLK_1: #单个窗口
             self._numsub = (1,1)
             self._current = None
@@ -1368,6 +1370,16 @@ class HotPlotApp(frame.app):
                         spv._needrender = True
                         self._SO._needrender = True
                     self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)
+            else:
+                code = self._SPV[self._current]._code
+                if code is not None:
+                    spv = self._SPV[self._current]
+                    self._current = None
+                    #首先保存当前的界面布局
+                    def done():
+                        spv._needrender = True
+                        self._SO._needrender = True
+                    self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)                
                     
             if mod&sdl2.KMOD_RCTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code

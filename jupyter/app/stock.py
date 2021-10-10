@@ -282,8 +282,10 @@ def loadKlineCache(code,period,bi):
     else:
         tbi = datetime.fromisoformat(bi)
     t = datetime.today()
-    if name in g_kd and (g_kd[name][2][0][0]-tbi<=timedelta(days=1) or g_kd[name][3]) and (t.hour<15 or (t.hour>=15 and g_kd[name][2][-1][0].day==t.day)):
-        return g_kd[name][:3]
+    if name in g_kd:
+        if bi==g_kd[name][4] or (g_kd[name][2][0][0]-tbi<=timedelta(days=1) or g_kd[name][3]) and (t.hour<15 or (t.hour>=15 and g_kd[name][2][-1][0].day==t.day)):
+            #bi和上次没区别直接返回
+            return g_kd[name][:3]
     b,z = shared.fromRedis(name)
     if b and z[1] is not None and z[2] is not None:
         (c,k,d) = z
@@ -300,14 +302,14 @@ def loadKlineCache(code,period,bi):
                 d = nd + d
         else: #直接返回数据，数据量可能更多
             isall = (d[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
-            g_kd[name] = (c,k,d,isall)
+            g_kd[name] = (c,k,d,isall,bi)
             return c,k,d
     else:
         c,k,d = loadKline(code,period,after=bi)
     
     shared.toRedis((c,k,d),name,ex=3600*12) #存储12小时
     isall = (d[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
-    g_kd[name] = (c,k,d,isall)
+    g_kd[name] = (c,k,d,isall,bi)
     return c,k,d
 
 """

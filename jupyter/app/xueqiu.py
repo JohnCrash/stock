@@ -2520,8 +2520,9 @@ def getFlowCache(code,bi):
     name = '%s.fcache2'%(code)
     tbi = datetime.fromisoformat(bi)
     t = datetime.today()
-    if name in g_fds and (g_fds[name][1][0][0]<=tbi or g_fds[name][2]) and (t.hour<15 or (t.hour>=15 and g_fds[name][1][-1][0].day==t.day)):
-        return g_fds[name][0],g_fds[name][1]
+    if name in g_fds:
+        if bi==g_fds[name][3] or (g_fds[name][1][0][0]<=tbi or g_fds[name][2]) and (t.hour<15 or (t.hour>=15 and g_fds[name][1][-1][0].day==t.day)):
+            return g_fds[name][0],g_fds[name][1]
     b,z = shared.fromRedis(name)
     if b and z[0] is not None and z[1] is not None:
         (f,d) = z
@@ -2556,7 +2557,7 @@ def getFlowCache(code,bi):
 
             flowk = np.vstack((flowk,nfk))
     isall = (flowd[0][0]-tbi>timedelta(days=5)) #表示数据已经全部加载了
-    g_fds[name] = (flowk,flowd,isall)
+    g_fds[name] = (flowk,flowd,isall,bi)
     return flowk,flowd
     
 """

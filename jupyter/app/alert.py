@@ -87,7 +87,7 @@ class AlertManager:
             if dt>1*1000: #3s
                 self._bt = SDL_GetTicks()
             if dt<400:
-                self._r = (math.pi/3)*math.sin(4*math.pi*dt/400)
+                self._r = (math.pi/6)*math.sin(4*math.pi*dt/400)
                 self._frame.delayUpdate()
             elif self._pdt<400:
                 self._r = 0
@@ -115,10 +115,16 @@ class AlertManager:
                         if a[4]==ENABLE:
                             for i in range(3):
                                 b,msg = self.testCondition(a[0],a[2][i])
-                                if b:
-                                    if a[5] is None:
-                                        a[5] = [None,None,None]
-                                    a[5][i] = datetime.today()
+                                try:
+                                    if b:
+                                        if a[5] is None:
+                                            a[5] = [None,None,None]
+                                        a[5][i] = datetime.today()
+                                except:
+                                    if b.all():
+                                        if a[5] is None:
+                                            a[5] = [None,None,None]
+                                        a[5][i] = datetime.today()
             sdl2.SDL_Delay(10)
             n+=1
     def render(self,canvas,x,y,w,h): #绘制报警动画，在所有fbo之上
