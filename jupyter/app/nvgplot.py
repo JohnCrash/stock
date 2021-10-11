@@ -406,12 +406,24 @@ class StockPlot:
         self._vplot.setInnerSpace(0,0,0,0)    
         if ma5b is not None and len(d)>0:
             ma5 = np.zeros((len(k),))
-            ma5[0] = ma5b[0]
-            k15b = ma5b[1]
-            N = 240*5
-            M = 15
-            for i in range(1,len(k)):
-                ma5[i] = ma5[i-1]+(k[i,0]-k15b[int(i/M)])/(N) #这是一个近似迭代
+            ma155 = ma5b[0]
+            d15 = ma5b[1]
+            N = len(d15)
+            curi = 0
+            bii = 0
+            for i in range(len(k)):
+                if curi+1<N and d[i]>=d15[curi][0] and d[i]<d15[curi+1][0]:
+                    ma5[i] = ui.one_bezier_curve(ma155[curi],ma155[curi+1],(i-bii+1)/15.) #这里最好做一个线性插值否则绘制上将出现阶梯
+                elif curi+1<N:
+                    for j in range(curi,N-1):
+                        if d[i]>=d15[j][0] and d[i]<d15[j+1][0]:
+                            curi = j
+                            bii = i
+                            ma5[i] = ma155[curi]
+                            break
+                else:
+                    ma5[i] = ma155[-1]
+
             self._kplot.plot(ma5,color=Themos.MA5_COLOR,linewidth=2,linestyle=(6,3,0))
         self._needrender = True
     def updateBollWay(self,code,label,k,d,period):
@@ -738,7 +750,7 @@ class HotPlotApp(frame.app):
         sdl2.SDLK_KP_4:0,sdl2.SDLK_KP_5:1,sdl2.SDLK_KP_6:2,sdl2.SDLK_KP_1:3,sdl2.SDLK_KP_2:4,sdl2.SDLK_KP_3:5
     }
     CLASS = ['ETF','概念','行业','大盘','持有','关注','昨日排行','前天排行','个股','活跃','ETF热点','概念热点','行业热点','']
-    ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速','5日乖离','20日乖离']
+    ORDER = ['日涨幅','主力流入','1分钟流入','1分钟涨速','5日乖离','最低反弹','最高点回撤']
     NONEWARNING = 0
     BUYWARNING = 1
     SELLWARNING = 2
@@ -759,6 +771,8 @@ class HotPlotApp(frame.app):
         self._topn = 64
         self._class = 0
         self._order = 0 #排序方式
+        self._todaybi = 0
+        self._rtdbi = 0
         self._current = None
         self._help = False
         self._helpimg = None
@@ -842,6 +856,16 @@ class HotPlotApp(frame.app):
                             continue
                     isFirst = self._Data is None
                     self._Data = (k,d,k15,d15,[],e)
+                    #计算今天的开始位置
+                    for i in range(len(d)-1,1,-1):
+                        if d[i].day!=d[i-1].day:
+                            self._todaybi = i
+                            break
+                    #计算k的开始位置，在计算ma5b时用到
+                    for i in range(len(d15)-1,1,-1):
+                        if d15[i][0]<d[-1]:
+                            self._rtdbi = i
+                            break
                     #做买入和卖出预警
                     if not isFirst:
                         self.watchDog()
@@ -952,17 +976,6 @@ class HotPlotApp(frame.app):
         else:
             title = "%s %s %d月%d日 %02d:%02d:%02d %s"%(HotPlotApp.CLASS[self._class],HotPlotApp.ORDER[self._order],tt.month,tt.day,tt.hour,tt.minute,tt.second,self._filter.upper())
         self.setWindowTitle(title)
-        #将大盘指数显示在标题栏上
-        if self._Data is not None:
-            k,d,K,D,bolls,em = self._Data
-        
-            c,w,h = self.beginFrame('title')
-            x = Themos.ORDER_WIDTH+48
-            y = h/2
-            for s in self._tips:
-                drawStockTips(c,x,y,s[0],k[s[1],-1,0],k[s[1],-1,1])
-                x += Themos.ORDER_WIDTH+32
-            self.endFrame()
     def renderfbo(self):
         try:
             if self._SO._needrender:
@@ -1035,6 +1048,14 @@ class HotPlotApp(frame.app):
                     canvas.text(mx,my,"%s %.2f%%"%(tx[i-1],k[i]))
                     my+=20
         self._alertmgr.render(canvas,x,y,w,h) #绘制报警动画
+        #将大盘指数显示在标题栏上
+        if self._Data is not None:
+            k,d,K,D,bolls,em = self._Data
+            xx = Themos.ORDER_WIDTH+48
+            yy = self.CAPTION_HEIGHT/2
+            for s in self._tips:
+                drawStockTips(canvas,xx,yy,s[0],k[s[1],-1,0],k[s[1],-1,1])
+                xx += Themos.ORDER_WIDTH+32      
             
     def messagebox(self,msg):
         self._messagebox = msg
@@ -1105,7 +1126,7 @@ class HotPlotApp(frame.app):
                 self._pagen -=1
         if self._pagen<0:
             self._pagen = 0
-        self._SO.update(R,self._pagen,PageNum,StockOrder.IT2P if self._order==0 or self._order==3 or self._order==4 else StockOrder.IT2E9)
+        self._SO.update(R,self._pagen,PageNum,StockOrder.IT2P if self._order in (0,3,4,5,6) else StockOrder.IT2E9)
         if self._period!=15 and self._kmode==HotPlotApp.BULLWAY:
             K,D = xueqiu.get_period_k(240 if self._period=='d' else self._period)
         ww = (self._w-Themos.ORDER_WIDTH)/NS[0] #视口宽度
@@ -1321,6 +1342,10 @@ class HotPlotApp(frame.app):
                 self._order = 1
             elif self._order==1:
                 self._order = 4
+            elif self._order==4:
+                self._order = 5
+            elif self._order==5:
+                self._order = 6
             else:
                 self._order = 0
             self.messagebox("%s排序"%HotPlotApp.ORDER[self._order])
@@ -1369,8 +1394,9 @@ class HotPlotApp(frame.app):
                         self.retoreLayout()
                         spv._needrender = True
                         self._SO._needrender = True
-                    self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)
-            else:
+                    if spv._rx is not None:
+                        self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)
+            elif mod==4096:
                 code = self._SPV[self._current]._code
                 if code is not None:
                     spv = self._SPV[self._current]
@@ -1379,7 +1405,8 @@ class HotPlotApp(frame.app):
                     def done():
                         spv._needrender = True
                         self._SO._needrender = True
-                    self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)                
+                    if spv._rx is not None:                        
+                        self._alertmgr.openui(code,done,spv._rx+spv._rw/2,spv._ry+spv._rh/2)                
                     
             if mod&sdl2.KMOD_RCTRL and self._class!=4:#增加持有
                 code = self._SPV[self._current]._code
@@ -1514,14 +1541,8 @@ class HotPlotApp(frame.app):
         self._oneviewcode = code
         self._class = 13
         self._needUpdate = True
-    def getma5b(self,K15,D15,n=3):
-        #f返回一个plotfs2 的ma5b需要的参数，用于绘制5日均线 n = 3起点位置在3天前
-        if n==0:
-            ma5b = K15[-16*n-16*5:].sum()/80
-        else:
-            ma5b = K15[-16*n-16*5:-16*n].sum()/80
-        k15b = K15[-16*n-16*5:]
-        return (ma5b,k15b)        
+    def getma5b(self,K15,D15):
+        return (stock.ma(K15,80),D15)
     def isSelected(self,company,bolls,k):
         def onif(b,s):
             return (b and s) or not b
@@ -1544,6 +1565,12 @@ class HotPlotApp(frame.app):
         elif self._order==4: #5日线乖离率排序
             ma5 = k15[-80:].sum()/80
             order = (k[i,-1,0]-ma5)*100/ma5
+        elif self._order==5: #相对日内最低点的涨幅
+            pmin = k[i,self._todaybi:,0].min()
+            order = (k[i,-1,0]-pmin)*100/pmin
+        elif self._order==6: #相对日内最高点的涨幅
+            pmin = k[i,self._todaybi:,0].max()
+            order = (k[i,-1,0]-pmin)*100/pmin            
         else:
             order = k[i,-1,1] #日涨幅
         return order

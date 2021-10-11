@@ -782,21 +782,30 @@ class Circular:
     def __init__(self):
         pass
     def render(self,canvas,ox,oy,r):
-        """
-        ox,oy 中心点位置 r 半径
-        """
-        x,y = self._ps['pos']
-        w,h = self._ps['size']
-        canvas.beginPath() #绘制阴影背景
-        canvas.fillColor(self._parent.bgcolor())
-        canvas.rect(x,y,w,h)
-        canvas.fill()        
-        canvas.fontFace(self.font())
-        canvas.fontSize(self.fontSize())
-        canvas.fillColor(self.fontColor())
-        canvas.textAlign(vg.NVG_ALIGN_LEFT|vg.NVG_ALIGN_TOP)
-        canvas.text(x,y,self._ps['label']) 
+        pass
 
+class PopMenu:
+    """
+    弹出菜单
+    """
+class Menu:
+    """
+    绘制菜单
+    """
+    def __init__(self,frame,menu):
+        self._frame = frame
+        self._menu = menu
+        pass
+    def onMouseUp(self,action,mx,my):
+        pass
+    def onMouseDown(self,action,mx,my):
+        pass
+    def onMouseMove(self,action,mx,my):
+        pass
+    def mouseMove():
+        pass
+    def render():
+        pass
 def test(self):
     """
     打开一个界面用来报警或者编辑报警
