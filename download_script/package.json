@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "async": "^2.6.1",
+    "async": "^2.6.4",
     "big-integer": "^1.6.40",
     "crawler": "^1.2.0",
     "macd": "^1.0.2",
